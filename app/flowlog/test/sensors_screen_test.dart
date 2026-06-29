@@ -3,6 +3,7 @@ import 'package:flowlog/screens/more/sensors_screen.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
+
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -48,6 +49,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Add'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
 
       expect(find.text('Pressensor PRS'), findsOneWidget);
       expect(find.text('Disconnected'), findsOneWidget);
@@ -56,9 +59,32 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Add'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
 
       expect(find.text('Decent Scale'), findsOneWidget);
       expect(find.text('Disconnected'), findsNWidgets(2));
+    });
+
+    testWidgets('offers scan flow after add', (tester) async {
+      final hub = SensorHub();
+      addTearDown(hub.dispose);
+
+      await pumpSensorsScreen(tester, hub: hub);
+
+      await tester.tap(find.byKey(const Key('add_pressensor_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Scan for Pressensor PRS?'), findsOneWidget);
+      expect(find.byKey(const Key('scan_after_add_button')), findsOneWidget);
+
+      await tester.tap(find.text('Skip'));
+      await tester.pumpAndSettle();
+
+      expect(hub.devices.first.bleRemoteId, isNull);
+      expect(find.text('Pressensor PRS'), findsOneWidget);
     });
 
     testWidgets('uses Flowlog card styling', (tester) async {
@@ -80,6 +106,9 @@ void main() {
     });
 
     testWidgets('chip labels cover all connection states', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(480, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
       final hub = SensorHub(initialDevices: [
         PairedSensorEntry(
           id: 'a',
@@ -110,10 +139,15 @@ void main() {
 
       await pumpSensorsScreen(tester, hub: hub);
 
-      expect(find.text('Connected'), findsOneWidget);
-      expect(find.text('Disconnected'), findsOneWidget);
-      expect(find.text('Connecting'), findsOneWidget);
-      expect(find.text('Error'), findsOneWidget);
+      final chips = tester
+          .widgetList<ConnectionStateChip>(find.byType(ConnectionStateChip))
+          .map((chip) => chip.state)
+          .toList();
+
+      expect(chips, contains(ConnectionState.connected));
+      expect(chips, contains(ConnectionState.disconnected));
+      expect(chips, contains(ConnectionState.connecting));
+      expect(chips, contains(ConnectionState.error));
     });
 
     testWidgets('opens diagnostics screen from link', (tester) async {
@@ -127,3 +161,4 @@ void main() {
     });
   });
 }
+

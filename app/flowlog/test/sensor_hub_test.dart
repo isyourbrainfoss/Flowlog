@@ -1,11 +1,33 @@
+import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
-import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
+import 'package:flowlog_sensors/flowlog_sensors.dart'
+    show ConnectionState, SensorAdapter;
 import 'package:flutter_test/flutter_test.dart';
+
+class _ReadyBleBackend extends BleConnectionBackend {
+  @override
+  Future<String?> ensureReady() async => null;
+
+  @override
+  Future<List<BleDiscoveredDevice>> scan(
+    SensorKind kind, {
+    Duration timeout = const Duration(seconds: 8),
+  }) async =>
+      const [];
+
+  @override
+  Future<SensorAdapter> createAdapter({
+    required SensorKind kind,
+    required String bleRemoteId,
+  }) {
+    throw UnimplementedError();
+  }
+}
 
 void main() {
   group('SensorHub diagnostics', () {
     test('connect records reconnect log and last error', () async {
-      final hub = SensorHub();
+      final hub = SensorHub(bleBackend: _ReadyBleBackend());
       addTearDown(hub.dispose);
 
       hub.addDevice(SensorKind.pressensor);
@@ -23,7 +45,7 @@ void main() {
 
       expect(hub.reconnectLog, hasLength(2));
       expect(hub.reconnectLog.last.outcome, ReconnectOutcome.failed);
-      expect(hub.lastError, contains('BLE pairing UI is not wired yet'));
+      expect(hub.lastError, contains('Scan for this sensor first'));
       expect(hub.devices.first.state, ConnectionState.disconnected);
     });
 

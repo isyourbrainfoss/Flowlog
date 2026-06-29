@@ -1,4 +1,5 @@
 import 'package:flowlog/screens/more/diagnostics.dart';
+import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
@@ -22,8 +23,8 @@ class SensorsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Pair your Pressensor and scale here. Live BLE connection is coming '
-          'soon — use mock replay on the Live tab until then.',
+          'Pair your Pressensor and scale here. Scan after adding to capture '
+          'the BLE device id, then connect when hardware is nearby.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -41,6 +42,7 @@ class SensorsScreen extends StatelessWidget {
             _PairedDeviceCard(
               device: device,
               onConnect: () => _connect(context, hub, device.id),
+              onScan: () => _runSensorScanFlow(context, hub, device.kind),
               onRemove: () => hub.removeDevice(device.id),
             ),
             const SizedBox(height: 12),
@@ -68,12 +70,18 @@ class SensorsScreen extends StatelessWidget {
     if (!context.mounted) {
       return;
     }
+
+    final device = hub.devices.firstWhere((entry) => entry.id == deviceId);
+    final message = switch (device.state) {
+      ConnectionState.connected => 'Connected to ${device.name}.',
+      ConnectionState.connecting => 'Connecting to ${device.name}…',
+      _ => hub.lastError ??
+          'Could not connect to ${device.name}. Check Bluetooth and try again.',
+    };
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'BLE pairing UI is not wired yet. Sensor parsers are ready — '
-          'hardware connect lands in the next slice.',
-        ),
+      SnackBar(
+        content: Text(message),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -166,7 +174,166 @@ class _AddSensorButtons extends StatelessWidget {
           behavior: SnackBarBehavior.floating,
         ),
       );
+      return;
     }
+
+    if (context.mounted) {
+      await _offerScanAfterAdd(context, hub, kind);
+    }
+  }
+}
+
+Future<void> _offerScanAfterAdd(
+  BuildContext context,
+  SensorHub hub,
+  SensorKind kind,
+) async {
+  final shouldScan = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => _ScanAfterAddDialog(kind: kind),
+  );
+  if (shouldScan != true || !context.mounted) {
+    return;
+  }
+
+  await _runSensorScanFlow(context, hub, kind);
+}
+
+Future<void> _runSensorScanFlow(
+  BuildContext context,
+  SensorHub hub,
+  SensorKind kind,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text('Scanning for ${kind.defaultName}…'),
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 2),
+    ),
+  );
+
+  final result = await hub.scanAndAssign(kind);
+  if (!context.mounted) {
+    return;
+  }
+
+  switch (result.outcome) {
+    case BleScanAssignOutcome.assigned:
+      final device = result.device!;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Assigned ${device.name} (${device.remoteId}).',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    case BleScanAssignOutcome.notFound:
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No nearby sensor found. Power it on and tap Scan to try again.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    case BleScanAssignOutcome.multiple:
+      final selected = await showDialog<BleDiscoveredDevice>(
+        context: context,
+        builder: (dialogContext) =>
+            _PickScannedDeviceDialog(devices: result.devices),
+      );
+      if (selected != null) {
+        hub.assignBleRemoteId(
+          kind,
+          bleRemoteId: selected.remoteId,
+          name: selected.name,
+          rssi: selected.rssi,
+        );
+        if (context.mounted) {
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text(
+                'Assigned ${selected.name} (${selected.remoteId}).',
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    case BleScanAssignOutcome.unavailable:
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            result.message ?? 'Bluetooth is not available on this device.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+}
+
+class _ScanAfterAddDialog extends StatelessWidget {
+  const _ScanAfterAddDialog({required this.kind});
+
+  final SensorKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Scan for ${kind.defaultName}?'),
+      content: Text(
+        'Look for a nearby ${kind.defaultName} and assign its BLE device id '
+        'automatically.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Skip'),
+        ),
+        FilledButton(
+          key: const Key('scan_after_add_button'),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Scan'),
+        ),
+      ],
+    );
+  }
+}
+
+class _PickScannedDeviceDialog extends StatelessWidget {
+  const _PickScannedDeviceDialog({required this.devices});
+
+  final List<BleDiscoveredDevice> devices;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Choose sensor'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView.separated(
+          shrinkWrap: true,
+          itemCount: devices.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            final device = devices[index];
+            return ListTile(
+              title: Text(device.name),
+              subtitle: Text('${device.remoteId} · ${device.rssi} dBm'),
+              onTap: () => Navigator.pop(context, device),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+      ],
+    );
   }
 }
 
@@ -224,11 +391,13 @@ class _PairedDeviceCard extends StatelessWidget {
   const _PairedDeviceCard({
     required this.device,
     required this.onConnect,
+    required this.onScan,
     required this.onRemove,
   });
 
   final PairedSensorEntry device;
   final VoidCallback onConnect;
+  final VoidCallback onScan;
   final VoidCallback onRemove;
 
   @override
@@ -276,13 +445,28 @@ class _PairedDeviceCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Row(
+            if (device.bleRemoteId != null) ...[
+              Text(
+                'BLE id: ${device.bleRemoteId}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 FilledButton.tonal(
                   onPressed: canConnect ? onConnect : null,
                   child: const Text('Connect'),
                 ),
-                const SizedBox(width: 8),
+                OutlinedButton(
+                  key: Key('scan_${device.kind.name}_button'),
+                  onPressed: onScan,
+                  child: const Text('Scan'),
+                ),
                 TextButton(
                   onPressed: onRemove,
                   child: const Text('Remove'),

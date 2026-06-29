@@ -12,6 +12,7 @@ dependencies:
     sdk: flutter
   file_selector: ^1.0.3
   share_plus: ^11.0.0
+  flutter_blue_plus: ^2.3.9
   flowlog_core:
   flowlog_sensors:
   flowlog_charts:

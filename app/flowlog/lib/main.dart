@@ -1,3 +1,4 @@
+import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/flowlog_shell.dart';
@@ -38,7 +39,8 @@ class _FlowlogAppState extends State<FlowlogApp> {
     _themeController =
         widget.themeController ?? FlowlogThemeController();
     _ownsSensorHub = widget.sensorHub == null;
-    _sensorHub = widget.sensorHub ?? SensorHub();
+    _sensorHub = widget.sensorHub ??
+        SensorHub(bleBackend: createBleConnectionBackend());
   }
 
   @override
