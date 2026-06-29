@@ -2,7 +2,7 @@ import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/shell_breakpoints.dart';
 import 'package:flutter/material.dart';
 
-/// Adaptive app shell: collapsed rail, icon rail, or labeled sidebar by width.
+/// Adaptive app shell: bottom bar when narrow/short, labeled sidebar when wide.
 class FlowlogShell extends StatefulWidget {
   const FlowlogShell({super.key, this.initialTab = AppTab.live});
 
@@ -29,15 +29,29 @@ class _FlowlogShellState extends State<FlowlogShell> {
     setState(() => _selectedIndex = index);
   }
 
+  bool _useBottomNav(BoxConstraints constraints) {
+    return constraints.maxWidth < ShellBreakpoints.sidebar ||
+        constraints.maxHeight < ShellBreakpoints.minRailHeight;
+  }
+
   @override
   Widget build(BuildContext context) {
     final destination = appDestinations[_selectedIndex];
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final useSidebar = width >= ShellBreakpoints.sidebar;
-        final collapsedRail = width < ShellBreakpoints.collapsedRail;
+        if (_useBottomNav(constraints)) {
+          return Scaffold(
+            body: _ShellContent(
+              title: destination.label,
+              child: destination.screen,
+            ),
+            bottomNavigationBar: _FlowlogBottomBar(
+              selectedIndex: _selectedIndex,
+              onDestinationSelected: _onDestinationSelected,
+            ),
+          );
+        }
 
         return Scaffold(
           body: Row(
@@ -45,12 +59,9 @@ class _FlowlogShellState extends State<FlowlogShell> {
               NavigationRail(
                 selectedIndex: _selectedIndex,
                 onDestinationSelected: _onDestinationSelected,
-                extended: useSidebar,
-                minWidth: collapsedRail ? 56 : 72,
+                extended: true,
                 minExtendedWidth: 200,
-                labelType: useSidebar
-                    ? NavigationRailLabelType.none
-                    : NavigationRailLabelType.none,
+                labelType: NavigationRailLabelType.none,
                 destinations: [
                   for (final item in appDestinations)
                     NavigationRailDestination(
@@ -62,20 +73,61 @@ class _FlowlogShellState extends State<FlowlogShell> {
               ),
               const VerticalDivider(width: 1),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    AppBar(
-                      title: Text(destination.label),
-                    ),
-                    Expanded(child: destination.screen),
-                  ],
+                child: _ShellContent(
+                  title: destination.label,
+                  child: destination.screen,
                 ),
               ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class _ShellContent extends StatelessWidget {
+  const _ShellContent({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppBar(title: Text(title)),
+        Expanded(child: child),
+      ],
+    );
+  }
+}
+
+/// Libadwaita-style bottom bar: icons only, easy thumb reach on phone.
+class _FlowlogBottomBar extends StatelessWidget {
+  const _FlowlogBottomBar({
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return NavigationBar(
+      selectedIndex: selectedIndex,
+      onDestinationSelected: onDestinationSelected,
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+      destinations: [
+        for (final item in appDestinations)
+          NavigationDestination(
+            icon: Icon(item.icon),
+            selectedIcon: Icon(item.icon),
+            label: item.label,
+          ),
+      ],
     );
   }
 }

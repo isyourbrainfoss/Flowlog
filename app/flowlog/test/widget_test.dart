@@ -31,23 +31,7 @@ void main() {
     }
   });
 
-  testWidgets('NavigationRail is not extended below 600dp', (tester) async {
-    tester.view.physicalSize = const Size(500, 800);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    await tester.pumpWidget(
-      const MaterialApp(home: FlowlogShell()),
-    );
-    await tester.pumpAndSettle();
-
-    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.extended, isFalse);
-    expect(rail.minWidth, 72);
-  });
-
-  testWidgets('NavigationRail is extended at 600dp and above', (tester) async {
+  testWidgets('Wide layout uses extended sidebar rail', (tester) async {
     tester.view.physicalSize = const Size(800, 600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -61,10 +45,11 @@ void main() {
     final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
     expect(rail.extended, isTrue);
     expect(find.text('History'), findsWidgets);
+    expect(find.byType(NavigationBar), findsNothing);
   });
 
-  testWidgets('Collapsed rail uses narrower width below 360dp', (tester) async {
-    tester.view.physicalSize = const Size(320, 800);
+  testWidgets('Narrow width uses bottom navigation bar', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -74,9 +59,41 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final rail = tester.widget<NavigationRail>(find.byType(NavigationRail));
-    expect(rail.extended, isFalse);
-    expect(rail.minWidth, 56);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
+  });
+
+  testWidgets('Very small window does not overflow', (tester) async {
+    tester.view.physicalSize = const Size(320, 200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: FlowlogShell()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
+    expect(find.text('Live shot'), findsOneWidget);
+  });
+
+  testWidgets('Short height uses bottom bar even when wide', (tester) async {
+    tester.view.physicalSize = const Size(800, 280);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: FlowlogShell()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
   });
 
   testWidgets('Named routes resolve to placeholder screens', (tester) async {

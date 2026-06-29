@@ -20,11 +20,10 @@ Personal coffee intelligence hub for CJ2 + Pressensor + DIY ESP scale. Libadwait
 
 ## Adaptive layout
 
-| Width | Layout |
-|-------|--------|
-| &lt; 360dp | Collapsed rail + full-width content |
-| 360–599dp | Nav rail (icons) |
-| 600dp+ | Sidebar with labels |
+| Width / height | Layout |
+|----------------|--------|
+| &lt; 600dp wide **or** &lt; 320dp tall | Bottom nav bar (icons only) |
+| 600dp+ wide and tall enough | Sidebar with icon + text labels |
 | 900dp+ | Split panels + keyboard shortcuts |
 
 ## MVP path
