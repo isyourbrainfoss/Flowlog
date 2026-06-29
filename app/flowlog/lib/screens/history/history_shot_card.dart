@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flowlog/screens/history/shot_detail.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -9,9 +10,13 @@ class HistoryShotCard extends StatelessWidget {
   const HistoryShotCard({
     super.key,
     required this.shot,
+    this.onTap,
   });
 
   final Shot shot;
+
+  /// Called when the card is tapped; defaults to [openShotDetail].
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -26,11 +31,14 @@ class HistoryShotCard extends StatelessWidget {
     return Card(
       key: Key('history_shot_card_${shot.id}'),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      child: InkWell(
+        onTap: onTap ?? () => openShotDetail(context, shot),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             Text(
               _formatStartedAt(shot.startedAt),
               style: theme.textTheme.titleSmall,
@@ -66,7 +74,8 @@ class HistoryShotCard extends StatelessWidget {
                 ),
               ],
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

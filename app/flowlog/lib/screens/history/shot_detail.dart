@@ -1,0 +1,234 @@
+import 'package:flowlog/screens/live/metadata_sheet.dart';
+import 'package:flowlog_charts/flowlog_charts.dart';
+import 'package:flowlog_core/flowlog_core.dart';
+import 'package:flutter/material.dart';
+
+/// Read-only detail view for a saved shot: full chart and metadata.
+class ShotDetailScreen extends StatelessWidget {
+  const ShotDetailScreen({
+    super.key,
+    required this.shot,
+  });
+
+  final Shot shot;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final metadata = ShotMetadata.fromShot(shot);
+
+    return Scaffold(
+      key: Key('shot_detail_${shot.id}'),
+      appBar: AppBar(
+        title: Text(_formatStartedAt(shot.startedAt)),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DualCurveChart(
+              samples: shot.samples,
+              maxDurationMs: _chartDurationMs(shot),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Metadata',
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            _MetadataGrid(metadata: metadata),
+            if (metadata.notes != null && metadata.notes!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text('Notes', style: theme.textTheme.titleSmall),
+              const SizedBox(height: 4),
+              Text(metadata.notes!),
+            ],
+            if (metadata.flavourTags.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text('Flavour tags', style: theme.textTheme.titleSmall),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final tag in metadata.flavourTags)
+                    Chip(
+                      label: Text(tag),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static int? _chartDurationMs(Shot shot) {
+    if (shot.endedAt != null) {
+      return shot.endedAt!.difference(shot.startedAt).inMilliseconds;
+    }
+    if (shot.samples.isEmpty) {
+      return null;
+    }
+    return shot.samples.last.elapsedMs;
+  }
+
+  static String _formatStartedAt(DateTime startedAt) {
+    final local = startedAt.toLocal();
+    final year = local.year;
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$year-$month-$day $hour:$minute';
+  }
+}
+
+/// Pushes [ShotDetailScreen] for [shot].
+void openShotDetail(BuildContext context, Shot shot) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (context) => ShotDetailScreen(shot: shot),
+    ),
+  );
+}
+
+class _MetadataGrid extends StatelessWidget {
+  const _MetadataGrid({required this.metadata});
+
+  final ShotMetadata metadata;
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        );
+    final valueStyle = Theme.of(context).textTheme.bodyLarge?.copyWith(
+          fontFeatures: const [FontFeature.tabularFigures()],
+        );
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _MetadataField(
+                label: 'Dose',
+                value: _formatGrams(metadata.doseG),
+                labelStyle: labelStyle,
+                valueStyle: valueStyle,
+              ),
+            ),
+            Expanded(
+              child: _MetadataField(
+                label: 'Yield',
+                value: _formatGrams(metadata.yieldG),
+                labelStyle: labelStyle,
+                valueStyle: valueStyle,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _MetadataField(
+                label: 'Grind',
+                value: _formatNumber(metadata.grindSetting),
+                labelStyle: labelStyle,
+                valueStyle: valueStyle,
+              ),
+            ),
+            Expanded(
+              child: _MetadataField(
+                label: 'Water temp',
+                value: _formatTemp(metadata.waterTempC),
+                labelStyle: labelStyle,
+                valueStyle: valueStyle,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _MetadataField(
+          label: 'Bean',
+          value: metadata.beanId ?? '—',
+          labelStyle: labelStyle,
+          valueStyle: valueStyle,
+        ),
+        const SizedBox(height: 12),
+        _MetadataField(
+          label: 'Taste',
+          value: _formatTasteScore(metadata.tasteScore),
+          labelStyle: labelStyle,
+          valueStyle: valueStyle,
+        ),
+      ],
+    );
+  }
+
+  static String _formatGrams(double? value) {
+    if (value == null) {
+      return '—';
+    }
+    return '${value.toStringAsFixed(1)} g';
+  }
+
+  static String _formatNumber(double? value) {
+    if (value == null) {
+      return '—';
+    }
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+    return value.toString();
+  }
+
+  static String _formatTemp(double? value) {
+    if (value == null) {
+      return '—';
+    }
+    return '${value.toStringAsFixed(1)} °C';
+  }
+
+  static String _formatTasteScore(int? tasteScore) {
+    if (tasteScore == null) {
+      return '—';
+    }
+    return '$tasteScore/10';
+  }
+}
+
+class _MetadataField extends StatelessWidget {
+  const _MetadataField({
+    required this.label,
+    required this.value,
+    required this.labelStyle,
+    required this.valueStyle,
+  });
+
+  final String label;
+  final String value;
+  final TextStyle? labelStyle;
+  final TextStyle? valueStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '$label $value',
+      readOnly: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: labelStyle),
+          const SizedBox(height: 2),
+          Text(value, style: valueStyle),
+        ],
+      ),
+    );
+  }
+}

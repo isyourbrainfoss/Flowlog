@@ -1,4 +1,5 @@
 import 'package:flowlog/main.dart';
+import 'package:flowlog/screens/more/export.dart';
 import 'package:flowlog/screens/more/sensors_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +14,20 @@ void main() {
 
     expect(find.text('Sensors'), findsOneWidget);
     expect(find.text('Paired pressure & scale devices'), findsOneWidget);
+  });
+
+  testWidgets('Export section navigates to export screen', (tester) async {
+    await tester.pumpWidget(const FlowlogApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.tune));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Export shots'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(AppBar, 'Export shots'), findsOneWidget);
+    expect(find.byType(ExportScreen), findsOneWidget);
   });
 
   testWidgets('Sensors section navigates to sensors screen', (tester) async {

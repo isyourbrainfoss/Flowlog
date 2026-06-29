@@ -128,7 +128,7 @@ SLICES = [
      ["Export matches golden CSV byte-for-byte", "Unit test"],
      "cd packages/flowlog_core && dart test test/csv_export_test.dart",
      "fixtures/shots/minimal_shot.csv"),
-    ("D4", "CSV batch export + share", "pending", ["D3"], ["D5"],
+    ("D4", "CSV batch export + share", "done", ["D3"], ["D5"],
      ["app/flowlog/lib/screens/more/export.dart"],
      ["Export multiple shots", "Linux save dialog", "Android share stub or platform channel"],
      "cd app/flowlog && flutter test",

@@ -1,6 +1,6 @@
 # SLICE-D5: CSV import
 
-status: pending
+status: done
 parallel_with: F1
 
 ## Prerequisites
@@ -13,8 +13,8 @@ D3
 
 ## Done when
 
-- [ ] Import exported CSV
-- [ ] Round-trip identical shot in DB
+- [x] Import exported CSV
+- [x] Round-trip identical shot in DB
 
 ## Verify
 

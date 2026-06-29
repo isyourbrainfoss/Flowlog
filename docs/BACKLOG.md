@@ -28,10 +28,10 @@ Parallel waves: [`docs/PARALLEL.md`](PARALLEL.md).
 | C7 | Auto shot detect | done | C8 |
 | C8 | Top bar sensor status | done | C7, D1 |
 | D1 | History card list | done | D3, F4 |
-| D2 | Shot detail view | pending | D4 |
+| D2 | Shot detail view | done | D4 |
 | D3 | CSV export single shot | done | D1, D4 |
-| D4 | CSV batch export + share | pending | D5 |
-| D5 | CSV import | pending | F1 |
+| D4 | CSV batch export + share | done | D5 |
+| D5 | CSV import | done | F1 |
 | E1 | Chart zoom/pan + view modes | pending | E2, E6 |
 | E2 | Annotations + channel mark | pending | E1, E3 |
 | E3 | Haptics + shot-end pulse | pending | E4, E2 |

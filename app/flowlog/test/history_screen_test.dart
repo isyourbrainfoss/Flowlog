@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flowlog/screens/history/history_shot_card.dart';
+import 'package:flowlog/screens/history/shot_detail.dart';
 import 'package:flowlog/screens/history_screen.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -44,6 +45,21 @@ void main() {
       expect(find.text('9.0 bar'), findsOneWidget);
       expect(find.text('36.0 g'), findsOneWidget);
       expect(find.text('7/10'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('navigates to shot detail when card is tapped', (tester) async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      await repository.insertShot(shot);
+
+      await _pumpHistoryScreen(tester, repository: repository);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(Key('history_shot_card_${shot.id}')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ShotDetailScreen), findsOneWidget);
+      expect(find.byKey(Key('shot_detail_${shot.id}')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

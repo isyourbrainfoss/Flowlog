@@ -6,15 +6,18 @@ Check status: `grep -l '^status: done' docs/slices/*.md | wc -l`
 
 ## Current state
 
-**Done:** A1
+**Done:** A1–A6, B1–B7, C1–C8, D1–D5 (MVP core complete)
 
-**Spawn now (Wave 1 — up to 3 agents):**
+**Spawn now (polish + library — parallel):**
 
-| Agent | Slice | Touches | Won't conflict with |
-|-------|-------|---------|---------------------|
-| 1 | **A2** | `docs/protocols/` only | A3, A5 |
-| 2 | **A3** | `packages/flowlog_core/lib/src/models/` | A2, A5 |
-| 3 | **A5** | `app/flowlog/lib/shell/`, `screens/` | A2, A3 |
+| Agent | Slice | Notes |
+|-------|-------|-------|
+| 1 | **E1** | Chart zoom/pan |
+| 2 | **E3** | Haptics + pulse |
+| 3 | **F1** | Search/filter history |
+| 4 | **F4** | Bean database |
+
+Or spawn **F2** + **F4** + **E5** together after F1/F4 land.
 
 ## Wave reference
 
