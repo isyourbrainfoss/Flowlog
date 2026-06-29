@@ -9,7 +9,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Live'), findsWidgets);
-    expect(find.text('Live shot'), findsOneWidget);
+    expect(find.text('Session: idle'), findsOneWidget);
+    expect(find.byKey(const Key('live_start')), findsOneWidget);
     expect(find.byType(NavigationRail), findsOneWidget);
   });
 
@@ -21,7 +22,7 @@ void main() {
       (Icons.history, 'Shot history'),
       (Icons.local_cafe_outlined, 'Beans & profiles'),
       (Icons.tune, 'Sensors'),
-      (Icons.play_circle_outline, 'Live shot'),
+      (Icons.play_circle_outline, 'Session: idle'),
     ];
 
     for (final (icon, body) in destinations) {
@@ -77,7 +78,8 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
-    expect(find.text('Live shot'), findsOneWidget);
+    expect(find.text('Session: idle'), findsOneWidget);
+    expect(find.byKey(const Key('live_start')), findsOneWidget);
   });
 
   testWidgets('Ultra-short window hides app bar and does not overflow', (
@@ -97,7 +99,8 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(AppBar), findsNothing);
     expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.text('Live shot'), findsOneWidget);
+    expect(find.text('Session: idle'), findsOneWidget);
+    expect(find.byKey(const Key('live_start')), findsOneWidget);
   });
 
   testWidgets('Short height uses bottom bar even when wide', (tester) async {
@@ -118,7 +121,7 @@ void main() {
 
   testWidgets('Named routes resolve to placeholder screens', (tester) async {
     const routeBodies = {
-      '/live': 'Live shot',
+      '/live': 'Live',
       '/history': 'Shot history',
       '/library': 'Beans & profiles',
       '/more': 'Sensors',

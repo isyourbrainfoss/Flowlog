@@ -1,6 +1,6 @@
 # SLICE-C4: Floating metrics row
 
-status: pending
+status: done
 parallel_with: C5, C2
 
 ## Prerequisites
@@ -13,8 +13,8 @@ C3
 
 ## Done when
 
-- [ ] Shows pressure, flow, elapsed, projected yield
-- [ ] Trend arrows on change
+- [x] Shows pressure, flow, elapsed, projected yield
+- [x] Trend arrows on change
 
 ## Verify
 
