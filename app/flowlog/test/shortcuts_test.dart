@@ -5,6 +5,21 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  Future<void> selectHistoryTab(WidgetTester tester) async {
+    final historyTooltip = find.byTooltip('Shot history');
+    if (historyTooltip.evaluate().isNotEmpty) {
+      await tester.tap(historyTooltip);
+    } else {
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationRail),
+          matching: find.byIcon(Icons.history),
+        ),
+      );
+    }
+    await tester.pumpAndSettle();
+  }
+
   Future<void> sendShortcut(
     WidgetTester tester, {
     required LogicalKeyboardKey key,
@@ -45,8 +60,7 @@ void main() {
     await tester.pumpWidget(const FlowlogApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.history));
-    await tester.pumpAndSettle();
+    await selectHistoryTab(tester);
 
     await tester.runAsync(() async {
       await sendShortcut(tester, key: LogicalKeyboardKey.space);
@@ -54,7 +68,7 @@ void main() {
     });
 
     expect(find.text('Session: idle'), findsNothing);
-    expect(find.text('No saved shots yet'), findsOneWidget);
+    expect(find.byKey(const Key('history_filter_bean')), findsOneWidget);
   });
 
   testWidgets('Ctrl+E opens export screen from Live tab', (tester) async {
@@ -76,8 +90,7 @@ void main() {
     await tester.pumpWidget(const FlowlogApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.history));
-    await tester.pumpAndSettle();
+    await selectHistoryTab(tester);
 
     await sendShortcut(
       tester,
