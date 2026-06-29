@@ -1,6 +1,6 @@
 # SLICE-D3: CSV export single shot
 
-status: pending
+status: done
 parallel_with: D1, D4
 
 ## Prerequisites
@@ -13,8 +13,8 @@ C6
 
 ## Done when
 
-- [ ] Export matches golden CSV byte-for-byte
-- [ ] Unit test
+- [x] Export matches golden CSV byte-for-byte
+- [x] Unit test
 
 ## Verify
 

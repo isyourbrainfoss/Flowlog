@@ -1,6 +1,6 @@
 # SLICE-D1: History card list
 
-status: pending
+status: done
 parallel_with: D3, F4
 
 ## Prerequisites
@@ -14,8 +14,8 @@ C6
 
 ## Done when
 
-- [ ] Cards with sparkline, peak P, yield, taste
-- [ ] Sorted by date desc
+- [x] Cards with sparkline, peak P, yield, taste
+- [x] Sorted by date desc
 
 ## Verify
 

@@ -19,7 +19,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final destinations = [
-      (Icons.history, 'Shot history'),
+      (Icons.history, 'No saved shots yet'),
       (Icons.local_cafe_outlined, 'Beans & profiles'),
       (Icons.tune, 'Sensors'),
       (Icons.play_circle_outline, 'Session: idle'),
@@ -122,7 +122,7 @@ void main() {
   testWidgets('Named routes resolve to placeholder screens', (tester) async {
     const routeBodies = {
       '/live': 'Live',
-      '/history': 'Shot history',
+      '/history': 'History',
       '/library': 'Beans & profiles',
       '/more': 'Sensors',
     };

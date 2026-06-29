@@ -27,9 +27,9 @@ Parallel waves: [`docs/PARALLEL.md`](PARALLEL.md).
 | C6 | Save shot + God Shot FAB | done | C8, D1 |
 | C7 | Auto shot detect | done | C8 |
 | C8 | Top bar sensor status | done | C7, D1 |
-| D1 | History card list | pending | D3, F4 |
+| D1 | History card list | done | D3, F4 |
 | D2 | Shot detail view | pending | D4 |
-| D3 | CSV export single shot | pending | D1, D4 |
+| D3 | CSV export single shot | done | D1, D4 |
 | D4 | CSV batch export + share | pending | D5 |
 | D5 | CSV import | pending | F1 |
 | E1 | Chart zoom/pan + view modes | pending | E2, E6 |
