@@ -1,6 +1,6 @@
 # SLICE-A2: Vendored protocol docs
 
-status: pending
+status: done
 parallel_with: A3, A5
 
 ## Prerequisites
@@ -14,9 +14,9 @@ A1
 
 ## Done when
 
-- [ ] Pressensor PRS BLE UUIDs and notify format documented
-- [ ] Decent Scale BLE commands and FFF4 parse format documented
-- [ ] Links to official sources in doc headers
+- [x] Pressensor PRS BLE UUIDs and notify format documented
+- [x] Decent Scale BLE commands and FFF4 parse format documented
+- [x] Links to official sources in doc headers
 
 ## Verify
 

@@ -1,6 +1,6 @@
 # SLICE-A3: flowlog_core models
 
-status: pending
+status: done
 parallel_with: A2, A5
 
 ## Prerequisites
@@ -14,9 +14,9 @@ A1
 
 ## Done when
 
-- [ ] Shot, ShotSample, Bean, Device types defined
-- [ ] toJson/fromJson round-trip tests pass
-- [ ] Exported from flowlog_core.dart
+- [x] Shot, ShotSample, Bean, Device types defined
+- [x] toJson/fromJson round-trip tests pass
+- [x] Exported from flowlog_core.dart
 
 ## Verify
 
