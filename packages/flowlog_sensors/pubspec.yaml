@@ -1,0 +1,16 @@
+name: flowlog_sensors
+description: Flowlog sensor adapters (BLE, mock replay).
+version: 0.0.1
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flowlog_core:
+  meta: ^1.16.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6

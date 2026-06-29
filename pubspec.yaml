@@ -1,0 +1,52 @@
+name: flowlog_workspace
+publish_to: none
+description: Flowlog monorepo workspace root.
+
+environment:
+  sdk: ^3.12.2
+
+workspace:
+  - app/flowlog
+  - packages/flowlog_core
+  - packages/flowlog_sensors
+  - packages/flowlog_charts
+
+dev_dependencies:
+  melos: ^8.0.0
+
+melos:
+  scripts:
+    analyze:
+      run: melos exec -- flutter analyze --no-pub
+      description: Run static analysis in all Flutter packages.
+      packageFilters:
+        flutter: true
+
+    test:flutter:
+      run: melos exec -c 1 --fail-fast -- flutter test --no-pub
+      description: Run Flutter tests.
+      packageFilters:
+        flutter: true
+        dirExists: test
+
+    test:dart:
+      run: melos exec --fail-fast -- dart test
+      description: Run Dart tests in pure-Dart packages.
+      packageFilters:
+        scope:
+          - flowlog_core
+          - flowlog_sensors
+
+    test:
+      run: |
+        melos run test:dart --no-select
+        melos run test:flutter --no-select
+      description: Run all package tests.
+
+    run:linux:
+      run: melos exec --scope=flowlog -- flutter run -d linux
+      description: Run the Flowlog app on Linux desktop.
+
+  command:
+    bootstrap:
+      usePubspecOverrides: true
