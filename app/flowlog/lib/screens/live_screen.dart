@@ -8,12 +8,13 @@ import 'package:flowlog/screens/live/feedback.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
+import 'package:flowlog/sensors/live_sensor_source.dart';
+import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/shell_breakpoints.dart';
 import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
-import 'package:flowlog_sensors/src/decent_scale/decent_scale.dart';
 import 'package:flutter/material.dart';
 
 /// Live shot tab: recording controls, live chart, metrics, and god-shot save.
@@ -27,10 +28,22 @@ class LiveScreen extends StatefulWidget {
     this.onShotSaved,
     this.shotEndFeedback = const ShotEndFeedback(),
     this.shotIdGenerator = generateShotId,
+    this.sensorSource,
+    this.pressureAdapterFactory,
+    this.weightAdapterFactory,
   });
 
   /// Optional override for tests or dependency injection.
   final LiveShotController? controller;
+
+  /// Optional live sensor source override for tests.
+  final LiveSensorSource? sensorSource;
+
+  /// Builds pressensor adapters when sensors are connected (tests inject mocks).
+  final PressureAdapterFactory? pressureAdapterFactory;
+
+  /// Builds scale adapters when sensors are connected (tests inject mocks).
+  final WeightAdapterFactory? weightAdapterFactory;
 
   /// Optional repository override; defaults to a temp-file database.
   final ShotRepository? shotRepository;
@@ -55,13 +68,13 @@ class LiveScreen extends StatefulWidget {
 }
 
 class _LiveScreenState extends State<LiveScreen> {
-  late final LiveShotController _controller;
+  LiveShotController? _controller;
   late final bool _ownsController;
+  bool _controllerReady = false;
+  LiveSensorSource? _sensorSource;
   late final ValueNotifier<List<ShotSample>> _samplesNotifier;
   late final ShotAnnotationController _annotationController;
   late final ValueNotifier<List<ShotAnnotation>> _annotationsNotifier;
-  MockReplayAdapter? _replayAdapter;
-  DecentScaleBleAdapter? _scaleAdapter;
   ShotRepository? _shotRepository;
   ProfileRepository? _profileRepository;
   FlowlogDatabase? _database;
@@ -75,37 +88,56 @@ class _LiveScreenState extends State<LiveScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.controller != null) {
-      _controller = widget.controller!;
-      _ownsController = false;
-    } else {
-      final scaleTransport = MockDecentScaleTransport();
-      _scaleAdapter = DecentScaleBleAdapter(transport: scaleTransport);
-      _replayAdapter = MockReplayAdapter(
-        fixturePath: _defaultFixturePath(),
-        speed: 0,
-      );
-      _controller = LiveShotController(
-        sampleAdapter: _replayAdapter!,
-        onTare: () => _scaleAdapter!.tare(),
-      );
-      _ownsController = true;
-    }
+    _ownsController = widget.controller == null;
 
-    _samplesNotifier = ValueNotifier<List<ShotSample>>(
-      List<ShotSample>.from(_controller.samples),
-    );
+    _samplesNotifier = ValueNotifier<List<ShotSample>>(const []);
     _annotationController = ShotAnnotationController();
     _annotationsNotifier = ValueNotifier<List<ShotAnnotation>>(
       List<ShotAnnotation>.from(_annotationController.annotations),
     );
-    _controller.addListener(_syncSamples);
     _annotationController.addListener(_syncAnnotations);
+
+    if (widget.controller != null) {
+      _bindController(widget.controller!);
+      _controllerReady = true;
+    }
+  }
+
+  void _bindController(LiveShotController controller) {
+    _controller?.removeListener(_syncSamples);
+    _controller = controller;
+    _controller!.addListener(_syncSamples);
+    _syncSamples();
+  }
+
+  void _ensureProductionController() {
+    final hub = SensorHubScope.of(context);
+    _sensorSource = widget.sensorSource ??
+        LiveSensorSource(
+          hub: hub,
+          demoFixturePath: _defaultFixturePath(),
+          pressureAdapterFactory: widget.pressureAdapterFactory,
+          weightAdapterFactory: widget.weightAdapterFactory,
+        );
+
+    _bindController(
+      LiveShotController(
+        sampleAdapter: SessionSensorAdapter(
+          resolve: _sensorSource!.resolveSampleAdapter,
+        ),
+        onTare: _sensorSource!.onTare,
+      ),
+    );
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!_controllerReady && widget.controller == null) {
+      _ensureProductionController();
+      _controllerReady = true;
+    }
+
     final scope = FlowlogShortcutsScope.maybeOf(context);
     if (scope != null) {
       _shortcutRegistry = scope.registry;
@@ -119,13 +151,13 @@ class _LiveScreenState extends State<LiveScreen> {
   void dispose() {
     _shortcutRegistry?.setToggleLiveShot(null);
     _confettiController.dispose();
-    _controller.removeListener(_syncSamples);
+    _controller?.removeListener(_syncSamples);
     _annotationController.removeListener(_syncAnnotations);
     _annotationController.dispose();
     _annotationsNotifier.dispose();
     _samplesNotifier.dispose();
     if (_ownsController) {
-      _controller.dispose();
+      _controller?.dispose();
     }
     if (_ownsRepository) {
       unawaited(_database?.close());
@@ -134,13 +166,18 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   void _syncSamples() {
-    final state = _controller.sessionState;
+    final controller = _controller;
+    if (controller == null) {
+      return;
+    }
+
+    final state = controller.sessionState;
     if (state == ShotSessionState.recording &&
         _lastSessionState != ShotSessionState.recording) {
       _annotationController.clear();
     }
     _lastSessionState = state;
-    _samplesNotifier.value = List<ShotSample>.from(_controller.samples);
+    _samplesNotifier.value = List<ShotSample>.from(controller.samples);
   }
 
   void _syncAnnotations() {
@@ -149,7 +186,7 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   int? _currentElapsedMs() {
-    final samples = _controller.samples;
+    final samples = _controller?.samples ?? const [];
     if (samples.isEmpty) {
       return null;
     }
@@ -165,7 +202,7 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Future<void> _onAnnotateAtElapsedMs(int elapsedMs) async {
-    if (_controller.sessionState == ShotSessionState.idle) {
+    if (_controller?.sessionState == ShotSessionState.idle) {
       return;
     }
 
@@ -177,11 +214,37 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Future<void> _onToggleShotShortcut() async {
-    if (_controller.canStart) {
-      await _controller.start();
-    } else if (_controller.canStop) {
-      await _controller.stop();
+    final controller = _controller;
+    if (controller == null) {
+      return;
     }
+
+    if (controller.canStart) {
+      await controller.start();
+    } else if (controller.canStop) {
+      await controller.stop();
+    }
+  }
+
+  Future<void> _onTryDemoShot() async {
+    final controller = _controller;
+    final source = _sensorSource;
+    if (controller == null ||
+        source == null ||
+        controller.sessionState == ShotSessionState.recording ||
+        controller.sessionState == ShotSessionState.paused ||
+        source.isDemoMode) {
+      return;
+    }
+
+    source.enterDemoMode();
+    setState(() {});
+    await controller.start();
+  }
+
+  void _onDismissDemoMode() {
+    _sensorSource?.exitDemoMode();
+    setState(() {});
   }
 
   Future<FlowlogDatabase> _ensureDatabase() async {
@@ -222,11 +285,12 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Future<void> _onStarShotPressed() async {
-    if (!_controller.canSaveShot || _savingShot) {
+    final controller = _controller;
+    if (controller == null || !controller.canSaveShot || _savingShot) {
       return;
     }
 
-    final startedAt = _controller.sessionStartedAt;
+    final startedAt = controller.sessionStartedAt;
     if (startedAt == null) {
       return;
     }
@@ -241,9 +305,9 @@ class _LiveScreenState extends State<LiveScreen> {
       final shot = await runStarShotSaveFlow(
         context: context,
         repository: repository,
-        samples: _controller.samples,
+        samples: controller.samples,
         startedAt: startedAt,
-        endedAt: _controller.sessionEndedAt,
+        endedAt: controller.sessionEndedAt,
         initialMetadata: _repeatShotController?.prefill?.metadata,
         annotations: _annotationController.annotations,
         idGenerator: widget.shotIdGenerator,
@@ -263,19 +327,20 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Future<void> _onRepeatShotPressed() async {
-    if (!_controller.canSaveShot) {
+    final controller = _controller;
+    if (controller == null || !controller.canSaveShot) {
       return;
     }
 
-    final startedAt = _controller.sessionStartedAt;
+    final startedAt = controller.sessionStartedAt;
     if (startedAt == null) {
       return;
     }
 
     final shot = buildShotFromSession(
-      samples: _controller.samples,
+      samples: controller.samples,
       startedAt: startedAt,
-      endedAt: _controller.sessionEndedAt,
+      endedAt: controller.sessionEndedAt,
     );
 
     await startRepeatShotFromShot(
@@ -288,7 +353,15 @@ class _LiveScreenState extends State<LiveScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final listenables = <Listenable>[_controller];
+    final controller = _controller;
+    if (controller == null) {
+      return const Scaffold(
+        primary: false,
+        body: SizedBox.shrink(),
+      );
+    }
+
+    final listenables = <Listenable>[controller];
     if (_repeatShotController != null) {
       listenables.add(_repeatShotController!);
     }
@@ -296,8 +369,12 @@ class _LiveScreenState extends State<LiveScreen> {
     return ListenableBuilder(
       listenable: Listenable.merge(listenables),
       builder: (context, _) {
-        final state = _controller.sessionState;
-        final samples = _controller.samples;
+        final state = controller.sessionState;
+        final samples = controller.samples;
+        final demoModeActive = _sensorSource?.isDemoMode ?? false;
+        final showTryDemoButton = !demoModeActive &&
+            state != ShotSessionState.recording &&
+            state != ShotSessionState.paused;
         final latestSample = samples.isEmpty ? null : samples.last;
         final previousSample =
             samples.length < 2 ? null : samples[samples.length - 2];
@@ -308,7 +385,7 @@ class _LiveScreenState extends State<LiveScreen> {
         return ConfettiOverlay(
           controller: _confettiController,
           child: LiveShotEndListener(
-            controller: _controller,
+            controller: controller,
             shotEndFeedback: widget.shotEndFeedback,
             child: Scaffold(
               primary: false,
@@ -325,7 +402,10 @@ class _LiveScreenState extends State<LiveScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        RecordingBeanFillIndicator(controller: _controller),
+                        RecordingBeanFillIndicator(controller: controller),
+                        if (demoModeActive)
+                          DemoModeBanner(onDismiss: _onDismissDemoMode),
+                        if (demoModeActive) const SizedBox(height: 8),
                         if (repeatPrefill != null)
                           RepeatShotBanner(
                             profileName: repeatPrefill.profile.name,
@@ -378,20 +458,31 @@ class _LiveScreenState extends State<LiveScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '${_controller.sampleCount} samples',
+                          '${controller.sampleCount} samples',
                           style: Theme.of(context).textTheme.bodyMedium,
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
-                        if (_controller.canSaveShot)
+                        if (showTryDemoButton)
+                          Align(
+                            alignment: Alignment.center,
+                            child: OutlinedButton.icon(
+                              key: const Key('live_try_demo'),
+                              onPressed: _onTryDemoShot,
+                              icon: const Icon(Icons.science_outlined),
+                              label: const Text('Try demo shot'),
+                            ),
+                          ),
+                        if (showTryDemoButton) const SizedBox(height: 16),
+                        if (controller.canSaveShot)
                           Align(
                             alignment: Alignment.center,
                             child: RepeatShotButton(
                               onPressed: _onRepeatShotPressed,
                             ),
                           ),
-                        if (_controller.canSaveShot) const SizedBox(height: 16),
-                        LiveControls(controller: _controller),
+                        if (controller.canSaveShot) const SizedBox(height: 16),
+                        LiveControls(controller: controller),
                       ],
                     ),
                   );
@@ -425,7 +516,7 @@ class _LiveScreenState extends State<LiveScreen> {
                 },
               ),
               floatingActionButton: StarShotFab(
-                enabled: _controller.canSaveShot && !_savingShot,
+                enabled: controller.canSaveShot && !_savingShot,
                 onPressed: _onStarShotPressed,
               ),
             ),

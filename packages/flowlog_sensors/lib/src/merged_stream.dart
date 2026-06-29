@@ -21,6 +21,7 @@ class MergedSampleStream {
     SensorAdapter? pressureAdapter,
     SensorAdapter? weightAdapter,
     MergeMonotonicClock? monotonicClock,
+    this.manageAdapterLifecycle = true,
   })  : _pressure = pressureAdapter,
         _weight = weightAdapter,
         _monotonicClock = monotonicClock;
@@ -28,6 +29,10 @@ class MergedSampleStream {
   final SensorAdapter? _pressure;
   final SensorAdapter? _weight;
   final MergeMonotonicClock? _monotonicClock;
+
+  /// When false, [start] only subscribes to existing adapter streams and [stop]
+  /// does not disconnect them (for hub-managed BLE links).
+  final bool manageAdapterLifecycle;
 
   final _samplesController = StreamController<SensorSample>.broadcast();
   final _stopwatch = Stopwatch();
@@ -62,14 +67,16 @@ class MergedSampleStream {
     _resetCarryForward();
     _startClock();
 
-    final connects = <Future<void>>[];
-    if (_pressure != null) {
-      connects.add(_pressure!.connect());
+    if (manageAdapterLifecycle) {
+      final connects = <Future<void>>[];
+      if (_pressure != null) {
+        connects.add(_pressure!.connect());
+      }
+      if (_weight != null) {
+        connects.add(_weight!.connect());
+      }
+      await Future.wait(connects);
     }
-    if (_weight != null) {
-      connects.add(_weight!.connect());
-    }
-    await Future.wait(connects);
 
     _running = true;
 
@@ -94,14 +101,16 @@ class MergedSampleStream {
     _pressureSub = null;
     _weightSub = null;
 
-    final disconnects = <Future<void>>[];
-    if (_pressure != null) {
-      disconnects.add(_pressure!.disconnect());
+    if (manageAdapterLifecycle) {
+      final disconnects = <Future<void>>[];
+      if (_pressure != null) {
+        disconnects.add(_pressure!.disconnect());
+      }
+      if (_weight != null) {
+        disconnects.add(_weight!.disconnect());
+      }
+      await Future.wait(disconnects);
     }
-    if (_weight != null) {
-      disconnects.add(_weight!.disconnect());
-    }
-    await Future.wait(disconnects);
 
     _stopClock();
   }
