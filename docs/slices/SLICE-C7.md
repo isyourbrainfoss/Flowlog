@@ -1,6 +1,6 @@
 # SLICE-C7: Auto shot detect
 
-status: pending
+status: done
 parallel_with: C8
 
 ## Prerequisites
@@ -13,9 +13,9 @@ C1, B3
 
 ## Done when
 
-- [ ] First flow > threshold sets t=0
-- [ ] Configurable threshold in settings stub
-- [ ] Unit tested
+- [x] First flow > threshold sets t=0
+- [x] Configurable threshold in settings stub
+- [x] Unit tested
 
 ## Verify
 

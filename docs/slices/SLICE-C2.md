@@ -1,6 +1,6 @@
 # SLICE-C2: Start/Stop + auto-tare
 
-status: pending
+status: done
 parallel_with: C4, C5
 
 ## Prerequisites
@@ -13,9 +13,9 @@ C1
 
 ## Done when
 
-- [ ] Start begins recording via ShotSession
-- [ ] Stop finalizes session
-- [ ] Start sends tare to mock/scale adapter
+- [x] Start begins recording via ShotSession
+- [x] Stop finalizes session
+- [x] Start sends tare to mock/scale adapter
 
 ## Verify
 

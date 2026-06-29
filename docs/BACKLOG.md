@@ -20,12 +20,12 @@ Parallel waves: [`docs/PARALLEL.md`](PARALLEL.md).
 | B6 | MergedSampleStream | done | C1 |
 | B7 | Device manager UI stub | done | C3 |
 | C1 | ShotSession state machine | done | C3, B6, B7 |
-| C2 | Start/Stop + auto-tare | pending | C4, C5 |
+| C2 | Start/Stop + auto-tare | done | C4, C5 |
 | C3 | DualCurveChart live | done | C1, C4, B7 |
-| C4 | Floating metrics row | pending | C5, C2 |
-| C5 | Shot metadata sheet | pending | C4, C6, C2 |
+| C4 | Floating metrics row | done | C5, C2 |
+| C5 | Shot metadata sheet | done | C4, C6, C2 |
 | C6 | Save shot + God Shot FAB | pending | C8, D1 |
-| C7 | Auto shot detect | pending | C8 |
+| C7 | Auto shot detect | done | C8 |
 | C8 | Top bar sensor status | pending | C7, D1 |
 | D1 | History card list | pending | D3, F4 |
 | D2 | Shot detail view | pending | D4 |
