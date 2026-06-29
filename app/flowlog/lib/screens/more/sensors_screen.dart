@@ -1,66 +1,79 @@
+import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
 import 'package:flutter/material.dart' hide ConnectionState;
 
-/// Placeholder paired device entry for the device manager stub.
-class PairedSensorDevice {
-  const PairedSensorDevice({
-    required this.name,
-    required this.kind,
-    required this.connectionState,
-  });
-
-  final String name;
-  final String kind;
-  final ConnectionState connectionState;
-}
-
-/// Mock paired sensors until real BLE pairing is wired up.
-const List<PairedSensorDevice> kMockPairedDevices = [
-  PairedSensorDevice(
-    name: 'Pressensor PRS',
-    kind: 'Pressure sensor',
-    connectionState: ConnectionState.connected,
-  ),
-  PairedSensorDevice(
-    name: 'Decent Scale',
-    kind: 'BLE scale',
-    connectionState: ConnectionState.disconnected,
-  ),
-];
-
-/// Device manager stub: placeholder list of paired sensors with mock states.
+/// Sensors pairing and connection management.
 class SensorsScreen extends StatelessWidget {
-  const SensorsScreen({
-    super.key,
-    this.devices = kMockPairedDevices,
-  });
-
-  final List<PairedSensorDevice> devices;
+  const SensorsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final hub = SensorHubScope.of(context);
+    final devices = hub.devices;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         Text(
-          'Paired devices',
+          'Sensors',
           style: Theme.of(context).textTheme.titleMedium,
         ),
-        const SizedBox(height: 12),
-        for (final device in devices) ...[
-          _PairedDeviceCard(device: device),
+        const SizedBox(height: 8),
+        Text(
+          'Pair your Pressensor and scale here. Live BLE connection is coming '
+          'soon — use mock replay on the Live tab until then.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 16),
+        if (devices.isEmpty)
+          const _EmptySensorsState()
+        else ...[
+          Text(
+            'Paired devices',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
           const SizedBox(height: 12),
+          for (final device in devices) ...[
+            _PairedDeviceCard(
+              device: device,
+              onConnect: () => _connect(context, hub, device.id),
+              onRemove: () => hub.removeDevice(device.id),
+            ),
+            const SizedBox(height: 12),
+          ],
         ],
+        const SizedBox(height: 8),
+        _AddSensorButtons(hub: hub),
       ],
+    );
+  }
+
+  Future<void> _connect(
+    BuildContext context,
+    SensorHub hub,
+    String deviceId,
+  ) async {
+    await hub.connect(deviceId);
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'BLE pairing UI is not wired yet. Sensor parsers are ready — '
+          'hardware connect lands in the next slice.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 }
 
-class _PairedDeviceCard extends StatelessWidget {
-  const _PairedDeviceCard({required this.device});
-
-  final PairedSensorDevice device;
+class _EmptySensorsState extends StatelessWidget {
+  const _EmptySensorsState();
 
   @override
   Widget build(BuildContext context) {
@@ -70,44 +83,208 @@ class _PairedDeviceCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(FlowlogColors.cardRadius),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
+        padding: const EdgeInsets.all(20),
+        child: Column(
           children: [
             Icon(
-              _iconForDevice(device.name),
+              Icons.bluetooth_searching,
+              size: 40,
               color: Theme.of(context).colorScheme.primary,
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    device.name,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    device.kind,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                ],
-              ),
+            const SizedBox(height: 12),
+            Text(
+              'No sensors paired',
+              style: Theme.of(context).textTheme.titleSmall,
             ),
-            ConnectionStateChip(state: device.connectionState),
+            const SizedBox(height: 4),
+            Text(
+              'Add your Pressensor and scale below.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
           ],
         ),
       ),
     );
   }
+}
 
-  IconData _iconForDevice(String name) {
-    if (name.contains('Scale')) {
-      return Icons.scale;
+class _AddSensorButtons extends StatelessWidget {
+  const _AddSensorButtons({required this.hub});
+
+  final SensorHub hub;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.icon(
+          key: const Key('add_pressensor_button'),
+          onPressed: hub.hasKind(SensorKind.pressensor)
+              ? null
+              : () => _add(context, SensorKind.pressensor),
+          icon: const Icon(Icons.speed),
+          label: const Text('Add Pressensor'),
+        ),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          key: const Key('add_scale_button'),
+          onPressed:
+              hub.hasKind(SensorKind.scale) ? null : () => _add(context, SensorKind.scale),
+          icon: const Icon(Icons.scale),
+          label: const Text('Add scale'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _add(BuildContext context, SensorKind kind) async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => _AddSensorDialog(kind: kind),
+    );
+    if (name == null || !context.mounted) {
+      return;
     }
-    return Icons.speed;
+
+    final added = hub.addDevice(kind, name: name);
+    if (!added && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('A ${kind.defaultName} is already paired.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+}
+
+class _AddSensorDialog extends StatefulWidget {
+  const _AddSensorDialog({required this.kind});
+
+  final SensorKind kind;
+
+  @override
+  State<_AddSensorDialog> createState() => _AddSensorDialogState();
+}
+
+class _AddSensorDialogState extends State<_AddSensorDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.kind.defaultName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Add ${widget.kind.defaultName}'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: InputDecoration(
+          labelText: 'Device name',
+          hintText: widget.kind.defaultName,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          child: const Text('Add'),
+        ),
+      ],
+    );
+  }
+}
+
+class _PairedDeviceCard extends StatelessWidget {
+  const _PairedDeviceCard({
+    required this.device,
+    required this.onConnect,
+    required this.onRemove,
+  });
+
+  final PairedSensorEntry device;
+  final VoidCallback onConnect;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final canConnect = device.state == ConnectionState.disconnected ||
+        device.state == ConnectionState.error;
+
+    return Card(
+      elevation: FlowlogColors.cardElevation,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(FlowlogColors.cardRadius),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  device.kind.icon,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        device.name,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        device.kind.subtitle,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color:
+                                  Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                ConnectionStateChip(state: device.state),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                FilledButton.tonal(
+                  onPressed: canConnect ? onConnect : null,
+                  child: const Text('Connect'),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: onRemove,
+                  child: const Text('Remove'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

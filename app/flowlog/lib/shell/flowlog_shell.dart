@@ -1,3 +1,4 @@
+import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/shell_breakpoints.dart';
 import 'package:flowlog/shell/top_bar.dart';
@@ -117,12 +118,21 @@ class _ShellContent extends StatelessWidget {
           return ClipRect(child: child);
         }
 
+        final hub = SensorHubScope.of(context);
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            FlowlogTopBar(
-              beanName: beanName,
-              onBeanNameChanged: onBeanNameChanged,
+            ListenableBuilder(
+              listenable: hub,
+              builder: (context, _) {
+                return FlowlogTopBar(
+                  beanName: beanName,
+                  onBeanNameChanged: onBeanNameChanged,
+                  pressensorState: hub.pressensorState,
+                  scaleState: hub.scaleState,
+                );
+              },
             ),
             Expanded(child: ClipRect(child: child)),
           ],
