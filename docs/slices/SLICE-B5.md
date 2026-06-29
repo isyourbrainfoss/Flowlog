@@ -1,6 +1,6 @@
 # SLICE-B5: PressensorBleAdapter
 
-status: pending
+status: done
 parallel_with: B2, B4, B3
 
 ## Prerequisites
@@ -14,10 +14,10 @@ B1
 
 ## Done when
 
-- [ ] Scan PRS* devices
-- [ ] Subscribe pressure notify, parse mbar
-- [ ] Zero pressure write
-- [ ] Mock-based unit tests pass
+- [x] Scan PRS* devices
+- [x] Subscribe pressure notify, parse mbar
+- [x] Zero pressure write
+- [x] Mock-based unit tests pass
 
 ## Verify
 

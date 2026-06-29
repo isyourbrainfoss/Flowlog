@@ -1,6 +1,6 @@
 # SLICE-B6: MergedSampleStream
 
-status: pending
+status: done
 parallel_with: C1
 
 ## Prerequisites
@@ -13,9 +13,9 @@ B4, B5
 
 ## Done when
 
-- [ ] Merges pressure + weight on host monotonic clock
-- [ ] Works with only one sensor connected
-- [ ] Unit test with two mock adapters
+- [x] Merges pressure + weight on host monotonic clock
+- [x] Works with only one sensor connected
+- [x] Unit test with two mock adapters
 
 ## Verify
 

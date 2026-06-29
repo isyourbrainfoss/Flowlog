@@ -1,6 +1,6 @@
 # SLICE-B3: Flow rate derivation
 
-status: pending
+status: done
 parallel_with: B2, B4, B5
 
 ## Prerequisites
@@ -13,9 +13,9 @@ A3
 
 ## Done when
 
-- [ ] weightG series to smoothed flowGs
-- [ ] Unit tests match golden values
-- [ ] Handles gaps in samples
+- [x] weightG series to smoothed flowGs
+- [x] Unit tests match golden values
+- [x] Handles gaps in samples
 
 ## Verify
 

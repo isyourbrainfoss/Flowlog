@@ -1,6 +1,6 @@
 # SLICE-B2: MockReplayAdapter
 
-status: pending
+status: done
 parallel_with: B4, B5, B3
 
 ## Prerequisites
@@ -14,9 +14,9 @@ B1
 
 ## Done when
 
-- [ ] Replays jsonl fixture at configurable speed
-- [ ] Emits SensorSample stream
-- [ ] Unit test counts samples
+- [x] Replays jsonl fixture at configurable speed
+- [x] Emits SensorSample stream
+- [x] Unit test counts samples
 
 ## Verify
 

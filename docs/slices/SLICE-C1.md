@@ -1,6 +1,6 @@
 # SLICE-C1: ShotSession state machine
 
-status: pending
+status: done
 parallel_with: C3, B6, B7
 
 ## Prerequisites
@@ -13,9 +13,9 @@ A4, B2
 
 ## Done when
 
-- [ ] States: idle, recording, paused, stopped
-- [ ] Emits sample batches to listeners
-- [ ] Unit tests cover transitions
+- [x] States: idle, recording, paused, stopped
+- [x] Emits sample batches to listeners
+- [x] Unit tests cover transitions
 
 ## Verify
 

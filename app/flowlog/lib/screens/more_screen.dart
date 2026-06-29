@@ -1,3 +1,4 @@
+import 'package:flowlog/screens/more/sensors_screen.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flutter/material.dart';
 
@@ -25,11 +26,21 @@ class MoreScreen extends StatelessWidget {
             },
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: Center(
-            child: Text('Settings & sensors'),
-          ),
+        ListTile(
+          leading: const Icon(Icons.sensors),
+          title: const Text('Sensors'),
+          subtitle: const Text('Paired pressure & scale devices'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => Scaffold(
+                  appBar: AppBar(title: const Text('Sensors')),
+                  body: const SensorsScreen(),
+                ),
+              ),
+            );
+          },
         ),
       ],
     );

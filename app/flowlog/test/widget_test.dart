@@ -20,7 +20,7 @@ void main() {
     final destinations = [
       (Icons.history, 'Shot history'),
       (Icons.local_cafe_outlined, 'Beans & profiles'),
-      (Icons.tune, 'Settings & sensors'),
+      (Icons.tune, 'Sensors'),
       (Icons.play_circle_outline, 'Live shot'),
     ];
 
@@ -121,7 +121,7 @@ void main() {
       '/live': 'Live shot',
       '/history': 'Shot history',
       '/library': 'Beans & profiles',
-      '/more': 'Settings & sensors',
+      '/more': 'Sensors',
     };
 
     await tester.pumpWidget(const FlowlogApp());

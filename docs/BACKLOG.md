@@ -12,16 +12,16 @@ Parallel waves: [`docs/PARALLEL.md`](PARALLEL.md).
 | A4 | SQLite schema + migrations | done | A5, A6 |
 | A5 | Adaptive shell + 4 tabs | done | A2, A3, A4, A6 |
 | A6 | Coffee dark theme | done | A4 |
-| B1 | SensorAdapter + SensorSample | pending | A6 |
-| B2 | MockReplayAdapter | pending | B4, B5, B3 |
-| B3 | Flow rate derivation | pending | B2, B4, B5 |
-| B4 | DecentScaleBleAdapter | pending | B2, B5, B3 |
-| B5 | PressensorBleAdapter | pending | B2, B4, B3 |
-| B6 | MergedSampleStream | pending | C1 |
-| B7 | Device manager UI stub | pending | C3 |
-| C1 | ShotSession state machine | pending | C3, B6, B7 |
+| B1 | SensorAdapter + SensorSample | done | A6 |
+| B2 | MockReplayAdapter | done | B4, B5, B3 |
+| B3 | Flow rate derivation | done | B2, B4, B5 |
+| B4 | DecentScaleBleAdapter | done | B2, B5, B3 |
+| B5 | PressensorBleAdapter | done | B2, B4, B3 |
+| B6 | MergedSampleStream | done | C1 |
+| B7 | Device manager UI stub | done | C3 |
+| C1 | ShotSession state machine | done | C3, B6, B7 |
 | C2 | Start/Stop + auto-tare | pending | C4, C5 |
-| C3 | DualCurveChart live | pending | C1, C4, B7 |
+| C3 | DualCurveChart live | done | C1, C4, B7 |
 | C4 | Floating metrics row | pending | C5, C2 |
 | C5 | Shot metadata sheet | pending | C4, C6, C2 |
 | C6 | Save shot + God Shot FAB | pending | C8, D1 |
