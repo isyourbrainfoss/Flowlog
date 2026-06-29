@@ -29,16 +29,6 @@ class MoreScreen extends StatelessWidget {
           ),
         ),
         ListTile(
-          title: const Text('High contrast'),
-          subtitle: Text(
-            themeController.highContrast ? 'Enabled' : 'Disabled',
-          ),
-          trailing: Switch(
-            value: themeController.highContrast,
-            onChanged: themeController.setHighContrast,
-          ),
-        ),
-        ListTile(
           leading: const Icon(Icons.ios_share),
           title: const Text('Export shots'),
           subtitle: const Text('Batch CSV export and share'),
