@@ -80,6 +80,26 @@ void main() {
     expect(find.text('Live shot'), findsOneWidget);
   });
 
+  testWidgets('Ultra-short window hides app bar and does not overflow', (
+    tester,
+  ) async {
+    // Matches narrow phone-ish width with almost no vertical space (body ~54px).
+    tester.view.physicalSize = const Size(303, 130);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: FlowlogShell()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(AppBar), findsNothing);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.text('Live shot'), findsOneWidget);
+  });
+
   testWidgets('Short height uses bottom bar even when wide', (tester) async {
     tester.view.physicalSize = const Size(800, 280);
     tester.view.devicePixelRatio = 1.0;
