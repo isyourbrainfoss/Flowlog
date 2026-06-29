@@ -32,17 +32,17 @@ Parallel waves: [`docs/PARALLEL.md`](PARALLEL.md).
 | D3 | CSV export single shot | done | D1, D4 |
 | D4 | CSV batch export + share | done | D5 |
 | D5 | CSV import | done | F1 |
-| E1 | Chart zoom/pan + view modes | pending | E2, E6 |
+| E1 | Chart zoom/pan + view modes | done | E2, E6 |
 | E2 | Annotations + channel mark | pending | E1, E3 |
-| E3 | Haptics + shot-end pulse | pending | E4, E2 |
+| E3 | Haptics + shot-end pulse | done | E4, E2 |
 | E4 | Bean fill + PB confetti | pending | E3 |
 | E5 | Desktop keyboard shortcuts | pending | E6 |
 | E6 | Accessibility pass | pending | E1, E5 |
 | E7 | Sensor diagnostics | pending | E6 |
-| F1 | Search + filter shots | pending | F2, F4 |
+| F1 | Search + filter shots | done | F2, F4 |
 | F2 | Tags / folders | pending | F1, F4 |
 | F3 | Side-by-side compare | pending | F6 |
-| F4 | Bean database | pending | F1, F2 |
+| F4 | Bean database | done | F1, F2 |
 | F5 | Saved profiles + Repeat shot | pending | F6 |
 | F6 | Insights dashboard | pending | F7, F3 |
 | F7 | PDF export | pending | F3 |

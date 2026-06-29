@@ -1,6 +1,6 @@
 # SLICE-E1: Chart zoom/pan + view modes
 
-status: pending
+status: done
 parallel_with: E2, E6
 
 ## Prerequisites
@@ -13,8 +13,8 @@ C3
 
 ## Done when
 
-- [ ] Pinch/zoom and pan
-- [ ] Swipe overlay/split/flow-only modes
+- [x] Pinch/zoom and pan
+- [x] Swipe overlay/split/flow-only modes
 
 ## Verify
 

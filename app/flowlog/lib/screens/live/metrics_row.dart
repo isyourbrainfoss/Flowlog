@@ -1,3 +1,4 @@
+import 'package:flowlog/screens/live/feedback.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
@@ -176,12 +177,19 @@ class LiveMetricsRow extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: _MetricTile(
-                label: 'Flow',
-                value: _formatFlow(resolved.flowGs),
-                trend: resolved.flowTrend,
-                labelStyle: labelStyle,
-                valueStyle: valueStyle,
+              child: FlowStabilityPulse(
+                isStable: isFlowStable(
+                  flowGs: resolved.flowGs,
+                  flowTrendIsNeutral:
+                      resolved.flowTrend == MetricTrend.neutral,
+                ),
+                child: _MetricTile(
+                  label: 'Flow',
+                  value: _formatFlow(resolved.flowGs),
+                  trend: resolved.flowTrend,
+                  labelStyle: labelStyle,
+                  valueStyle: valueStyle,
+                ),
               ),
             ),
             Expanded(

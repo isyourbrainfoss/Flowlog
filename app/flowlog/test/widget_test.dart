@@ -21,7 +21,7 @@ void main() {
 
     final destinations = [
       (Icons.history, 'No saved shots yet'),
-      (Icons.local_cafe_outlined, 'Beans & profiles'),
+      (Icons.local_cafe_outlined, 'No beans yet'),
       (Icons.tune, 'Sensors'),
       (Icons.play_circle_outline, 'Session: idle'),
     ];
@@ -149,7 +149,7 @@ void main() {
     const routeBodies = {
       '/live': 'Live',
       '/history': 'History',
-      '/library': 'Beans & profiles',
+      '/library': 'No beans yet',
       '/more': 'Sensors',
     };
 
