@@ -1,5 +1,4 @@
 import 'package:flowlog/main.dart';
-import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/flowlog_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -1,6 +1,6 @@
 # SLICE-A4: SQLite schema + migrations
 
-status: pending
+status: done
 parallel_with: A5, A6
 
 ## Prerequisites
@@ -14,9 +14,9 @@ A3
 
 ## Done when
 
-- [ ] drift (or sqlite) schema for shots + samples
-- [ ] Insert and read shot with samples
-- [ ] Migration from v1 works
+- [x] drift (or sqlite) schema for shots + samples
+- [x] Insert and read shot with samples
+- [x] Migration from v1 works
 
 ## Verify
 

@@ -1,6 +1,6 @@
 # SLICE-A6: Coffee dark theme
 
-status: pending
+status: done
 parallel_with: A4
 
 ## Prerequisites
@@ -13,9 +13,9 @@ A5
 
 ## Done when
 
-- [ ] coffeeDark ColorScheme and text theme
-- [ ] cafeLight variant defined
-- [ ] Theme toggle stub in More tab
+- [x] coffeeDark ColorScheme and text theme
+- [x] cafeLight variant defined
+- [x] Theme toggle stub in More tab
 
 ## Verify
 
