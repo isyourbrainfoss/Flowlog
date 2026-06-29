@@ -54,7 +54,7 @@ void showShotSavedSnackBar(BuildContext context, {String? message}) {
 }
 
 /// Opens the metadata sheet and persists the stopped session when confirmed.
-Future<Shot?> runGodShotSaveFlow({
+Future<Shot?> runExcellentShotSaveFlow({
   required BuildContext context,
   required ShotRepository repository,
   required List<ShotSample> samples,
@@ -102,9 +102,9 @@ ShotMetadata _defaultMetadataFromSamples(List<ShotSample> samples) {
   );
 }
 
-/// Floating action button for saving a completed shot as a "god shot".
-class GodShotFab extends StatelessWidget {
-  const GodShotFab({
+/// Floating action button for saving a standout completed shot.
+class ExcellentShotFab extends StatelessWidget {
+  const ExcellentShotFab({
     required this.enabled,
     required this.onPressed,
     super.key,
@@ -118,14 +118,14 @@ class GodShotFab extends StatelessWidget {
     final theme = Theme.of(context);
 
     return FloatingActionButton.extended(
-      key: const Key('god_shot_fab'),
+      key: const Key('excellent_shot_fab'),
       onPressed: enabled ? onPressed : null,
-      tooltip: 'Save god shot',
+      tooltip: 'Save excellent shot',
       icon: Icon(
         Icons.auto_awesome,
         color: enabled ? null : theme.disabledColor,
       ),
-      label: const Text('God Shot'),
+      label: const Text('Excellent shot'),
     );
   }
 }

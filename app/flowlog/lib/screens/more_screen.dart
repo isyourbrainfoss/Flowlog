@@ -46,7 +46,7 @@ class MoreScreen extends StatelessWidget {
         ListTile(
           leading: const Icon(Icons.sensors),
           title: const Text('Sensors'),
-          subtitle: const Text('Paired pressure & scale devices'),
+          subtitle: const Text('Pair Pressensor and scale'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
             Navigator.of(context).push(

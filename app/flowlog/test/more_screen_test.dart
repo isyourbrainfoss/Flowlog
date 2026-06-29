@@ -13,7 +13,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sensors'), findsOneWidget);
-    expect(find.text('Paired pressure & scale devices'), findsOneWidget);
+    expect(find.text('Pair Pressensor and scale'), findsOneWidget);
   });
 
   testWidgets('Export section navigates to export screen', (tester) async {
@@ -40,11 +40,9 @@ void main() {
     await tester.tap(find.text('Sensors'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Paired devices'), findsOneWidget);
-    expect(find.text('Pressensor PRS'), findsOneWidget);
-    expect(find.text('Decent Scale'), findsOneWidget);
-    expect(find.text('Connected'), findsOneWidget);
-    expect(find.text('Disconnected'), findsOneWidget);
+    expect(find.text('No sensors paired'), findsOneWidget);
+    expect(find.byKey(const Key('add_pressensor_button')), findsOneWidget);
+    expect(find.byKey(const Key('add_scale_button')), findsOneWidget);
     expect(find.byType(SensorsScreen), findsOneWidget);
   });
 }

@@ -1,4 +1,4 @@
-import 'package:flowlog/shell/flowlog_shell.dart';
+import 'package:flowlog/main.dart';
 import 'package:flowlog/shell/top_bar.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
@@ -10,8 +10,8 @@ void main() {
     WidgetTester tester, {
     String beanName = kDefaultBeanName,
     ValueChanged<String>? onBeanNameChanged,
-    ConnectionState pressensorState = kMockPressensorState,
-    ConnectionState scaleState = kMockScaleState,
+    ConnectionState pressensorState = ConnectionState.disconnected,
+    ConnectionState scaleState = ConnectionState.disconnected,
     ThemeData? theme,
   }) async {
     await tester.pumpWidget(
@@ -121,10 +121,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       await tester.pumpWidget(
-        MaterialApp(
-          theme: FlowlogTheme.coffeeDark,
-          home: const FlowlogShell(),
-        ),
+        const FlowlogApp(),
       );
       await tester.pump();
 

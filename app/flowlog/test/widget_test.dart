@@ -1,4 +1,5 @@
 import 'package:flowlog/main.dart';
+import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/flowlog_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,7 +40,12 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(home: FlowlogShell()),
+      MaterialApp(
+        home: SensorHubScope(
+          hub: SensorHub(),
+          child: const FlowlogShell(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -56,7 +62,12 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(home: FlowlogShell()),
+      MaterialApp(
+        home: SensorHubScope(
+          hub: SensorHub(),
+          child: const FlowlogShell(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -71,7 +82,12 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(home: FlowlogShell()),
+      MaterialApp(
+        home: SensorHubScope(
+          hub: SensorHub(),
+          child: const FlowlogShell(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -92,7 +108,12 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(home: FlowlogShell()),
+      MaterialApp(
+        home: SensorHubScope(
+          hub: SensorHub(),
+          child: const FlowlogShell(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -110,7 +131,12 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(home: FlowlogShell()),
+      MaterialApp(
+        home: SensorHubScope(
+          hub: SensorHub(),
+          child: const FlowlogShell(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 

@@ -2,10 +2,6 @@ import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
 import 'package:flutter/material.dart' hide ConnectionState;
 
-/// Default mock sensor connection states until BLE wiring replaces them.
-const ConnectionState kMockPressensorState = ConnectionState.connected;
-const ConnectionState kMockScaleState = ConnectionState.disconnected;
-
 /// Default active bean label shown in the top bar.
 const String kDefaultBeanName = 'House Blend';
 
@@ -15,8 +11,8 @@ class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
     required this.beanName,
     this.onBeanNameChanged,
-    this.pressensorState = kMockPressensorState,
-    this.scaleState = kMockScaleState,
+    this.pressensorState = ConnectionState.disconnected,
+    this.scaleState = ConnectionState.disconnected,
   });
 
   final String beanName;
