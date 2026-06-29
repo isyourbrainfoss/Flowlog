@@ -108,3 +108,46 @@ final grams = raw / 10.0;
 - Flowlog: Half Decent Scale heartbeat every 5 s (`03 0a 03 ff ff 00 0a`).
 - Merge weight samples on **host receive time**, not device timestamp (see `docs/AGENT_GUIDE.md`).
 - Max weight **2000 g**; implement smoothing in software if needed.
+
+---
+
+## WiFi mode (openscale 3.x)
+
+Half Decent Scale firmware **3.0+** exposes a WebSocket endpoint when WiFi is enabled.
+
+| Item | Value |
+|------|-------|
+| Endpoint | `ws://{host}/snapshot` (default host: `hds.local` via mDNS) |
+| Discovery | DNS-SD `_decentscale._tcp` |
+| Default rate | 2 Hz weight snapshots |
+
+### Weight snapshot (untyped)
+
+Absence of `type` means a weight frame:
+
+```json
+{"grams": 25.66, "ms": 12345}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `grams` | Weight in grams (double) |
+| `ms` | Device monotonic timestamp (ms) |
+
+Flowlog stamps samples on **host receive time**, not device `ms`.
+
+### Commands (text)
+
+```
+tare
+rate 2k
+rate 5k
+rate 10k
+status
+```
+
+Legacy `tare` is silent (no ack). JSON `{"command":"tare"}` returns a typed status ack.
+
+### Flowlog adapter
+
+`WifiScaleAdapter` in `flowlog_sensors` connects to `/snapshot`, sends `rate 2k` on connect, parses untyped `grams`/`ms` frames, and exposes `tare()`.

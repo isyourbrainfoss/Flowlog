@@ -1,6 +1,6 @@
 # SLICE-G6: WiFi scale adapter
 
-status: pending
+status: done
 parallel_with: none
 
 ## Prerequisites
@@ -13,9 +13,9 @@ B1
 
 ## Done when
 
-- [ ] WebSocket client for openscale 3.x
-- [ ] Parse grams/ms frames
-- [ ] tare command
+- [x] WebSocket client for openscale 3.x
+- [x] Parse grams/ms frames
+- [x] tare command
 
 ## Verify
 

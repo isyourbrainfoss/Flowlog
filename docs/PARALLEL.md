@@ -6,15 +6,9 @@ Check status: `grep -l '^status: done' docs/slices/*.md | wc -l`
 
 ## Current state
 
-**Done:** A1–G5 (MVP + polish + library + future stubs complete)
+**Done:** A1–G6 (all slices complete)
 
-**Spawn now (optional future):**
-
-| Agent | Slice | Notes |
-|-------|-------|-------|
-| 1 | **G6** | WiFi scale adapter — independent module |
-
-All other slices are `done`. Run `melos run test` after any new work.
+No pending slices. Run `melos run test` after any new work.
 
 ## Wave reference
 
