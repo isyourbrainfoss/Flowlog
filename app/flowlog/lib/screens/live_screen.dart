@@ -310,9 +310,15 @@ class _LiveScreenState extends State<LiveScreen> {
             controller: _controller,
             shotEndFeedback: widget.shotEndFeedback,
             child: Scaffold(
-              body: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
+              body: LayoutBuilder(
+                builder: (context, constraints) {
+                  final narrow = constraints.maxWidth < 360;
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: narrow ? 8 : 24,
+                      vertical: narrow ? 12 : 24,
+                    ),
+                    child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     RecordingBeanFillIndicator(controller: _controller),
@@ -369,7 +375,9 @@ class _LiveScreenState extends State<LiveScreen> {
                     if (_controller.canSaveShot) const SizedBox(height: 16),
                     LiveControls(controller: _controller),
                   ],
-                ),
+                    ),
+                  );
+                },
               ),
               floatingActionButton: StarShotFab(
                 enabled: _controller.canSaveShot && !_savingShot,

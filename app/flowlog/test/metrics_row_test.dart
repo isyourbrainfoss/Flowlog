@@ -227,6 +227,38 @@ void main() {
       expect(find.text('—'), findsNWidgets(3));
       expect(find.text('0:00'), findsOneWidget);
     });
+
+    testWidgets('does not overflow in a very narrow viewport', (tester) async {
+      const metrics = LiveMetrics(
+        pressureBar: 9.2,
+        flowGs: 1.8,
+        elapsedMs: 18500,
+        projectedYieldG: 34.5,
+        pressureTrend: MetricTrend.up,
+        flowTrend: MetricTrend.down,
+      );
+
+      await tester.binding.setSurfaceSize(const Size(120, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 120,
+                child: LiveMetricsRow(metrics: metrics),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pressure'), findsOneWidget);
+      expect(find.text('9.2 bar'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 }
 
