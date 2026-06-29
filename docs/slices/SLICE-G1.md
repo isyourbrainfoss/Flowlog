@@ -1,6 +1,6 @@
 # SLICE-G1: AI insights tab
 
-status: pending
+status: done
 parallel_with: G2
 
 ## Prerequisites
@@ -13,9 +13,9 @@ F4, D2
 
 ## Done when
 
-- [ ] Taste notes input
-- [ ] Rule-based tweak suggestions stub
-- [ ] Anomaly hints from curve
+- [x] Taste notes input
+- [x] Rule-based tweak suggestions stub
+- [x] Anomaly hints from curve
 
 ## Verify
 

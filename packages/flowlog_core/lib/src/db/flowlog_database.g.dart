@@ -2293,6 +2293,890 @@ class ShotTagsCompanion extends UpdateCompanion<ShotTagRow> {
   }
 }
 
+class $SavedProfilesTable extends SavedProfiles
+    with TableInfo<$SavedProfilesTable, SavedProfileRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SavedProfilesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, String> createdAt =
+      GeneratedColumn<String>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($SavedProfilesTable.$convertercreatedAt);
+  static const VerificationMeta _sourceShotIdMeta = const VerificationMeta(
+    'sourceShotId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceShotId = GeneratedColumn<String>(
+    'source_shot_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _doseGMeta = const VerificationMeta('doseG');
+  @override
+  late final GeneratedColumn<double> doseG = GeneratedColumn<double>(
+    'dose_g',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _yieldGMeta = const VerificationMeta('yieldG');
+  @override
+  late final GeneratedColumn<double> yieldG = GeneratedColumn<double>(
+    'yield_g',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _grindSettingMeta = const VerificationMeta(
+    'grindSetting',
+  );
+  @override
+  late final GeneratedColumn<double> grindSetting = GeneratedColumn<double>(
+    'grind_setting',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _beanIdMeta = const VerificationMeta('beanId');
+  @override
+  late final GeneratedColumn<String> beanId = GeneratedColumn<String>(
+    'bean_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _waterTempCMeta = const VerificationMeta(
+    'waterTempC',
+  );
+  @override
+  late final GeneratedColumn<double> waterTempC = GeneratedColumn<double>(
+    'water_temp_c',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    createdAt,
+    sourceShotId,
+    doseG,
+    yieldG,
+    grindSetting,
+    beanId,
+    waterTempC,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'saved_profiles';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SavedProfileRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('source_shot_id')) {
+      context.handle(
+        _sourceShotIdMeta,
+        sourceShotId.isAcceptableOrUnknown(
+          data['source_shot_id']!,
+          _sourceShotIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dose_g')) {
+      context.handle(
+        _doseGMeta,
+        doseG.isAcceptableOrUnknown(data['dose_g']!, _doseGMeta),
+      );
+    }
+    if (data.containsKey('yield_g')) {
+      context.handle(
+        _yieldGMeta,
+        yieldG.isAcceptableOrUnknown(data['yield_g']!, _yieldGMeta),
+      );
+    }
+    if (data.containsKey('grind_setting')) {
+      context.handle(
+        _grindSettingMeta,
+        grindSetting.isAcceptableOrUnknown(
+          data['grind_setting']!,
+          _grindSettingMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bean_id')) {
+      context.handle(
+        _beanIdMeta,
+        beanId.isAcceptableOrUnknown(data['bean_id']!, _beanIdMeta),
+      );
+    }
+    if (data.containsKey('water_temp_c')) {
+      context.handle(
+        _waterTempCMeta,
+        waterTempC.isAcceptableOrUnknown(
+          data['water_temp_c']!,
+          _waterTempCMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SavedProfileRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SavedProfileRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      createdAt: $SavedProfilesTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      sourceShotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_shot_id'],
+      ),
+      doseG: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}dose_g'],
+      ),
+      yieldG: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}yield_g'],
+      ),
+      grindSetting: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}grind_setting'],
+      ),
+      beanId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bean_id'],
+      ),
+      waterTempC: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}water_temp_c'],
+      ),
+    );
+  }
+
+  @override
+  $SavedProfilesTable createAlias(String alias) {
+    return $SavedProfilesTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, String> $convertercreatedAt =
+      const UtcIso8601Converter();
+}
+
+class SavedProfileRow extends DataClass implements Insertable<SavedProfileRow> {
+  final String id;
+  final String name;
+  final DateTime createdAt;
+  final String? sourceShotId;
+  final double? doseG;
+  final double? yieldG;
+  final double? grindSetting;
+  final String? beanId;
+  final double? waterTempC;
+  const SavedProfileRow({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+    this.sourceShotId,
+    this.doseG,
+    this.yieldG,
+    this.grindSetting,
+    this.beanId,
+    this.waterTempC,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    {
+      map['created_at'] = Variable<String>(
+        $SavedProfilesTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    if (!nullToAbsent || sourceShotId != null) {
+      map['source_shot_id'] = Variable<String>(sourceShotId);
+    }
+    if (!nullToAbsent || doseG != null) {
+      map['dose_g'] = Variable<double>(doseG);
+    }
+    if (!nullToAbsent || yieldG != null) {
+      map['yield_g'] = Variable<double>(yieldG);
+    }
+    if (!nullToAbsent || grindSetting != null) {
+      map['grind_setting'] = Variable<double>(grindSetting);
+    }
+    if (!nullToAbsent || beanId != null) {
+      map['bean_id'] = Variable<String>(beanId);
+    }
+    if (!nullToAbsent || waterTempC != null) {
+      map['water_temp_c'] = Variable<double>(waterTempC);
+    }
+    return map;
+  }
+
+  SavedProfilesCompanion toCompanion(bool nullToAbsent) {
+    return SavedProfilesCompanion(
+      id: Value(id),
+      name: Value(name),
+      createdAt: Value(createdAt),
+      sourceShotId: sourceShotId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceShotId),
+      doseG: doseG == null && nullToAbsent
+          ? const Value.absent()
+          : Value(doseG),
+      yieldG: yieldG == null && nullToAbsent
+          ? const Value.absent()
+          : Value(yieldG),
+      grindSetting: grindSetting == null && nullToAbsent
+          ? const Value.absent()
+          : Value(grindSetting),
+      beanId: beanId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(beanId),
+      waterTempC: waterTempC == null && nullToAbsent
+          ? const Value.absent()
+          : Value(waterTempC),
+    );
+  }
+
+  factory SavedProfileRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SavedProfileRow(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      sourceShotId: serializer.fromJson<String?>(json['sourceShotId']),
+      doseG: serializer.fromJson<double?>(json['doseG']),
+      yieldG: serializer.fromJson<double?>(json['yieldG']),
+      grindSetting: serializer.fromJson<double?>(json['grindSetting']),
+      beanId: serializer.fromJson<String?>(json['beanId']),
+      waterTempC: serializer.fromJson<double?>(json['waterTempC']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'sourceShotId': serializer.toJson<String?>(sourceShotId),
+      'doseG': serializer.toJson<double?>(doseG),
+      'yieldG': serializer.toJson<double?>(yieldG),
+      'grindSetting': serializer.toJson<double?>(grindSetting),
+      'beanId': serializer.toJson<String?>(beanId),
+      'waterTempC': serializer.toJson<double?>(waterTempC),
+    };
+  }
+
+  SavedProfileRow copyWith({
+    String? id,
+    String? name,
+    DateTime? createdAt,
+    Value<String?> sourceShotId = const Value.absent(),
+    Value<double?> doseG = const Value.absent(),
+    Value<double?> yieldG = const Value.absent(),
+    Value<double?> grindSetting = const Value.absent(),
+    Value<String?> beanId = const Value.absent(),
+    Value<double?> waterTempC = const Value.absent(),
+  }) => SavedProfileRow(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    createdAt: createdAt ?? this.createdAt,
+    sourceShotId: sourceShotId.present ? sourceShotId.value : this.sourceShotId,
+    doseG: doseG.present ? doseG.value : this.doseG,
+    yieldG: yieldG.present ? yieldG.value : this.yieldG,
+    grindSetting: grindSetting.present ? grindSetting.value : this.grindSetting,
+    beanId: beanId.present ? beanId.value : this.beanId,
+    waterTempC: waterTempC.present ? waterTempC.value : this.waterTempC,
+  );
+  SavedProfileRow copyWithCompanion(SavedProfilesCompanion data) {
+    return SavedProfileRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      sourceShotId: data.sourceShotId.present
+          ? data.sourceShotId.value
+          : this.sourceShotId,
+      doseG: data.doseG.present ? data.doseG.value : this.doseG,
+      yieldG: data.yieldG.present ? data.yieldG.value : this.yieldG,
+      grindSetting: data.grindSetting.present
+          ? data.grindSetting.value
+          : this.grindSetting,
+      beanId: data.beanId.present ? data.beanId.value : this.beanId,
+      waterTempC: data.waterTempC.present
+          ? data.waterTempC.value
+          : this.waterTempC,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SavedProfileRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('sourceShotId: $sourceShotId, ')
+          ..write('doseG: $doseG, ')
+          ..write('yieldG: $yieldG, ')
+          ..write('grindSetting: $grindSetting, ')
+          ..write('beanId: $beanId, ')
+          ..write('waterTempC: $waterTempC')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    createdAt,
+    sourceShotId,
+    doseG,
+    yieldG,
+    grindSetting,
+    beanId,
+    waterTempC,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SavedProfileRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.createdAt == this.createdAt &&
+          other.sourceShotId == this.sourceShotId &&
+          other.doseG == this.doseG &&
+          other.yieldG == this.yieldG &&
+          other.grindSetting == this.grindSetting &&
+          other.beanId == this.beanId &&
+          other.waterTempC == this.waterTempC);
+}
+
+class SavedProfilesCompanion extends UpdateCompanion<SavedProfileRow> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<DateTime> createdAt;
+  final Value<String?> sourceShotId;
+  final Value<double?> doseG;
+  final Value<double?> yieldG;
+  final Value<double?> grindSetting;
+  final Value<String?> beanId;
+  final Value<double?> waterTempC;
+  final Value<int> rowid;
+  const SavedProfilesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.sourceShotId = const Value.absent(),
+    this.doseG = const Value.absent(),
+    this.yieldG = const Value.absent(),
+    this.grindSetting = const Value.absent(),
+    this.beanId = const Value.absent(),
+    this.waterTempC = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SavedProfilesCompanion.insert({
+    required String id,
+    required String name,
+    required DateTime createdAt,
+    this.sourceShotId = const Value.absent(),
+    this.doseG = const Value.absent(),
+    this.yieldG = const Value.absent(),
+    this.grindSetting = const Value.absent(),
+    this.beanId = const Value.absent(),
+    this.waterTempC = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       createdAt = Value(createdAt);
+  static Insertable<SavedProfileRow> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? createdAt,
+    Expression<String>? sourceShotId,
+    Expression<double>? doseG,
+    Expression<double>? yieldG,
+    Expression<double>? grindSetting,
+    Expression<String>? beanId,
+    Expression<double>? waterTempC,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (createdAt != null) 'created_at': createdAt,
+      if (sourceShotId != null) 'source_shot_id': sourceShotId,
+      if (doseG != null) 'dose_g': doseG,
+      if (yieldG != null) 'yield_g': yieldG,
+      if (grindSetting != null) 'grind_setting': grindSetting,
+      if (beanId != null) 'bean_id': beanId,
+      if (waterTempC != null) 'water_temp_c': waterTempC,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SavedProfilesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<DateTime>? createdAt,
+    Value<String?>? sourceShotId,
+    Value<double?>? doseG,
+    Value<double?>? yieldG,
+    Value<double?>? grindSetting,
+    Value<String?>? beanId,
+    Value<double?>? waterTempC,
+    Value<int>? rowid,
+  }) {
+    return SavedProfilesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      createdAt: createdAt ?? this.createdAt,
+      sourceShotId: sourceShotId ?? this.sourceShotId,
+      doseG: doseG ?? this.doseG,
+      yieldG: yieldG ?? this.yieldG,
+      grindSetting: grindSetting ?? this.grindSetting,
+      beanId: beanId ?? this.beanId,
+      waterTempC: waterTempC ?? this.waterTempC,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<String>(
+        $SavedProfilesTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (sourceShotId.present) {
+      map['source_shot_id'] = Variable<String>(sourceShotId.value);
+    }
+    if (doseG.present) {
+      map['dose_g'] = Variable<double>(doseG.value);
+    }
+    if (yieldG.present) {
+      map['yield_g'] = Variable<double>(yieldG.value);
+    }
+    if (grindSetting.present) {
+      map['grind_setting'] = Variable<double>(grindSetting.value);
+    }
+    if (beanId.present) {
+      map['bean_id'] = Variable<String>(beanId.value);
+    }
+    if (waterTempC.present) {
+      map['water_temp_c'] = Variable<double>(waterTempC.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SavedProfilesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('sourceShotId: $sourceShotId, ')
+          ..write('doseG: $doseG, ')
+          ..write('yieldG: $yieldG, ')
+          ..write('grindSetting: $grindSetting, ')
+          ..write('beanId: $beanId, ')
+          ..write('waterTempC: $waterTempC, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SavedProfileSamplesTable extends SavedProfileSamples
+    with TableInfo<$SavedProfileSamplesTable, SavedProfileSampleRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SavedProfileSamplesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _profileIdMeta = const VerificationMeta(
+    'profileId',
+  );
+  @override
+  late final GeneratedColumn<String> profileId = GeneratedColumn<String>(
+    'profile_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES saved_profiles (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _elapsedMsMeta = const VerificationMeta(
+    'elapsedMs',
+  );
+  @override
+  late final GeneratedColumn<int> elapsedMs = GeneratedColumn<int>(
+    'elapsed_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _pressureBarMeta = const VerificationMeta(
+    'pressureBar',
+  );
+  @override
+  late final GeneratedColumn<double> pressureBar = GeneratedColumn<double>(
+    'pressure_bar',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, profileId, elapsedMs, pressureBar];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'saved_profile_samples';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SavedProfileSampleRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('profile_id')) {
+      context.handle(
+        _profileIdMeta,
+        profileId.isAcceptableOrUnknown(data['profile_id']!, _profileIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_profileIdMeta);
+    }
+    if (data.containsKey('elapsed_ms')) {
+      context.handle(
+        _elapsedMsMeta,
+        elapsedMs.isAcceptableOrUnknown(data['elapsed_ms']!, _elapsedMsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_elapsedMsMeta);
+    }
+    if (data.containsKey('pressure_bar')) {
+      context.handle(
+        _pressureBarMeta,
+        pressureBar.isAcceptableOrUnknown(
+          data['pressure_bar']!,
+          _pressureBarMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_pressureBarMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SavedProfileSampleRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SavedProfileSampleRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      profileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}profile_id'],
+      )!,
+      elapsedMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}elapsed_ms'],
+      )!,
+      pressureBar: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}pressure_bar'],
+      )!,
+    );
+  }
+
+  @override
+  $SavedProfileSamplesTable createAlias(String alias) {
+    return $SavedProfileSamplesTable(attachedDatabase, alias);
+  }
+}
+
+class SavedProfileSampleRow extends DataClass
+    implements Insertable<SavedProfileSampleRow> {
+  final int id;
+  final String profileId;
+  final int elapsedMs;
+  final double pressureBar;
+  const SavedProfileSampleRow({
+    required this.id,
+    required this.profileId,
+    required this.elapsedMs,
+    required this.pressureBar,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['profile_id'] = Variable<String>(profileId);
+    map['elapsed_ms'] = Variable<int>(elapsedMs);
+    map['pressure_bar'] = Variable<double>(pressureBar);
+    return map;
+  }
+
+  SavedProfileSamplesCompanion toCompanion(bool nullToAbsent) {
+    return SavedProfileSamplesCompanion(
+      id: Value(id),
+      profileId: Value(profileId),
+      elapsedMs: Value(elapsedMs),
+      pressureBar: Value(pressureBar),
+    );
+  }
+
+  factory SavedProfileSampleRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SavedProfileSampleRow(
+      id: serializer.fromJson<int>(json['id']),
+      profileId: serializer.fromJson<String>(json['profileId']),
+      elapsedMs: serializer.fromJson<int>(json['elapsedMs']),
+      pressureBar: serializer.fromJson<double>(json['pressureBar']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'profileId': serializer.toJson<String>(profileId),
+      'elapsedMs': serializer.toJson<int>(elapsedMs),
+      'pressureBar': serializer.toJson<double>(pressureBar),
+    };
+  }
+
+  SavedProfileSampleRow copyWith({
+    int? id,
+    String? profileId,
+    int? elapsedMs,
+    double? pressureBar,
+  }) => SavedProfileSampleRow(
+    id: id ?? this.id,
+    profileId: profileId ?? this.profileId,
+    elapsedMs: elapsedMs ?? this.elapsedMs,
+    pressureBar: pressureBar ?? this.pressureBar,
+  );
+  SavedProfileSampleRow copyWithCompanion(SavedProfileSamplesCompanion data) {
+    return SavedProfileSampleRow(
+      id: data.id.present ? data.id.value : this.id,
+      profileId: data.profileId.present ? data.profileId.value : this.profileId,
+      elapsedMs: data.elapsedMs.present ? data.elapsedMs.value : this.elapsedMs,
+      pressureBar: data.pressureBar.present
+          ? data.pressureBar.value
+          : this.pressureBar,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SavedProfileSampleRow(')
+          ..write('id: $id, ')
+          ..write('profileId: $profileId, ')
+          ..write('elapsedMs: $elapsedMs, ')
+          ..write('pressureBar: $pressureBar')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, profileId, elapsedMs, pressureBar);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SavedProfileSampleRow &&
+          other.id == this.id &&
+          other.profileId == this.profileId &&
+          other.elapsedMs == this.elapsedMs &&
+          other.pressureBar == this.pressureBar);
+}
+
+class SavedProfileSamplesCompanion
+    extends UpdateCompanion<SavedProfileSampleRow> {
+  final Value<int> id;
+  final Value<String> profileId;
+  final Value<int> elapsedMs;
+  final Value<double> pressureBar;
+  const SavedProfileSamplesCompanion({
+    this.id = const Value.absent(),
+    this.profileId = const Value.absent(),
+    this.elapsedMs = const Value.absent(),
+    this.pressureBar = const Value.absent(),
+  });
+  SavedProfileSamplesCompanion.insert({
+    this.id = const Value.absent(),
+    required String profileId,
+    required int elapsedMs,
+    required double pressureBar,
+  }) : profileId = Value(profileId),
+       elapsedMs = Value(elapsedMs),
+       pressureBar = Value(pressureBar);
+  static Insertable<SavedProfileSampleRow> custom({
+    Expression<int>? id,
+    Expression<String>? profileId,
+    Expression<int>? elapsedMs,
+    Expression<double>? pressureBar,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (profileId != null) 'profile_id': profileId,
+      if (elapsedMs != null) 'elapsed_ms': elapsedMs,
+      if (pressureBar != null) 'pressure_bar': pressureBar,
+    });
+  }
+
+  SavedProfileSamplesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? profileId,
+    Value<int>? elapsedMs,
+    Value<double>? pressureBar,
+  }) {
+    return SavedProfileSamplesCompanion(
+      id: id ?? this.id,
+      profileId: profileId ?? this.profileId,
+      elapsedMs: elapsedMs ?? this.elapsedMs,
+      pressureBar: pressureBar ?? this.pressureBar,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (profileId.present) {
+      map['profile_id'] = Variable<String>(profileId.value);
+    }
+    if (elapsedMs.present) {
+      map['elapsed_ms'] = Variable<int>(elapsedMs.value);
+    }
+    if (pressureBar.present) {
+      map['pressure_bar'] = Variable<double>(pressureBar.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SavedProfileSamplesCompanion(')
+          ..write('id: $id, ')
+          ..write('profileId: $profileId, ')
+          ..write('elapsedMs: $elapsedMs, ')
+          ..write('pressureBar: $pressureBar')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$FlowlogDatabase extends GeneratedDatabase {
   _$FlowlogDatabase(QueryExecutor e) : super(e);
   $FlowlogDatabaseManager get managers => $FlowlogDatabaseManager(this);
@@ -2304,6 +3188,9 @@ abstract class _$FlowlogDatabase extends GeneratedDatabase {
   late final $BeansTable beans = $BeansTable(this);
   late final $TagsTable tags = $TagsTable(this);
   late final $ShotTagsTable shotTags = $ShotTagsTable(this);
+  late final $SavedProfilesTable savedProfiles = $SavedProfilesTable(this);
+  late final $SavedProfileSamplesTable savedProfileSamples =
+      $SavedProfileSamplesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2315,6 +3202,8 @@ abstract class _$FlowlogDatabase extends GeneratedDatabase {
     beans,
     tags,
     shotTags,
+    savedProfiles,
+    savedProfileSamples,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -2345,6 +3234,13 @@ abstract class _$FlowlogDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('shot_tags', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'saved_profiles',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('saved_profile_samples', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -4433,6 +5329,724 @@ typedef $$ShotTagsTableProcessedTableManager =
       ShotTagRow,
       PrefetchHooks Function({bool shotId, bool tagId})
     >;
+typedef $$SavedProfilesTableCreateCompanionBuilder =
+    SavedProfilesCompanion Function({
+      required String id,
+      required String name,
+      required DateTime createdAt,
+      Value<String?> sourceShotId,
+      Value<double?> doseG,
+      Value<double?> yieldG,
+      Value<double?> grindSetting,
+      Value<String?> beanId,
+      Value<double?> waterTempC,
+      Value<int> rowid,
+    });
+typedef $$SavedProfilesTableUpdateCompanionBuilder =
+    SavedProfilesCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<DateTime> createdAt,
+      Value<String?> sourceShotId,
+      Value<double?> doseG,
+      Value<double?> yieldG,
+      Value<double?> grindSetting,
+      Value<String?> beanId,
+      Value<double?> waterTempC,
+      Value<int> rowid,
+    });
+
+final class $$SavedProfilesTableReferences
+    extends
+        BaseReferences<
+          _$FlowlogDatabase,
+          $SavedProfilesTable,
+          SavedProfileRow
+        > {
+  $$SavedProfilesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<
+    $SavedProfileSamplesTable,
+    List<SavedProfileSampleRow>
+  >
+  _savedProfileSamplesRefsTable(_$FlowlogDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.savedProfileSamples,
+        aliasName: 'saved_profiles__id__saved_profile_samples__profile_id',
+      );
+
+  $$SavedProfileSamplesTableProcessedTableManager get savedProfileSamplesRefs {
+    final manager = $$SavedProfileSamplesTableTableManager(
+      $_db,
+      $_db.savedProfileSamples,
+    ).filter((f) => f.profileId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _savedProfileSamplesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$SavedProfilesTableFilterComposer
+    extends Composer<_$FlowlogDatabase, $SavedProfilesTable> {
+  $$SavedProfilesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, String> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get sourceShotId => $composableBuilder(
+    column: $table.sourceShotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get doseG => $composableBuilder(
+    column: $table.doseG,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get yieldG => $composableBuilder(
+    column: $table.yieldG,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get grindSetting => $composableBuilder(
+    column: $table.grindSetting,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get beanId => $composableBuilder(
+    column: $table.beanId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get waterTempC => $composableBuilder(
+    column: $table.waterTempC,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> savedProfileSamplesRefs(
+    Expression<bool> Function($$SavedProfileSamplesTableFilterComposer f) f,
+  ) {
+    final $$SavedProfileSamplesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.savedProfileSamples,
+      getReferencedColumn: (t) => t.profileId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SavedProfileSamplesTableFilterComposer(
+            $db: $db,
+            $table: $db.savedProfileSamples,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$SavedProfilesTableOrderingComposer
+    extends Composer<_$FlowlogDatabase, $SavedProfilesTable> {
+  $$SavedProfilesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceShotId => $composableBuilder(
+    column: $table.sourceShotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get doseG => $composableBuilder(
+    column: $table.doseG,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get yieldG => $composableBuilder(
+    column: $table.yieldG,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get grindSetting => $composableBuilder(
+    column: $table.grindSetting,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get beanId => $composableBuilder(
+    column: $table.beanId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get waterTempC => $composableBuilder(
+    column: $table.waterTempC,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SavedProfilesTableAnnotationComposer
+    extends Composer<_$FlowlogDatabase, $SavedProfilesTable> {
+  $$SavedProfilesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, String> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceShotId => $composableBuilder(
+    column: $table.sourceShotId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get doseG =>
+      $composableBuilder(column: $table.doseG, builder: (column) => column);
+
+  GeneratedColumn<double> get yieldG =>
+      $composableBuilder(column: $table.yieldG, builder: (column) => column);
+
+  GeneratedColumn<double> get grindSetting => $composableBuilder(
+    column: $table.grindSetting,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get beanId =>
+      $composableBuilder(column: $table.beanId, builder: (column) => column);
+
+  GeneratedColumn<double> get waterTempC => $composableBuilder(
+    column: $table.waterTempC,
+    builder: (column) => column,
+  );
+
+  Expression<T> savedProfileSamplesRefs<T extends Object>(
+    Expression<T> Function($$SavedProfileSamplesTableAnnotationComposer a) f,
+  ) {
+    final $$SavedProfileSamplesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.savedProfileSamples,
+          getReferencedColumn: (t) => t.profileId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$SavedProfileSamplesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.savedProfileSamples,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$SavedProfilesTableTableManager
+    extends
+        RootTableManager<
+          _$FlowlogDatabase,
+          $SavedProfilesTable,
+          SavedProfileRow,
+          $$SavedProfilesTableFilterComposer,
+          $$SavedProfilesTableOrderingComposer,
+          $$SavedProfilesTableAnnotationComposer,
+          $$SavedProfilesTableCreateCompanionBuilder,
+          $$SavedProfilesTableUpdateCompanionBuilder,
+          (SavedProfileRow, $$SavedProfilesTableReferences),
+          SavedProfileRow,
+          PrefetchHooks Function({bool savedProfileSamplesRefs})
+        > {
+  $$SavedProfilesTableTableManager(
+    _$FlowlogDatabase db,
+    $SavedProfilesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SavedProfilesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SavedProfilesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SavedProfilesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<String?> sourceShotId = const Value.absent(),
+                Value<double?> doseG = const Value.absent(),
+                Value<double?> yieldG = const Value.absent(),
+                Value<double?> grindSetting = const Value.absent(),
+                Value<String?> beanId = const Value.absent(),
+                Value<double?> waterTempC = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SavedProfilesCompanion(
+                id: id,
+                name: name,
+                createdAt: createdAt,
+                sourceShotId: sourceShotId,
+                doseG: doseG,
+                yieldG: yieldG,
+                grindSetting: grindSetting,
+                beanId: beanId,
+                waterTempC: waterTempC,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required DateTime createdAt,
+                Value<String?> sourceShotId = const Value.absent(),
+                Value<double?> doseG = const Value.absent(),
+                Value<double?> yieldG = const Value.absent(),
+                Value<double?> grindSetting = const Value.absent(),
+                Value<String?> beanId = const Value.absent(),
+                Value<double?> waterTempC = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SavedProfilesCompanion.insert(
+                id: id,
+                name: name,
+                createdAt: createdAt,
+                sourceShotId: sourceShotId,
+                doseG: doseG,
+                yieldG: yieldG,
+                grindSetting: grindSetting,
+                beanId: beanId,
+                waterTempC: waterTempC,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$SavedProfilesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({savedProfileSamplesRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (savedProfileSamplesRefs) db.savedProfileSamples,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (savedProfileSamplesRefs)
+                    await $_getPrefetchedData<
+                      SavedProfileRow,
+                      $SavedProfilesTable,
+                      SavedProfileSampleRow
+                    >(
+                      currentTable: table,
+                      referencedTable: $$SavedProfilesTableReferences
+                          ._savedProfileSamplesRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$SavedProfilesTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).savedProfileSamplesRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.profileId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$SavedProfilesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$FlowlogDatabase,
+      $SavedProfilesTable,
+      SavedProfileRow,
+      $$SavedProfilesTableFilterComposer,
+      $$SavedProfilesTableOrderingComposer,
+      $$SavedProfilesTableAnnotationComposer,
+      $$SavedProfilesTableCreateCompanionBuilder,
+      $$SavedProfilesTableUpdateCompanionBuilder,
+      (SavedProfileRow, $$SavedProfilesTableReferences),
+      SavedProfileRow,
+      PrefetchHooks Function({bool savedProfileSamplesRefs})
+    >;
+typedef $$SavedProfileSamplesTableCreateCompanionBuilder =
+    SavedProfileSamplesCompanion Function({
+      Value<int> id,
+      required String profileId,
+      required int elapsedMs,
+      required double pressureBar,
+    });
+typedef $$SavedProfileSamplesTableUpdateCompanionBuilder =
+    SavedProfileSamplesCompanion Function({
+      Value<int> id,
+      Value<String> profileId,
+      Value<int> elapsedMs,
+      Value<double> pressureBar,
+    });
+
+final class $$SavedProfileSamplesTableReferences
+    extends
+        BaseReferences<
+          _$FlowlogDatabase,
+          $SavedProfileSamplesTable,
+          SavedProfileSampleRow
+        > {
+  $$SavedProfileSamplesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $SavedProfilesTable _profileIdTable(_$FlowlogDatabase db) => db
+      .savedProfiles
+      .createAlias('saved_profile_samples__profile_id__saved_profiles__id');
+
+  $$SavedProfilesTableProcessedTableManager get profileId {
+    final $_column = $_itemColumn<String>('profile_id')!;
+
+    final manager = $$SavedProfilesTableTableManager(
+      $_db,
+      $_db.savedProfiles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_profileIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$SavedProfileSamplesTableFilterComposer
+    extends Composer<_$FlowlogDatabase, $SavedProfileSamplesTable> {
+  $$SavedProfileSamplesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get elapsedMs => $composableBuilder(
+    column: $table.elapsedMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get pressureBar => $composableBuilder(
+    column: $table.pressureBar,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$SavedProfilesTableFilterComposer get profileId {
+    final $$SavedProfilesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.profileId,
+      referencedTable: $db.savedProfiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SavedProfilesTableFilterComposer(
+            $db: $db,
+            $table: $db.savedProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SavedProfileSamplesTableOrderingComposer
+    extends Composer<_$FlowlogDatabase, $SavedProfileSamplesTable> {
+  $$SavedProfileSamplesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get elapsedMs => $composableBuilder(
+    column: $table.elapsedMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get pressureBar => $composableBuilder(
+    column: $table.pressureBar,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$SavedProfilesTableOrderingComposer get profileId {
+    final $$SavedProfilesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.profileId,
+      referencedTable: $db.savedProfiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SavedProfilesTableOrderingComposer(
+            $db: $db,
+            $table: $db.savedProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SavedProfileSamplesTableAnnotationComposer
+    extends Composer<_$FlowlogDatabase, $SavedProfileSamplesTable> {
+  $$SavedProfileSamplesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get elapsedMs =>
+      $composableBuilder(column: $table.elapsedMs, builder: (column) => column);
+
+  GeneratedColumn<double> get pressureBar => $composableBuilder(
+    column: $table.pressureBar,
+    builder: (column) => column,
+  );
+
+  $$SavedProfilesTableAnnotationComposer get profileId {
+    final $$SavedProfilesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.profileId,
+      referencedTable: $db.savedProfiles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SavedProfilesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.savedProfiles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SavedProfileSamplesTableTableManager
+    extends
+        RootTableManager<
+          _$FlowlogDatabase,
+          $SavedProfileSamplesTable,
+          SavedProfileSampleRow,
+          $$SavedProfileSamplesTableFilterComposer,
+          $$SavedProfileSamplesTableOrderingComposer,
+          $$SavedProfileSamplesTableAnnotationComposer,
+          $$SavedProfileSamplesTableCreateCompanionBuilder,
+          $$SavedProfileSamplesTableUpdateCompanionBuilder,
+          (SavedProfileSampleRow, $$SavedProfileSamplesTableReferences),
+          SavedProfileSampleRow,
+          PrefetchHooks Function({bool profileId})
+        > {
+  $$SavedProfileSamplesTableTableManager(
+    _$FlowlogDatabase db,
+    $SavedProfileSamplesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SavedProfileSamplesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SavedProfileSamplesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$SavedProfileSamplesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> profileId = const Value.absent(),
+                Value<int> elapsedMs = const Value.absent(),
+                Value<double> pressureBar = const Value.absent(),
+              }) => SavedProfileSamplesCompanion(
+                id: id,
+                profileId: profileId,
+                elapsedMs: elapsedMs,
+                pressureBar: pressureBar,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String profileId,
+                required int elapsedMs,
+                required double pressureBar,
+              }) => SavedProfileSamplesCompanion.insert(
+                id: id,
+                profileId: profileId,
+                elapsedMs: elapsedMs,
+                pressureBar: pressureBar,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$SavedProfileSamplesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({profileId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (profileId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.profileId,
+                                referencedTable:
+                                    $$SavedProfileSamplesTableReferences
+                                        ._profileIdTable(db),
+                                referencedColumn:
+                                    $$SavedProfileSamplesTableReferences
+                                        ._profileIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$SavedProfileSamplesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$FlowlogDatabase,
+      $SavedProfileSamplesTable,
+      SavedProfileSampleRow,
+      $$SavedProfileSamplesTableFilterComposer,
+      $$SavedProfileSamplesTableOrderingComposer,
+      $$SavedProfileSamplesTableAnnotationComposer,
+      $$SavedProfileSamplesTableCreateCompanionBuilder,
+      $$SavedProfileSamplesTableUpdateCompanionBuilder,
+      (SavedProfileSampleRow, $$SavedProfileSamplesTableReferences),
+      SavedProfileSampleRow,
+      PrefetchHooks Function({bool profileId})
+    >;
 
 class $FlowlogDatabaseManager {
   final _$FlowlogDatabase _db;
@@ -4448,4 +6062,8 @@ class $FlowlogDatabaseManager {
   $$TagsTableTableManager get tags => $$TagsTableTableManager(_db, _db.tags);
   $$ShotTagsTableTableManager get shotTags =>
       $$ShotTagsTableTableManager(_db, _db.shotTags);
+  $$SavedProfilesTableTableManager get savedProfiles =>
+      $$SavedProfilesTableTableManager(_db, _db.savedProfiles);
+  $$SavedProfileSamplesTableTableManager get savedProfileSamples =>
+      $$SavedProfileSamplesTableTableManager(_db, _db.savedProfileSamples);
 }

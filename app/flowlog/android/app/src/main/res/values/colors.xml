@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="flowlog_espresso">#FF6F4E37</color>
+    <color name="flowlog_background_dark">#FF1A140F</color>
+    <color name="flowlog_surface_dark">#FF241C16</color>
+    <color name="flowlog_on_background_dark">#FFF5F0E8</color>
+    <color name="flowlog_crema">#FFC4A574</color>
+    <color name="flowlog_outline">#FF8A7B6E</color>
+</resources>

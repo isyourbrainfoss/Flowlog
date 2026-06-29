@@ -11,19 +11,21 @@ class SparklineChart extends StatelessWidget {
     super.key,
     required this.samples,
     this.height = 48,
-    this.lineColor = FlowlogChartColors.pressureLine,
+    this.lineColor,
     this.fillColor,
     this.backgroundColor = Colors.transparent,
   });
 
   final List<ShotSample> samples;
   final double height;
-  final Color lineColor;
+  final Color? lineColor;
   final Color? fillColor;
   final Color backgroundColor;
 
   @override
   Widget build(BuildContext context) {
+    final resolvedLineColor = lineColor ?? FlowlogChartColors.pressureLine;
+
     return RepaintBoundary(
       child: Semantics(
         label: 'Pressure sparkline',
@@ -33,8 +35,8 @@ class SparklineChart extends StatelessWidget {
           child: CustomPaint(
             painter: _SparklinePainter(
               samples: samples,
-              lineColor: lineColor,
-              fillColor: fillColor ?? lineColor.withValues(alpha: 0.15),
+              lineColor: resolvedLineColor,
+              fillColor: fillColor ?? resolvedLineColor.withValues(alpha: 0.15),
               backgroundColor: backgroundColor,
             ),
           ),

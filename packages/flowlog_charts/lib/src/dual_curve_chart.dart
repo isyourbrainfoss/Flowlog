@@ -6,18 +6,78 @@ import 'chart_interaction.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
-/// Coffee-themed chart colors aligned with [FlowlogColors] in the app theme.
-abstract final class FlowlogChartColors {
-  static const pressureLow = Color(0xFF6B9E5A);
-  static const pressureHigh = Color(0xFFE8A54B);
-  static const pressureLine = Color(0xFFD4923A);
+/// Chart color palettes for espresso curves.
+enum FlowlogChartPalette {
+  /// Warm coffee tones aligned with [FlowlogColors] in the app theme.
+  coffee,
 
-  static const weightLine = Color(0xFF5B8DB8);
-  static const flowLine = Color(0xFF4ECDC4);
+  /// Wong-inspired palette distinguishable with common colour-vision deficiencies.
+  colorblindSafe,
+}
+
+/// Chart colors for pressure, weight, and flow curves.
+///
+/// Set [palette] to switch between the coffee theme and a colour-blind safe set.
+/// Line colors are exposed as getters so they follow the active palette.
+abstract final class FlowlogChartColors {
+  static FlowlogChartPalette palette = FlowlogChartPalette.coffee;
+
+  static const coffeePressureLow = Color(0xFF6B9E5A);
+  static const coffeePressureHigh = Color(0xFFE8A54B);
+  static const coffeePressureLine = Color(0xFFD4923A);
+  static const coffeeWeightLine = Color(0xFF5B8DB8);
+  static const coffeeFlowLine = Color(0xFF4ECDC4);
+  static const coffeeTargetPressureLine = Color(0xFFE8E0D8);
+
+  static const colorblindPressureLow = Color(0xFF56B4E9);
+  static const colorblindPressureHigh = Color(0xFFE69F00);
+  static const colorblindPressureLine = Color(0xFFD55E00);
+  static const colorblindWeightLine = Color(0xFF0072B2);
+  static const colorblindFlowLine = Color(0xFF009E73);
+  static const colorblindTargetPressureLine = Color(0xFFCC79A7);
+
+  static Color get pressureLow => _lineColor(
+        coffee: coffeePressureLow,
+        colorblindSafe: colorblindPressureLow,
+      );
+
+  static Color get pressureHigh => _lineColor(
+        coffee: coffeePressureHigh,
+        colorblindSafe: colorblindPressureHigh,
+      );
+
+  static Color get pressureLine => _lineColor(
+        coffee: coffeePressureLine,
+        colorblindSafe: colorblindPressureLine,
+      );
+
+  static Color get weightLine => _lineColor(
+        coffee: coffeeWeightLine,
+        colorblindSafe: colorblindWeightLine,
+      );
+
+  static Color get flowLine => _lineColor(
+        coffee: coffeeFlowLine,
+        colorblindSafe: colorblindFlowLine,
+      );
+
+  static Color get targetPressureLine => _lineColor(
+        coffee: coffeeTargetPressureLine,
+        colorblindSafe: colorblindTargetPressureLine,
+      );
 
   static const grid = Color(0xFF8A7B6E);
   static const axisLabel = Color(0xFFD4C9BC);
   static const background = Color(0xFF241C16);
+
+  static Color _lineColor({
+    required Color coffee,
+    required Color colorblindSafe,
+  }) {
+    return palette == FlowlogChartPalette.colorblindSafe
+        ? colorblindSafe
+        : coffee;
+  }
 }
 
 /// Live dual-axis chart for espresso pressure, weight, and flow.
@@ -42,6 +102,7 @@ class DualCurveChart extends StatefulWidget {
     this.annotations,
     this.annotationsNotifier,
     this.onAnnotateAtElapsedMs,
+    this.targetPressureSamples = const [],
   }) : assert(
           samples != null || samplesNotifier != null,
           'Provide samples or samplesNotifier',
@@ -81,6 +142,9 @@ class DualCurveChart extends StatefulWidget {
 
   /// Called when the user long-presses the chart to add a note.
   final void Function(int elapsedMs)? onAnnotateAtElapsedMs;
+
+  /// Reference pressure curve drawn as a dashed overlay (repeat-shot target).
+  final List<ShotSample> targetPressureSamples;
 
   @override
   State<DualCurveChart> createState() => _DualCurveChartState();
@@ -197,6 +261,7 @@ class _DualCurveChartState extends State<DualCurveChart> {
                           visibility: visibility,
                           backgroundColor: widget.backgroundColor,
                           annotations: annotations,
+                          targetPressureSamples: widget.targetPressureSamples,
                         )
                       : _OverlayChart(
                           samples: prepared,
@@ -205,6 +270,7 @@ class _DualCurveChartState extends State<DualCurveChart> {
                           visibility: visibility,
                           backgroundColor: widget.backgroundColor,
                           annotations: annotations,
+                          targetPressureSamples: widget.targetPressureSamples,
                         );
 
                   final interactiveBody = widget.enableInteraction
@@ -237,6 +303,7 @@ class _DualCurveChartState extends State<DualCurveChart> {
               showPressure: visibility.showPressure,
               showWeight: visibility.showWeight,
               showFlow: visibility.showFlow,
+              showTarget: widget.targetPressureSamples.isNotEmpty,
               viewMode: viewMode,
             ),
           ],
@@ -261,6 +328,9 @@ class _DualCurveChartState extends State<DualCurveChart> {
   int _resolveTotalDurationMs(List<ShotSample> samples) {
     var total = widget.maxDurationMs ?? 30000;
     for (final sample in samples) {
+      total = math.max(total, sample.elapsedMs);
+    }
+    for (final sample in widget.targetPressureSamples) {
       total = math.max(total, sample.elapsedMs);
     }
     if (widget.maxDurationMs != null) {
@@ -330,6 +400,7 @@ class _OverlayChart extends StatelessWidget {
     required this.visibility,
     required this.backgroundColor,
     required this.annotations,
+    required this.targetPressureSamples,
   });
 
   final List<ShotSample> samples;
@@ -338,6 +409,7 @@ class _OverlayChart extends StatelessWidget {
   final _SeriesVisibility visibility;
   final Color backgroundColor;
   final List<ShotAnnotation> annotations;
+  final List<ShotSample> targetPressureSamples;
 
   @override
   Widget build(BuildContext context) {
@@ -351,6 +423,7 @@ class _OverlayChart extends StatelessWidget {
         showFlow: visibility.showFlow,
         backgroundColor: backgroundColor,
         annotations: annotations,
+        targetPressureSamples: targetPressureSamples,
       ),
     );
   }
@@ -364,6 +437,7 @@ class _SplitCharts extends StatelessWidget {
     required this.visibility,
     required this.backgroundColor,
     required this.annotations,
+    required this.targetPressureSamples,
   });
 
   final List<ShotSample> samples;
@@ -372,6 +446,7 @@ class _SplitCharts extends StatelessWidget {
   final _SeriesVisibility visibility;
   final Color backgroundColor;
   final List<ShotAnnotation> annotations;
+  final List<ShotSample> targetPressureSamples;
 
   @override
   Widget build(BuildContext context) {
@@ -395,6 +470,7 @@ class _SplitCharts extends StatelessWidget {
             compact: true,
             axisUnitLabel: 'bar',
             annotations: annotations,
+            targetPressureSamples: targetPressureSamples,
           ),
         ),
       );
@@ -512,12 +588,14 @@ class _Legend extends StatelessWidget {
     required this.showPressure,
     required this.showWeight,
     required this.showFlow,
+    required this.showTarget,
     required this.viewMode,
   });
 
   final bool showPressure;
   final bool showWeight;
   final bool showFlow;
+  final bool showTarget;
   final ChartViewMode viewMode;
 
   @override
@@ -538,6 +616,15 @@ class _Legend extends StatelessWidget {
     }
     if (showFlow) {
       items.add(_LegendItem(color: FlowlogChartColors.flowLine, label: 'Flow'));
+    }
+    if (showTarget) {
+      items.add(
+        _LegendItem(
+          color: FlowlogChartColors.targetPressureLine,
+          label: 'Target',
+          dashed: true,
+        ),
+      );
     }
 
     return Row(
@@ -570,21 +657,34 @@ class _Legend extends StatelessWidget {
 }
 
 class _LegendItem extends StatelessWidget {
-  const _LegendItem({required this.color, required this.label});
+  const _LegendItem({
+    required this.color,
+    required this.label,
+    this.dashed = false,
+  });
 
   final Color color;
   final String label;
+  final bool dashed;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
+        dashed
+            ? SizedBox(
+                width: 14,
+                height: 10,
+                child: CustomPaint(
+                  painter: _DashedLegendSwatchPainter(color: color),
+                ),
+              )
+            : Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
         const SizedBox(width: 6),
         Text(
           label,
@@ -595,6 +695,36 @@ class _LegendItem extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _DashedLegendSwatchPainter extends CustomPainter {
+  const _DashedLegendSwatchPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+
+    const dashLength = 4.0;
+    const gapLength = 3.0;
+    var x = 0.0;
+    final y = size.height / 2;
+    while (x < size.width) {
+      final end = math.min(x + dashLength, size.width);
+      canvas.drawLine(Offset(x, y), Offset(end, y), paint);
+      x += dashLength + gapLength;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedLegendSwatchPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }
 
@@ -611,11 +741,13 @@ class DualCurveChartPainter extends CustomPainter {
     this.compact = false,
     this.axisUnitLabel,
     this.annotations = const [],
+    this.targetPressureSamples = const [],
   }) : viewport = viewport ??
             ChartViewport(
               totalDurationMs: math.max(
                 1,
-                maxDurationMs ?? _fallbackDuration(samples),
+                maxDurationMs ??
+                    _fallbackDuration(samples, targetPressureSamples),
               ),
             );
 
@@ -629,17 +761,25 @@ class DualCurveChartPainter extends CustomPainter {
   final bool compact;
   final String? axisUnitLabel;
   final List<ShotAnnotation> annotations;
+  final List<ShotSample> targetPressureSamples;
 
   static const leftPad = 40.0;
   static const rightPad = 40.0;
   static const topPad = 12.0;
   static const bottomPad = 24.0;
 
-  static int _fallbackDuration(List<ShotSample> samples) {
-    if (samples.isEmpty) {
-      return 30000;
+  static int _fallbackDuration(
+    List<ShotSample> samples,
+    List<ShotSample> targetPressureSamples,
+  ) {
+    var duration = 30000;
+    if (samples.isNotEmpty) {
+      duration = samples.last.elapsedMs;
     }
-    return samples.last.elapsedMs;
+    if (targetPressureSamples.isNotEmpty) {
+      duration = math.max(duration, targetPressureSamples.last.elapsedMs);
+    }
+    return duration;
   }
 
   @override
@@ -658,18 +798,23 @@ class DualCurveChartPainter extends CustomPainter {
 
     _drawGrid(canvas, plotRect);
 
-    if (samples.isEmpty) {
-      _drawEmptyLabel(canvas, plotRect);
-      return;
-    }
-
     final scales = _ChartScales.fromSamples(
       samples,
       maxDurationMs: maxDurationMs,
       viewport: viewport,
+      targetPressureSamples: targetPressureSamples,
     );
 
     _drawAxes(canvas, plotRect, scales);
+
+    if (samples.isEmpty && targetPressureSamples.isEmpty) {
+      _drawEmptyLabel(canvas, plotRect);
+      return;
+    }
+
+    if (showPressure && targetPressureSamples.isNotEmpty) {
+      _drawTargetPressure(canvas, plotRect, scales);
+    }
 
     if (showPressure) {
       _drawPressure(canvas, plotRect, scales);
@@ -790,6 +935,20 @@ class DualCurveChartPainter extends CustomPainter {
     );
   }
 
+  void _drawTargetPressure(Canvas canvas, Rect plotRect, _ChartScales scales) {
+    _drawSeries(
+      canvas,
+      plotRect,
+      scales,
+      samples: targetPressureSamples,
+      valueSelector: (sample) => sample.pressureBar,
+      maxValue: scales.pressureMax,
+      color: FlowlogChartColors.targetPressureLine.withValues(alpha: 0.85),
+      strokeWidth: 1.75,
+      dashed: true,
+    );
+  }
+
   void _drawPressure(Canvas canvas, Rect plotRect, _ChartScales scales) {
     final points = <Offset>[];
     for (final sample in samples) {
@@ -844,14 +1003,16 @@ class DualCurveChartPainter extends CustomPainter {
     Canvas canvas,
     Rect plotRect,
     _ChartScales scales, {
+    List<ShotSample>? samples,
     required double? Function(ShotSample sample) valueSelector,
     required double maxValue,
     required Color color,
     required double strokeWidth,
     bool dashed = false,
   }) {
+    final series = samples ?? this.samples;
     final points = <Offset>[];
-    for (final sample in samples) {
+    for (final sample in series) {
       final value = valueSelector(sample);
       if (value == null) {
         continue;
@@ -970,7 +1131,8 @@ class DualCurveChartPainter extends CustomPainter {
         oldDelegate.backgroundColor != backgroundColor ||
         oldDelegate.compact != compact ||
         oldDelegate.axisUnitLabel != axisUnitLabel ||
-        oldDelegate.annotations != annotations;
+        oldDelegate.annotations != annotations ||
+        oldDelegate.targetPressureSamples != targetPressureSamples;
   }
 }
 
@@ -995,6 +1157,7 @@ class _ChartScales {
     List<ShotSample> samples, {
     int? maxDurationMs,
     required ChartViewport viewport,
+    List<ShotSample> targetPressureSamples = const [],
   }) {
     var pressureMax = 12.0;
     var weightMax = 50.0;
@@ -1003,9 +1166,9 @@ class _ChartScales {
     final windowStart = viewport.visibleStartMs;
     final windowEnd = viewport.visibleEndMs;
 
-    for (final sample in samples) {
+    void considerSample(ShotSample sample) {
       if (sample.elapsedMs < windowStart || sample.elapsedMs > windowEnd) {
-        continue;
+        return;
       }
       if (sample.pressureBar != null) {
         pressureMax = math.max(pressureMax, sample.pressureBar! * 1.1);
@@ -1016,6 +1179,13 @@ class _ChartScales {
       if (sample.flowGs != null) {
         flowMax = math.max(flowMax, sample.flowGs! * 1.1);
       }
+    }
+
+    for (final sample in samples) {
+      considerSample(sample);
+    }
+    for (final sample in targetPressureSamples) {
+      considerSample(sample);
     }
 
     return _ChartScales(

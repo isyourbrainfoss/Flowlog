@@ -121,15 +121,24 @@ class StarShotFab extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return FloatingActionButton.extended(
-      key: const Key('star_shot_fab'),
-      onPressed: enabled ? onPressed : null,
-      tooltip: 'Save star shot',
-      icon: Icon(
-        Icons.auto_awesome,
-        color: enabled ? null : theme.disabledColor,
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: enabled
+          ? 'Save star shot'
+          : 'Save star shot, unavailable until recording stops',
+      child: ExcludeSemantics(
+        child: FloatingActionButton.extended(
+          key: const Key('star_shot_fab'),
+          onPressed: enabled ? onPressed : null,
+          tooltip: 'Save star shot',
+          icon: Icon(
+            Icons.auto_awesome,
+            color: enabled ? null : theme.disabledColor,
+          ),
+          label: const Text('Star shot'),
+        ),
       ),
-      label: const Text('Star shot'),
     );
   }
 }

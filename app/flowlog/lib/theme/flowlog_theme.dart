@@ -147,19 +147,35 @@ abstract final class FlowlogTheme {
 
 /// Notifies listeners when the user switches between coffee dark and café light.
 class FlowlogThemeController extends ChangeNotifier {
-  FlowlogThemeController({this._themeMode = ThemeMode.dark});
+  FlowlogThemeController({
+    ThemeMode themeMode = ThemeMode.dark,
+    bool highContrast = false,
+  })  : _themeMode = themeMode,
+        _highContrast = highContrast;
 
   ThemeMode _themeMode;
+  bool _highContrast;
 
   ThemeMode get themeMode => _themeMode;
 
   bool get isDark => _themeMode == ThemeMode.dark;
+
+  /// Stub flag for a future high-contrast theme; toggled from the More tab.
+  bool get highContrast => _highContrast;
 
   void setThemeMode(ThemeMode mode) {
     if (_themeMode == mode) {
       return;
     }
     _themeMode = mode;
+    notifyListeners();
+  }
+
+  void setHighContrast(bool enabled) {
+    if (_highContrast == enabled) {
+      return;
+    }
+    _highContrast = enabled;
     notifyListeners();
   }
 }

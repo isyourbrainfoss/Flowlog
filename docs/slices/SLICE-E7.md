@@ -1,6 +1,6 @@
 # SLICE-E7: Sensor diagnostics
 
-status: pending
+status: done
 parallel_with: E6
 
 ## Prerequisites
@@ -13,9 +13,9 @@ B7
 
 ## Done when
 
-- [ ] RSSI display
-- [ ] Reconnect log
-- [ ] Last error message
+- [x] RSSI display
+- [x] Reconnect log
+- [x] Last error message
 
 ## Verify
 

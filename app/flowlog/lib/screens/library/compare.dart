@@ -7,18 +7,19 @@ import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
 /// Distinct colors for overlaid shot pressure curves.
-const List<Color> compareShotPalette = [
-  FlowlogChartColors.pressureLine,
-  FlowlogChartColors.weightLine,
-  FlowlogChartColors.flowLine,
-  Color(0xFFE8786A),
-  Color(0xFF9B7EDE),
-  Color(0xFFF2C94C),
-];
+List<Color> get compareShotPalette => [
+      FlowlogChartColors.pressureLine,
+      FlowlogChartColors.weightLine,
+      FlowlogChartColors.flowLine,
+      const Color(0xFFE8786A),
+      const Color(0xFF9B7EDE),
+      const Color(0xFFF2C94C),
+    ];
 
 /// Picks [index] from [compareShotPalette].
 Color compareShotColor(int index) {
-  return compareShotPalette[index % compareShotPalette.length];
+  final palette = compareShotPalette;
+  return palette[index % palette.length];
 }
 
 /// Compare saved shots by overlaying pressure curves on a shared time axis.

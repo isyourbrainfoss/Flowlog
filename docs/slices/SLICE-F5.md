@@ -1,6 +1,6 @@
 # SLICE-F5: Saved profiles + Repeat shot
 
-status: pending
+status: done
 parallel_with: F6
 
 ## Prerequisites
@@ -14,8 +14,8 @@ C6, C3
 
 ## Done when
 
-- [ ] Save cranking pattern from shot
-- [ ] One-tap Repeat prefill
+- [x] Save cranking pattern from shot
+- [x] One-tap Repeat prefill
 
 ## Verify
 

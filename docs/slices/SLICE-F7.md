@@ -1,6 +1,6 @@
 # SLICE-F7: PDF export
 
-status: pending
+status: done
 parallel_with: F3
 
 ## Prerequisites
@@ -13,8 +13,8 @@ D2
 
 ## Done when
 
-- [ ] Single shot PDF report
-- [ ] Unit test output structure
+- [x] Single shot PDF report
+- [x] Unit test output structure
 
 ## Verify
 

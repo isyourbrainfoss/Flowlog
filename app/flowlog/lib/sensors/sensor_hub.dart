@@ -25,6 +25,30 @@ extension SensorKindLabels on SensorKind {
       };
 }
 
+/// Outcome of a recorded reconnect attempt.
+enum ReconnectOutcome {
+  attempted,
+  connected,
+  failed,
+}
+
+/// A reconnect attempt recorded for sensor diagnostics.
+class SensorReconnectEvent {
+  SensorReconnectEvent({
+    required this.deviceId,
+    required this.deviceName,
+    required this.timestamp,
+    required this.outcome,
+    this.message,
+  });
+
+  final String deviceId;
+  final String deviceName;
+  final DateTime timestamp;
+  final ReconnectOutcome outcome;
+  final String? message;
+}
+
 /// A user-paired sensor entry (persisted in memory for this session).
 class PairedSensorEntry {
   PairedSensorEntry({
@@ -58,9 +82,21 @@ class SensorHub extends ChangeNotifier {
       : _devices = List.of(initialDevices ?? []);
 
   final List<PairedSensorEntry> _devices;
+  final List<SensorReconnectEvent> _reconnectLog = [];
+  final Map<String, int?> _rssiByDevice = {};
   int _idCounter = 0;
+  String? _lastError;
 
   List<PairedSensorEntry> get devices => List.unmodifiable(_devices);
+
+  /// Chronological reconnect attempts (newest last).
+  List<SensorReconnectEvent> get reconnectLog => List.unmodifiable(_reconnectLog);
+
+  /// Most recent connection error across all sensors.
+  String? get lastError => _lastError;
+
+  /// Placeholder RSSI in dBm until live BLE reports signal strength.
+  int? rssiFor(String deviceId) => _rssiByDevice[deviceId];
 
   bool hasKind(SensorKind kind) =>
       _devices.any((device) => device.kind == kind);
@@ -98,8 +134,51 @@ class SensorHub extends ChangeNotifier {
     final removed = _devices.length;
     _devices.removeWhere((device) => device.id == id);
     if (_devices.length != removed) {
+      _rssiByDevice.remove(id);
       notifyListeners();
     }
+  }
+
+  /// Records a reconnect attempt for the diagnostics screen.
+  void recordReconnect({
+    required String deviceId,
+    required String deviceName,
+    required ReconnectOutcome outcome,
+    String? message,
+    DateTime? timestamp,
+  }) {
+    _reconnectLog.add(
+      SensorReconnectEvent(
+        deviceId: deviceId,
+        deviceName: deviceName,
+        timestamp: timestamp ?? DateTime.now(),
+        outcome: outcome,
+        message: message,
+      ),
+    );
+    notifyListeners();
+  }
+
+  void clearReconnectLog() {
+    if (_reconnectLog.isEmpty) {
+      return;
+    }
+    _reconnectLog.clear();
+    notifyListeners();
+  }
+
+  void setLastError(String? message) {
+    if (_lastError == message) {
+      return;
+    }
+    _lastError = message;
+    notifyListeners();
+  }
+
+  /// Updates placeholder RSSI for [deviceId] (live BLE will populate this later).
+  void updateRssi(String deviceId, int? rssi) {
+    _rssiByDevice[deviceId] = rssi;
+    notifyListeners();
   }
 
   /// Attempt BLE connect — stub until flutter_blue_plus UI lands.
@@ -109,13 +188,29 @@ class SensorHub extends ChangeNotifier {
       return;
     }
 
-    _devices[index] = _devices[index].copyWith(state: ConnectionState.connecting);
+    final device = _devices[index];
+    _devices[index] = device.copyWith(state: ConnectionState.connecting);
+    _rssiByDevice[id] = null;
+    recordReconnect(
+      deviceId: id,
+      deviceName: device.name,
+      outcome: ReconnectOutcome.attempted,
+    );
     notifyListeners();
 
     await Future<void>.delayed(const Duration(milliseconds: 400));
 
     // Honest default: parsers exist but live BLE UI is not wired yet.
-    _devices[index] = _devices[index].copyWith(state: ConnectionState.disconnected);
+    const errorMessage =
+        'BLE pairing UI is not wired yet. Sensor parsers are ready.';
+    _devices[index] = device.copyWith(state: ConnectionState.disconnected);
+    setLastError(errorMessage);
+    recordReconnect(
+      deviceId: id,
+      deviceName: device.name,
+      outcome: ReconnectOutcome.failed,
+      message: errorMessage,
+    );
     notifyListeners();
   }
 

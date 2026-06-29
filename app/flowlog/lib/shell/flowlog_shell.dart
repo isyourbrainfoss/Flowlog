@@ -1,15 +1,24 @@
+import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog/shell/shell_breakpoints.dart';
+import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog/shell/top_bar.dart';
 import 'package:flutter/material.dart';
 
 /// Adaptive app shell: bottom bar when narrow/short, labeled sidebar when wide.
 class FlowlogShell extends StatefulWidget {
-  const FlowlogShell({super.key, this.initialTab = AppTab.live});
+  const FlowlogShell({
+    super.key,
+    this.initialTab = AppTab.live,
+    this.repeatShotController,
+  });
 
   final AppTab initialTab;
+
+  /// Optional repeat-shot controller for tests.
+  final RepeatShotController? repeatShotController;
 
   @override
   State<FlowlogShell> createState() => _FlowlogShellState();
@@ -19,10 +28,15 @@ class _FlowlogShellState extends State<FlowlogShell> {
   late int _selectedIndex;
   String _beanName = kDefaultBeanName;
   final FlowlogShortcutRegistry _shortcutRegistry = FlowlogShortcutRegistry();
+  late final RepeatShotController _repeatShotController;
+  late final bool _ownsRepeatShotController;
 
   @override
   void initState() {
     super.initState();
+    _ownsRepeatShotController = widget.repeatShotController == null;
+    _repeatShotController =
+        widget.repeatShotController ?? RepeatShotController();
     _selectedIndex = appDestinations
         .indexWhere((destination) => destination.tab == widget.initialTab);
     if (_selectedIndex < 0) {
@@ -30,11 +44,28 @@ class _FlowlogShellState extends State<FlowlogShell> {
     }
   }
 
+  @override
+  void dispose() {
+    if (_ownsRepeatShotController) {
+      _repeatShotController.dispose();
+    }
+    super.dispose();
+  }
+
   void _onBeanNameChanged(String name) {
     setState(() => _beanName = name);
   }
 
   void _onDestinationSelected(int index) {
+    setState(() => _selectedIndex = index);
+  }
+
+  void _switchTab(AppTab tab) {
+    final index =
+        appDestinations.indexWhere((destination) => destination.tab == tab);
+    if (index < 0) {
+      return;
+    }
     setState(() => _selectedIndex = index);
   }
 
@@ -75,7 +106,12 @@ class _FlowlogShellState extends State<FlowlogShell> {
                           NavigationRailDestination(
                             icon: Icon(item.icon),
                             selectedIcon: Icon(item.icon),
-                            label: Text(item.label),
+                            label: Semantics(
+                              label: item.semanticsLabel,
+                              child: ExcludeSemantics(
+                                child: Text(item.label),
+                              ),
+                            ),
                           ),
                       ],
                     ),
@@ -91,10 +127,16 @@ class _FlowlogShellState extends State<FlowlogShell> {
                 ),
               );
 
-        return FlowlogShortcuts(
-          registry: _shortcutRegistry,
-          currentTab: destination.tab,
-          child: shell,
+        return RepeatShotScope(
+          controller: _repeatShotController,
+          child: FlowlogShellScope(
+            switchTab: _switchTab,
+            child: FlowlogShortcuts(
+              registry: _shortcutRegistry,
+              currentTab: destination.tab,
+              child: shell,
+            ),
+          ),
         );
       },
     );
@@ -169,7 +211,8 @@ class _FlowlogBottomBar extends StatelessWidget {
           NavigationDestination(
             icon: Icon(item.icon),
             selectedIcon: Icon(item.icon),
-            label: item.label,
+            label: item.semanticsLabel,
+            tooltip: item.semanticsLabel,
           ),
       ],
     );

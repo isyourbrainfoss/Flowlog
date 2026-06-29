@@ -35,20 +35,20 @@ Parallel waves: [`docs/PARALLEL.md`](PARALLEL.md).
 | E1 | Chart zoom/pan + view modes | done | E2, E6 |
 | E2 | Annotations + channel mark | done | E1, E3 |
 | E3 | Haptics + shot-end pulse | done | E4, E2 |
-| E4 | Bean fill + PB confetti | pending | E3 |
+| E4 | Bean fill + PB confetti | done | E3 |
 | E5 | Desktop keyboard shortcuts | done | E6 |
-| E6 | Accessibility pass | pending | E1, E5 |
-| E7 | Sensor diagnostics | pending | E6 |
+| E6 | Accessibility pass | done | E1, E5 |
+| E7 | Sensor diagnostics | done | E6 |
 | F1 | Search + filter shots | done | F2, F4 |
 | F2 | Tags / folders | done | F1, F4 |
 | F3 | Side-by-side compare | done | F6 |
 | F4 | Bean database | done | F1, F2 |
-| F5 | Saved profiles + Repeat shot | pending | F6 |
-| F6 | Insights dashboard | pending | F7, F3 |
-| F7 | PDF export | pending | F3 |
-| G1 | AI insights tab | pending | G2 |
-| G2 | What-if curve simulator | pending | G1 |
-| G3 | E2E cloud sync | pending | G4 |
-| G4 | Community profile share | pending | G3 |
-| G5 | Android home widget | pending | — |
+| F5 | Saved profiles + Repeat shot | done | F6 |
+| F6 | Insights dashboard | done | F7, F3 |
+| F7 | PDF export | done | F3 |
+| G1 | AI insights tab | done | G2 |
+| G2 | What-if curve simulator | done | G1 |
+| G3 | E2E cloud sync | done | G4 |
+| G4 | Community profile share | done | G3 |
+| G5 | Android home widget | done | — |
 | G6 | WiFi scale adapter | pending | — |

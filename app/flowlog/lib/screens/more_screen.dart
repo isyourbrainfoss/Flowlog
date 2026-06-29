@@ -1,3 +1,4 @@
+import 'package:flowlog/screens/more/diagnostics.dart';
 import 'package:flowlog/screens/more/sensors_screen.dart';
 import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
@@ -28,6 +29,16 @@ class MoreScreen extends StatelessWidget {
           ),
         ),
         ListTile(
+          title: const Text('High contrast'),
+          subtitle: Text(
+            themeController.highContrast ? 'Enabled' : 'Disabled',
+          ),
+          trailing: Switch(
+            value: themeController.highContrast,
+            onChanged: themeController.setHighContrast,
+          ),
+        ),
+        ListTile(
           leading: const Icon(Icons.ios_share),
           title: const Text('Export shots'),
           subtitle: const Text('Batch CSV export and share'),
@@ -49,6 +60,14 @@ class MoreScreen extends StatelessWidget {
               ),
             );
           },
+        ),
+        ListTile(
+          key: const Key('more_diagnostics_tile'),
+          leading: const Icon(Icons.bug_report_outlined),
+          title: const Text('Sensor diagnostics'),
+          subtitle: const Text('RSSI, reconnect log, last error'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => openSensorDiagnosticsScreen(context),
         ),
       ],
     );

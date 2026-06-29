@@ -1,6 +1,6 @@
 # SLICE-G3: E2E cloud sync
 
-status: pending
+status: done
 parallel_with: G4
 
 ## Prerequisites
@@ -13,8 +13,8 @@ D5
 
 ## Done when
 
-- [ ] Encrypted blob export/import stub
-- [ ] Optional account-off by default
+- [x] Encrypted blob export/import stub
+- [x] Optional account-off by default
 
 ## Verify
 

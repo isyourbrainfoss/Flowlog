@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_description">Flowlog pressure mini-graph</string>
+    <string name="widget_tap_to_open">Tap to open</string>
+    <string name="widget_sparkline_description">Pressure sparkline placeholder</string>
+</resources>

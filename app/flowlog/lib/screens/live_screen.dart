@@ -3,8 +3,10 @@ import 'dart:io';
 
 import 'package:flowlog/screens/live/annotations.dart';
 import 'package:flowlog/screens/live/controls.dart';
+import 'package:flowlog/screens/live/delight.dart';
 import 'package:flowlog/screens/live/feedback.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
+import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
@@ -19,6 +21,8 @@ class LiveScreen extends StatefulWidget {
     super.key,
     this.controller,
     this.shotRepository,
+    this.profileRepository,
+    this.repeatShotController,
     this.onShotSaved,
     this.shotEndFeedback = const ShotEndFeedback(),
     this.shotIdGenerator = generateShotId,
@@ -29,6 +33,12 @@ class LiveScreen extends StatefulWidget {
 
   /// Optional repository override; defaults to a temp-file database.
   final ShotRepository? shotRepository;
+
+  /// Optional profile repository override; defaults to shared temp database.
+  final ProfileRepository? profileRepository;
+
+  /// Optional repeat-shot controller override for tests.
+  final RepeatShotController? repeatShotController;
 
   /// Called after a shot is persisted (useful in tests).
   final void Function(Shot shot)? onShotSaved;
@@ -52,11 +62,14 @@ class _LiveScreenState extends State<LiveScreen> {
   MockReplayAdapter? _replayAdapter;
   DecentScaleBleAdapter? _scaleAdapter;
   ShotRepository? _shotRepository;
+  ProfileRepository? _profileRepository;
   FlowlogDatabase? _database;
   bool _ownsRepository = false;
   bool _savingShot = false;
   ShotSessionState _lastSessionState = ShotSessionState.idle;
   FlowlogShortcutRegistry? _shortcutRegistry;
+  RepeatShotController? _repeatShotController;
+  final ConfettiController _confettiController = ConfettiController();
 
   @override
   void initState() {
@@ -97,11 +110,14 @@ class _LiveScreenState extends State<LiveScreen> {
       _shortcutRegistry = scope.registry;
       _shortcutRegistry!.setToggleLiveShot(_onToggleShotShortcut);
     }
+    _repeatShotController =
+        widget.repeatShotController ?? RepeatShotScope.maybeOf(context);
   }
 
   @override
   void dispose() {
     _shortcutRegistry?.setToggleLiveShot(null);
+    _confettiController.dispose();
     _controller.removeListener(_syncSamples);
     _annotationController.removeListener(_syncAnnotations);
     _annotationController.dispose();
@@ -167,7 +183,18 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
-  Future<ShotRepository> _ensureRepository() async {
+  Future<FlowlogDatabase> _ensureDatabase() async {
+    if (_database != null) {
+      return _database!;
+    }
+
+    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
+    _database = FlowlogDatabase.openFile(dbPath);
+    _ownsRepository = true;
+    return _database!;
+  }
+
+  Future<ShotRepository> _ensureShotRepository() async {
     if (widget.shotRepository != null) {
       return widget.shotRepository!;
     }
@@ -175,11 +202,22 @@ class _LiveScreenState extends State<LiveScreen> {
       return _shotRepository!;
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
-    _shotRepository = ShotRepository(_database!);
-    _ownsRepository = true;
+    final database = await _ensureDatabase();
+    _shotRepository = ShotRepository(database);
     return _shotRepository!;
+  }
+
+  Future<ProfileRepository> _ensureProfileRepository() async {
+    if (widget.profileRepository != null) {
+      return widget.profileRepository!;
+    }
+    if (_profileRepository != null) {
+      return _profileRepository!;
+    }
+
+    final database = await _ensureDatabase();
+    _profileRepository = ProfileRepository(database);
+    return _profileRepository!;
   }
 
   Future<void> _onStarShotPressed() async {
@@ -194,20 +232,27 @@ class _LiveScreenState extends State<LiveScreen> {
 
     setState(() => _savingShot = true);
     try {
-      final repository = await _ensureRepository();
+      final repository = await _ensureShotRepository();
       if (!mounted) {
         return;
       }
 
-      await runStarShotSaveFlow(
+      final shot = await runStarShotSaveFlow(
         context: context,
         repository: repository,
         samples: _controller.samples,
         startedAt: startedAt,
         endedAt: _controller.sessionEndedAt,
+        initialMetadata: _repeatShotController?.prefill?.metadata,
         annotations: _annotationController.annotations,
         idGenerator: widget.shotIdGenerator,
         onSaved: widget.onShotSaved,
+      );
+
+      await celebratePersonalBestTasteScore(
+        repository: repository,
+        shot: shot,
+        confettiController: _confettiController,
       );
     } finally {
       if (mounted) {
@@ -216,10 +261,39 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
+  Future<void> _onRepeatShotPressed() async {
+    if (!_controller.canSaveShot) {
+      return;
+    }
+
+    final startedAt = _controller.sessionStartedAt;
+    if (startedAt == null) {
+      return;
+    }
+
+    final shot = buildShotFromSession(
+      samples: _controller.samples,
+      startedAt: startedAt,
+      endedAt: _controller.sessionEndedAt,
+    );
+
+    await startRepeatShotFromShot(
+      context: context,
+      shot: shot,
+      profileRepository: await _ensureProfileRepository(),
+      repeatController: _repeatShotController,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final listenables = <Listenable>[_controller];
+    if (_repeatShotController != null) {
+      listenables.add(_repeatShotController!);
+    }
+
     return ListenableBuilder(
-      listenable: _controller,
+      listenable: Listenable.merge(listenables),
       builder: (context, _) {
         final state = _controller.sessionState;
         final samples = _controller.samples;
@@ -228,58 +302,79 @@ class _LiveScreenState extends State<LiveScreen> {
             samples.length < 2 ? null : samples[samples.length - 2];
         final canAnnotate =
             state != ShotSessionState.idle && samples.isNotEmpty;
+        final repeatPrefill = _repeatShotController?.prefill;
 
-        return LiveShotEndListener(
-          controller: _controller,
-          shotEndFeedback: widget.shotEndFeedback,
-          child: Scaffold(
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  DualCurveChart(
-                    samplesNotifier: _samplesNotifier,
-                    annotationsNotifier: _annotationsNotifier,
-                    onAnnotateAtElapsedMs:
-                        canAnnotate ? _onAnnotateAtElapsedMs : null,
-                  ),
-                  const SizedBox(height: 8),
-                  AnnotationControls(
-                    controller: _annotationController,
-                    canMarkChannel: canAnnotate,
-                    onMarkChannel: _onMarkChannel,
-                  ),
-                  const SizedBox(height: 8),
-                  if (latestSample != null)
-                    LiveMetricsRow(
-                      sample: latestSample,
-                      previousSample: previousSample,
-                    )
-                  else
-                    const LiveMetricsRow(
-                      metrics: LiveMetrics(elapsedMs: 0),
+        return ConfettiOverlay(
+          controller: _confettiController,
+          child: LiveShotEndListener(
+            controller: _controller,
+            shotEndFeedback: widget.shotEndFeedback,
+            child: Scaffold(
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    RecordingBeanFillIndicator(controller: _controller),
+                    if (repeatPrefill != null)
+                      RepeatShotBanner(
+                        profileName: repeatPrefill.profile.name,
+                        onDismiss: _repeatShotController!.clear,
+                      ),
+                    if (repeatPrefill != null) const SizedBox(height: 8),
+                    DualCurveChart(
+                      samplesNotifier: _samplesNotifier,
+                      annotationsNotifier: _annotationsNotifier,
+                      targetPressureSamples:
+                          repeatPrefill?.targetPressureSamples ?? const [],
+                      onAnnotateAtElapsedMs:
+                          canAnnotate ? _onAnnotateAtElapsedMs : null,
                     ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Session: ${state.name}',
-                    style: Theme.of(context).textTheme.titleMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${_controller.sampleCount} samples',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  LiveControls(controller: _controller),
-                ],
+                    const SizedBox(height: 8),
+                    AnnotationControls(
+                      controller: _annotationController,
+                      canMarkChannel: canAnnotate,
+                      onMarkChannel: _onMarkChannel,
+                    ),
+                    const SizedBox(height: 8),
+                    if (latestSample != null)
+                      LiveMetricsRow(
+                        sample: latestSample,
+                        previousSample: previousSample,
+                      )
+                    else
+                      const LiveMetricsRow(
+                        metrics: LiveMetrics(elapsedMs: 0),
+                      ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Session: ${state.name}',
+                      style: Theme.of(context).textTheme.titleMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_controller.sampleCount} samples',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    if (_controller.canSaveShot)
+                      Align(
+                        alignment: Alignment.center,
+                        child: RepeatShotButton(
+                          onPressed: _onRepeatShotPressed,
+                        ),
+                      ),
+                    if (_controller.canSaveShot) const SizedBox(height: 16),
+                    LiveControls(controller: _controller),
+                  ],
+                ),
               ),
-            ),
-            floatingActionButton: StarShotFab(
-              enabled: _controller.canSaveShot && !_savingShot,
-              onPressed: _onStarShotPressed,
+              floatingActionButton: StarShotFab(
+                enabled: _controller.canSaveShot && !_savingShot,
+                onPressed: _onStarShotPressed,
+              ),
             ),
           ),
         );

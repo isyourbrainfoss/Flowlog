@@ -1,3 +1,4 @@
+import 'package:flowlog/screens/more/diagnostics.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
@@ -47,6 +48,13 @@ class SensorsScreen extends StatelessWidget {
         ],
         const SizedBox(height: 8),
         _AddSensorButtons(hub: hub),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          key: const Key('open_diagnostics_button'),
+          onPressed: () => openSensorDiagnosticsScreen(context),
+          icon: const Icon(Icons.bug_report_outlined),
+          label: const Text('Sensor diagnostics'),
+        ),
       ],
     );
   }
