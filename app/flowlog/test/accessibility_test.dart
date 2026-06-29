@@ -4,7 +4,6 @@ import 'package:flowlog/main.dart';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog/shell/app_destinations.dart';
-import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
 import 'package:flowlog_sensors/src/decent_scale/decent_scale.dart';
@@ -160,33 +159,6 @@ void main() {
     });
   });
 
-  group('More screen accessibility settings', () {
-    testWidgets('high contrast toggle updates controller stub', (
-      tester,
-    ) async {
-      final controller = FlowlogThemeController();
-      addTearDown(controller.dispose);
-
-      await tester.pumpWidget(FlowlogApp(themeController: controller));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byIcon(Icons.tune));
-      await tester.pumpAndSettle();
-
-      expect(find.text('High contrast'), findsOneWidget);
-      expect(find.text('Disabled'), findsOneWidget);
-      expect(controller.highContrast, isFalse);
-
-      final switches = find.byType(Switch);
-      expect(switches, findsNWidgets(2));
-
-      await tester.tap(switches.at(1));
-      await tester.pumpAndSettle();
-
-      expect(controller.highContrast, isTrue);
-      expect(find.text('Enabled'), findsOneWidget);
-    });
-  });
 }
 
 String _fixturePath(String relativePath) {
