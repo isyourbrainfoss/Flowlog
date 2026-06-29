@@ -71,12 +71,12 @@ void main() {
     });
   });
 
-  group('ExcellentShotFab', () {
+  group('StarShotFab', () {
     testWidgets('is visible on Live tab', (tester) async {
       await _pumpLiveScreen(tester);
 
-      expect(find.byKey(const Key('excellent_shot_fab')), findsOneWidget);
-      expect(find.text('Excellent shot'), findsOneWidget);
+      expect(find.byKey(const Key('star_shot_fab')), findsOneWidget);
+      expect(find.text('Star shot'), findsOneWidget);
     });
 
     testWidgets('is disabled until session is stopped with samples', (
@@ -85,7 +85,7 @@ void main() {
       final harness = await _pumpLiveScreen(tester);
 
       final fab = tester.widget<FloatingActionButton>(
-        find.byKey(const Key('excellent_shot_fab')),
+        find.byKey(const Key('star_shot_fab')),
       );
       expect(fab.onPressed, isNull);
 
@@ -93,13 +93,13 @@ void main() {
 
       expect(harness.controller.canSaveShot, isTrue);
       final enabledFab = tester.widget<FloatingActionButton>(
-        find.byKey(const Key('excellent_shot_fab')),
+        find.byKey(const Key('star_shot_fab')),
       );
       expect(enabledFab.onPressed, isNotNull);
     });
   });
 
-  group('runExcellentShotSaveFlow', () {
+  group('runStarShotSaveFlow', () {
     late FlowlogDatabase db;
     late ShotRepository repository;
 
@@ -125,7 +125,7 @@ void main() {
 
       await _startAndStopSession(tester, harness.controller);
 
-      await tester.tap(find.byKey(const Key('excellent_shot_fab')));
+      await tester.tap(find.byKey(const Key('star_shot_fab')));
       await tester.pumpAndSettle();
 
       expect(find.text('Shot metadata'), findsOneWidget);
