@@ -149,29 +149,59 @@ class LiveControls extends StatelessWidget {
           runSpacing: 8,
           alignment: WrapAlignment.center,
           children: [
-            FilledButton(
-              key: const Key('live_start'),
-              onPressed: controller.canStart ? () => controller.start() : null,
-              child: const Text('Start'),
-            ),
-            FilledButton.tonal(
-              key: const Key('live_pause'),
-              onPressed: controller.canPause ? controller.pause : null,
-              child: const Text('Pause'),
-            ),
-            FilledButton.tonal(
-              key: const Key('live_resume'),
-              onPressed: controller.canResume ? controller.resume : null,
-              child: const Text('Resume'),
-            ),
-            FilledButton(
-              key: const Key('live_stop'),
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-                foregroundColor: Theme.of(context).colorScheme.onError,
+            Semantics(
+              button: true,
+              enabled: controller.canStart,
+              label: 'Start recording',
+              child: ExcludeSemantics(
+                child: FilledButton(
+                  key: const Key('live_start'),
+                  onPressed:
+                      controller.canStart ? () => controller.start() : null,
+                  child: const Text('Start'),
+                ),
               ),
-              onPressed: controller.canStop ? () => controller.stop() : null,
-              child: const Text('Stop'),
+            ),
+            Semantics(
+              button: true,
+              enabled: controller.canPause,
+              label: 'Pause recording',
+              child: ExcludeSemantics(
+                child: FilledButton.tonal(
+                  key: const Key('live_pause'),
+                  onPressed: controller.canPause ? controller.pause : null,
+                  child: const Text('Pause'),
+                ),
+              ),
+            ),
+            Semantics(
+              button: true,
+              enabled: controller.canResume,
+              label: 'Resume recording',
+              child: ExcludeSemantics(
+                child: FilledButton.tonal(
+                  key: const Key('live_resume'),
+                  onPressed: controller.canResume ? controller.resume : null,
+                  child: const Text('Resume'),
+                ),
+              ),
+            ),
+            Semantics(
+              button: true,
+              enabled: controller.canStop,
+              label: 'Stop recording',
+              child: ExcludeSemantics(
+                child: FilledButton(
+                  key: const Key('live_stop'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                    foregroundColor: Theme.of(context).colorScheme.onError,
+                  ),
+                  onPressed:
+                      controller.canStop ? () => controller.stop() : null,
+                  child: const Text('Stop'),
+                ),
+              ),
             ),
           ],
         );

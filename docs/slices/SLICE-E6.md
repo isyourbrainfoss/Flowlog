@@ -1,6 +1,6 @@
 # SLICE-E6: Accessibility pass
 
-status: pending
+status: done
 parallel_with: E1, E5
 
 ## Prerequisites
@@ -14,9 +14,9 @@ A5, C3
 
 ## Done when
 
-- [ ] Semantics labels on controls
-- [ ] High contrast option stub
-- [ ] Colour-blind safe chart colors
+- [x] Semantics labels on controls
+- [x] High contrast option stub
+- [x] Colour-blind safe chart colors
 
 ## Verify
 

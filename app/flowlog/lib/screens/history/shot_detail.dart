@@ -1,19 +1,96 @@
+import 'dart:io';
+
+import 'package:flowlog/screens/library/share_profile.dart';
 import 'package:flowlog/screens/live/metadata_sheet.dart';
+import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
 /// Read-only detail view for a saved shot: full chart and metadata.
-class ShotDetailScreen extends StatelessWidget {
+class ShotDetailScreen extends StatefulWidget {
   const ShotDetailScreen({
     super.key,
     required this.shot,
+    this.profileRepository,
+    this.repeatShotController,
   });
 
   final Shot shot;
 
+  /// Optional repository override for tests.
+  final ProfileRepository? profileRepository;
+
+  /// Optional repeat-shot controller override for tests.
+  final RepeatShotController? repeatShotController;
+
+  @override
+  State<ShotDetailScreen> createState() => _ShotDetailScreenState();
+}
+
+class _ShotDetailScreenState extends State<ShotDetailScreen> {
+  ProfileRepository? _profileRepository;
+  FlowlogDatabase? _database;
+  bool _ownsRepository = false;
+  bool _repeating = false;
+  RepeatShotController? _repeatShotController;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _repeatShotController =
+        widget.repeatShotController ?? RepeatShotScope.maybeOf(context);
+  }
+
+  @override
+  void dispose() {
+    if (_ownsRepository) {
+      _database?.close();
+    }
+    super.dispose();
+  }
+
+  Future<ProfileRepository> _ensureProfileRepository() async {
+    if (widget.profileRepository != null) {
+      return widget.profileRepository!;
+    }
+    if (_profileRepository != null) {
+      return _profileRepository!;
+    }
+
+    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
+    _database = FlowlogDatabase.openFile(dbPath);
+    _profileRepository = ProfileRepository(_database!);
+    _ownsRepository = true;
+    return _profileRepository!;
+  }
+
+  Future<void> _onRepeatShotPressed() async {
+    if (_repeating) {
+      return;
+    }
+
+    setState(() => _repeating = true);
+    try {
+      await startRepeatShotFromShot(
+        context: context,
+        shot: widget.shot,
+        profileRepository: await _ensureProfileRepository(),
+        repeatController: _repeatShotController,
+      );
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _repeating = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final shot = widget.shot;
     final theme = Theme.of(context);
     final metadata = ShotMetadata.fromShot(shot);
 
@@ -21,6 +98,9 @@ class ShotDetailScreen extends StatelessWidget {
       key: Key('shot_detail_${shot.id}'),
       appBar: AppBar(
         title: Text(_formatStartedAt(shot.startedAt)),
+        actions: [
+          ShareProfileButton.fromShot(shot),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -61,6 +141,10 @@ class ShotDetailScreen extends StatelessWidget {
                 ],
               ),
             ],
+            const SizedBox(height: 24),
+            RepeatShotButton(
+              onPressed: _repeating ? null : _onRepeatShotPressed,
+            ),
           ],
         ),
       ),

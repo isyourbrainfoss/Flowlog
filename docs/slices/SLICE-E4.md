@@ -1,6 +1,6 @@
 # SLICE-E4: Bean fill + PB confetti
 
-status: pending
+status: done
 parallel_with: E3
 
 ## Prerequisites
@@ -13,8 +13,8 @@ C2
 
 ## Done when
 
-- [ ] Bean icon fills during shot
-- [ ] Confetti on personal best taste score
+- [x] Bean icon fills during shot
+- [x] Confetti on personal best taste score
 
 ## Verify
 

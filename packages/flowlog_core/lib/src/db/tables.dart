@@ -83,3 +83,31 @@ class ShotSamples extends Table {
   RealColumn get flowGs => real().nullable()();
   RealColumn get tempC => real().nullable()();
 }
+
+/// Saved pressure profile and metadata for repeat shots.
+@DataClassName('SavedProfileRow')
+class SavedProfiles extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get createdAt =>
+      text().map(const UtcIso8601Converter())();
+  TextColumn get sourceShotId => text().nullable()();
+  RealColumn get doseG => real().nullable()();
+  RealColumn get yieldG => real().nullable()();
+  RealColumn get grindSetting => real().nullable()();
+  TextColumn get beanId => text().nullable()();
+  RealColumn get waterTempC => real().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// Pressure curve samples for a [SavedProfiles] entry.
+@DataClassName('SavedProfileSampleRow')
+class SavedProfileSamples extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get profileId =>
+      text().references(SavedProfiles, #id, onDelete: KeyAction.cascade)();
+  IntColumn get elapsedMs => integer()();
+  RealColumn get pressureBar => real()();
+}

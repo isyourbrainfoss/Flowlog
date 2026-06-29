@@ -1,6 +1,6 @@
 # SLICE-G2: What-if curve simulator
 
-status: pending
+status: done
 parallel_with: G1
 
 ## Prerequisites
@@ -13,8 +13,8 @@ C3, F5
 
 ## Done when
 
-- [ ] Drag target pressure profile
-- [ ] Predicted flow display stub
+- [x] Drag target pressure profile
+- [x] Predicted flow display stub
 
 ## Verify
 

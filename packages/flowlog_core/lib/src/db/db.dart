@@ -1,5 +1,6 @@
 export 'bean_repository.dart';
 export 'flowlog_database.dart';
+export 'profile_repository.dart';
 export 'shot_list_filters.dart';
 export 'shot_repository.dart';
 export 'tag_repository.dart';

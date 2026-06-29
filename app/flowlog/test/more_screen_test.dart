@@ -1,4 +1,5 @@
 import 'package:flowlog/main.dart';
+import 'package:flowlog/screens/more/diagnostics.dart';
 import 'package:flowlog/screens/more/export.dart';
 import 'package:flowlog/screens/more/sensors_screen.dart';
 import 'package:flutter/material.dart';
@@ -44,5 +45,20 @@ void main() {
     expect(find.byKey(const Key('add_pressensor_button')), findsOneWidget);
     expect(find.byKey(const Key('add_scale_button')), findsOneWidget);
     expect(find.byType(SensorsScreen), findsOneWidget);
+  });
+
+  testWidgets('Diagnostics section navigates to diagnostics screen', (tester) async {
+    await tester.pumpWidget(const FlowlogApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.tune));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('more_diagnostics_tile')));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(AppBar, 'Sensor diagnostics'), findsOneWidget);
+    expect(find.byType(SensorDiagnosticsScreen), findsOneWidget);
+    expect(find.text('Reconnect log'), findsOneWidget);
   });
 }

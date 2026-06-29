@@ -1,6 +1,6 @@
 # SLICE-G5: Android home widget
 
-status: pending
+status: done
 parallel_with: none
 
 ## Prerequisites
@@ -13,7 +13,7 @@ C3
 
 ## Done when
 
-- [ ] Live mini-graph widget stub
+- [x] Live mini-graph widget stub
 
 ## Verify
 

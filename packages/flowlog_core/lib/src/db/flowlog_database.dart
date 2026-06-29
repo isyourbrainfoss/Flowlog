@@ -11,13 +11,22 @@ part 'flowlog_database.g.dart';
 
 /// Drift-backed SQLite database for Flowlog shot persistence.
 @DriftDatabase(
-  tables: [Shots, ShotSamples, ShotAnnotations, Beans, Tags, ShotTags],
+  tables: [
+    Shots,
+    ShotSamples,
+    ShotAnnotations,
+    Beans,
+    Tags,
+    ShotTags,
+    SavedProfiles,
+    SavedProfileSamples,
+  ],
 )
 class FlowlogDatabase extends _$FlowlogDatabase {
   FlowlogDatabase(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -34,6 +43,10 @@ class FlowlogDatabase extends _$FlowlogDatabase {
           }
           if (from < 4) {
             await m.createTable(shotAnnotations);
+          }
+          if (from < 5) {
+            await m.createTable(savedProfiles);
+            await m.createTable(savedProfileSamples);
           }
         },
       );

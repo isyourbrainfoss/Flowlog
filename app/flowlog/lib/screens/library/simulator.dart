@@ -1,0 +1,785 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math' as math;
+
+import 'package:flowlog_charts/flowlog_charts.dart';
+import 'package:flowlog_core/flowlog_core.dart';
+import 'package:flutter/material.dart';
+
+/// Default elapsed times for editable pressure keyframes (ms).
+const List<int> defaultSimulatorKeyframeTimes = [
+  0,
+  6000,
+  12000,
+  18000,
+  28000,
+];
+
+/// One editable pressure point on the what-if profile.
+@immutable
+class PressureKeyframe {
+  const PressureKeyframe({
+    required this.elapsedMs,
+    required this.pressureBar,
+  });
+
+  final int elapsedMs;
+  final double pressureBar;
+
+  PressureKeyframe copyWith({
+    int? elapsedMs,
+    double? pressureBar,
+  }) {
+    return PressureKeyframe(
+      elapsedMs: elapsedMs ?? this.elapsedMs,
+      pressureBar: pressureBar ?? this.pressureBar,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is PressureKeyframe &&
+            elapsedMs == other.elapsedMs &&
+            pressureBar == other.pressureBar;
+  }
+
+  @override
+  int get hashCode => Object.hash(elapsedMs, pressureBar);
+}
+
+/// Stub heuristic: higher pressure yields higher predicted flow (g/s).
+double predictFlowGs(double pressureBar) {
+  if (pressureBar <= 0.2) {
+    return 0;
+  }
+  return (pressureBar * 0.18 + 0.05).clamp(0, 4.0);
+}
+
+/// Builds predicted flow samples from a pressure profile.
+List<ShotSample> buildPredictedFlowSamples(List<ShotSample> pressureProfile) {
+  return [
+    for (final sample in pressureProfile)
+      ShotSample(
+        elapsedMs: sample.elapsedMs,
+        pressureBar: sample.pressureBar,
+        flowGs: predictFlowGs(sample.pressureBar ?? 0),
+      ),
+  ];
+}
+
+/// Summary metrics for the predicted flow curve.
+@immutable
+class PredictedFlowSummary {
+  const PredictedFlowSummary({
+    required this.peakFlowGs,
+    required this.averageFlowGs,
+    required this.peakPressureBar,
+  });
+
+  final double peakFlowGs;
+  final double averageFlowGs;
+  final double peakPressureBar;
+}
+
+PredictedFlowSummary summarizePredictedFlow(List<ShotSample> samples) {
+  var peakFlow = 0.0;
+  var peakPressure = 0.0;
+  var flowSum = 0.0;
+  var flowCount = 0;
+
+  for (final sample in samples) {
+    final pressure = sample.pressureBar ?? 0;
+    final flow = sample.flowGs ?? predictFlowGs(pressure);
+    peakFlow = math.max(peakFlow, flow);
+    peakPressure = math.max(peakPressure, pressure);
+    flowSum += flow;
+    flowCount++;
+  }
+
+  return PredictedFlowSummary(
+    peakFlowGs: peakFlow,
+    averageFlowGs: flowCount == 0 ? 0 : flowSum / flowCount,
+    peakPressureBar: peakPressure,
+  );
+}
+
+/// Interpolates pressure (bar) at [elapsedMs] from [samples].
+double? pressureAtElapsedMs(int elapsedMs, List<ShotSample> samples) {
+  if (samples.isEmpty) {
+    return null;
+  }
+
+  ShotSample? before;
+  ShotSample? after;
+  for (final sample in samples) {
+    if (sample.elapsedMs == elapsedMs) {
+      return sample.pressureBar;
+    }
+    if (sample.elapsedMs < elapsedMs) {
+      before = sample;
+    } else if (sample.elapsedMs > elapsedMs) {
+      after = sample;
+      break;
+    }
+  }
+
+  if (before == null || after == null) {
+    return before?.pressureBar ?? after?.pressureBar;
+  }
+
+  final beforePressure = before.pressureBar;
+  final afterPressure = after.pressureBar;
+  if (beforePressure == null || afterPressure == null) {
+    return beforePressure ?? afterPressure;
+  }
+
+  final span = after.elapsedMs - before.elapsedMs;
+  if (span <= 0) {
+    return beforePressure;
+  }
+
+  final t = (elapsedMs - before.elapsedMs) / span;
+  return beforePressure + (afterPressure - beforePressure) * t;
+}
+
+/// Builds editable keyframes from a saved profile or shot samples.
+List<PressureKeyframe> keyframesFromPressureSamples(
+  List<ShotSample> samples, {
+  List<int> keyframeTimes = defaultSimulatorKeyframeTimes,
+}) {
+  return [
+    for (final elapsedMs in keyframeTimes)
+      PressureKeyframe(
+        elapsedMs: elapsedMs,
+        pressureBar: (pressureAtElapsedMs(elapsedMs, samples) ?? 0)
+            .clamp(0, 12)
+            .toDouble(),
+      ),
+  ];
+}
+
+/// Expands keyframes into a dense pressure profile for charting.
+List<ShotSample> expandKeyframesToProfile(
+  List<PressureKeyframe> keyframes, {
+  int stepMs = 500,
+}) {
+  if (keyframes.isEmpty) {
+    return const [];
+  }
+
+  final sorted = List<PressureKeyframe>.from(keyframes)
+    ..sort((a, b) => a.elapsedMs.compareTo(b.elapsedMs));
+  final endMs = sorted.last.elapsedMs;
+  final profile = <ShotSample>[];
+
+  for (var elapsedMs = 0; elapsedMs <= endMs; elapsedMs += stepMs) {
+    profile.add(
+      ShotSample(
+        elapsedMs: elapsedMs,
+        pressureBar: _pressureAtKeyframeTime(elapsedMs, sorted),
+      ),
+    );
+  }
+
+  if (profile.isEmpty || profile.last.elapsedMs != endMs) {
+    profile.add(
+      ShotSample(
+        elapsedMs: endMs,
+        pressureBar: _pressureAtKeyframeTime(endMs, sorted),
+      ),
+    );
+  }
+
+  return profile;
+}
+
+double _pressureAtKeyframeTime(int elapsedMs, List<PressureKeyframe> keyframes) {
+  if (keyframes.isEmpty) {
+    return 0;
+  }
+
+  PressureKeyframe? before;
+  PressureKeyframe? after;
+  for (final keyframe in keyframes) {
+    if (keyframe.elapsedMs == elapsedMs) {
+      return keyframe.pressureBar;
+    }
+    if (keyframe.elapsedMs < elapsedMs) {
+      before = keyframe;
+    } else if (keyframe.elapsedMs > elapsedMs) {
+      after = keyframe;
+      break;
+    }
+  }
+
+  if (before == null || after == null) {
+    return before?.pressureBar ?? after?.pressureBar ?? 0;
+  }
+
+  final span = after.elapsedMs - before.elapsedMs;
+  if (span <= 0) {
+    return before.pressureBar;
+  }
+
+  final t = (elapsedMs - before.elapsedMs) / span;
+  return before.pressureBar + (after.pressureBar - before.pressureBar) * t;
+}
+
+/// Draggable canvas for editing a target pressure profile.
+class PressureProfileEditor extends StatefulWidget {
+  const PressureProfileEditor({
+    required this.keyframes,
+    required this.onKeyframesChanged,
+    super.key,
+    this.durationMs = 30000,
+    this.height = 200,
+    this.pressureMax = 12,
+  });
+
+  final List<PressureKeyframe> keyframes;
+  final ValueChanged<List<PressureKeyframe>> onKeyframesChanged;
+  final int durationMs;
+  final double height;
+  final double pressureMax;
+
+  @override
+  State<PressureProfileEditor> createState() => _PressureProfileEditorState();
+}
+
+class _PressureProfileEditorState extends State<PressureProfileEditor> {
+  int? _activeIndex;
+
+  void _updateKeyframePressure(int index, double pressureBar) {
+    final updated = List<PressureKeyframe>.from(widget.keyframes);
+    updated[index] = updated[index].copyWith(
+      pressureBar: pressureBar.clamp(0, widget.pressureMax).toDouble(),
+    );
+    widget.onKeyframesChanged(updated);
+  }
+
+  int? _hitTestKeyframe(Offset localPosition, Size size) {
+    const handleRadius = 18.0;
+    for (var i = 0; i < widget.keyframes.length; i++) {
+      final point = _PressureProfileEditorPainter.pointFor(
+        keyframe: widget.keyframes[i],
+        size: size,
+        durationMs: widget.durationMs,
+        pressureMax: widget.pressureMax,
+      );
+      if ((localPosition - point).distance <= handleRadius) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Target pressure profile editor',
+      child: SizedBox(
+        key: const Key('simulator_profile_editor'),
+        height: widget.height,
+        width: double.infinity,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final size = Size(constraints.maxWidth, widget.height);
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onPanStart: (details) {
+                setState(() {
+                  _activeIndex = _hitTestKeyframe(details.localPosition, size);
+                });
+              },
+              onPanUpdate: (details) {
+                final index = _activeIndex;
+                if (index == null) {
+                  return;
+                }
+
+                final plotRect = _PressureProfileEditorPainter.plotRect(size);
+                final normalizedY = 1 -
+                    ((details.localPosition.dy - plotRect.top) / plotRect.height)
+                        .clamp(0.0, 1.0);
+                _updateKeyframePressure(
+                  index,
+                  normalizedY * widget.pressureMax,
+                );
+              },
+              onPanEnd: (_) => setState(() => _activeIndex = null),
+              onPanCancel: () => setState(() => _activeIndex = null),
+              child: CustomPaint(
+                painter: _PressureProfileEditorPainter(
+                  keyframes: widget.keyframes,
+                  durationMs: widget.durationMs,
+                  pressureMax: widget.pressureMax,
+                  activeIndex: _activeIndex,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _PressureProfileEditorPainter extends CustomPainter {
+  _PressureProfileEditorPainter({
+    required this.keyframes,
+    required this.durationMs,
+    required this.pressureMax,
+    this.activeIndex,
+  });
+
+  final List<PressureKeyframe> keyframes;
+  final int durationMs;
+  final double pressureMax;
+  final int? activeIndex;
+
+  static const leftPad = 40.0;
+  static const rightPad = 16.0;
+  static const topPad = 12.0;
+  static const bottomPad = 24.0;
+
+  static Rect plotRect(Size size) {
+    return Rect.fromLTWH(
+      leftPad,
+      topPad,
+      math.max(1, size.width - leftPad - rightPad),
+      math.max(1, size.height - topPad - bottomPad),
+    );
+  }
+
+  static Offset pointFor({
+    required PressureKeyframe keyframe,
+    required Size size,
+    required int durationMs,
+    required double pressureMax,
+  }) {
+    final plot = plotRect(size);
+    final x = plot.left +
+        (keyframe.elapsedMs / math.max(durationMs, 1)).clamp(0.0, 1.0) *
+            plot.width;
+    final y = plot.bottom -
+        (keyframe.pressureBar / pressureMax).clamp(0.0, 1.0) * plot.height;
+    return Offset(x, y);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final plot = plotRect(size);
+
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = FlowlogChartColors.background,
+    );
+
+    _drawGrid(canvas, plot);
+    _drawAxes(canvas, plot);
+    _drawProfile(canvas, plot, size);
+    _drawHandles(canvas, size);
+  }
+
+  void _drawGrid(Canvas canvas, Rect plot) {
+    final gridPaint = Paint()
+      ..color = FlowlogChartColors.grid.withValues(alpha: 0.25)
+      ..strokeWidth = 1;
+
+    for (var i = 0; i <= 4; i++) {
+      final y = plot.top + (plot.height / 4) * i;
+      canvas.drawLine(Offset(plot.left, y), Offset(plot.right, y), gridPaint);
+    }
+
+    for (var i = 0; i <= 5; i++) {
+      final x = plot.left + (plot.width / 5) * i;
+      canvas.drawLine(Offset(x, plot.top), Offset(x, plot.bottom), gridPaint);
+    }
+  }
+
+  void _drawAxes(Canvas canvas, Rect plot) {
+    const textStyle = TextStyle(
+      color: FlowlogChartColors.axisLabel,
+      fontSize: 10,
+    );
+    _paintText(canvas, 'bar', const Offset(4, topPad), textStyle);
+    _paintText(
+      canvas,
+      _formatDuration(durationMs),
+      Offset(plot.right - 28, plot.bottom + 6),
+      textStyle,
+    );
+  }
+
+  void _drawProfile(Canvas canvas, Rect plot, Size size) {
+    if (keyframes.length < 2) {
+      return;
+    }
+
+    final sorted = List<PressureKeyframe>.from(keyframes)
+      ..sort((a, b) => a.elapsedMs.compareTo(b.elapsedMs));
+    final points = <Offset>[];
+    for (var elapsedMs = 0; elapsedMs <= durationMs; elapsedMs += 250) {
+      final pressure = _pressureAtKeyframeTime(elapsedMs, sorted);
+      final x = plot.left +
+          (elapsedMs / math.max(durationMs, 1)).clamp(0.0, 1.0) * plot.width;
+      final y = plot.bottom -
+          (pressure / pressureMax).clamp(0.0, 1.0) * plot.height;
+      points.add(Offset(x, y));
+    }
+
+    if (points.length < 2) {
+      return;
+    }
+
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (var i = 1; i < points.length; i++) {
+      path.lineTo(points[i].dx, points[i].dy);
+    }
+
+    final linePaint = Paint()
+      ..color = FlowlogChartColors.targetPressureLine
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, linePaint);
+  }
+
+  void _drawHandles(Canvas canvas, Size size) {
+    for (var i = 0; i < keyframes.length; i++) {
+      final point = pointFor(
+        keyframe: keyframes[i],
+        size: size,
+        durationMs: durationMs,
+        pressureMax: pressureMax,
+      );
+      final isActive = activeIndex == i;
+      final fillPaint = Paint()
+        ..color = isActive
+            ? FlowlogChartColors.pressureHigh
+            : FlowlogChartColors.pressureLine;
+      final strokePaint = Paint()
+        ..color = FlowlogChartColors.axisLabel
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2;
+
+      canvas.drawCircle(point, isActive ? 9 : 7, fillPaint);
+      canvas.drawCircle(point, isActive ? 9 : 7, strokePaint);
+    }
+  }
+
+  void _paintText(
+    Canvas canvas,
+    String text,
+    Offset offset,
+    TextStyle style,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    painter.paint(canvas, offset);
+  }
+
+  String _formatDuration(int elapsedMs) {
+    final seconds = (elapsedMs / 1000).round();
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    if (minutes == 0) {
+      return '${remainingSeconds}s';
+    }
+    return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  bool shouldRepaint(covariant _PressureProfileEditorPainter oldDelegate) {
+    return oldDelegate.keyframes != keyframes ||
+        oldDelegate.durationMs != durationMs ||
+        oldDelegate.pressureMax != pressureMax ||
+        oldDelegate.activeIndex != activeIndex;
+  }
+}
+
+/// What-if curve simulator: edit pressure and preview predicted flow.
+class SimulatorScreen extends StatefulWidget {
+  const SimulatorScreen({
+    super.key,
+    this.profileRepository,
+  });
+
+  /// Optional repository override for tests or dependency injection.
+  final ProfileRepository? profileRepository;
+
+  @override
+  State<SimulatorScreen> createState() => _SimulatorScreenState();
+}
+
+class _SimulatorScreenState extends State<SimulatorScreen> {
+  ProfileRepository? _profileRepository;
+  FlowlogDatabase? _database;
+  bool _ownsRepository = false;
+  late Future<_SimulatorState> _stateFuture;
+
+  List<PressureKeyframe> _keyframes = const [];
+  SavedProfile? _profile;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _stateFuture = _loadState();
+  }
+
+  Future<ProfileRepository> _ensureRepository() async {
+    if (widget.profileRepository != null) {
+      return widget.profileRepository!;
+    }
+    if (_profileRepository != null) {
+      return _profileRepository!;
+    }
+
+    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
+    _database = FlowlogDatabase.openFile(dbPath);
+    _profileRepository = ProfileRepository(_database!);
+    _ownsRepository = true;
+    return _profileRepository!;
+  }
+
+  Future<_SimulatorState> _loadState() async {
+    final repository = await _ensureRepository();
+    final profiles = await repository.listProfiles(includeSamples: true);
+    final profile = profiles.isNotEmpty
+        ? profiles.first
+        : _demoProfileFromFixture();
+    final keyframes = keyframesFromPressureSamples(profile.pressureSamples);
+    return _SimulatorState(profile: profile, keyframes: keyframes);
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _initialized = false;
+      _stateFuture = _loadState();
+    });
+    await _stateFuture;
+  }
+
+  void _applyLoadedState(_SimulatorState state) {
+    if (_initialized) {
+      return;
+    }
+    _profile = state.profile;
+    _keyframes = state.keyframes;
+    _initialized = true;
+  }
+
+  void _onKeyframesChanged(List<PressureKeyframe> keyframes) {
+    setState(() => _keyframes = keyframes);
+  }
+
+  @override
+  void dispose() {
+    if (_ownsRepository) {
+      _database?.close();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_SimulatorState>(
+      future: _stateFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Failed to load simulator: ${snapshot.error}'),
+          );
+        }
+
+        final state = snapshot.data!;
+        _applyLoadedState(state);
+
+        final pressureProfile = expandKeyframesToProfile(_keyframes);
+        final predictedSamples = buildPredictedFlowSamples(pressureProfile);
+        final summary = summarizePredictedFlow(predictedSamples);
+        final durationMs = _keyframes.isEmpty
+            ? 30000
+            : _keyframes.map((k) => k.elapsedMs).reduce(math.max);
+
+        return RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView(
+            key: const Key('simulator_screen'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+              Text(
+                'What-if simulator',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _profile?.name ?? 'Demo profile',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Drag the control points to shape a target pressure curve. '
+                'Predicted flow is a simple stub (higher pressure → higher g/s).',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Target pressure',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              PressureProfileEditor(
+                keyframes: _keyframes,
+                durationMs: durationMs,
+                onKeyframesChanged: _onKeyframesChanged,
+              ),
+              const SizedBox(height: 16),
+              _PredictedFlowMetrics(
+                key: const Key('simulator_predicted_flow'),
+                summary: summary,
+              ),
+              const SizedBox(height: 12),
+              DualCurveChart(
+                key: const Key('simulator_flow_chart'),
+                samples: predictedSamples,
+                maxDurationMs: durationMs,
+                showPressure: true,
+                showWeight: false,
+                showFlow: true,
+                enableInteraction: false,
+                targetPressureSamples: pressureProfile,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PredictedFlowMetrics extends StatelessWidget {
+  const _PredictedFlowMetrics({
+    required this.summary,
+    super.key,
+  });
+
+  final PredictedFlowSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Predicted flow (stub)', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              children: [
+                _MetricChip(
+                  label: 'Peak flow',
+                  value: '${summary.peakFlowGs.toStringAsFixed(2)} g/s',
+                  valueKey: const Key('simulator_peak_flow_value'),
+                ),
+                _MetricChip(
+                  label: 'Avg flow',
+                  value: '${summary.averageFlowGs.toStringAsFixed(2)} g/s',
+                  valueKey: const Key('simulator_avg_flow_value'),
+                ),
+                _MetricChip(
+                  label: 'Peak pressure',
+                  value: '${summary.peakPressureBar.toStringAsFixed(1)} bar',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MetricChip extends StatelessWidget {
+  const _MetricChip({
+    required this.label,
+    required this.value,
+    this.valueKey,
+  });
+
+  final String label;
+  final String value;
+  final Key? valueKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        Text(
+          value,
+          key: valueKey,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+      ],
+    );
+  }
+}
+
+@immutable
+class _SimulatorState {
+  const _SimulatorState({
+    required this.profile,
+    required this.keyframes,
+  });
+
+  final SavedProfile profile;
+  final List<PressureKeyframe> keyframes;
+}
+
+SavedProfile _demoProfileFromFixture() {
+  final shot = _loadDemoShotFromFixture();
+  return SavedProfile.fromShot(
+    shot,
+    id: 'demo-profile',
+    name: 'Demo profile (fixture)',
+    createdAt: DateTime.utc(2026, 6, 29),
+  );
+}
+
+Shot _loadDemoShotFromFixture() {
+  final json =
+      jsonDecode(File(_fixturePath('shots/minimal_shot.json')).readAsStringSync())
+          as Map<String, dynamic>;
+  return Shot.fromJson(json);
+}
+
+String _fixturePath(String relativePath) {
+  final candidates = [
+    '../../fixtures/$relativePath',
+    '../../../fixtures/$relativePath',
+    '../../../../fixtures/$relativePath',
+  ];
+
+  for (final candidate in candidates) {
+    if (File(candidate).existsSync()) {
+      return candidate;
+    }
+  }
+
+  throw StateError('Fixture not found: $relativePath');
+}

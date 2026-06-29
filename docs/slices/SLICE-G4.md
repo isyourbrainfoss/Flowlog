@@ -1,6 +1,6 @@
 # SLICE-G4: Community profile share
 
-status: pending
+status: done
 parallel_with: G3
 
 ## Prerequisites
@@ -13,7 +13,7 @@ F5
 
 ## Done when
 
-- [ ] Anonymised export link generation stub
+- [x] Anonymised export link generation stub
 
 ## Verify
 

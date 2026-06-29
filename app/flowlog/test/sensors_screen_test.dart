@@ -1,3 +1,4 @@
+import 'package:flowlog/screens/more/diagnostics.dart';
 import 'package:flowlog/screens/more/sensors_screen.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
@@ -17,11 +18,11 @@ void main() {
     }
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: theme ?? FlowlogTheme.coffeeDark,
-        home: SensorHubScope(
-          hub: sensorHub,
-          child: const Scaffold(
+      SensorHubScope(
+        hub: sensorHub,
+        child: MaterialApp(
+          theme: theme ?? FlowlogTheme.coffeeDark,
+          home: const Scaffold(
             body: SensorsScreen(),
           ),
         ),
@@ -113,6 +114,16 @@ void main() {
       expect(find.text('Disconnected'), findsOneWidget);
       expect(find.text('Connecting'), findsOneWidget);
       expect(find.text('Error'), findsOneWidget);
+    });
+
+    testWidgets('opens diagnostics screen from link', (tester) async {
+      await pumpSensorsScreen(tester);
+
+      await tester.tap(find.byKey(const Key('open_diagnostics_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SensorDiagnosticsScreen), findsOneWidget);
+      expect(find.text('No errors recorded'), findsOneWidget);
     });
   });
 }

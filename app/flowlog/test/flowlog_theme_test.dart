@@ -79,7 +79,7 @@ void main() {
     expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('Coffee dark'), findsOneWidget);
 
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.byType(Switch).first);
     await tester.pumpAndSettle();
 
     expect(controller.isDark, isFalse);

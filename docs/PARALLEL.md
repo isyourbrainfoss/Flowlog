@@ -6,18 +6,15 @@ Check status: `grep -l '^status: done' docs/slices/*.md | wc -l`
 
 ## Current state
 
-**Done:** A1–A6, B1–B7, C1–C8, D1–D5 (MVP core complete)
+**Done:** A1–G5 (MVP + polish + library + future stubs complete)
 
-**Spawn now (polish + library — parallel):**
+**Spawn now (optional future):**
 
 | Agent | Slice | Notes |
 |-------|-------|-------|
-| 1 | **E1** | Chart zoom/pan |
-| 2 | **E3** | Haptics + pulse |
-| 3 | **F1** | Search/filter history |
-| 4 | **F4** | Bean database |
+| 1 | **G6** | WiFi scale adapter — independent module |
 
-Or spawn **F2** + **F4** + **E5** together after F1/F4 land.
+All other slices are `done`. Run `melos run test` after any new work.
 
 ## Wave reference
 

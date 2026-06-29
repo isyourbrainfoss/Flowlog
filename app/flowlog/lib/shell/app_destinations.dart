@@ -17,6 +17,7 @@ class AppDestination {
     required this.tab,
     required this.route,
     required this.label,
+    required this.semanticsLabel,
     required this.icon,
     required this.screen,
   });
@@ -24,6 +25,7 @@ class AppDestination {
   final AppTab tab;
   final String route;
   final String label;
+  final String semanticsLabel;
   final IconData icon;
   final Widget screen;
 }
@@ -33,6 +35,7 @@ const List<AppDestination> appDestinations = [
     tab: AppTab.live,
     route: '/live',
     label: 'Live',
+    semanticsLabel: 'Live shot recording',
     icon: Icons.play_circle_outline,
     screen: LiveScreen(),
   ),
@@ -40,6 +43,7 @@ const List<AppDestination> appDestinations = [
     tab: AppTab.history,
     route: '/history',
     label: 'History',
+    semanticsLabel: 'Shot history',
     icon: Icons.history,
     screen: HistoryScreen(),
   ),
@@ -47,6 +51,7 @@ const List<AppDestination> appDestinations = [
     tab: AppTab.library,
     route: '/library',
     label: 'Library',
+    semanticsLabel: 'Bean library',
     icon: Icons.local_cafe_outlined,
     screen: LibraryScreen(),
   ),
@@ -54,6 +59,7 @@ const List<AppDestination> appDestinations = [
     tab: AppTab.more,
     route: '/more',
     label: 'More',
+    semanticsLabel: 'More settings',
     icon: Icons.tune,
     screen: MoreScreen(),
   ),
