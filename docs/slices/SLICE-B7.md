@@ -1,6 +1,6 @@
 # SLICE-B7: Device manager UI stub
 
-status: pending
+status: done
 parallel_with: C3
 
 ## Prerequisites
@@ -13,9 +13,9 @@ A5, B1
 
 ## Done when
 
-- [ ] More tab shows Sensors section
-- [ ] Placeholder paired device list
-- [ ] Connection state chips (mock)
+- [x] More tab shows Sensors section
+- [x] Placeholder paired device list
+- [x] Connection state chips (mock)
 
 ## Verify
 

@@ -1,6 +1,6 @@
 # SLICE-C3: DualCurveChart live
 
-status: pending
+status: done
 parallel_with: C1, C4, B7
 
 ## Prerequisites
@@ -13,9 +13,9 @@ B3, B2
 
 ## Done when
 
-- [ ] Pressure + weight/flow curves
-- [ ] Driven by mock stream in widget test
-- [ ] Repaint boundary for performance
+- [x] Pressure + weight/flow curves
+- [x] Driven by mock stream in widget test
+- [x] Repaint boundary for performance
 
 ## Verify
 
