@@ -94,12 +94,27 @@ class _ShellContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AppBar(title: Text(title)),
-        Expanded(child: child),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final showAppBar =
+            constraints.maxHeight >= ShellBreakpoints.minHeightForAppBar;
+
+        if (!showAppBar) {
+          // Ultra-compact: bottom nav ate most of the height — skip the app bar.
+          return ClipRect(child: child);
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppBar(
+              title: Text(title),
+              toolbarHeight: kToolbarHeight,
+            ),
+            Expanded(child: ClipRect(child: child)),
+          ],
+        );
+      },
     );
   }
 }
