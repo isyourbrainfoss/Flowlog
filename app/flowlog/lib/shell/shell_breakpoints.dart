@@ -6,7 +6,7 @@ abstract final class ShellBreakpoints {
   /// Below this height: bottom bar even if wide (avoids rail overflow).
   static const double minRailHeight = 320;
 
-  /// Body must be at least this tall before showing an [AppBar] above content.
+  /// Body must be at least this tall before showing the top bar above content.
   static const double minHeightForAppBar = 88;
 
   /// Split panels + keyboard shortcuts (future slices).

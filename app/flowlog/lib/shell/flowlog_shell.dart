@@ -1,5 +1,6 @@
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/shell_breakpoints.dart';
+import 'package:flowlog/shell/top_bar.dart';
 import 'package:flutter/material.dart';
 
 /// Adaptive app shell: bottom bar when narrow/short, labeled sidebar when wide.
@@ -14,6 +15,7 @@ class FlowlogShell extends StatefulWidget {
 
 class _FlowlogShellState extends State<FlowlogShell> {
   late int _selectedIndex;
+  String _beanName = kDefaultBeanName;
 
   @override
   void initState() {
@@ -23,6 +25,10 @@ class _FlowlogShellState extends State<FlowlogShell> {
     if (_selectedIndex < 0) {
       _selectedIndex = 0;
     }
+  }
+
+  void _onBeanNameChanged(String name) {
+    setState(() => _beanName = name);
   }
 
   void _onDestinationSelected(int index) {
@@ -43,7 +49,8 @@ class _FlowlogShellState extends State<FlowlogShell> {
         if (_useBottomNav(constraints)) {
           return Scaffold(
             body: _ShellContent(
-              title: destination.label,
+              beanName: _beanName,
+              onBeanNameChanged: _onBeanNameChanged,
               child: destination.screen,
             ),
             bottomNavigationBar: _FlowlogBottomBar(
@@ -74,7 +81,8 @@ class _FlowlogShellState extends State<FlowlogShell> {
               const VerticalDivider(width: 1),
               Expanded(
                 child: _ShellContent(
-                  title: destination.label,
+                  beanName: _beanName,
+                  onBeanNameChanged: _onBeanNameChanged,
                   child: destination.screen,
                 ),
               ),
@@ -87,29 +95,34 @@ class _FlowlogShellState extends State<FlowlogShell> {
 }
 
 class _ShellContent extends StatelessWidget {
-  const _ShellContent({required this.title, required this.child});
+  const _ShellContent({
+    required this.beanName,
+    required this.onBeanNameChanged,
+    required this.child,
+  });
 
-  final String title;
+  final String beanName;
+  final ValueChanged<String> onBeanNameChanged;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final showAppBar =
+        final showTopBar =
             constraints.maxHeight >= ShellBreakpoints.minHeightForAppBar;
 
-        if (!showAppBar) {
-          // Ultra-compact: bottom nav ate most of the height — skip the app bar.
+        if (!showTopBar) {
+          // Ultra-compact: bottom nav ate most of the height — skip the top bar.
           return ClipRect(child: child);
         }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AppBar(
-              title: Text(title),
-              toolbarHeight: kToolbarHeight,
+            FlowlogTopBar(
+              beanName: beanName,
+              onBeanNameChanged: onBeanNameChanged,
             ),
             Expanded(child: ClipRect(child: child)),
           ],

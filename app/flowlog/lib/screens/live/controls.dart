@@ -14,12 +14,16 @@ class LiveShotController extends ChangeNotifier {
         _onTare = onTare,
         _session = session ?? ShotSession() {
     _stateSub = _session.stateChanges.listen((_) => _notify());
+    _sampleBatchSub = _session.sampleBatches.listen((_) => _notify());
   }
 
   final SensorAdapter _sampleAdapter;
   final Future<void> Function() _onTare;
   ShotSession _session;
   StreamSubscription<ShotSessionState>? _stateSub;
+  StreamSubscription<List<ShotSample>>? _sampleBatchSub;
+  DateTime? _sessionStartedAt;
+  DateTime? _sessionEndedAt;
   bool _disposed = false;
 
   ShotSession get session => _session;
@@ -27,6 +31,15 @@ class LiveShotController extends ChangeNotifier {
   ShotSessionState get sessionState => _session.state;
 
   int get sampleCount => _session.samples.length;
+
+  List<ShotSample> get samples => _session.samples;
+
+  DateTime? get sessionStartedAt => _sessionStartedAt;
+
+  DateTime? get sessionEndedAt => _sessionEndedAt;
+
+  bool get canSaveShot =>
+      sessionState == ShotSessionState.stopped && samples.isNotEmpty;
 
   bool get canStart =>
       sessionState == ShotSessionState.idle ||
@@ -51,6 +64,8 @@ class LiveShotController extends ChangeNotifier {
     }
 
     await _onTare();
+    _sessionStartedAt = DateTime.now().toUtc();
+    _sessionEndedAt = null;
     // Subscribe before connect so instant replay samples are not missed.
     _session.start(
       _sampleAdapter.samples.map((sample) => sample.toShotSample()),
@@ -82,6 +97,7 @@ class LiveShotController extends ChangeNotifier {
     }
 
     _session.stop();
+    _sessionEndedAt = DateTime.now().toUtc();
     await _sampleAdapter.disconnect();
     _notify();
   }
@@ -96,6 +112,7 @@ class LiveShotController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _stateSub?.cancel();
+    _sampleBatchSub?.cancel();
     unawaited(_session.dispose());
     unawaited(_sampleAdapter.disconnect());
     super.dispose();
@@ -103,9 +120,13 @@ class LiveShotController extends ChangeNotifier {
 
   Future<void> _replaceSession() async {
     _stateSub?.cancel();
+    _sampleBatchSub?.cancel();
     await _session.dispose();
     _session = ShotSession();
+    _sessionStartedAt = null;
+    _sessionEndedAt = null;
     _stateSub = _session.stateChanges.listen((_) => _notify());
+    _sampleBatchSub = _session.sampleBatches.listen((_) => _notify());
   }
 }
 

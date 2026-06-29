@@ -1,6 +1,6 @@
 # SLICE-C8: Top bar sensor status
 
-status: pending
+status: done
 parallel_with: C7, D1
 
 ## Prerequisites
@@ -13,8 +13,8 @@ A5, B7
 
 ## Done when
 
-- [ ] Bean name + quick edit
-- [ ] PRS + scale connection icons
+- [x] Bean name + quick edit
+- [x] PRS + scale connection icons
 
 ## Verify
 
