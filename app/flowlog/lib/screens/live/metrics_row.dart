@@ -131,6 +131,10 @@ class LiveMetricsRow extends StatelessWidget {
           'Provide metrics or sample',
         );
 
+  /// Below this width, metrics render in a 2×2 grid instead of one row.
+  @visibleForTesting
+  static const compactLayoutBreakpoint = 360.0;
+
   /// Pre-computed metrics (takes precedence over [sample]).
   final LiveMetrics? metrics;
 
@@ -160,57 +164,82 @@ class LiveMetricsRow extends StatelessWidget {
       fontFeatures: const [FontFeature.tabularFigures()],
     );
 
+    final tiles = <Widget>[
+      _MetricTile(
+        label: 'Pressure',
+        value: _formatPressure(resolved.pressureBar),
+        trend: resolved.pressureTrend,
+        labelStyle: labelStyle,
+        valueStyle: valueStyle,
+      ),
+      FlowStabilityPulse(
+        isStable: isFlowStable(
+          flowGs: resolved.flowGs,
+          flowTrendIsNeutral: resolved.flowTrend == MetricTrend.neutral,
+        ),
+        child: _MetricTile(
+          label: 'Flow',
+          value: _formatFlow(resolved.flowGs),
+          trend: resolved.flowTrend,
+          labelStyle: labelStyle,
+          valueStyle: valueStyle,
+        ),
+      ),
+      _MetricTile(
+        label: 'Elapsed',
+        value: _formatElapsed(resolved.elapsedMs),
+        trend: resolved.elapsedTrend,
+        labelStyle: labelStyle,
+        valueStyle: valueStyle,
+      ),
+      _MetricTile(
+        label: 'Proj. yield',
+        value: _formatYield(resolved.projectedYieldG),
+        trend: resolved.projectedYieldTrend,
+        labelStyle: labelStyle,
+        valueStyle: valueStyle,
+      ),
+    ];
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            Expanded(
-              child: _MetricTile(
-                label: 'Pressure',
-                value: _formatPressure(resolved.pressureBar),
-                trend: resolved.pressureTrend,
-                labelStyle: labelStyle,
-                valueStyle: valueStyle,
-              ),
-            ),
-            Expanded(
-              child: FlowStabilityPulse(
-                isStable: isFlowStable(
-                  flowGs: resolved.flowGs,
-                  flowTrendIsNeutral:
-                      resolved.flowTrend == MetricTrend.neutral,
-                ),
-                child: _MetricTile(
-                  label: 'Flow',
-                  value: _formatFlow(resolved.flowGs),
-                  trend: resolved.flowTrend,
-                  labelStyle: labelStyle,
-                  valueStyle: valueStyle,
-                ),
-              ),
-            ),
-            Expanded(
-              child: _MetricTile(
-                label: 'Elapsed',
-                value: _formatElapsed(resolved.elapsedMs),
-                trend: resolved.elapsedTrend,
-                labelStyle: labelStyle,
-                valueStyle: valueStyle,
-              ),
-            ),
-            Expanded(
-              child: _MetricTile(
-                label: 'Proj. yield',
-                value: _formatYield(resolved.projectedYieldG),
-                trend: resolved.projectedYieldTrend,
-                labelStyle: labelStyle,
-                valueStyle: valueStyle,
-              ),
-            ),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < compactLayoutBreakpoint) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: tiles[0]),
+                      const SizedBox(width: 8),
+                      Expanded(child: tiles[1]),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: tiles[2]),
+                      const SizedBox(width: 8),
+                      Expanded(child: tiles[3]),
+                    ],
+                  ),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                for (var i = 0; i < tiles.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 4),
+                  Expanded(child: tiles[i]),
+                ],
+              ],
+            );
+          },
         ),
       ),
     );
@@ -274,31 +303,65 @@ class _MetricTile extends StatelessWidget {
       MetricTrend.neutral => Icons.remove,
     };
 
-    return Semantics(
-      label: '$label $value',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label, style: labelStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 2),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final showInlineTrend = maxWidth >= 56;
+        final showLabel = maxWidth >= 24;
+
+        final trendWidget = Icon(
+          trendIcon,
+          size: showInlineTrend ? 18 : 14,
+          color: trendColor,
+        );
+
+        return Semantics(
+          label: '$label $value',
+          child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Flexible(
-                child: Text(
-                  value,
-                  style: valueStyle,
+              if (showLabel)
+                Text(
+                  label,
+                  style: labelStyle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                 ),
-              ),
-              Icon(trendIcon, size: 18, color: trendColor),
+              if (showLabel) const SizedBox(height: 2),
+              if (showInlineTrend)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        value,
+                        style: valueStyle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    trendWidget,
+                  ],
+                )
+              else ...[
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    value,
+                    style: valueStyle,
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                Center(child: trendWidget),
+              ],
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
