@@ -105,7 +105,7 @@ class _LiveScreenState extends State<LiveScreen> {
     return _shotRepository!;
   }
 
-  Future<void> _onExcellentShotPressed() async {
+  Future<void> _onStarShotPressed() async {
     if (!_controller.canSaveShot || _savingShot) {
       return;
     }
@@ -122,7 +122,7 @@ class _LiveScreenState extends State<LiveScreen> {
         return;
       }
 
-      await runExcellentShotSaveFlow(
+      await runStarShotSaveFlow(
         context: context,
         repository: repository,
         samples: _controller.samples,
@@ -183,9 +183,9 @@ class _LiveScreenState extends State<LiveScreen> {
               ],
             ),
           ),
-          floatingActionButton: ExcellentShotFab(
+          floatingActionButton: StarShotFab(
             enabled: _controller.canSaveShot && !_savingShot,
-            onPressed: _onExcellentShotPressed,
+            onPressed: _onStarShotPressed,
           ),
         );
       },
