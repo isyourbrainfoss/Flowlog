@@ -51,4 +51,4 @@ Parallel waves: [`docs/PARALLEL.md`](PARALLEL.md).
 | G3 | E2E cloud sync | done | G4 |
 | G4 | Community profile share | done | G3 |
 | G5 | Android home widget | done | — |
-| G6 | WiFi scale adapter | pending | — |
+| G6 | WiFi scale adapter | done | — |

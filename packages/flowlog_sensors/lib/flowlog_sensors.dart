@@ -9,3 +9,4 @@ export 'src/pressensor/pressensor_ble_transport.dart';
 export 'src/pressensor/pressensor_parser.dart';
 export 'src/pressensor/pressensor_protocol.dart';
 export 'src/sample.dart';
+export 'src/wifi_scale/wifi_scale.dart';
