@@ -7,10 +7,10 @@ Parallel waves: [`docs/PARALLEL.md`](PARALLEL.md).
 | ID | Title | Status | Can parallel with |
 |----|-------|--------|-------------------|
 | A1 | Flutter workspace + melos | done | — |
-| A2 | Vendored protocol docs | pending | A3, A5 |
-| A3 | flowlog_core models | pending | A2, A5 |
+| A2 | Vendored protocol docs | done | A3, A5 |
+| A3 | flowlog_core models | done | A2, A5 |
 | A4 | SQLite schema + migrations | pending | A5, A6 |
-| A5 | Adaptive shell + 4 tabs | pending | A2, A3, A4, A6 |
+| A5 | Adaptive shell + 4 tabs | done | A2, A3, A4, A6 |
 | A6 | Coffee dark theme | pending | A4 |
 | B1 | SensorAdapter + SensorSample | pending | A6 |
 | B2 | MockReplayAdapter | pending | B4, B5, B3 |
