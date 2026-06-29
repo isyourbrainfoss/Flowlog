@@ -1,6 +1,6 @@
 # SLICE-D4: CSV batch export + share
 
-status: pending
+status: done
 parallel_with: D5
 
 ## Prerequisites
@@ -13,9 +13,9 @@ D3
 
 ## Done when
 
-- [ ] Export multiple shots
-- [ ] Linux save dialog
-- [ ] Android share stub or platform channel
+- [x] Export multiple shots
+- [x] Linux save dialog
+- [x] Android share stub or platform channel
 
 ## Verify
 

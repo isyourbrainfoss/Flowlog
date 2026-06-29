@@ -1,6 +1,6 @@
 # SLICE-D2: Shot detail view
 
-status: pending
+status: done
 parallel_with: D4
 
 ## Prerequisites
@@ -13,8 +13,8 @@ D1, C3
 
 ## Done when
 
-- [ ] Full chart + read-only metadata
-- [ ] Navigate from history card
+- [x] Full chart + read-only metadata
+- [x] Navigate from history card
 
 ## Verify
 
