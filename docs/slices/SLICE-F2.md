@@ -1,6 +1,6 @@
 # SLICE-F2: Tags / folders
 
-status: pending
+status: done
 parallel_with: F1, F4
 
 ## Prerequisites
@@ -14,8 +14,8 @@ D1
 
 ## Done when
 
-- [ ] CRUD tags
-- [ ] Filter history by tag
+- [x] CRUD tags
+- [x] Filter history by tag
 
 ## Verify
 

@@ -1,6 +1,6 @@
 # SLICE-E2: Annotations + channel mark
 
-status: pending
+status: done
 parallel_with: E1, E3
 
 ## Prerequisites
@@ -14,10 +14,10 @@ C3, C6
 
 ## Done when
 
-- [ ] Long-press to annotate
-- [ ] Mark channel button
-- [ ] Undo stack
-- [ ] Persisted on shot
+- [x] Long-press to annotate
+- [x] Mark channel button
+- [x] Undo stack
+- [x] Persisted on shot
 
 ## Verify
 

@@ -8,10 +8,12 @@ class HistoryFiltersPanel extends StatefulWidget {
     super.key,
     required this.filters,
     required this.onChanged,
+    this.tags = const [],
   });
 
   final ShotListFilters filters;
   final ValueChanged<ShotListFilters> onChanged;
+  final List<Tag> tags;
 
   @override
   State<HistoryFiltersPanel> createState() => _HistoryFiltersPanelState();
@@ -113,6 +115,26 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
                 ),
               ],
             ),
+            if (widget.tags.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('Tags', style: theme.textTheme.labelLarge),
+              const SizedBox(height: 4),
+              Wrap(
+                key: const Key('history_filter_tags'),
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  for (final tag in widget.tags)
+                    FilterChip(
+                      key: Key('history_filter_tag_${tag.id}'),
+                      label: Text(tag.name),
+                      selected: widget.filters.tagIds.contains(tag.id),
+                      onSelected: (_) =>
+                          _emit(widget.filters.toggleTagId(tag.id)),
+                    ),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             Row(
               children: [

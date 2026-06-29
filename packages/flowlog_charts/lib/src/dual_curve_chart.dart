@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'chart_annotations.dart';
 import 'chart_interaction.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -38,6 +39,9 @@ class DualCurveChart extends StatefulWidget {
     this.enableInteraction = true,
     this.interactionController,
     this.initialViewMode = ChartViewMode.overlay,
+    this.annotations,
+    this.annotationsNotifier,
+    this.onAnnotateAtElapsedMs,
   }) : assert(
           samples != null || samplesNotifier != null,
           'Provide samples or samplesNotifier',
@@ -68,6 +72,15 @@ class DualCurveChart extends StatefulWidget {
 
   /// Initial layout when no external controller is supplied.
   final ChartViewMode initialViewMode;
+
+  /// Static annotation markers (e.g. saved shot detail).
+  final List<ShotAnnotation>? annotations;
+
+  /// Live annotation stream for in-progress sessions.
+  final ValueNotifier<List<ShotAnnotation>>? annotationsNotifier;
+
+  /// Called when the user long-presses the chart to add a note.
+  final void Function(int elapsedMs)? onAnnotateAtElapsedMs;
 
   @override
   State<DualCurveChart> createState() => _DualCurveChartState();
@@ -119,13 +132,27 @@ class _DualCurveChartState extends State<DualCurveChart> {
     if (widget.samplesNotifier != null) {
       return ValueListenableBuilder<List<ShotSample>>(
         valueListenable: widget.samplesNotifier!,
-        builder: (context, value, _) => _buildChart(value),
+        builder: (context, samples, _) => _buildWithAnnotations(samples),
       );
     }
-    return _buildChart(widget.samples!);
+    return _buildWithAnnotations(widget.samples!);
   }
 
-  Widget _buildChart(List<ShotSample> rawSamples) {
+  Widget _buildWithAnnotations(List<ShotSample> samples) {
+    if (widget.annotationsNotifier != null) {
+      return ValueListenableBuilder<List<ShotAnnotation>>(
+        valueListenable: widget.annotationsNotifier!,
+        builder: (context, annotations, _) =>
+            _buildChart(samples, annotations),
+      );
+    }
+    return _buildChart(samples, widget.annotations ?? const []);
+  }
+
+  Widget _buildChart(
+    List<ShotSample> rawSamples,
+    List<ShotAnnotation> annotations,
+  ) {
     final prepared = _prepareSamples(rawSamples);
     final totalDurationMs = _resolveTotalDurationMs(prepared);
 
@@ -169,6 +196,7 @@ class _DualCurveChartState extends State<DualCurveChart> {
                           viewport: viewport,
                           visibility: visibility,
                           backgroundColor: widget.backgroundColor,
+                          annotations: annotations,
                         )
                       : _OverlayChart(
                           samples: prepared,
@@ -176,20 +204,31 @@ class _DualCurveChartState extends State<DualCurveChart> {
                           viewport: viewport,
                           visibility: visibility,
                           backgroundColor: widget.backgroundColor,
+                          annotations: annotations,
                         );
 
-                  if (!widget.enableInteraction) {
-                    return chartBody;
-                  }
+                  final interactiveBody = widget.enableInteraction
+                      ? GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onScaleStart: _interactionController.onScaleStart,
+                          onScaleUpdate: (details) => _interactionController
+                              .onScaleUpdate(details, plotWidth),
+                          onScaleEnd: _interactionController.onScaleEnd,
+                          onLongPressStart: widget.onAnnotateAtElapsedMs == null
+                              ? null
+                              : (details) {
+                                  final elapsedMs = chartElapsedMsFromLocalX(
+                                    localX: details.localPosition.dx,
+                                    chartWidth: constraints.maxWidth,
+                                    viewport: viewport,
+                                  );
+                                  widget.onAnnotateAtElapsedMs!(elapsedMs);
+                                },
+                          child: chartBody,
+                        )
+                      : chartBody;
 
-                  return GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onScaleStart: _interactionController.onScaleStart,
-                    onScaleUpdate: (details) => _interactionController
-                        .onScaleUpdate(details, plotWidth),
-                    onScaleEnd: _interactionController.onScaleEnd,
-                    child: chartBody,
-                  );
+                  return interactiveBody;
                 },
               ),
             ),
@@ -290,6 +329,7 @@ class _OverlayChart extends StatelessWidget {
     required this.viewport,
     required this.visibility,
     required this.backgroundColor,
+    required this.annotations,
   });
 
   final List<ShotSample> samples;
@@ -297,6 +337,7 @@ class _OverlayChart extends StatelessWidget {
   final ChartViewport viewport;
   final _SeriesVisibility visibility;
   final Color backgroundColor;
+  final List<ShotAnnotation> annotations;
 
   @override
   Widget build(BuildContext context) {
@@ -309,6 +350,7 @@ class _OverlayChart extends StatelessWidget {
         showWeight: visibility.showWeight,
         showFlow: visibility.showFlow,
         backgroundColor: backgroundColor,
+        annotations: annotations,
       ),
     );
   }
@@ -321,6 +363,7 @@ class _SplitCharts extends StatelessWidget {
     required this.viewport,
     required this.visibility,
     required this.backgroundColor,
+    required this.annotations,
   });
 
   final List<ShotSample> samples;
@@ -328,6 +371,7 @@ class _SplitCharts extends StatelessWidget {
   final ChartViewport viewport;
   final _SeriesVisibility visibility;
   final Color backgroundColor;
+  final List<ShotAnnotation> annotations;
 
   @override
   Widget build(BuildContext context) {
@@ -350,6 +394,7 @@ class _SplitCharts extends StatelessWidget {
             backgroundColor: backgroundColor,
             compact: true,
             axisUnitLabel: 'bar',
+            annotations: annotations,
           ),
         ),
       );
@@ -372,6 +417,7 @@ class _SplitCharts extends StatelessWidget {
             backgroundColor: backgroundColor,
             compact: true,
             axisUnitLabel: 'g',
+            annotations: annotations,
           ),
         ),
       );
@@ -394,6 +440,7 @@ class _SplitCharts extends StatelessWidget {
             backgroundColor: backgroundColor,
             compact: true,
             axisUnitLabel: 'g/s',
+            annotations: annotations,
           ),
         ),
       );
@@ -406,6 +453,7 @@ class _SplitCharts extends StatelessWidget {
           maxDurationMs: maxDurationMs,
           viewport: viewport,
           backgroundColor: backgroundColor,
+          annotations: annotations,
         ),
       );
     }
@@ -562,6 +610,7 @@ class DualCurveChartPainter extends CustomPainter {
     this.backgroundColor = FlowlogChartColors.background,
     this.compact = false,
     this.axisUnitLabel,
+    this.annotations = const [],
   }) : viewport = viewport ??
             ChartViewport(
               totalDurationMs: math.max(
@@ -579,6 +628,7 @@ class DualCurveChartPainter extends CustomPainter {
   final Color backgroundColor;
   final bool compact;
   final String? axisUnitLabel;
+  final List<ShotAnnotation> annotations;
 
   static const leftPad = 40.0;
   static const rightPad = 40.0;
@@ -647,6 +697,13 @@ class DualCurveChartPainter extends CustomPainter {
         dashed: true,
       );
     }
+
+    paintShotAnnotations(
+      canvas,
+      plotRect,
+      viewport,
+      annotations: annotations,
+    );
   }
 
   void _drawGrid(Canvas canvas, Rect plotRect) {
@@ -912,7 +969,8 @@ class DualCurveChartPainter extends CustomPainter {
         oldDelegate.showFlow != showFlow ||
         oldDelegate.backgroundColor != backgroundColor ||
         oldDelegate.compact != compact ||
-        oldDelegate.axisUnitLabel != axisUnitLabel;
+        oldDelegate.axisUnitLabel != axisUnitLabel ||
+        oldDelegate.annotations != annotations;
   }
 }
 

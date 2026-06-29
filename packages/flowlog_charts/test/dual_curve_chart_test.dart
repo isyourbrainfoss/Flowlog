@@ -124,6 +124,38 @@ void main() {
       notifier.dispose();
     });
 
+    testWidgets('renders annotation markers', (tester) async {
+      const samples = [
+        ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0),
+        ShotSample(elapsedMs: 10000, pressureBar: 9, weightG: 30),
+      ];
+      const annotations = [
+        ShotAnnotation(
+          elapsedMs: 5000,
+          label: 'Channel 1',
+          type: ShotAnnotationType.channel,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DualCurveChart(
+            samples: samples,
+            annotations: annotations,
+          ),
+        ),
+      );
+
+      expect(
+        find.descendant(
+          of: find.byType(DualCurveChart),
+          matching: find.byType(CustomPaint),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     test('prepares flow rates when fixture lacks flowGs', () {
       expect(fixtureSamples.any((sample) => sample.flowGs != null), isFalse);
 

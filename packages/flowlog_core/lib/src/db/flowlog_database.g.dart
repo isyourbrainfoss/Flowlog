@@ -1127,6 +1127,350 @@ class ShotSamplesCompanion extends UpdateCompanion<ShotSampleRow> {
   }
 }
 
+class $ShotAnnotationsTable extends ShotAnnotations
+    with TableInfo<$ShotAnnotationsTable, ShotAnnotationRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ShotAnnotationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _shotIdMeta = const VerificationMeta('shotId');
+  @override
+  late final GeneratedColumn<String> shotId = GeneratedColumn<String>(
+    'shot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES shots (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _elapsedMsMeta = const VerificationMeta(
+    'elapsedMs',
+  );
+  @override
+  late final GeneratedColumn<int> elapsedMs = GeneratedColumn<int>(
+    'elapsed_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, shotId, elapsedMs, label, type];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'shot_annotations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ShotAnnotationRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('shot_id')) {
+      context.handle(
+        _shotIdMeta,
+        shotId.isAcceptableOrUnknown(data['shot_id']!, _shotIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_shotIdMeta);
+    }
+    if (data.containsKey('elapsed_ms')) {
+      context.handle(
+        _elapsedMsMeta,
+        elapsedMs.isAcceptableOrUnknown(data['elapsed_ms']!, _elapsedMsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_elapsedMsMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ShotAnnotationRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ShotAnnotationRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      shotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shot_id'],
+      )!,
+      elapsedMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}elapsed_ms'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+    );
+  }
+
+  @override
+  $ShotAnnotationsTable createAlias(String alias) {
+    return $ShotAnnotationsTable(attachedDatabase, alias);
+  }
+}
+
+class ShotAnnotationRow extends DataClass
+    implements Insertable<ShotAnnotationRow> {
+  final int id;
+  final String shotId;
+  final int elapsedMs;
+  final String label;
+  final String type;
+  const ShotAnnotationRow({
+    required this.id,
+    required this.shotId,
+    required this.elapsedMs,
+    required this.label,
+    required this.type,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['shot_id'] = Variable<String>(shotId);
+    map['elapsed_ms'] = Variable<int>(elapsedMs);
+    map['label'] = Variable<String>(label);
+    map['type'] = Variable<String>(type);
+    return map;
+  }
+
+  ShotAnnotationsCompanion toCompanion(bool nullToAbsent) {
+    return ShotAnnotationsCompanion(
+      id: Value(id),
+      shotId: Value(shotId),
+      elapsedMs: Value(elapsedMs),
+      label: Value(label),
+      type: Value(type),
+    );
+  }
+
+  factory ShotAnnotationRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ShotAnnotationRow(
+      id: serializer.fromJson<int>(json['id']),
+      shotId: serializer.fromJson<String>(json['shotId']),
+      elapsedMs: serializer.fromJson<int>(json['elapsedMs']),
+      label: serializer.fromJson<String>(json['label']),
+      type: serializer.fromJson<String>(json['type']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'shotId': serializer.toJson<String>(shotId),
+      'elapsedMs': serializer.toJson<int>(elapsedMs),
+      'label': serializer.toJson<String>(label),
+      'type': serializer.toJson<String>(type),
+    };
+  }
+
+  ShotAnnotationRow copyWith({
+    int? id,
+    String? shotId,
+    int? elapsedMs,
+    String? label,
+    String? type,
+  }) => ShotAnnotationRow(
+    id: id ?? this.id,
+    shotId: shotId ?? this.shotId,
+    elapsedMs: elapsedMs ?? this.elapsedMs,
+    label: label ?? this.label,
+    type: type ?? this.type,
+  );
+  ShotAnnotationRow copyWithCompanion(ShotAnnotationsCompanion data) {
+    return ShotAnnotationRow(
+      id: data.id.present ? data.id.value : this.id,
+      shotId: data.shotId.present ? data.shotId.value : this.shotId,
+      elapsedMs: data.elapsedMs.present ? data.elapsedMs.value : this.elapsedMs,
+      label: data.label.present ? data.label.value : this.label,
+      type: data.type.present ? data.type.value : this.type,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShotAnnotationRow(')
+          ..write('id: $id, ')
+          ..write('shotId: $shotId, ')
+          ..write('elapsedMs: $elapsedMs, ')
+          ..write('label: $label, ')
+          ..write('type: $type')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, shotId, elapsedMs, label, type);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ShotAnnotationRow &&
+          other.id == this.id &&
+          other.shotId == this.shotId &&
+          other.elapsedMs == this.elapsedMs &&
+          other.label == this.label &&
+          other.type == this.type);
+}
+
+class ShotAnnotationsCompanion extends UpdateCompanion<ShotAnnotationRow> {
+  final Value<int> id;
+  final Value<String> shotId;
+  final Value<int> elapsedMs;
+  final Value<String> label;
+  final Value<String> type;
+  const ShotAnnotationsCompanion({
+    this.id = const Value.absent(),
+    this.shotId = const Value.absent(),
+    this.elapsedMs = const Value.absent(),
+    this.label = const Value.absent(),
+    this.type = const Value.absent(),
+  });
+  ShotAnnotationsCompanion.insert({
+    this.id = const Value.absent(),
+    required String shotId,
+    required int elapsedMs,
+    required String label,
+    required String type,
+  }) : shotId = Value(shotId),
+       elapsedMs = Value(elapsedMs),
+       label = Value(label),
+       type = Value(type);
+  static Insertable<ShotAnnotationRow> custom({
+    Expression<int>? id,
+    Expression<String>? shotId,
+    Expression<int>? elapsedMs,
+    Expression<String>? label,
+    Expression<String>? type,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (shotId != null) 'shot_id': shotId,
+      if (elapsedMs != null) 'elapsed_ms': elapsedMs,
+      if (label != null) 'label': label,
+      if (type != null) 'type': type,
+    });
+  }
+
+  ShotAnnotationsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? shotId,
+    Value<int>? elapsedMs,
+    Value<String>? label,
+    Value<String>? type,
+  }) {
+    return ShotAnnotationsCompanion(
+      id: id ?? this.id,
+      shotId: shotId ?? this.shotId,
+      elapsedMs: elapsedMs ?? this.elapsedMs,
+      label: label ?? this.label,
+      type: type ?? this.type,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (shotId.present) {
+      map['shot_id'] = Variable<String>(shotId.value);
+    }
+    if (elapsedMs.present) {
+      map['elapsed_ms'] = Variable<int>(elapsedMs.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShotAnnotationsCompanion(')
+          ..write('id: $id, ')
+          ..write('shotId: $shotId, ')
+          ..write('elapsedMs: $elapsedMs, ')
+          ..write('label: $label, ')
+          ..write('type: $type')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -1533,12 +1877,433 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
   }
 }
 
+class $TagsTable extends Tags with TableInfo<$TagsTable, TagRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TagsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'tags';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TagRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TagRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TagRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+    );
+  }
+
+  @override
+  $TagsTable createAlias(String alias) {
+    return $TagsTable(attachedDatabase, alias);
+  }
+}
+
+class TagRow extends DataClass implements Insertable<TagRow> {
+  final String id;
+  final String name;
+  const TagRow({required this.id, required this.name});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    return map;
+  }
+
+  TagsCompanion toCompanion(bool nullToAbsent) {
+    return TagsCompanion(id: Value(id), name: Value(name));
+  }
+
+  factory TagRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TagRow(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+    };
+  }
+
+  TagRow copyWith({String? id, String? name}) =>
+      TagRow(id: id ?? this.id, name: name ?? this.name);
+  TagRow copyWithCompanion(TagsCompanion data) {
+    return TagRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TagRow(')
+          ..write('id: $id, ')
+          ..write('name: $name')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TagRow && other.id == this.id && other.name == this.name);
+}
+
+class TagsCompanion extends UpdateCompanion<TagRow> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> rowid;
+  const TagsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TagsCompanion.insert({
+    required String id,
+    required String name,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<TagRow> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TagsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? rowid,
+  }) {
+    return TagsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TagsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ShotTagsTable extends ShotTags
+    with TableInfo<$ShotTagsTable, ShotTagRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ShotTagsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _shotIdMeta = const VerificationMeta('shotId');
+  @override
+  late final GeneratedColumn<String> shotId = GeneratedColumn<String>(
+    'shot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES shots (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _tagIdMeta = const VerificationMeta('tagId');
+  @override
+  late final GeneratedColumn<String> tagId = GeneratedColumn<String>(
+    'tag_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES tags (id) ON DELETE CASCADE',
+    ),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [shotId, tagId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'shot_tags';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ShotTagRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('shot_id')) {
+      context.handle(
+        _shotIdMeta,
+        shotId.isAcceptableOrUnknown(data['shot_id']!, _shotIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_shotIdMeta);
+    }
+    if (data.containsKey('tag_id')) {
+      context.handle(
+        _tagIdMeta,
+        tagId.isAcceptableOrUnknown(data['tag_id']!, _tagIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tagIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {shotId, tagId};
+  @override
+  ShotTagRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ShotTagRow(
+      shotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shot_id'],
+      )!,
+      tagId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tag_id'],
+      )!,
+    );
+  }
+
+  @override
+  $ShotTagsTable createAlias(String alias) {
+    return $ShotTagsTable(attachedDatabase, alias);
+  }
+}
+
+class ShotTagRow extends DataClass implements Insertable<ShotTagRow> {
+  final String shotId;
+  final String tagId;
+  const ShotTagRow({required this.shotId, required this.tagId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['shot_id'] = Variable<String>(shotId);
+    map['tag_id'] = Variable<String>(tagId);
+    return map;
+  }
+
+  ShotTagsCompanion toCompanion(bool nullToAbsent) {
+    return ShotTagsCompanion(shotId: Value(shotId), tagId: Value(tagId));
+  }
+
+  factory ShotTagRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ShotTagRow(
+      shotId: serializer.fromJson<String>(json['shotId']),
+      tagId: serializer.fromJson<String>(json['tagId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'shotId': serializer.toJson<String>(shotId),
+      'tagId': serializer.toJson<String>(tagId),
+    };
+  }
+
+  ShotTagRow copyWith({String? shotId, String? tagId}) =>
+      ShotTagRow(shotId: shotId ?? this.shotId, tagId: tagId ?? this.tagId);
+  ShotTagRow copyWithCompanion(ShotTagsCompanion data) {
+    return ShotTagRow(
+      shotId: data.shotId.present ? data.shotId.value : this.shotId,
+      tagId: data.tagId.present ? data.tagId.value : this.tagId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShotTagRow(')
+          ..write('shotId: $shotId, ')
+          ..write('tagId: $tagId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(shotId, tagId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ShotTagRow &&
+          other.shotId == this.shotId &&
+          other.tagId == this.tagId);
+}
+
+class ShotTagsCompanion extends UpdateCompanion<ShotTagRow> {
+  final Value<String> shotId;
+  final Value<String> tagId;
+  final Value<int> rowid;
+  const ShotTagsCompanion({
+    this.shotId = const Value.absent(),
+    this.tagId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ShotTagsCompanion.insert({
+    required String shotId,
+    required String tagId,
+    this.rowid = const Value.absent(),
+  }) : shotId = Value(shotId),
+       tagId = Value(tagId);
+  static Insertable<ShotTagRow> custom({
+    Expression<String>? shotId,
+    Expression<String>? tagId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (shotId != null) 'shot_id': shotId,
+      if (tagId != null) 'tag_id': tagId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ShotTagsCompanion copyWith({
+    Value<String>? shotId,
+    Value<String>? tagId,
+    Value<int>? rowid,
+  }) {
+    return ShotTagsCompanion(
+      shotId: shotId ?? this.shotId,
+      tagId: tagId ?? this.tagId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (shotId.present) {
+      map['shot_id'] = Variable<String>(shotId.value);
+    }
+    if (tagId.present) {
+      map['tag_id'] = Variable<String>(tagId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShotTagsCompanion(')
+          ..write('shotId: $shotId, ')
+          ..write('tagId: $tagId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$FlowlogDatabase extends GeneratedDatabase {
   _$FlowlogDatabase(QueryExecutor e) : super(e);
   $FlowlogDatabaseManager get managers => $FlowlogDatabaseManager(this);
   late final $ShotsTable shots = $ShotsTable(this);
   late final $ShotSamplesTable shotSamples = $ShotSamplesTable(this);
+  late final $ShotAnnotationsTable shotAnnotations = $ShotAnnotationsTable(
+    this,
+  );
   late final $BeansTable beans = $BeansTable(this);
+  late final $TagsTable tags = $TagsTable(this);
+  late final $ShotTagsTable shotTags = $ShotTagsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1546,7 +2311,10 @@ abstract class _$FlowlogDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     shots,
     shotSamples,
+    shotAnnotations,
     beans,
+    tags,
+    shotTags,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -1556,6 +2324,27 @@ abstract class _$FlowlogDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('shot_samples', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'shots',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('shot_annotations', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'shots',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('shot_tags', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'tags',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('shot_tags', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -1608,6 +2397,45 @@ final class $$ShotsTableReferences
     ).filter((f) => f.shotId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_shotSamplesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$ShotAnnotationsTable, List<ShotAnnotationRow>>
+  _shotAnnotationsRefsTable(_$FlowlogDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.shotAnnotations,
+        aliasName: 'shots__id__shot_annotations__shot_id',
+      );
+
+  $$ShotAnnotationsTableProcessedTableManager get shotAnnotationsRefs {
+    final manager = $$ShotAnnotationsTableTableManager(
+      $_db,
+      $_db.shotAnnotations,
+    ).filter((f) => f.shotId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _shotAnnotationsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$ShotTagsTable, List<ShotTagRow>>
+  _shotTagsRefsTable(_$FlowlogDatabase db) => MultiTypedResultKey.fromTable(
+    db.shotTags,
+    aliasName: 'shots__id__shot_tags__shot_id',
+  );
+
+  $$ShotTagsTableProcessedTableManager get shotTagsRefs {
+    final manager = $$ShotTagsTableTableManager(
+      $_db,
+      $_db.shotTags,
+    ).filter((f) => f.shotId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_shotTagsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -1696,6 +2524,56 @@ class $$ShotsTableFilterComposer
           }) => $$ShotSamplesTableFilterComposer(
             $db: $db,
             $table: $db.shotSamples,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> shotAnnotationsRefs(
+    Expression<bool> Function($$ShotAnnotationsTableFilterComposer f) f,
+  ) {
+    final $$ShotAnnotationsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.shotAnnotations,
+      getReferencedColumn: (t) => t.shotId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotAnnotationsTableFilterComposer(
+            $db: $db,
+            $table: $db.shotAnnotations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> shotTagsRefs(
+    Expression<bool> Function($$ShotTagsTableFilterComposer f) f,
+  ) {
+    final $$ShotTagsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.shotTags,
+      getReferencedColumn: (t) => t.shotId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotTagsTableFilterComposer(
+            $db: $db,
+            $table: $db.shotTags,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -1845,6 +2723,56 @@ class $$ShotsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> shotAnnotationsRefs<T extends Object>(
+    Expression<T> Function($$ShotAnnotationsTableAnnotationComposer a) f,
+  ) {
+    final $$ShotAnnotationsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.shotAnnotations,
+      getReferencedColumn: (t) => t.shotId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotAnnotationsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.shotAnnotations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> shotTagsRefs<T extends Object>(
+    Expression<T> Function($$ShotTagsTableAnnotationComposer a) f,
+  ) {
+    final $$ShotTagsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.shotTags,
+      getReferencedColumn: (t) => t.shotId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotTagsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.shotTags,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$ShotsTableTableManager
@@ -1860,7 +2788,11 @@ class $$ShotsTableTableManager
           $$ShotsTableUpdateCompanionBuilder,
           (ShotRow, $$ShotsTableReferences),
           ShotRow,
-          PrefetchHooks Function({bool shotSamplesRefs})
+          PrefetchHooks Function({
+            bool shotSamplesRefs,
+            bool shotAnnotationsRefs,
+            bool shotTagsRefs,
+          })
         > {
   $$ShotsTableTableManager(_$FlowlogDatabase db, $ShotsTable table)
     : super(
@@ -1935,32 +2867,89 @@ class $$ShotsTableTableManager
                     (e.readTable(table), $$ShotsTableReferences(db, table, e)),
               )
               .toList(),
-          prefetchHooksCallback: ({shotSamplesRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (shotSamplesRefs) db.shotSamples],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (shotSamplesRefs)
-                    await $_getPrefetchedData<
-                      ShotRow,
-                      $ShotsTable,
-                      ShotSampleRow
-                    >(
-                      currentTable: table,
-                      referencedTable: $$ShotsTableReferences
-                          ._shotSamplesRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$ShotsTableReferences(db, table, p0).shotSamplesRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.shotId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+          prefetchHooksCallback:
+              ({
+                shotSamplesRefs = false,
+                shotAnnotationsRefs = false,
+                shotTagsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (shotSamplesRefs) db.shotSamples,
+                    if (shotAnnotationsRefs) db.shotAnnotations,
+                    if (shotTagsRefs) db.shotTags,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (shotSamplesRefs)
+                        await $_getPrefetchedData<
+                          ShotRow,
+                          $ShotsTable,
+                          ShotSampleRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ShotsTableReferences
+                              ._shotSamplesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ShotsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).shotSamplesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.shotId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (shotAnnotationsRefs)
+                        await $_getPrefetchedData<
+                          ShotRow,
+                          $ShotsTable,
+                          ShotAnnotationRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ShotsTableReferences
+                              ._shotAnnotationsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ShotsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).shotAnnotationsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.shotId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (shotTagsRefs)
+                        await $_getPrefetchedData<
+                          ShotRow,
+                          $ShotsTable,
+                          ShotTagRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ShotsTableReferences
+                              ._shotTagsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ShotsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).shotTagsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.shotId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -1977,7 +2966,11 @@ typedef $$ShotsTableProcessedTableManager =
       $$ShotsTableUpdateCompanionBuilder,
       (ShotRow, $$ShotsTableReferences),
       ShotRow,
-      PrefetchHooks Function({bool shotSamplesRefs})
+      PrefetchHooks Function({
+        bool shotSamplesRefs,
+        bool shotAnnotationsRefs,
+        bool shotTagsRefs,
+      })
     >;
 typedef $$ShotSamplesTableCreateCompanionBuilder =
     ShotSamplesCompanion Function({
@@ -2331,6 +3324,330 @@ typedef $$ShotSamplesTableProcessedTableManager =
       ShotSampleRow,
       PrefetchHooks Function({bool shotId})
     >;
+typedef $$ShotAnnotationsTableCreateCompanionBuilder =
+    ShotAnnotationsCompanion Function({
+      Value<int> id,
+      required String shotId,
+      required int elapsedMs,
+      required String label,
+      required String type,
+    });
+typedef $$ShotAnnotationsTableUpdateCompanionBuilder =
+    ShotAnnotationsCompanion Function({
+      Value<int> id,
+      Value<String> shotId,
+      Value<int> elapsedMs,
+      Value<String> label,
+      Value<String> type,
+    });
+
+final class $$ShotAnnotationsTableReferences
+    extends
+        BaseReferences<
+          _$FlowlogDatabase,
+          $ShotAnnotationsTable,
+          ShotAnnotationRow
+        > {
+  $$ShotAnnotationsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ShotsTable _shotIdTable(_$FlowlogDatabase db) =>
+      db.shots.createAlias('shot_annotations__shot_id__shots__id');
+
+  $$ShotsTableProcessedTableManager get shotId {
+    final $_column = $_itemColumn<String>('shot_id')!;
+
+    final manager = $$ShotsTableTableManager(
+      $_db,
+      $_db.shots,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_shotIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ShotAnnotationsTableFilterComposer
+    extends Composer<_$FlowlogDatabase, $ShotAnnotationsTable> {
+  $$ShotAnnotationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get elapsedMs => $composableBuilder(
+    column: $table.elapsedMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ShotsTableFilterComposer get shotId {
+    final $$ShotsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.shotId,
+      referencedTable: $db.shots,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotsTableFilterComposer(
+            $db: $db,
+            $table: $db.shots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ShotAnnotationsTableOrderingComposer
+    extends Composer<_$FlowlogDatabase, $ShotAnnotationsTable> {
+  $$ShotAnnotationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get elapsedMs => $composableBuilder(
+    column: $table.elapsedMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ShotsTableOrderingComposer get shotId {
+    final $$ShotsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.shotId,
+      referencedTable: $db.shots,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotsTableOrderingComposer(
+            $db: $db,
+            $table: $db.shots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ShotAnnotationsTableAnnotationComposer
+    extends Composer<_$FlowlogDatabase, $ShotAnnotationsTable> {
+  $$ShotAnnotationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get elapsedMs =>
+      $composableBuilder(column: $table.elapsedMs, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  $$ShotsTableAnnotationComposer get shotId {
+    final $$ShotsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.shotId,
+      referencedTable: $db.shots,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.shots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ShotAnnotationsTableTableManager
+    extends
+        RootTableManager<
+          _$FlowlogDatabase,
+          $ShotAnnotationsTable,
+          ShotAnnotationRow,
+          $$ShotAnnotationsTableFilterComposer,
+          $$ShotAnnotationsTableOrderingComposer,
+          $$ShotAnnotationsTableAnnotationComposer,
+          $$ShotAnnotationsTableCreateCompanionBuilder,
+          $$ShotAnnotationsTableUpdateCompanionBuilder,
+          (ShotAnnotationRow, $$ShotAnnotationsTableReferences),
+          ShotAnnotationRow,
+          PrefetchHooks Function({bool shotId})
+        > {
+  $$ShotAnnotationsTableTableManager(
+    _$FlowlogDatabase db,
+    $ShotAnnotationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ShotAnnotationsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ShotAnnotationsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ShotAnnotationsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> shotId = const Value.absent(),
+                Value<int> elapsedMs = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<String> type = const Value.absent(),
+              }) => ShotAnnotationsCompanion(
+                id: id,
+                shotId: shotId,
+                elapsedMs: elapsedMs,
+                label: label,
+                type: type,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String shotId,
+                required int elapsedMs,
+                required String label,
+                required String type,
+              }) => ShotAnnotationsCompanion.insert(
+                id: id,
+                shotId: shotId,
+                elapsedMs: elapsedMs,
+                label: label,
+                type: type,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ShotAnnotationsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({shotId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (shotId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.shotId,
+                                referencedTable:
+                                    $$ShotAnnotationsTableReferences
+                                        ._shotIdTable(db),
+                                referencedColumn:
+                                    $$ShotAnnotationsTableReferences
+                                        ._shotIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ShotAnnotationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$FlowlogDatabase,
+      $ShotAnnotationsTable,
+      ShotAnnotationRow,
+      $$ShotAnnotationsTableFilterComposer,
+      $$ShotAnnotationsTableOrderingComposer,
+      $$ShotAnnotationsTableAnnotationComposer,
+      $$ShotAnnotationsTableCreateCompanionBuilder,
+      $$ShotAnnotationsTableUpdateCompanionBuilder,
+      (ShotAnnotationRow, $$ShotAnnotationsTableReferences),
+      ShotAnnotationRow,
+      PrefetchHooks Function({bool shotId})
+    >;
 typedef $$BeansTableCreateCompanionBuilder =
     BeansCompanion Function({
       required String id,
@@ -2546,6 +3863,576 @@ typedef $$BeansTableProcessedTableManager =
       BeanRow,
       PrefetchHooks Function()
     >;
+typedef $$TagsTableCreateCompanionBuilder =
+    TagsCompanion Function({
+      required String id,
+      required String name,
+      Value<int> rowid,
+    });
+typedef $$TagsTableUpdateCompanionBuilder =
+    TagsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<int> rowid,
+    });
+
+final class $$TagsTableReferences
+    extends BaseReferences<_$FlowlogDatabase, $TagsTable, TagRow> {
+  $$TagsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$ShotTagsTable, List<ShotTagRow>>
+  _shotTagsRefsTable(_$FlowlogDatabase db) => MultiTypedResultKey.fromTable(
+    db.shotTags,
+    aliasName: 'tags__id__shot_tags__tag_id',
+  );
+
+  $$ShotTagsTableProcessedTableManager get shotTagsRefs {
+    final manager = $$ShotTagsTableTableManager(
+      $_db,
+      $_db.shotTags,
+    ).filter((f) => f.tagId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_shotTagsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$TagsTableFilterComposer
+    extends Composer<_$FlowlogDatabase, $TagsTable> {
+  $$TagsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> shotTagsRefs(
+    Expression<bool> Function($$ShotTagsTableFilterComposer f) f,
+  ) {
+    final $$ShotTagsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.shotTags,
+      getReferencedColumn: (t) => t.tagId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotTagsTableFilterComposer(
+            $db: $db,
+            $table: $db.shotTags,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$TagsTableOrderingComposer
+    extends Composer<_$FlowlogDatabase, $TagsTable> {
+  $$TagsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TagsTableAnnotationComposer
+    extends Composer<_$FlowlogDatabase, $TagsTable> {
+  $$TagsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  Expression<T> shotTagsRefs<T extends Object>(
+    Expression<T> Function($$ShotTagsTableAnnotationComposer a) f,
+  ) {
+    final $$ShotTagsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.shotTags,
+      getReferencedColumn: (t) => t.tagId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotTagsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.shotTags,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$TagsTableTableManager
+    extends
+        RootTableManager<
+          _$FlowlogDatabase,
+          $TagsTable,
+          TagRow,
+          $$TagsTableFilterComposer,
+          $$TagsTableOrderingComposer,
+          $$TagsTableAnnotationComposer,
+          $$TagsTableCreateCompanionBuilder,
+          $$TagsTableUpdateCompanionBuilder,
+          (TagRow, $$TagsTableReferences),
+          TagRow,
+          PrefetchHooks Function({bool shotTagsRefs})
+        > {
+  $$TagsTableTableManager(_$FlowlogDatabase db, $TagsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TagsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TagsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TagsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TagsCompanion(id: id, name: name, rowid: rowid),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<int> rowid = const Value.absent(),
+              }) => TagsCompanion.insert(id: id, name: name, rowid: rowid),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) =>
+                    (e.readTable(table), $$TagsTableReferences(db, table, e)),
+              )
+              .toList(),
+          prefetchHooksCallback: ({shotTagsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (shotTagsRefs) db.shotTags],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (shotTagsRefs)
+                    await $_getPrefetchedData<TagRow, $TagsTable, ShotTagRow>(
+                      currentTable: table,
+                      referencedTable: $$TagsTableReferences._shotTagsRefsTable(
+                        db,
+                      ),
+                      managerFromTypedResult: (p0) =>
+                          $$TagsTableReferences(db, table, p0).shotTagsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.tagId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$TagsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$FlowlogDatabase,
+      $TagsTable,
+      TagRow,
+      $$TagsTableFilterComposer,
+      $$TagsTableOrderingComposer,
+      $$TagsTableAnnotationComposer,
+      $$TagsTableCreateCompanionBuilder,
+      $$TagsTableUpdateCompanionBuilder,
+      (TagRow, $$TagsTableReferences),
+      TagRow,
+      PrefetchHooks Function({bool shotTagsRefs})
+    >;
+typedef $$ShotTagsTableCreateCompanionBuilder =
+    ShotTagsCompanion Function({
+      required String shotId,
+      required String tagId,
+      Value<int> rowid,
+    });
+typedef $$ShotTagsTableUpdateCompanionBuilder =
+    ShotTagsCompanion Function({
+      Value<String> shotId,
+      Value<String> tagId,
+      Value<int> rowid,
+    });
+
+final class $$ShotTagsTableReferences
+    extends BaseReferences<_$FlowlogDatabase, $ShotTagsTable, ShotTagRow> {
+  $$ShotTagsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $ShotsTable _shotIdTable(_$FlowlogDatabase db) =>
+      db.shots.createAlias('shot_tags__shot_id__shots__id');
+
+  $$ShotsTableProcessedTableManager get shotId {
+    final $_column = $_itemColumn<String>('shot_id')!;
+
+    final manager = $$ShotsTableTableManager(
+      $_db,
+      $_db.shots,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_shotIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $TagsTable _tagIdTable(_$FlowlogDatabase db) =>
+      db.tags.createAlias('shot_tags__tag_id__tags__id');
+
+  $$TagsTableProcessedTableManager get tagId {
+    final $_column = $_itemColumn<String>('tag_id')!;
+
+    final manager = $$TagsTableTableManager(
+      $_db,
+      $_db.tags,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_tagIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ShotTagsTableFilterComposer
+    extends Composer<_$FlowlogDatabase, $ShotTagsTable> {
+  $$ShotTagsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  $$ShotsTableFilterComposer get shotId {
+    final $$ShotsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.shotId,
+      referencedTable: $db.shots,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotsTableFilterComposer(
+            $db: $db,
+            $table: $db.shots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$TagsTableFilterComposer get tagId {
+    final $$TagsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tagId,
+      referencedTable: $db.tags,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TagsTableFilterComposer(
+            $db: $db,
+            $table: $db.tags,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ShotTagsTableOrderingComposer
+    extends Composer<_$FlowlogDatabase, $ShotTagsTable> {
+  $$ShotTagsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  $$ShotsTableOrderingComposer get shotId {
+    final $$ShotsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.shotId,
+      referencedTable: $db.shots,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotsTableOrderingComposer(
+            $db: $db,
+            $table: $db.shots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$TagsTableOrderingComposer get tagId {
+    final $$TagsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tagId,
+      referencedTable: $db.tags,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TagsTableOrderingComposer(
+            $db: $db,
+            $table: $db.tags,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ShotTagsTableAnnotationComposer
+    extends Composer<_$FlowlogDatabase, $ShotTagsTable> {
+  $$ShotTagsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  $$ShotsTableAnnotationComposer get shotId {
+    final $$ShotsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.shotId,
+      referencedTable: $db.shots,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.shots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$TagsTableAnnotationComposer get tagId {
+    final $$TagsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.tagId,
+      referencedTable: $db.tags,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TagsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.tags,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ShotTagsTableTableManager
+    extends
+        RootTableManager<
+          _$FlowlogDatabase,
+          $ShotTagsTable,
+          ShotTagRow,
+          $$ShotTagsTableFilterComposer,
+          $$ShotTagsTableOrderingComposer,
+          $$ShotTagsTableAnnotationComposer,
+          $$ShotTagsTableCreateCompanionBuilder,
+          $$ShotTagsTableUpdateCompanionBuilder,
+          (ShotTagRow, $$ShotTagsTableReferences),
+          ShotTagRow,
+          PrefetchHooks Function({bool shotId, bool tagId})
+        > {
+  $$ShotTagsTableTableManager(_$FlowlogDatabase db, $ShotTagsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ShotTagsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ShotTagsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ShotTagsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> shotId = const Value.absent(),
+                Value<String> tagId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) =>
+                  ShotTagsCompanion(shotId: shotId, tagId: tagId, rowid: rowid),
+          createCompanionCallback:
+              ({
+                required String shotId,
+                required String tagId,
+                Value<int> rowid = const Value.absent(),
+              }) => ShotTagsCompanion.insert(
+                shotId: shotId,
+                tagId: tagId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ShotTagsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({shotId = false, tagId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (shotId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.shotId,
+                                referencedTable: $$ShotTagsTableReferences
+                                    ._shotIdTable(db),
+                                referencedColumn: $$ShotTagsTableReferences
+                                    ._shotIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+                    if (tagId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.tagId,
+                                referencedTable: $$ShotTagsTableReferences
+                                    ._tagIdTable(db),
+                                referencedColumn: $$ShotTagsTableReferences
+                                    ._tagIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ShotTagsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$FlowlogDatabase,
+      $ShotTagsTable,
+      ShotTagRow,
+      $$ShotTagsTableFilterComposer,
+      $$ShotTagsTableOrderingComposer,
+      $$ShotTagsTableAnnotationComposer,
+      $$ShotTagsTableCreateCompanionBuilder,
+      $$ShotTagsTableUpdateCompanionBuilder,
+      (ShotTagRow, $$ShotTagsTableReferences),
+      ShotTagRow,
+      PrefetchHooks Function({bool shotId, bool tagId})
+    >;
 
 class $FlowlogDatabaseManager {
   final _$FlowlogDatabase _db;
@@ -2554,6 +4441,11 @@ class $FlowlogDatabaseManager {
       $$ShotsTableTableManager(_db, _db.shots);
   $$ShotSamplesTableTableManager get shotSamples =>
       $$ShotSamplesTableTableManager(_db, _db.shotSamples);
+  $$ShotAnnotationsTableTableManager get shotAnnotations =>
+      $$ShotAnnotationsTableTableManager(_db, _db.shotAnnotations);
   $$BeansTableTableManager get beans =>
       $$BeansTableTableManager(_db, _db.beans);
+  $$TagsTableTableManager get tags => $$TagsTableTableManager(_db, _db.tags);
+  $$ShotTagsTableTableManager get shotTags =>
+      $$ShotTagsTableTableManager(_db, _db.shotTags);
 }

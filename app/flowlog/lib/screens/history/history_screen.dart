@@ -10,11 +10,15 @@ class HistoryScreen extends StatefulWidget {
   const HistoryScreen({
     super.key,
     this.shotRepository,
+    this.tagRepository,
     this.initialFilters = ShotListFilters.empty,
   });
 
   /// Optional repository override for tests or dependency injection.
   final ShotRepository? shotRepository;
+
+  /// Optional tag repository override for tests or dependency injection.
+  final TagRepository? tagRepository;
 
   /// Initial filter state (primarily for tests).
   final ShotListFilters initialFilters;
@@ -25,19 +29,31 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   ShotRepository? _shotRepository;
+  TagRepository? _tagRepository;
   FlowlogDatabase? _database;
   bool _ownsRepository = false;
   late ShotListFilters _filters;
-  late Future<List<Shot>> _shotsFuture;
+  late Future<_HistoryData> _historyFuture;
 
   @override
   void initState() {
     super.initState();
     _filters = widget.initialFilters;
-    _shotsFuture = _loadShots();
+    _historyFuture = _loadHistory();
   }
 
-  Future<ShotRepository> _ensureRepository() async {
+  Future<FlowlogDatabase> _ensureDatabase() async {
+    if (_database != null) {
+      return _database!;
+    }
+
+    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
+    _database = FlowlogDatabase.openFile(dbPath);
+    _ownsRepository = true;
+    return _database!;
+  }
+
+  Future<ShotRepository> _ensureShotRepository() async {
     if (widget.shotRepository != null) {
       return widget.shotRepository!;
     }
@@ -45,33 +61,53 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return _shotRepository!;
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
-    _shotRepository = ShotRepository(_database!);
-    _ownsRepository = true;
+    final database = await _ensureDatabase();
+    _shotRepository = ShotRepository(database);
     return _shotRepository!;
   }
 
-  Future<List<Shot>> _loadShots() async {
-    final repository = await _ensureRepository();
-    return repository.listShots(
-      includeSamples: true,
-      filters: _filters,
+  Future<TagRepository> _ensureTagRepository() async {
+    if (widget.tagRepository != null) {
+      return widget.tagRepository!;
+    }
+    if (_tagRepository != null) {
+      return _tagRepository!;
+    }
+
+    final database = await _ensureDatabase();
+    _tagRepository = TagRepository(database);
+    return _tagRepository!;
+  }
+
+  Future<_HistoryData> _loadHistory() async {
+    final shotRepository = await _ensureShotRepository();
+    final tagRepository = await _ensureTagRepository();
+    final results = await Future.wait([
+      shotRepository.listShots(
+        includeSamples: true,
+        filters: _filters,
+      ),
+      tagRepository.listTags(),
+    ]);
+
+    return _HistoryData(
+      shots: results[0] as List<Shot>,
+      tags: results[1] as List<Tag>,
     );
   }
 
   void _onFiltersChanged(ShotListFilters filters) {
     setState(() {
       _filters = filters;
-      _shotsFuture = _loadShots();
+      _historyFuture = _loadHistory();
     });
   }
 
   Future<void> _refresh() async {
     setState(() {
-      _shotsFuture = _loadShots();
+      _historyFuture = _loadHistory();
     });
-    await _shotsFuture;
+    await _historyFuture;
   }
 
   @override
@@ -84,52 +120,82 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        HistoryFiltersPanel(
-          filters: _filters,
-          onChanged: _onFiltersChanged,
-        ),
-        Expanded(
-          child: FutureBuilder<List<Shot>>(
-            future: _shotsFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const Center(child: CircularProgressIndicator());
-              }
+    return FutureBuilder<_HistoryData>(
+      future: _historyFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-              if (snapshot.hasError) {
-                return Center(
-                  child: Text('Failed to load shots: ${snapshot.error}'),
-                );
-              }
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Failed to load history: ${snapshot.error}'),
+          );
+        }
 
-              final shots = snapshot.data ?? const <Shot>[];
+        final data = snapshot.data!;
+        final shots = data.shots;
 
-              if (shots.isEmpty) {
-                return Center(
-                  child: Text(
-                    _filters.isActive
-                        ? 'No shots match filters'
-                        : 'No saved shots yet',
-                  ),
-                );
-              }
-
-              return RefreshIndicator(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            HistoryFiltersPanel(
+              filters: _filters,
+              tags: data.tags,
+              onChanged: _onFiltersChanged,
+            ),
+            Expanded(
+              child: _HistoryShotList(
+                shots: shots,
+                filters: _filters,
                 onRefresh: _refresh,
-                child: ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: shots.length,
-                  itemBuilder: (context, index) =>
-                      HistoryShotCard(shot: shots[index]),
-                ),
-              );
-            },
-          ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _HistoryData {
+  const _HistoryData({
+    required this.shots,
+    required this.tags,
+  });
+
+  final List<Shot> shots;
+  final List<Tag> tags;
+}
+
+class _HistoryShotList extends StatelessWidget {
+  const _HistoryShotList({
+    required this.shots,
+    required this.filters,
+    required this.onRefresh,
+  });
+
+  final List<Shot> shots;
+  final ShotListFilters filters;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    if (shots.isEmpty) {
+      return Center(
+        child: Text(
+          filters.isActive ? 'No shots match filters' : 'No saved shots yet',
         ),
-      ],
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: shots.length,
+        itemBuilder: (context, index) => HistoryShotCard(shot: shots[index]),
+      ),
     );
   }
 }

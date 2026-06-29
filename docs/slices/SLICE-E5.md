@@ -1,6 +1,6 @@
 # SLICE-E5: Desktop keyboard shortcuts
 
-status: pending
+status: done
 parallel_with: E6
 
 ## Prerequisites
@@ -13,8 +13,8 @@ A5, C2
 
 ## Done when
 
-- [ ] Space toggles start/stop
-- [ ] Ctrl+E triggers export
+- [x] Space toggles start/stop
+- [x] Ctrl+E triggers export
 
 ## Verify
 
