@@ -8,6 +8,7 @@ import 'package:flowlog/screens/live/feedback.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
+import 'package:flowlog/shell/shell_breakpoints.dart';
 import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -310,71 +311,115 @@ class _LiveScreenState extends State<LiveScreen> {
             controller: _controller,
             shotEndFeedback: widget.shotEndFeedback,
             child: Scaffold(
+              primary: false,
               body: LayoutBuilder(
                 builder: (context, constraints) {
-                  final narrow = constraints.maxWidth < 360;
-                  return SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: narrow ? 8 : 24,
-                      vertical: narrow ? 12 : 24,
+                  final useCompactLayout =
+                      constraints.maxWidth < ShellBreakpoints.sidebar ||
+                      constraints.maxHeight < ShellBreakpoints.minRailHeight;
+                  final horizontalPadding = useCompactLayout ? 8.0 : 24.0;
+                  final chartHeight = _liveChartHeight(constraints);
+
+                  final chartSection = Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        RecordingBeanFillIndicator(controller: _controller),
+                        if (repeatPrefill != null)
+                          RepeatShotBanner(
+                            profileName: repeatPrefill.profile.name,
+                            onDismiss: _repeatShotController!.clear,
+                          ),
+                        if (repeatPrefill != null) const SizedBox(height: 8),
+                        DualCurveChart(
+                          height: chartHeight,
+                          samplesNotifier: _samplesNotifier,
+                          annotationsNotifier: _annotationsNotifier,
+                          targetPressureSamples:
+                              repeatPrefill?.targetPressureSamples ?? const [],
+                          onAnnotateAtElapsedMs:
+                              canAnnotate ? _onAnnotateAtElapsedMs : null,
+                        ),
+                      ],
+                    ),
+                  );
+
+                  final controlsSection = Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      8,
+                      horizontalPadding,
+                      useCompactLayout ? 12 : 24,
                     ),
                     child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    RecordingBeanFillIndicator(controller: _controller),
-                    if (repeatPrefill != null)
-                      RepeatShotBanner(
-                        profileName: repeatPrefill.profile.name,
-                        onDismiss: _repeatShotController!.clear,
-                      ),
-                    if (repeatPrefill != null) const SizedBox(height: 8),
-                    DualCurveChart(
-                      samplesNotifier: _samplesNotifier,
-                      annotationsNotifier: _annotationsNotifier,
-                      targetPressureSamples:
-                          repeatPrefill?.targetPressureSamples ?? const [],
-                      onAnnotateAtElapsedMs:
-                          canAnnotate ? _onAnnotateAtElapsedMs : null,
-                    ),
-                    const SizedBox(height: 8),
-                    AnnotationControls(
-                      controller: _annotationController,
-                      canMarkChannel: canAnnotate,
-                      onMarkChannel: _onMarkChannel,
-                    ),
-                    const SizedBox(height: 8),
-                    if (latestSample != null)
-                      LiveMetricsRow(
-                        sample: latestSample,
-                        previousSample: previousSample,
-                      )
-                    else
-                      const LiveMetricsRow(
-                        metrics: LiveMetrics(elapsedMs: 0),
-                      ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Session: ${state.name}',
-                      style: Theme.of(context).textTheme.titleMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${_controller.sampleCount} samples',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    if (_controller.canSaveShot)
-                      Align(
-                        alignment: Alignment.center,
-                        child: RepeatShotButton(
-                          onPressed: _onRepeatShotPressed,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AnnotationControls(
+                          controller: _annotationController,
+                          canMarkChannel: canAnnotate,
+                          onMarkChannel: _onMarkChannel,
                         ),
-                      ),
-                    if (_controller.canSaveShot) const SizedBox(height: 16),
-                    LiveControls(controller: _controller),
-                  ],
+                        const SizedBox(height: 8),
+                        if (latestSample != null)
+                          LiveMetricsRow(
+                            sample: latestSample,
+                            previousSample: previousSample,
+                          )
+                        else
+                          const LiveMetricsRow(
+                            metrics: LiveMetrics(elapsedMs: 0),
+                          ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Session: ${state.name}',
+                          style: Theme.of(context).textTheme.titleMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${_controller.sampleCount} samples',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        if (_controller.canSaveShot)
+                          Align(
+                            alignment: Alignment.center,
+                            child: RepeatShotButton(
+                              onPressed: _onRepeatShotPressed,
+                            ),
+                          ),
+                        if (_controller.canSaveShot) const SizedBox(height: 16),
+                        LiveControls(controller: _controller),
+                      ],
+                    ),
+                  );
+
+                  final pinChart = useCompactLayout &&
+                      constraints.maxHeight.isFinite &&
+                      constraints.maxHeight >= 360;
+
+                  if (pinChart) {
+                    // Pin the chart on phone / bottom-nav layouts so it stays
+                    // visible while controls scroll underneath.
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        chartSection,
+                        Expanded(child: SingleChildScrollView(child: controlsSection)),
+                      ],
+                    );
+                  }
+
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(vertical: useCompactLayout ? 12 : 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        chartSection,
+                        controlsSection,
+                      ],
                     ),
                   );
                 },
@@ -389,6 +434,19 @@ class _LiveScreenState extends State<LiveScreen> {
       },
     );
   }
+}
+
+double _liveChartHeight(BoxConstraints constraints) {
+  if (!constraints.maxHeight.isFinite) {
+    return 220;
+  }
+
+  if (constraints.maxWidth < ShellBreakpoints.sidebar ||
+      constraints.maxHeight < ShellBreakpoints.minRailHeight) {
+    return (constraints.maxHeight * 0.34).clamp(140.0, 200.0);
+  }
+
+  return 220;
 }
 
 String _defaultFixturePath() {
