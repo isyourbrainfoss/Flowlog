@@ -1,5 +1,6 @@
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/app_destinations.dart';
+import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog/shell/shell_breakpoints.dart';
 import 'package:flowlog/shell/top_bar.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ class FlowlogShell extends StatefulWidget {
 class _FlowlogShellState extends State<FlowlogShell> {
   late int _selectedIndex;
   String _beanName = kDefaultBeanName;
+  final FlowlogShortcutRegistry _shortcutRegistry = FlowlogShortcutRegistry();
 
   @override
   void initState() {
@@ -47,48 +49,52 @@ class _FlowlogShellState extends State<FlowlogShell> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (_useBottomNav(constraints)) {
-          return Scaffold(
-            body: _ShellContent(
-              beanName: _beanName,
-              onBeanNameChanged: _onBeanNameChanged,
-              child: destination.screen,
-            ),
-            bottomNavigationBar: _FlowlogBottomBar(
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: _onDestinationSelected,
-            ),
-          );
-        }
-
-        return Scaffold(
-          body: Row(
-            children: [
-              NavigationRail(
-                selectedIndex: _selectedIndex,
-                onDestinationSelected: _onDestinationSelected,
-                extended: true,
-                minExtendedWidth: 200,
-                labelType: NavigationRailLabelType.none,
-                destinations: [
-                  for (final item in appDestinations)
-                    NavigationRailDestination(
-                      icon: Icon(item.icon),
-                      selectedIcon: Icon(item.icon),
-                      label: Text(item.label),
-                    ),
-                ],
-              ),
-              const VerticalDivider(width: 1),
-              Expanded(
-                child: _ShellContent(
+        final shell = _useBottomNav(constraints)
+            ? Scaffold(
+                body: _ShellContent(
                   beanName: _beanName,
                   onBeanNameChanged: _onBeanNameChanged,
                   child: destination.screen,
                 ),
-              ),
-            ],
-          ),
+                bottomNavigationBar: _FlowlogBottomBar(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: _onDestinationSelected,
+                ),
+              )
+            : Scaffold(
+                body: Row(
+                  children: [
+                    NavigationRail(
+                      selectedIndex: _selectedIndex,
+                      onDestinationSelected: _onDestinationSelected,
+                      extended: true,
+                      minExtendedWidth: 200,
+                      labelType: NavigationRailLabelType.none,
+                      destinations: [
+                        for (final item in appDestinations)
+                          NavigationRailDestination(
+                            icon: Icon(item.icon),
+                            selectedIcon: Icon(item.icon),
+                            label: Text(item.label),
+                          ),
+                      ],
+                    ),
+                    const VerticalDivider(width: 1),
+                    Expanded(
+                      child: _ShellContent(
+                        beanName: _beanName,
+                        onBeanNameChanged: _onBeanNameChanged,
+                        child: destination.screen,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+
+        return FlowlogShortcuts(
+          registry: _shortcutRegistry,
+          currentTab: destination.tab,
+          child: shell,
         );
       },
     );

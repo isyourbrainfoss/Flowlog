@@ -16,6 +16,7 @@ Shot buildShotFromSession({
   required DateTime startedAt,
   DateTime? endedAt,
   ShotMetadata? metadata,
+  List<ShotAnnotation> annotations = const [],
   String? id,
   ShotIdGenerator idGenerator = generateShotId,
 }) {
@@ -24,6 +25,7 @@ Shot buildShotFromSession({
     startedAt: startedAt,
     endedAt: endedAt ?? DateTime.now().toUtc(),
     samples: List<ShotSample>.from(samples),
+    annotations: List<ShotAnnotation>.from(annotations),
   );
 
   if (metadata != null) {
@@ -61,6 +63,7 @@ Future<Shot?> runStarShotSaveFlow({
   required DateTime startedAt,
   DateTime? endedAt,
   ShotMetadata? initialMetadata,
+  List<ShotAnnotation> annotations = const [],
   ShotIdGenerator idGenerator = generateShotId,
   void Function(Shot shot)? onSaved,
 }) async {
@@ -81,6 +84,7 @@ Future<Shot?> runStarShotSaveFlow({
     startedAt: startedAt,
     endedAt: endedAt,
     metadata: metadata,
+    annotations: annotations,
     idGenerator: idGenerator,
   );
 

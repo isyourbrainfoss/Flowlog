@@ -9,14 +9,17 @@ void main() {
     late FlowlogDatabase db;
     late ShotRepository shotRepository;
     late BeanRepository beanRepository;
+    late TagRepository tagRepository;
 
     setUp(() async {
       db = FlowlogDatabase.inMemory();
       shotRepository = ShotRepository(db);
       beanRepository = BeanRepository(db);
+      tagRepository = TagRepository(db);
       await _seedFilterFixtures(
         shotRepository: shotRepository,
         beanRepository: beanRepository,
+        tagRepository: tagRepository,
       );
     });
 
@@ -80,20 +83,43 @@ void main() {
 
       expect(shots.map((shot) => shot.id).toList(), ['shot-ethiopia']);
     });
+
+    test('filters by tag id', () async {
+      final shots = await shotRepository.listShots(
+        filters: const ShotListFilters(tagIds: {'tag-practice'}),
+      );
+
+      expect(shots.map((shot) => shot.id).toList(), ['shot-ethiopia']);
+    });
+
+    test('filters by multiple tag ids with OR semantics', () async {
+      final shots = await shotRepository.listShots(
+        filters: const ShotListFilters(tagIds: {'tag-practice', 'tag-dial-in'}),
+      );
+
+      expect(
+        shots.map((shot) => shot.id).toList(),
+        containsAll(['shot-ethiopia', 'shot-house']),
+      );
+      expect(shots, hasLength(2));
+    });
   });
 
   group('HistoryScreen filters', () {
     late FlowlogDatabase db;
     late ShotRepository shotRepository;
     late BeanRepository beanRepository;
+    late TagRepository tagRepository;
 
     setUp(() async {
       db = FlowlogDatabase.inMemory();
       shotRepository = ShotRepository(db);
       beanRepository = BeanRepository(db);
+      tagRepository = TagRepository(db);
       await _seedFilterFixtures(
         shotRepository: shotRepository,
         beanRepository: beanRepository,
+        tagRepository: tagRepository,
       );
     });
 
@@ -102,14 +128,22 @@ void main() {
     });
 
     testWidgets('shows all seeded shots before filtering', (tester) async {
-      await _pumpHistoryScreen(tester, repository: shotRepository);
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: shotRepository,
+        tagRepository: tagRepository,
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(HistoryShotCard), findsNWidgets(2));
     });
 
     testWidgets('bean filter updates visible history cards', (tester) async {
-      await _pumpHistoryScreen(tester, repository: shotRepository);
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: shotRepository,
+        tagRepository: tagRepository,
+      );
       await tester.pumpAndSettle();
 
       await tester.enterText(
@@ -123,7 +157,11 @@ void main() {
     });
 
     testWidgets('taste filter updates visible history cards', (tester) async {
-      await _pumpHistoryScreen(tester, repository: shotRepository);
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: shotRepository,
+        tagRepository: tagRepository,
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('history_filter_taste_min')));
@@ -138,7 +176,11 @@ void main() {
     testWidgets('peak pressure filter updates visible history cards', (
       tester,
     ) async {
-      await _pumpHistoryScreen(tester, repository: shotRepository);
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: shotRepository,
+        tagRepository: tagRepository,
+      );
       await tester.pumpAndSettle();
 
       await tester.enterText(
@@ -154,7 +196,11 @@ void main() {
     testWidgets('shows filtered empty state when nothing matches', (
       tester,
     ) async {
-      await _pumpHistoryScreen(tester, repository: shotRepository);
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: shotRepository,
+        tagRepository: tagRepository,
+      );
       await tester.pumpAndSettle();
 
       await tester.enterText(
@@ -168,7 +214,11 @@ void main() {
     });
 
     testWidgets('clear filters restores full history list', (tester) async {
-      await _pumpHistoryScreen(tester, repository: shotRepository);
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: shotRepository,
+        tagRepository: tagRepository,
+      );
       await tester.pumpAndSettle();
 
       await tester.enterText(
@@ -183,13 +233,31 @@ void main() {
 
       expect(find.byType(HistoryShotCard), findsNWidgets(2));
     });
+
+    testWidgets('tag filter updates visible history cards', (tester) async {
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: shotRepository,
+        tagRepository: tagRepository,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('history_filter_tag_tag-practice')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('history_shot_card_shot-ethiopia')), findsOneWidget);
+      expect(find.byKey(const Key('history_shot_card_shot-house')), findsNothing);
+    });
   });
 }
 
 Future<void> _seedFilterFixtures({
   required ShotRepository shotRepository,
   required BeanRepository beanRepository,
+  required TagRepository tagRepository,
 }) async {
+  await tagRepository.upsertTag(const Tag(id: 'tag-practice', name: 'Practice'));
+  await tagRepository.upsertTag(const Tag(id: 'tag-dial-in', name: 'Dial-in'));
   await beanRepository.upsertBean(
     const Bean(id: 'bean-ethiopia', name: 'Ethiopia Yirgacheffe'),
   );
@@ -209,6 +277,7 @@ Future<void> _seedFilterFixtures({
       ],
     ),
   );
+  await tagRepository.setTagsForShot('shot-ethiopia', ['tag-practice']);
 
   await shotRepository.insertShot(
     Shot(
@@ -222,15 +291,20 @@ Future<void> _seedFilterFixtures({
       ],
     ),
   );
+  await tagRepository.setTagsForShot('shot-house', ['tag-dial-in']);
 }
 
 Future<void> _pumpHistoryScreen(
   WidgetTester tester, {
-  required ShotRepository repository,
+  required ShotRepository shotRepository,
+  required TagRepository tagRepository,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
-      home: HistoryScreen(shotRepository: repository),
+      home: HistoryScreen(
+        shotRepository: shotRepository,
+        tagRepository: tagRepository,
+      ),
     ),
   );
 }

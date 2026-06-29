@@ -13,10 +13,12 @@ void main() {
   group('HistoryScreen', () {
     late FlowlogDatabase db;
     late ShotRepository repository;
+    late TagRepository tagRepository;
 
     setUp(() {
       db = FlowlogDatabase.inMemory();
       repository = ShotRepository(db);
+      tagRepository = TagRepository(db);
     });
 
     tearDown(() async {
@@ -24,7 +26,11 @@ void main() {
     });
 
     testWidgets('shows empty state when no shots are saved', (tester) async {
-      await _pumpHistoryScreen(tester, repository: repository);
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: repository,
+        tagRepository: tagRepository,
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('No saved shots yet'), findsOneWidget);
@@ -37,7 +43,11 @@ void main() {
       final shot = _loadFixtureShot('shots/minimal_shot.json');
       await repository.insertShot(shot);
 
-      await _pumpHistoryScreen(tester, repository: repository);
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: repository,
+        tagRepository: tagRepository,
+      );
       await tester.pumpAndSettle();
 
       expect(find.byKey(Key('history_shot_card_${shot.id}')), findsOneWidget);
@@ -52,7 +62,11 @@ void main() {
       final shot = _loadFixtureShot('shots/minimal_shot.json');
       await repository.insertShot(shot);
 
-      await _pumpHistoryScreen(tester, repository: repository);
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: repository,
+        tagRepository: tagRepository,
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(Key('history_shot_card_${shot.id}')));
@@ -76,7 +90,11 @@ void main() {
       await repository.insertShot(older);
       await repository.insertShot(newer);
 
-      await _pumpHistoryScreen(tester, repository: repository);
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: repository,
+        tagRepository: tagRepository,
+      );
       await tester.pumpAndSettle();
 
       final cards = tester.widgetList<HistoryShotCard>(
@@ -122,11 +140,15 @@ void main() {
 
 Future<void> _pumpHistoryScreen(
   WidgetTester tester, {
-  required ShotRepository repository,
+  required ShotRepository shotRepository,
+  required TagRepository tagRepository,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
-      home: HistoryScreen(shotRepository: repository),
+      home: HistoryScreen(
+        shotRepository: shotRepository,
+        tagRepository: tagRepository,
+      ),
     ),
   );
 }

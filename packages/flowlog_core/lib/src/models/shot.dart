@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 
+import 'shot_annotation.dart';
 import 'shot_sample.dart';
 
 /// A recorded espresso pull with metadata and optional inline samples.
@@ -18,6 +19,7 @@ class Shot {
     this.tasteScore,
     this.flavourTags = const [],
     this.samples = const [],
+    this.annotations = const [],
   }) : assert(
           tasteScore == null || (tasteScore >= 0 && tasteScore <= 10),
           'tasteScore must be between 0 and 10',
@@ -35,6 +37,7 @@ class Shot {
   final int? tasteScore;
   final List<String> flavourTags;
   final List<ShotSample> samples;
+  final List<ShotAnnotation> annotations;
 
   factory Shot.fromJson(Map<String, dynamic> json) {
     return Shot(
@@ -58,6 +61,10 @@ class Shot {
               ?.map((e) => ShotSample.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
+      annotations: (json['annotations'] as List<dynamic>?)
+              ?.map((e) => ShotAnnotation.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
     );
   }
 
@@ -76,6 +83,8 @@ class Shot {
       if (flavourTags.isNotEmpty) 'flavourTags': flavourTags,
       if (samples.isNotEmpty)
         'samples': samples.map((s) => s.toJson()).toList(),
+      if (annotations.isNotEmpty)
+        'annotations': annotations.map((a) => a.toJson()).toList(),
     };
   }
 
@@ -92,6 +101,7 @@ class Shot {
     int? tasteScore,
     List<String>? flavourTags,
     List<ShotSample>? samples,
+    List<ShotAnnotation>? annotations,
   }) {
     return Shot(
       id: id ?? this.id,
@@ -106,6 +116,7 @@ class Shot {
       tasteScore: tasteScore ?? this.tasteScore,
       flavourTags: flavourTags ?? this.flavourTags,
       samples: samples ?? this.samples,
+      annotations: annotations ?? this.annotations,
     );
   }
 
@@ -124,7 +135,8 @@ class Shot {
             notes == other.notes &&
             tasteScore == other.tasteScore &&
             _listEquals(flavourTags, other.flavourTags) &&
-            _listEquals(samples, other.samples);
+            _listEquals(samples, other.samples) &&
+            _listEquals(annotations, other.annotations);
   }
 
   @override
@@ -141,6 +153,7 @@ class Shot {
         tasteScore,
         Object.hashAll(flavourTags),
         Object.hashAll(samples),
+        Object.hashAll(annotations),
       );
 
   @override

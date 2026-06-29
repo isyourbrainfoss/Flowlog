@@ -29,6 +29,7 @@ class ShotDetailScreen extends StatelessWidget {
           children: [
             DualCurveChart(
               samples: shot.samples,
+              annotations: shot.annotations,
               maxDurationMs: _chartDurationMs(shot),
             ),
             const SizedBox(height: 24),

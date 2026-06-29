@@ -38,6 +38,39 @@ class Beans extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+/// User-defined tag for organizing shots.
+@DataClassName('TagRow')
+class Tags extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// Many-to-many link between shots and tags.
+@DataClassName('ShotTagRow')
+class ShotTags extends Table {
+  TextColumn get shotId =>
+      text().references(Shots, #id, onDelete: KeyAction.cascade)();
+  TextColumn get tagId =>
+      text().references(Tags, #id, onDelete: KeyAction.cascade)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {shotId, tagId};
+}
+
+/// Chart markers (channel marks and notes) for a shot.
+@DataClassName('ShotAnnotationRow')
+class ShotAnnotations extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get shotId =>
+      text().references(Shots, #id, onDelete: KeyAction.cascade)();
+  IntColumn get elapsedMs => integer()();
+  TextColumn get label => text()();
+  TextColumn get type => text()();
+}
+
 /// Time-series samples captured during a shot.
 @DataClassName('ShotSampleRow')
 class ShotSamples extends Table {

@@ -9,6 +9,7 @@ class ShotListFilters {
     this.startedOnOrBefore,
     this.minTasteScore,
     this.minPeakPressureBar,
+    this.tagIds = const {},
   });
 
   static const empty = ShotListFilters();
@@ -28,12 +29,16 @@ class ShotListFilters {
   /// Minimum peak sample pressure in bar; shots without samples are excluded.
   final double? minPeakPressureBar;
 
+  /// When non-empty, keeps shots linked to any selected tag id.
+  final Set<String> tagIds;
+
   bool get isActive =>
       beanQuery.trim().isNotEmpty ||
       startedOnOrAfter != null ||
       startedOnOrBefore != null ||
       minTasteScore != null ||
-      minPeakPressureBar != null;
+      minPeakPressureBar != null ||
+      tagIds.isNotEmpty;
 
   ShotListFilters copyWith({
     String? beanQuery,
@@ -45,6 +50,8 @@ class ShotListFilters {
     bool clearMinTasteScore = false,
     double? minPeakPressureBar,
     bool clearMinPeakPressureBar = false,
+    Set<String>? tagIds,
+    bool clearTagIds = false,
   }) {
     return ShotListFilters(
       beanQuery: beanQuery ?? this.beanQuery,
@@ -59,7 +66,19 @@ class ShotListFilters {
       minPeakPressureBar: clearMinPeakPressureBar
           ? null
           : (minPeakPressureBar ?? this.minPeakPressureBar),
+      tagIds: clearTagIds ? const {} : (tagIds ?? this.tagIds),
     );
+  }
+
+  /// Toggles [tagId] in [tagIds].
+  ShotListFilters toggleTagId(String tagId) {
+    final next = Set<String>.from(tagIds);
+    if (next.contains(tagId)) {
+      next.remove(tagId);
+    } else {
+      next.add(tagId);
+    }
+    return copyWith(tagIds: next);
   }
 
   @override
@@ -70,7 +89,8 @@ class ShotListFilters {
             startedOnOrAfter == other.startedOnOrAfter &&
             startedOnOrBefore == other.startedOnOrBefore &&
             minTasteScore == other.minTasteScore &&
-            minPeakPressureBar == other.minPeakPressureBar;
+            minPeakPressureBar == other.minPeakPressureBar &&
+            _setEquals(tagIds, other.tagIds);
   }
 
   @override
@@ -80,5 +100,18 @@ class ShotListFilters {
         startedOnOrBefore,
         minTasteScore,
         minPeakPressureBar,
+        Object.hashAllUnordered(tagIds),
       );
+}
+
+bool _setEquals<T>(Set<T> a, Set<T> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (final value in a) {
+    if (!b.contains(value)) {
+      return false;
+    }
+  }
+  return true;
 }

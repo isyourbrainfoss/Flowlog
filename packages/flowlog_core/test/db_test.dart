@@ -7,14 +7,16 @@ import 'package:test/test.dart';
 
 void main() {
   group('schema', () {
-    test('schema version is 2', () async {
+    test('schema version is 4', () async {
       final db = FlowlogDatabase.inMemory();
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 2);
+      expect(db.schemaVersion, 4);
     });
 
-    test('creates shots, shot_samples, and beans tables', () async {
+    test(
+      'creates shots, shot_samples, beans, tags, shot_tags, and shot_annotations tables',
+      () async {
       final db = FlowlogDatabase.inMemory();
       addTearDown(db.close);
 
@@ -26,7 +28,17 @@ void main() {
           .map((row) => row.read<String>('name'))
           .get();
 
-      expect(tables, containsAll(['shots', 'shot_samples', 'beans']));
+      expect(
+        tables,
+        containsAll([
+          'shots',
+          'shot_samples',
+          'beans',
+          'tags',
+          'shot_tags',
+          'shot_annotations',
+        ]),
+      );
     });
   });
 
@@ -63,6 +75,34 @@ void main() {
       expect(await repository.getShotById('missing'), isNull);
     });
 
+    test('inserts and reads shot annotations', () async {
+      final shot = Shot(
+        id: 'shot-annotated',
+        startedAt: DateTime.utc(2026, 6, 29, 10, 0),
+        samples: const [
+          ShotSample(elapsedMs: 0, pressureBar: 0),
+          ShotSample(elapsedMs: 5000, pressureBar: 9),
+        ],
+        annotations: const [
+          ShotAnnotation(
+            elapsedMs: 1200,
+            label: 'Channel 1',
+            type: ShotAnnotationType.channel,
+          ),
+          ShotAnnotation(
+            elapsedMs: 4200,
+            label: 'First drops',
+            type: ShotAnnotationType.note,
+          ),
+        ],
+      );
+
+      await repository.insertShot(shot);
+
+      final loaded = await repository.getShotWithSamples('shot-annotated');
+      expect(loaded, shot);
+    });
+
     test('re-insert replaces samples for the same shot id', () async {
       final original = Shot(
         id: 'shot-replace',
@@ -85,6 +125,76 @@ void main() {
 
       final loaded = await repository.getShotWithSamples('shot-replace');
       expect(loaded, updated);
+    });
+  });
+
+  group('TagRepository', () {
+    late FlowlogDatabase db;
+    late TagRepository tagRepository;
+    late ShotRepository shotRepository;
+
+    setUp(() {
+      db = FlowlogDatabase.inMemory();
+      tagRepository = TagRepository(db);
+      shotRepository = ShotRepository(db);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    test('creates, reads, updates, and deletes tags', () async {
+      const tag = Tag(id: 'tag-practice', name: 'Practice');
+
+      await tagRepository.upsertTag(tag);
+      expect(await tagRepository.getTagById(tag.id), tag);
+
+      const updated = Tag(id: 'tag-practice', name: 'Competition');
+      await tagRepository.updateTag(updated);
+      expect(await tagRepository.getTagById(tag.id), updated);
+
+      final listed = await tagRepository.listTags();
+      expect(listed, [updated]);
+
+      await tagRepository.deleteTag(tag.id);
+      expect(await tagRepository.getTagById(tag.id), isNull);
+      expect(await tagRepository.listTags(), isEmpty);
+    });
+
+    test('assigns tags to shots and counts linked shots', () async {
+      const practice = Tag(id: 'tag-practice', name: 'Practice');
+      const dialIn = Tag(id: 'tag-dial-in', name: 'Dial-in');
+      await tagRepository.upsertTag(practice);
+      await tagRepository.upsertTag(dialIn);
+
+      final taggedShot = Shot(
+        id: 'shot-tagged',
+        startedAt: DateTime.utc(2026, 6, 29, 10),
+      );
+      final otherShot = Shot(
+        id: 'shot-other',
+        startedAt: DateTime.utc(2026, 6, 29, 11),
+      );
+      await shotRepository.insertShot(taggedShot);
+      await shotRepository.insertShot(otherShot);
+
+      await tagRepository.setTagsForShot(taggedShot.id, [practice.id, dialIn.id]);
+
+      expect(
+        (await tagRepository.getTagsForShot(taggedShot.id))
+            .map((tag) => tag.id)
+            .toList(),
+        [dialIn.id, practice.id],
+      );
+      expect(await tagRepository.getTagsForShot(otherShot.id), isEmpty);
+      expect(await tagRepository.countShotsForTag(practice.id), 1);
+
+      final withCounts = await tagRepository.listTagsWithShotCounts();
+      expect(withCounts.firstWhere((entry) => entry.tag.id == practice.id).shotCount, 1);
+      expect(withCounts.firstWhere((entry) => entry.tag.id == dialIn.id).shotCount, 1);
+
+      await tagRepository.setTagsForShot(taggedShot.id, [practice.id]);
+      expect(await tagRepository.countShotsForTag(dialIn.id), 0);
     });
   });
 
@@ -166,13 +276,13 @@ void main() {
         final shot = _loadFixtureShot('shots/minimal_shot.json');
 
         await writerRepo.insertShot(shot);
-        expect(writer.schemaVersion, 2);
+        expect(writer.schemaVersion, 4);
         await writer.close();
 
         final reader = FlowlogDatabase.openFile(dbPath);
         final readerRepo = ShotRepository(reader);
 
-        expect(reader.schemaVersion, 2);
+        expect(reader.schemaVersion, 4);
         expect(await readerRepo.getShotWithSamples(shot.id), shot);
 
         await reader.close();
@@ -222,7 +332,7 @@ void main() {
         final migrated = FlowlogDatabase.openFile(dbPath);
         addTearDown(migrated.close);
 
-        expect(migrated.schemaVersion, 2);
+        expect(migrated.schemaVersion, 4);
 
         final tables = await migrated
             .customSelect(
@@ -231,12 +341,85 @@ void main() {
             )
             .map((row) => row.read<String>('name'))
             .get();
-        expect(tables, contains('beans'));
+        expect(
+          tables,
+          containsAll(['beans', 'tags', 'shot_tags', 'shot_annotations']),
+        );
 
         final shotRepo = ShotRepository(migrated);
         final loaded = await shotRepo.getShotById('legacy-shot');
         expect(loaded, isNotNull);
         expect(loaded!.startedAt, DateTime.utc(2026, 1, 1));
+      } finally {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    test('migrates v2 database to v3 and adds tags tables', () async {
+      final tempDir = await Directory.systemTemp.createTemp('flowlog_db_v2_');
+      final dbPath = '${tempDir.path}/flowlog.db';
+
+      try {
+        final v2Db = sqlite3.open(dbPath);
+        v2Db.execute('''
+          CREATE TABLE shots (
+            id TEXT NOT NULL PRIMARY KEY,
+            started_at TEXT NOT NULL,
+            ended_at TEXT,
+            dose_g REAL,
+            yield_g REAL,
+            grind_setting REAL,
+            bean_id TEXT,
+            water_temp_c REAL,
+            notes TEXT,
+            taste_score INTEGER,
+            flavour_tags TEXT NOT NULL DEFAULT '[]'
+          );
+        ''');
+        v2Db.execute('''
+          CREATE TABLE shot_samples (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            shot_id TEXT NOT NULL REFERENCES shots(id) ON DELETE CASCADE,
+            elapsed_ms INTEGER NOT NULL,
+            pressure_bar REAL,
+            weight_g REAL,
+            flow_gs REAL,
+            temp_c REAL
+          );
+        ''');
+        v2Db.execute('''
+          CREATE TABLE beans (
+            id TEXT NOT NULL PRIMARY KEY,
+            name TEXT NOT NULL,
+            origin TEXT,
+            roast_level TEXT,
+            stock_g REAL,
+            notes TEXT
+          );
+        ''');
+        v2Db.execute(
+          "INSERT INTO shots (id, started_at) VALUES ('legacy-shot', '2026-01-01T00:00:00.000Z');",
+        );
+        v2Db.execute('PRAGMA user_version = 2;');
+        v2Db.dispose();
+
+        final migrated = FlowlogDatabase.openFile(dbPath);
+        addTearDown(migrated.close);
+
+        expect(migrated.schemaVersion, 4);
+
+        final tables = await migrated
+            .customSelect(
+              "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+              readsFrom: {},
+            )
+            .map((row) => row.read<String>('name'))
+            .get();
+        expect(tables, containsAll(['tags', 'shot_tags', 'shot_annotations']));
+
+        final shotRepo = ShotRepository(migrated);
+        final loaded = await shotRepo.getShotById('legacy-shot');
+        expect(loaded, isNotNull);
       } finally {
         await tempDir.delete(recursive: true);
       }

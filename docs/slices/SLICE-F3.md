@@ -1,6 +1,6 @@
 # SLICE-F3: Side-by-side compare
 
-status: pending
+status: done
 parallel_with: F6
 
 ## Prerequisites
@@ -13,8 +13,8 @@ D2, F1
 
 ## Done when
 
-- [ ] Overlay 2+ shots
-- [ ] Optional delta highlight
+- [x] Overlay 2+ shots
+- [x] Optional delta highlight
 
 ## Verify
 

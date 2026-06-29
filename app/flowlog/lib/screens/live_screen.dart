@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flowlog/screens/live/annotations.dart';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/feedback.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
+import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
@@ -45,12 +47,16 @@ class _LiveScreenState extends State<LiveScreen> {
   late final LiveShotController _controller;
   late final bool _ownsController;
   late final ValueNotifier<List<ShotSample>> _samplesNotifier;
+  late final ShotAnnotationController _annotationController;
+  late final ValueNotifier<List<ShotAnnotation>> _annotationsNotifier;
   MockReplayAdapter? _replayAdapter;
   DecentScaleBleAdapter? _scaleAdapter;
   ShotRepository? _shotRepository;
   FlowlogDatabase? _database;
   bool _ownsRepository = false;
   bool _savingShot = false;
+  ShotSessionState _lastSessionState = ShotSessionState.idle;
+  FlowlogShortcutRegistry? _shortcutRegistry;
 
   @override
   void initState() {
@@ -75,12 +81,31 @@ class _LiveScreenState extends State<LiveScreen> {
     _samplesNotifier = ValueNotifier<List<ShotSample>>(
       List<ShotSample>.from(_controller.samples),
     );
+    _annotationController = ShotAnnotationController();
+    _annotationsNotifier = ValueNotifier<List<ShotAnnotation>>(
+      List<ShotAnnotation>.from(_annotationController.annotations),
+    );
     _controller.addListener(_syncSamples);
+    _annotationController.addListener(_syncAnnotations);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final scope = FlowlogShortcutsScope.maybeOf(context);
+    if (scope != null) {
+      _shortcutRegistry = scope.registry;
+      _shortcutRegistry!.setToggleLiveShot(_onToggleShotShortcut);
+    }
   }
 
   @override
   void dispose() {
+    _shortcutRegistry?.setToggleLiveShot(null);
     _controller.removeListener(_syncSamples);
+    _annotationController.removeListener(_syncAnnotations);
+    _annotationController.dispose();
+    _annotationsNotifier.dispose();
     _samplesNotifier.dispose();
     if (_ownsController) {
       _controller.dispose();
@@ -92,7 +117,54 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   void _syncSamples() {
+    final state = _controller.sessionState;
+    if (state == ShotSessionState.recording &&
+        _lastSessionState != ShotSessionState.recording) {
+      _annotationController.clear();
+    }
+    _lastSessionState = state;
     _samplesNotifier.value = List<ShotSample>.from(_controller.samples);
+  }
+
+  void _syncAnnotations() {
+    _annotationsNotifier.value =
+        List<ShotAnnotation>.from(_annotationController.annotations);
+  }
+
+  int? _currentElapsedMs() {
+    final samples = _controller.samples;
+    if (samples.isEmpty) {
+      return null;
+    }
+    return samples.last.elapsedMs;
+  }
+
+  void _onMarkChannel() {
+    final elapsedMs = _currentElapsedMs();
+    if (elapsedMs == null) {
+      return;
+    }
+    _annotationController.markChannel(elapsedMs: elapsedMs);
+  }
+
+  Future<void> _onAnnotateAtElapsedMs(int elapsedMs) async {
+    if (_controller.sessionState == ShotSessionState.idle) {
+      return;
+    }
+
+    await promptShotNoteAnnotation(
+      context: context,
+      controller: _annotationController,
+      elapsedMs: elapsedMs,
+    );
+  }
+
+  Future<void> _onToggleShotShortcut() async {
+    if (_controller.canStart) {
+      await _controller.start();
+    } else if (_controller.canStop) {
+      await _controller.stop();
+    }
   }
 
   Future<ShotRepository> _ensureRepository() async {
@@ -133,6 +205,7 @@ class _LiveScreenState extends State<LiveScreen> {
         samples: _controller.samples,
         startedAt: startedAt,
         endedAt: _controller.sessionEndedAt,
+        annotations: _annotationController.annotations,
         idGenerator: widget.shotIdGenerator,
         onSaved: widget.onShotSaved,
       );
@@ -153,6 +226,8 @@ class _LiveScreenState extends State<LiveScreen> {
         final latestSample = samples.isEmpty ? null : samples.last;
         final previousSample =
             samples.length < 2 ? null : samples[samples.length - 2];
+        final canAnnotate =
+            state != ShotSessionState.idle && samples.isNotEmpty;
 
         return LiveShotEndListener(
           controller: _controller,
@@ -163,7 +238,18 @@ class _LiveScreenState extends State<LiveScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  DualCurveChart(samplesNotifier: _samplesNotifier),
+                  DualCurveChart(
+                    samplesNotifier: _samplesNotifier,
+                    annotationsNotifier: _annotationsNotifier,
+                    onAnnotateAtElapsedMs:
+                        canAnnotate ? _onAnnotateAtElapsedMs : null,
+                  ),
+                  const SizedBox(height: 8),
+                  AnnotationControls(
+                    controller: _annotationController,
+                    canMarkChannel: canAnnotate,
+                    onMarkChannel: _onMarkChannel,
+                  ),
                   const SizedBox(height: 8),
                   if (latestSample != null)
                     LiveMetricsRow(

@@ -5,6 +5,38 @@ import 'package:flowlog_core/flowlog_core.dart';
 import 'package:test/test.dart';
 
 void main() {
+  group('ShotAnnotation', () {
+    test('toJson/fromJson round-trip', () {
+      const original = ShotAnnotation(
+        elapsedMs: 2500,
+        label: 'Channel 1',
+        type: ShotAnnotationType.channel,
+      );
+
+      expect(ShotAnnotation.fromJson(original.toJson()), original);
+    });
+
+    test('helpers build channel marks and undo stack', () {
+      var annotations = <ShotAnnotation>[];
+      annotations = ShotAnnotationHelpers.add(
+        annotations,
+        ShotAnnotationHelpers.channelMark(annotations, elapsedMs: 1000),
+      );
+      annotations = ShotAnnotationHelpers.add(
+        annotations,
+        ShotAnnotationHelpers.channelMark(annotations, elapsedMs: 5000),
+      );
+
+      expect(annotations, hasLength(2));
+      expect(annotations.first.label, 'Channel 1');
+      expect(annotations.last.label, 'Channel 2');
+
+      annotations = ShotAnnotationHelpers.undo(annotations);
+      expect(annotations, hasLength(1));
+      expect(annotations.single.label, 'Channel 1');
+    });
+  });
+
   group('ShotSample', () {
     test('toJson/fromJson round-trip', () {
       const original = ShotSample(
@@ -106,6 +138,13 @@ void main() {
         samples: const [
           ShotSample(elapsedMs: 0, pressureBar: 0.0, weightG: 0.0),
           ShotSample(elapsedMs: 15000, pressureBar: 9.0, weightG: 18.2),
+        ],
+        annotations: const [
+          ShotAnnotation(
+            elapsedMs: 3000,
+            label: 'Bloom',
+            type: ShotAnnotationType.note,
+          ),
         ],
       );
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../models/shot.dart' as models;
+import '../models/shot_annotation.dart' as models;
 import '../models/shot_sample.dart' as models;
 import 'flowlog_database.dart';
 import 'shot_list_filters.dart';
@@ -23,12 +24,27 @@ class ShotRepository {
             ..where((row) => row.shotId.equals(shot.id)))
           .go();
 
+      await (_db.delete(_db.shotAnnotations)
+            ..where((row) => row.shotId.equals(shot.id)))
+          .go();
+
       if (shot.samples.isNotEmpty) {
         await _db.batch((batch) {
           batch.insertAll(
             _db.shotSamples,
             shot.samples
                 .map((sample) => _sampleToCompanion(shot.id, sample))
+                .toList(),
+          );
+        });
+      }
+
+      if (shot.annotations.isNotEmpty) {
+        await _db.batch((batch) {
+          batch.insertAll(
+            _db.shotAnnotations,
+            shot.annotations
+                .map((annotation) => _annotationToCompanion(shot.id, annotation))
                 .toList(),
           );
         });
@@ -46,7 +62,7 @@ class ShotRepository {
       return null;
     }
 
-    return _shotFromRow(row, samples: const []);
+    return _shotFromRow(row, samples: const [], annotations: const []);
   }
 
   /// Returns shots ordered by [models.Shot.startedAt] descending.
@@ -67,7 +83,7 @@ class ShotRepository {
 
     if (!includeSamples) {
       return rows
-          .map((row) => _shotFromRow(row, samples: const []))
+          .map((row) => _shotFromRow(row, samples: const [], annotations: const []))
           .toList();
     }
 
@@ -78,10 +94,19 @@ class ShotRepository {
             ..orderBy([(sample) => OrderingTerm.asc(sample.elapsedMs)]))
           .get();
 
+      final annotationRows = await (_db.select(_db.shotAnnotations)
+            ..where((annotation) => annotation.shotId.equals(row.id))
+            ..orderBy([
+              (annotation) => OrderingTerm.asc(annotation.elapsedMs),
+              (annotation) => OrderingTerm.asc(annotation.id),
+            ]))
+          .get();
+
       shots.add(
         _shotFromRow(
           row,
           samples: sampleRows.map(_sampleFromRow).toList(),
+          annotations: annotationRows.map(_annotationFromRow).toList(),
         ),
       );
     }
@@ -141,6 +166,24 @@ class ShotRepository {
         query.where((shot) => shot.id.isIn(shotIds));
       }
     }
+
+    if (filters.tagIds.isNotEmpty) {
+      final shotIds = await _shotIdsWithAnyTag(filters.tagIds);
+      if (shotIds.isEmpty) {
+        query.where((shot) => const Constant(false));
+      } else {
+        query.where((shot) => shot.id.isIn(shotIds));
+      }
+    }
+  }
+
+  Future<List<String>> _shotIdsWithAnyTag(Set<String> tagIds) async {
+    final rows = await (_db.select(_db.shotTags)
+          ..where((row) => row.tagId.isIn(tagIds)))
+        .map((row) => row.shotId)
+        .get();
+
+    return rows.toSet().toList();
   }
 
   Future<List<String>> _shotIdsWithMinPeakPressure(double minBar) async {
@@ -173,9 +216,18 @@ class ShotRepository {
           ..orderBy([(sample) => OrderingTerm.asc(sample.elapsedMs)]))
         .get();
 
+    final annotationRows = await (_db.select(_db.shotAnnotations)
+          ..where((annotation) => annotation.shotId.equals(id))
+          ..orderBy([
+            (annotation) => OrderingTerm.asc(annotation.elapsedMs),
+            (annotation) => OrderingTerm.asc(annotation.id),
+          ]))
+        .get();
+
     return _shotFromRow(
       row,
       samples: sampleRows.map(_sampleFromRow).toList(),
+      annotations: annotationRows.map(_annotationFromRow).toList(),
     );
   }
 
@@ -209,9 +261,22 @@ class ShotRepository {
     );
   }
 
+  ShotAnnotationsCompanion _annotationToCompanion(
+    String shotId,
+    models.ShotAnnotation annotation,
+  ) {
+    return ShotAnnotationsCompanion.insert(
+      shotId: shotId,
+      elapsedMs: annotation.elapsedMs,
+      label: annotation.label,
+      type: _annotationTypeToSql(annotation.type),
+    );
+  }
+
   models.Shot _shotFromRow(
     ShotRow row, {
     required List<models.ShotSample> samples,
+    required List<models.ShotAnnotation> annotations,
   }) {
     return models.Shot(
       id: row.id,
@@ -226,6 +291,15 @@ class ShotRepository {
       tasteScore: row.tasteScore,
       flavourTags: _decodeFlavourTags(row.flavourTags),
       samples: samples,
+      annotations: annotations,
+    );
+  }
+
+  models.ShotAnnotation _annotationFromRow(ShotAnnotationRow row) {
+    return models.ShotAnnotation(
+      elapsedMs: row.elapsedMs,
+      label: row.label,
+      type: _annotationTypeFromSql(row.type),
     );
   }
 
@@ -250,5 +324,20 @@ class ShotRepository {
     }
 
     return decoded.map((value) => value as String).toList();
+  }
+
+  String _annotationTypeToSql(models.ShotAnnotationType type) {
+    return switch (type) {
+      models.ShotAnnotationType.channel => 'channel',
+      models.ShotAnnotationType.note => 'note',
+    };
+  }
+
+  models.ShotAnnotationType _annotationTypeFromSql(String value) {
+    return switch (value) {
+      'channel' => models.ShotAnnotationType.channel,
+      'note' => models.ShotAnnotationType.note,
+      _ => throw ArgumentError.value(value, 'type', 'Unknown annotation type'),
+    };
   }
 }

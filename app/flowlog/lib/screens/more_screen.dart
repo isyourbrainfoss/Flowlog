@@ -1,5 +1,5 @@
-import 'package:flowlog/screens/more/export.dart';
 import 'package:flowlog/screens/more/sensors_screen.dart';
+import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flutter/material.dart';
 
@@ -32,16 +32,7 @@ class MoreScreen extends StatelessWidget {
           title: const Text('Export shots'),
           subtitle: const Text('Batch CSV export and share'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (context) => Scaffold(
-                  appBar: AppBar(title: const Text('Export shots')),
-                  body: const ExportScreen(),
-                ),
-              ),
-            );
-          },
+          onTap: () => openExportScreen(context),
         ),
         ListTile(
           leading: const Icon(Icons.sensors),
