@@ -1,0 +1,17 @@
+key,value
+export_version,1
+id,shot-minimal-001
+started_at,2026-06-29T10:00:00.000Z
+ended_at,2026-06-29T10:00:28.500Z
+dose_g,18.0
+yield_g,36.0
+grind_setting,14.0
+bean_id,bean-house-blend
+water_temp_c,93.0
+notes,Minimal fixture shot for tests and mock replay.
+taste_score,7
+flavour_tags,chocolate;nutty
+
+elapsed_ms,pressure_bar,weight_g,flow_gs,temp_c
+0,0.0,0.0,0.0,93.0
+15000,9.0,18.5,1.2,92.5
