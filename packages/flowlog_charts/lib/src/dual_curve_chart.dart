@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'chart_interaction.dart';
 import 'package:flowlog_core/flowlog_core.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Coffee-themed chart colors aligned with [FlowlogColors] in the app theme.
@@ -22,7 +22,9 @@ abstract final class FlowlogChartColors {
 /// Live dual-axis chart for espresso pressure, weight, and flow.
 ///
 /// Provide either a static [samples] list or a live [samplesNotifier] stream.
-class DualCurveChart extends StatelessWidget {
+/// When [enableInteraction] is true (default), supports pinch/zoom, pan, and
+/// swipe (or [ChartInteractionController.setViewMode]) for overlay/split/flow-only.
+class DualCurveChart extends StatefulWidget {
   const DualCurveChart({
     super.key,
     this.samples,
@@ -33,6 +35,9 @@ class DualCurveChart extends StatelessWidget {
     this.showWeight = true,
     this.showFlow = true,
     this.backgroundColor = FlowlogChartColors.background,
+    this.enableInteraction = true,
+    this.interactionController,
+    this.initialViewMode = ChartViewMode.overlay,
   }) : assert(
           samples != null || samplesNotifier != null,
           'Provide samples or samplesNotifier',
@@ -55,45 +60,145 @@ class DualCurveChart extends StatelessWidget {
   final bool showFlow;
   final Color backgroundColor;
 
+  /// Pinch/zoom, pan, and swipe view-mode gestures.
+  final bool enableInteraction;
+
+  /// Optional external controller for view mode and viewport.
+  final ChartInteractionController? interactionController;
+
+  /// Initial layout when no external controller is supplied.
+  final ChartViewMode initialViewMode;
+
+  @override
+  State<DualCurveChart> createState() => _DualCurveChartState();
+}
+
+class _DualCurveChartState extends State<DualCurveChart> {
+  late ChartInteractionController _interactionController;
+  bool _ownsInteractionController = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsInteractionController = widget.interactionController == null;
+    _interactionController = widget.interactionController ??
+        ChartInteractionController(viewMode: widget.initialViewMode);
+    _interactionController.addListener(_onInteractionChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant DualCurveChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.interactionController != widget.interactionController) {
+      _interactionController.removeListener(_onInteractionChanged);
+      if (_ownsInteractionController) {
+        _interactionController.dispose();
+      }
+      _ownsInteractionController = widget.interactionController == null;
+      _interactionController = widget.interactionController ??
+          ChartInteractionController(viewMode: widget.initialViewMode);
+      _interactionController.addListener(_onInteractionChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    _interactionController.removeListener(_onInteractionChanged);
+    if (_ownsInteractionController) {
+      _interactionController.dispose();
+    }
+    super.dispose();
+  }
+
+  void _onInteractionChanged() {
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (samplesNotifier != null) {
+    if (widget.samplesNotifier != null) {
       return ValueListenableBuilder<List<ShotSample>>(
-        valueListenable: samplesNotifier!,
+        valueListenable: widget.samplesNotifier!,
         builder: (context, value, _) => _buildChart(value),
       );
     }
-    return _buildChart(samples!);
+    return _buildChart(widget.samples!);
   }
 
   Widget _buildChart(List<ShotSample> rawSamples) {
     final prepared = _prepareSamples(rawSamples);
+    final totalDurationMs = _resolveTotalDurationMs(prepared);
+
+    if (widget.enableInteraction) {
+      _interactionController.syncTotalDuration(
+        totalDurationMs,
+        followEndWhenZoomedOut: widget.samplesNotifier != null,
+      );
+    }
+
+    final viewMode = widget.enableInteraction
+        ? _interactionController.viewMode
+        : ChartViewMode.overlay;
+    final viewport = widget.enableInteraction
+        ? _interactionController.viewport
+        : ChartViewport(totalDurationMs: totalDurationMs);
+
+    final visibility = _visibilityForMode(
+      viewMode: viewMode,
+      showPressure: widget.showPressure,
+      showWeight: widget.showWeight,
+      showFlow: widget.showFlow,
+    );
 
     return RepaintBoundary(
       child: Semantics(
-        label: 'Espresso shot chart',
+        label: _semanticsLabel(viewMode),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              height: height,
+              height: widget.height,
               width: double.infinity,
-              child: CustomPaint(
-                painter: DualCurveChartPainter(
-                  samples: prepared,
-                  maxDurationMs: maxDurationMs,
-                  showPressure: showPressure,
-                  showWeight: showWeight,
-                  showFlow: showFlow,
-                  backgroundColor: backgroundColor,
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final plotWidth = _plotWidth(constraints.maxWidth);
+                  final chartBody = viewMode == ChartViewMode.split
+                      ? _SplitCharts(
+                          samples: prepared,
+                          maxDurationMs: widget.maxDurationMs,
+                          viewport: viewport,
+                          visibility: visibility,
+                          backgroundColor: widget.backgroundColor,
+                        )
+                      : _OverlayChart(
+                          samples: prepared,
+                          maxDurationMs: widget.maxDurationMs,
+                          viewport: viewport,
+                          visibility: visibility,
+                          backgroundColor: widget.backgroundColor,
+                        );
+
+                  if (!widget.enableInteraction) {
+                    return chartBody;
+                  }
+
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onScaleStart: _interactionController.onScaleStart,
+                    onScaleUpdate: (details) => _interactionController
+                        .onScaleUpdate(details, plotWidth),
+                    onScaleEnd: _interactionController.onScaleEnd,
+                    child: chartBody,
+                  );
+                },
               ),
             ),
             const SizedBox(height: 8),
             _Legend(
-              showPressure: showPressure,
-              showWeight: showWeight,
-              showFlow: showFlow,
+              showPressure: visibility.showPressure,
+              showWeight: visibility.showWeight,
+              showFlow: visibility.showFlow,
+              viewMode: viewMode,
             ),
           ],
         ),
@@ -113,10 +218,36 @@ class DualCurveChart extends StatelessWidget {
 
     return computeFlowRates(raw);
   }
+
+  int _resolveTotalDurationMs(List<ShotSample> samples) {
+    var total = widget.maxDurationMs ?? 30000;
+    for (final sample in samples) {
+      total = math.max(total, sample.elapsedMs);
+    }
+    if (widget.maxDurationMs != null) {
+      total = math.max(total, widget.maxDurationMs!);
+    }
+    return math.max(total, 1);
+  }
+
+  static double _plotWidth(double width) {
+    return math.max(
+      1,
+      width - DualCurveChartPainter.leftPad - DualCurveChartPainter.rightPad,
+    );
+  }
+
+  static String _semanticsLabel(ChartViewMode mode) {
+    return switch (mode) {
+      ChartViewMode.overlay => 'Espresso shot chart, overlay view',
+      ChartViewMode.split => 'Espresso shot chart, split view',
+      ChartViewMode.flowOnly => 'Espresso shot chart, flow only',
+    };
+  }
 }
 
-class _Legend extends StatelessWidget {
-  const _Legend({
+class _SeriesVisibility {
+  const _SeriesVisibility({
     required this.showPressure,
     required this.showWeight,
     required this.showFlow,
@@ -125,6 +256,221 @@ class _Legend extends StatelessWidget {
   final bool showPressure;
   final bool showWeight;
   final bool showFlow;
+}
+
+_SeriesVisibility _visibilityForMode({
+  required ChartViewMode viewMode,
+  required bool showPressure,
+  required bool showWeight,
+  required bool showFlow,
+}) {
+  return switch (viewMode) {
+    ChartViewMode.overlay => _SeriesVisibility(
+        showPressure: showPressure,
+        showWeight: showWeight,
+        showFlow: showFlow,
+      ),
+    ChartViewMode.split => _SeriesVisibility(
+        showPressure: showPressure,
+        showWeight: showWeight,
+        showFlow: showFlow,
+      ),
+    ChartViewMode.flowOnly => _SeriesVisibility(
+        showPressure: false,
+        showWeight: false,
+        showFlow: showFlow,
+      ),
+  };
+}
+
+class _OverlayChart extends StatelessWidget {
+  const _OverlayChart({
+    required this.samples,
+    required this.maxDurationMs,
+    required this.viewport,
+    required this.visibility,
+    required this.backgroundColor,
+  });
+
+  final List<ShotSample> samples;
+  final int? maxDurationMs;
+  final ChartViewport viewport;
+  final _SeriesVisibility visibility;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: DualCurveChartPainter(
+        samples: samples,
+        maxDurationMs: maxDurationMs,
+        viewport: viewport,
+        showPressure: visibility.showPressure,
+        showWeight: visibility.showWeight,
+        showFlow: visibility.showFlow,
+        backgroundColor: backgroundColor,
+      ),
+    );
+  }
+}
+
+class _SplitCharts extends StatelessWidget {
+  const _SplitCharts({
+    required this.samples,
+    required this.maxDurationMs,
+    required this.viewport,
+    required this.visibility,
+    required this.backgroundColor,
+  });
+
+  final List<ShotSample> samples;
+  final int? maxDurationMs;
+  final ChartViewport viewport;
+  final _SeriesVisibility visibility;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final panels = <Widget>[];
+    if (visibility.showPressure) {
+      panels.add(
+        _SplitPanel(
+          label: 'Pressure',
+          samples: samples,
+          maxDurationMs: maxDurationMs,
+          viewport: viewport,
+          backgroundColor: backgroundColor,
+          painter: DualCurveChartPainter(
+            samples: samples,
+            maxDurationMs: maxDurationMs,
+            viewport: viewport,
+            showPressure: true,
+            showWeight: false,
+            showFlow: false,
+            backgroundColor: backgroundColor,
+            compact: true,
+            axisUnitLabel: 'bar',
+          ),
+        ),
+      );
+    }
+    if (visibility.showWeight) {
+      panels.add(
+        _SplitPanel(
+          label: 'Weight',
+          samples: samples,
+          maxDurationMs: maxDurationMs,
+          viewport: viewport,
+          backgroundColor: backgroundColor,
+          painter: DualCurveChartPainter(
+            samples: samples,
+            maxDurationMs: maxDurationMs,
+            viewport: viewport,
+            showPressure: false,
+            showWeight: true,
+            showFlow: false,
+            backgroundColor: backgroundColor,
+            compact: true,
+            axisUnitLabel: 'g',
+          ),
+        ),
+      );
+    }
+    if (visibility.showFlow) {
+      panels.add(
+        _SplitPanel(
+          label: 'Flow',
+          samples: samples,
+          maxDurationMs: maxDurationMs,
+          viewport: viewport,
+          backgroundColor: backgroundColor,
+          painter: DualCurveChartPainter(
+            samples: samples,
+            maxDurationMs: maxDurationMs,
+            viewport: viewport,
+            showPressure: false,
+            showWeight: false,
+            showFlow: true,
+            backgroundColor: backgroundColor,
+            compact: true,
+            axisUnitLabel: 'g/s',
+          ),
+        ),
+      );
+    }
+
+    if (panels.isEmpty) {
+      return CustomPaint(
+        painter: DualCurveChartPainter(
+          samples: samples,
+          maxDurationMs: maxDurationMs,
+          viewport: viewport,
+          backgroundColor: backgroundColor,
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        for (var i = 0; i < panels.length; i++) ...[
+          if (i > 0) const SizedBox(height: 4),
+          Expanded(child: panels[i]),
+        ],
+      ],
+    );
+  }
+}
+
+class _SplitPanel extends StatelessWidget {
+  const _SplitPanel({
+    required this.label,
+    required this.samples,
+    required this.maxDurationMs,
+    required this.viewport,
+    required this.backgroundColor,
+    required this.painter,
+  });
+
+  final String label;
+  final List<ShotSample> samples;
+  final int? maxDurationMs;
+  final ChartViewport viewport;
+  final Color backgroundColor;
+  final DualCurveChartPainter painter;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: FlowlogChartColors.axisLabel,
+            fontSize: 10,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Expanded(
+          child: CustomPaint(painter: painter),
+        ),
+      ],
+    );
+  }
+}
+
+class _Legend extends StatelessWidget {
+  const _Legend({
+    required this.showPressure,
+    required this.showWeight,
+    required this.showFlow,
+    required this.viewMode,
+  });
+
+  final bool showPressure;
+  final bool showWeight;
+  final bool showFlow;
+  final ChartViewMode viewMode;
 
   @override
   Widget build(BuildContext context) {
@@ -146,11 +492,32 @@ class _Legend extends StatelessWidget {
       items.add(_LegendItem(color: FlowlogChartColors.flowLine, label: 'Flow'));
     }
 
-    return Wrap(
-      spacing: 16,
-      runSpacing: 4,
-      children: items,
+    return Row(
+      children: [
+        Expanded(
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 4,
+            children: items,
+          ),
+        ),
+        Text(
+          _viewModeLabel(viewMode),
+          style: const TextStyle(
+            color: FlowlogChartColors.axisLabel,
+            fontSize: 11,
+          ),
+        ),
+      ],
     );
+  }
+
+  static String _viewModeLabel(ChartViewMode mode) {
+    return switch (mode) {
+      ChartViewMode.overlay => 'Overlay',
+      ChartViewMode.split => 'Split',
+      ChartViewMode.flowOnly => 'Flow only',
+    };
   }
 }
 
@@ -188,31 +555,50 @@ class DualCurveChartPainter extends CustomPainter {
   DualCurveChartPainter({
     required this.samples,
     this.maxDurationMs,
+    ChartViewport? viewport,
     this.showPressure = true,
     this.showWeight = true,
     this.showFlow = true,
     this.backgroundColor = FlowlogChartColors.background,
-  });
+    this.compact = false,
+    this.axisUnitLabel,
+  }) : viewport = viewport ??
+            ChartViewport(
+              totalDurationMs: math.max(
+                1,
+                maxDurationMs ?? _fallbackDuration(samples),
+              ),
+            );
 
   final List<ShotSample> samples;
   final int? maxDurationMs;
+  final ChartViewport viewport;
   final bool showPressure;
   final bool showWeight;
   final bool showFlow;
   final Color backgroundColor;
+  final bool compact;
+  final String? axisUnitLabel;
 
-  static const _leftPad = 40.0;
-  static const _rightPad = 40.0;
-  static const _topPad = 12.0;
-  static const _bottomPad = 24.0;
+  static const leftPad = 40.0;
+  static const rightPad = 40.0;
+  static const topPad = 12.0;
+  static const bottomPad = 24.0;
+
+  static int _fallbackDuration(List<ShotSample> samples) {
+    if (samples.isEmpty) {
+      return 30000;
+    }
+    return samples.last.elapsedMs;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     final plotRect = Rect.fromLTWH(
-      _leftPad,
-      _topPad,
-      math.max(1, size.width - _leftPad - _rightPad),
-      math.max(1, size.height - _topPad - _bottomPad),
+      leftPad,
+      topPad,
+      math.max(1, size.width - leftPad - rightPad),
+      math.max(1, size.height - topPad - bottomPad),
     );
 
     canvas.drawRect(
@@ -230,6 +616,7 @@ class DualCurveChartPainter extends CustomPainter {
     final scales = _ChartScales.fromSamples(
       samples,
       maxDurationMs: maxDurationMs,
+      viewport: viewport,
     );
 
     _drawAxes(canvas, plotRect, scales);
@@ -267,7 +654,7 @@ class DualCurveChartPainter extends CustomPainter {
       ..color = FlowlogChartColors.grid.withValues(alpha: 0.25)
       ..strokeWidth = 1;
 
-    const horizontalLines = 4;
+    final horizontalLines = compact ? 2 : 4;
     for (var i = 0; i <= horizontalLines; i++) {
       final y = plotRect.top + (plotRect.height / horizontalLines) * i;
       canvas.drawLine(
@@ -291,29 +678,39 @@ class DualCurveChartPainter extends CustomPainter {
   void _drawAxes(Canvas canvas, Rect plotRect, _ChartScales scales) {
     final textStyle = TextStyle(
       color: FlowlogChartColors.axisLabel,
-      fontSize: 10,
+      fontSize: compact ? 9 : 10,
     );
 
-    _drawAxisLabel(
-      canvas,
-      'bar',
-      Offset(4, plotRect.top),
-      textStyle,
-    );
-    _drawAxisLabel(
-      canvas,
-      'g',
-      Offset(plotRect.right + 6, plotRect.top),
-      textStyle,
-    );
-    _drawAxisLabel(
-      canvas,
-      'g/s',
-      Offset(plotRect.right + 6, plotRect.center.dy),
-      textStyle,
-    );
+    if (compact) {
+      final unit = axisUnitLabel ?? 'bar';
+      _drawAxisLabel(
+        canvas,
+        unit,
+        Offset(4, plotRect.top),
+        textStyle,
+      );
+    } else {
+      _drawAxisLabel(
+        canvas,
+        'bar',
+        Offset(4, plotRect.top),
+        textStyle,
+      );
+      _drawAxisLabel(
+        canvas,
+        'g',
+        Offset(plotRect.right + 6, plotRect.top),
+        textStyle,
+      );
+      _drawAxisLabel(
+        canvas,
+        'g/s',
+        Offset(plotRect.right + 6, plotRect.center.dy),
+        textStyle,
+      );
+    }
 
-    final durationLabel = _formatDuration(scales.timeMaxMs);
+    final durationLabel = _formatDuration(scales.visibleEndMs);
     _drawAxisLabel(
       canvas,
       durationLabel,
@@ -456,8 +853,9 @@ class DualCurveChartPainter extends CustomPainter {
     required double value,
     required double maxValue,
   }) {
-    final x = plotRect.left +
-        (elapsedMs / scales.timeMaxMs).clamp(0.0, 1.0) * plotRect.width;
+    final normalizedTime =
+        (elapsedMs - scales.timeOffsetMs) / scales.timeSpanMs;
+    final x = plotRect.left + normalizedTime.clamp(0.0, 1.0) * plotRect.width;
     final y = plotRect.bottom -
         (value / maxValue).clamp(0.0, 1.0) * plotRect.height;
     return Offset(x, y);
@@ -508,22 +906,29 @@ class DualCurveChartPainter extends CustomPainter {
   bool shouldRepaint(covariant DualCurveChartPainter oldDelegate) {
     return oldDelegate.samples != samples ||
         oldDelegate.maxDurationMs != maxDurationMs ||
+        oldDelegate.viewport != viewport ||
         oldDelegate.showPressure != showPressure ||
         oldDelegate.showWeight != showWeight ||
         oldDelegate.showFlow != showFlow ||
-        oldDelegate.backgroundColor != backgroundColor;
+        oldDelegate.backgroundColor != backgroundColor ||
+        oldDelegate.compact != compact ||
+        oldDelegate.axisUnitLabel != axisUnitLabel;
   }
 }
 
 class _ChartScales {
   const _ChartScales({
-    required this.timeMaxMs,
+    required this.timeOffsetMs,
+    required this.timeSpanMs,
+    required this.visibleEndMs,
     required this.pressureMax,
     required this.weightMax,
     required this.flowMax,
   });
 
-  final int timeMaxMs;
+  final int timeOffsetMs;
+  final int timeSpanMs;
+  final int visibleEndMs;
   final double pressureMax;
   final double weightMax;
   final double flowMax;
@@ -531,13 +936,19 @@ class _ChartScales {
   factory _ChartScales.fromSamples(
     List<ShotSample> samples, {
     int? maxDurationMs,
+    required ChartViewport viewport,
   }) {
     var pressureMax = 12.0;
     var weightMax = 50.0;
     var flowMax = 5.0;
-    var timeMaxMs = maxDurationMs ?? 30000;
+
+    final windowStart = viewport.visibleStartMs;
+    final windowEnd = viewport.visibleEndMs;
 
     for (final sample in samples) {
+      if (sample.elapsedMs < windowStart || sample.elapsedMs > windowEnd) {
+        continue;
+      }
       if (sample.pressureBar != null) {
         pressureMax = math.max(pressureMax, sample.pressureBar! * 1.1);
       }
@@ -547,15 +958,12 @@ class _ChartScales {
       if (sample.flowGs != null) {
         flowMax = math.max(flowMax, sample.flowGs! * 1.1);
       }
-      timeMaxMs = math.max(timeMaxMs, sample.elapsedMs);
-    }
-
-    if (maxDurationMs != null) {
-      timeMaxMs = math.max(timeMaxMs, maxDurationMs);
     }
 
     return _ChartScales(
-      timeMaxMs: math.max(timeMaxMs, 1),
+      timeOffsetMs: viewport.visibleStartMs,
+      timeSpanMs: math.max(viewport.visibleDurationMs, 1),
+      visibleEndMs: viewport.visibleEndMs,
       pressureMax: pressureMax,
       weightMax: weightMax,
       flowMax: flowMax,

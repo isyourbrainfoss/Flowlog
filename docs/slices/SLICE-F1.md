@@ -1,6 +1,6 @@
 # SLICE-F1: Search + filter shots
 
-status: pending
+status: done
 parallel_with: F2, F4
 
 ## Prerequisites
@@ -13,7 +13,7 @@ D1
 
 ## Done when
 
-- [ ] Filter by bean, date, taste, peak pressure
+- [x] Filter by bean, date, taste, peak pressure
 
 ## Verify
 

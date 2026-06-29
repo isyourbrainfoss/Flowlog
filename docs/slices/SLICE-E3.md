@@ -1,6 +1,6 @@
 # SLICE-E3: Haptics + shot-end pulse
 
-status: pending
+status: done
 parallel_with: E4, E2
 
 ## Prerequisites
@@ -13,8 +13,8 @@ C4
 
 ## Done when
 
-- [ ] Flow stability pulse animation
-- [ ] Shot-end haptic/sound hook
+- [x] Flow stability pulse animation
+- [x] Shot-end haptic/sound hook
 
 ## Verify
 

@@ -1127,16 +1127,427 @@ class ShotSamplesCompanion extends UpdateCompanion<ShotSampleRow> {
   }
 }
 
+class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BeansTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _originMeta = const VerificationMeta('origin');
+  @override
+  late final GeneratedColumn<String> origin = GeneratedColumn<String>(
+    'origin',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _roastLevelMeta = const VerificationMeta(
+    'roastLevel',
+  );
+  @override
+  late final GeneratedColumn<String> roastLevel = GeneratedColumn<String>(
+    'roast_level',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _stockGMeta = const VerificationMeta('stockG');
+  @override
+  late final GeneratedColumn<double> stockG = GeneratedColumn<double>(
+    'stock_g',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    origin,
+    roastLevel,
+    stockG,
+    notes,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'beans';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BeanRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('origin')) {
+      context.handle(
+        _originMeta,
+        origin.isAcceptableOrUnknown(data['origin']!, _originMeta),
+      );
+    }
+    if (data.containsKey('roast_level')) {
+      context.handle(
+        _roastLevelMeta,
+        roastLevel.isAcceptableOrUnknown(data['roast_level']!, _roastLevelMeta),
+      );
+    }
+    if (data.containsKey('stock_g')) {
+      context.handle(
+        _stockGMeta,
+        stockG.isAcceptableOrUnknown(data['stock_g']!, _stockGMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BeanRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BeanRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      origin: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin'],
+      ),
+      roastLevel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}roast_level'],
+      ),
+      stockG: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}stock_g'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+    );
+  }
+
+  @override
+  $BeansTable createAlias(String alias) {
+    return $BeansTable(attachedDatabase, alias);
+  }
+}
+
+class BeanRow extends DataClass implements Insertable<BeanRow> {
+  final String id;
+  final String name;
+  final String? origin;
+  final String? roastLevel;
+  final double? stockG;
+  final String? notes;
+  const BeanRow({
+    required this.id,
+    required this.name,
+    this.origin,
+    this.roastLevel,
+    this.stockG,
+    this.notes,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || origin != null) {
+      map['origin'] = Variable<String>(origin);
+    }
+    if (!nullToAbsent || roastLevel != null) {
+      map['roast_level'] = Variable<String>(roastLevel);
+    }
+    if (!nullToAbsent || stockG != null) {
+      map['stock_g'] = Variable<double>(stockG);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    return map;
+  }
+
+  BeansCompanion toCompanion(bool nullToAbsent) {
+    return BeansCompanion(
+      id: Value(id),
+      name: Value(name),
+      origin: origin == null && nullToAbsent
+          ? const Value.absent()
+          : Value(origin),
+      roastLevel: roastLevel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(roastLevel),
+      stockG: stockG == null && nullToAbsent
+          ? const Value.absent()
+          : Value(stockG),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+    );
+  }
+
+  factory BeanRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BeanRow(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      origin: serializer.fromJson<String?>(json['origin']),
+      roastLevel: serializer.fromJson<String?>(json['roastLevel']),
+      stockG: serializer.fromJson<double?>(json['stockG']),
+      notes: serializer.fromJson<String?>(json['notes']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'origin': serializer.toJson<String?>(origin),
+      'roastLevel': serializer.toJson<String?>(roastLevel),
+      'stockG': serializer.toJson<double?>(stockG),
+      'notes': serializer.toJson<String?>(notes),
+    };
+  }
+
+  BeanRow copyWith({
+    String? id,
+    String? name,
+    Value<String?> origin = const Value.absent(),
+    Value<String?> roastLevel = const Value.absent(),
+    Value<double?> stockG = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+  }) => BeanRow(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    origin: origin.present ? origin.value : this.origin,
+    roastLevel: roastLevel.present ? roastLevel.value : this.roastLevel,
+    stockG: stockG.present ? stockG.value : this.stockG,
+    notes: notes.present ? notes.value : this.notes,
+  );
+  BeanRow copyWithCompanion(BeansCompanion data) {
+    return BeanRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      origin: data.origin.present ? data.origin.value : this.origin,
+      roastLevel: data.roastLevel.present
+          ? data.roastLevel.value
+          : this.roastLevel,
+      stockG: data.stockG.present ? data.stockG.value : this.stockG,
+      notes: data.notes.present ? data.notes.value : this.notes,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BeanRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('origin: $origin, ')
+          ..write('roastLevel: $roastLevel, ')
+          ..write('stockG: $stockG, ')
+          ..write('notes: $notes')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, origin, roastLevel, stockG, notes);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BeanRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.origin == this.origin &&
+          other.roastLevel == this.roastLevel &&
+          other.stockG == this.stockG &&
+          other.notes == this.notes);
+}
+
+class BeansCompanion extends UpdateCompanion<BeanRow> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> origin;
+  final Value<String?> roastLevel;
+  final Value<double?> stockG;
+  final Value<String?> notes;
+  final Value<int> rowid;
+  const BeansCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.origin = const Value.absent(),
+    this.roastLevel = const Value.absent(),
+    this.stockG = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BeansCompanion.insert({
+    required String id,
+    required String name,
+    this.origin = const Value.absent(),
+    this.roastLevel = const Value.absent(),
+    this.stockG = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<BeanRow> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? origin,
+    Expression<String>? roastLevel,
+    Expression<double>? stockG,
+    Expression<String>? notes,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (origin != null) 'origin': origin,
+      if (roastLevel != null) 'roast_level': roastLevel,
+      if (stockG != null) 'stock_g': stockG,
+      if (notes != null) 'notes': notes,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BeansCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String?>? origin,
+    Value<String?>? roastLevel,
+    Value<double?>? stockG,
+    Value<String?>? notes,
+    Value<int>? rowid,
+  }) {
+    return BeansCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      origin: origin ?? this.origin,
+      roastLevel: roastLevel ?? this.roastLevel,
+      stockG: stockG ?? this.stockG,
+      notes: notes ?? this.notes,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (origin.present) {
+      map['origin'] = Variable<String>(origin.value);
+    }
+    if (roastLevel.present) {
+      map['roast_level'] = Variable<String>(roastLevel.value);
+    }
+    if (stockG.present) {
+      map['stock_g'] = Variable<double>(stockG.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BeansCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('origin: $origin, ')
+          ..write('roastLevel: $roastLevel, ')
+          ..write('stockG: $stockG, ')
+          ..write('notes: $notes, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$FlowlogDatabase extends GeneratedDatabase {
   _$FlowlogDatabase(QueryExecutor e) : super(e);
   $FlowlogDatabaseManager get managers => $FlowlogDatabaseManager(this);
   late final $ShotsTable shots = $ShotsTable(this);
   late final $ShotSamplesTable shotSamples = $ShotSamplesTable(this);
+  late final $BeansTable beans = $BeansTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [shots, shotSamples];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    shots,
+    shotSamples,
+    beans,
+  ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
     WritePropagation(
@@ -1920,6 +2331,221 @@ typedef $$ShotSamplesTableProcessedTableManager =
       ShotSampleRow,
       PrefetchHooks Function({bool shotId})
     >;
+typedef $$BeansTableCreateCompanionBuilder =
+    BeansCompanion Function({
+      required String id,
+      required String name,
+      Value<String?> origin,
+      Value<String?> roastLevel,
+      Value<double?> stockG,
+      Value<String?> notes,
+      Value<int> rowid,
+    });
+typedef $$BeansTableUpdateCompanionBuilder =
+    BeansCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String?> origin,
+      Value<String?> roastLevel,
+      Value<double?> stockG,
+      Value<String?> notes,
+      Value<int> rowid,
+    });
+
+class $$BeansTableFilterComposer
+    extends Composer<_$FlowlogDatabase, $BeansTable> {
+  $$BeansTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get origin => $composableBuilder(
+    column: $table.origin,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get roastLevel => $composableBuilder(
+    column: $table.roastLevel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get stockG => $composableBuilder(
+    column: $table.stockG,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$BeansTableOrderingComposer
+    extends Composer<_$FlowlogDatabase, $BeansTable> {
+  $$BeansTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get origin => $composableBuilder(
+    column: $table.origin,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get roastLevel => $composableBuilder(
+    column: $table.roastLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get stockG => $composableBuilder(
+    column: $table.stockG,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$BeansTableAnnotationComposer
+    extends Composer<_$FlowlogDatabase, $BeansTable> {
+  $$BeansTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get origin =>
+      $composableBuilder(column: $table.origin, builder: (column) => column);
+
+  GeneratedColumn<String> get roastLevel => $composableBuilder(
+    column: $table.roastLevel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get stockG =>
+      $composableBuilder(column: $table.stockG, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+}
+
+class $$BeansTableTableManager
+    extends
+        RootTableManager<
+          _$FlowlogDatabase,
+          $BeansTable,
+          BeanRow,
+          $$BeansTableFilterComposer,
+          $$BeansTableOrderingComposer,
+          $$BeansTableAnnotationComposer,
+          $$BeansTableCreateCompanionBuilder,
+          $$BeansTableUpdateCompanionBuilder,
+          (BeanRow, BaseReferences<_$FlowlogDatabase, $BeansTable, BeanRow>),
+          BeanRow,
+          PrefetchHooks Function()
+        > {
+  $$BeansTableTableManager(_$FlowlogDatabase db, $BeansTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BeansTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BeansTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BeansTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> origin = const Value.absent(),
+                Value<String?> roastLevel = const Value.absent(),
+                Value<double?> stockG = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BeansCompanion(
+                id: id,
+                name: name,
+                origin: origin,
+                roastLevel: roastLevel,
+                stockG: stockG,
+                notes: notes,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<String?> origin = const Value.absent(),
+                Value<String?> roastLevel = const Value.absent(),
+                Value<double?> stockG = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BeansCompanion.insert(
+                id: id,
+                name: name,
+                origin: origin,
+                roastLevel: roastLevel,
+                stockG: stockG,
+                notes: notes,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$BeansTableProcessedTableManager =
+    ProcessedTableManager<
+      _$FlowlogDatabase,
+      $BeansTable,
+      BeanRow,
+      $$BeansTableFilterComposer,
+      $$BeansTableOrderingComposer,
+      $$BeansTableAnnotationComposer,
+      $$BeansTableCreateCompanionBuilder,
+      $$BeansTableUpdateCompanionBuilder,
+      (BeanRow, BaseReferences<_$FlowlogDatabase, $BeansTable, BeanRow>),
+      BeanRow,
+      PrefetchHooks Function()
+    >;
 
 class $FlowlogDatabaseManager {
   final _$FlowlogDatabase _db;
@@ -1928,4 +2554,6 @@ class $FlowlogDatabaseManager {
       $$ShotsTableTableManager(_db, _db.shots);
   $$ShotSamplesTableTableManager get shotSamples =>
       $$ShotSamplesTableTableManager(_db, _db.shotSamples);
+  $$BeansTableTableManager get beans =>
+      $$BeansTableTableManager(_db, _db.beans);
 }

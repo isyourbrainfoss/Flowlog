@@ -1,6 +1,6 @@
 # SLICE-F4: Bean database
 
-status: pending
+status: done
 parallel_with: F1, F2
 
 ## Prerequisites
@@ -13,9 +13,9 @@ A4, C6
 
 ## Done when
 
-- [ ] CRUD beans
-- [ ] Link shots to bean
-- [ ] Stock field
+- [x] CRUD beans
+- [x] Link shots to bean
+- [x] Stock field
 
 ## Verify
 

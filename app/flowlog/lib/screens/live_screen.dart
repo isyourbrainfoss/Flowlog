@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flowlog/screens/live/controls.dart';
+import 'package:flowlog/screens/live/feedback.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
@@ -17,6 +18,7 @@ class LiveScreen extends StatefulWidget {
     this.controller,
     this.shotRepository,
     this.onShotSaved,
+    this.shotEndFeedback = const ShotEndFeedback(),
     this.shotIdGenerator = generateShotId,
   });
 
@@ -28,6 +30,9 @@ class LiveScreen extends StatefulWidget {
 
   /// Called after a shot is persisted (useful in tests).
   final void Function(Shot shot)? onShotSaved;
+
+  /// Shot-end haptic/sound hook (injectable in tests).
+  final ShotEndFeedback shotEndFeedback;
 
   /// Generates ids for newly saved shots.
   final ShotIdGenerator shotIdGenerator;
@@ -149,43 +154,47 @@ class _LiveScreenState extends State<LiveScreen> {
         final previousSample =
             samples.length < 2 ? null : samples[samples.length - 2];
 
-        return Scaffold(
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                DualCurveChart(samplesNotifier: _samplesNotifier),
-                const SizedBox(height: 8),
-                if (latestSample != null)
-                  LiveMetricsRow(
-                    sample: latestSample,
-                    previousSample: previousSample,
-                  )
-                else
-                  const LiveMetricsRow(
-                    metrics: LiveMetrics(elapsedMs: 0),
+        return LiveShotEndListener(
+          controller: _controller,
+          shotEndFeedback: widget.shotEndFeedback,
+          child: Scaffold(
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DualCurveChart(samplesNotifier: _samplesNotifier),
+                  const SizedBox(height: 8),
+                  if (latestSample != null)
+                    LiveMetricsRow(
+                      sample: latestSample,
+                      previousSample: previousSample,
+                    )
+                  else
+                    const LiveMetricsRow(
+                      metrics: LiveMetrics(elapsedMs: 0),
+                    ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Session: ${state.name}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                    textAlign: TextAlign.center,
                   ),
-                const SizedBox(height: 16),
-                Text(
-                  'Session: ${state.name}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${_controller.sampleCount} samples',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                LiveControls(controller: _controller),
-              ],
+                  const SizedBox(height: 8),
+                  Text(
+                    '${_controller.sampleCount} samples',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  LiveControls(controller: _controller),
+                ],
+              ),
             ),
-          ),
-          floatingActionButton: StarShotFab(
-            enabled: _controller.canSaveShot && !_savingShot,
-            onPressed: _onStarShotPressed,
+            floatingActionButton: StarShotFab(
+              enabled: _controller.canSaveShot && !_savingShot,
+              onPressed: _onStarShotPressed,
+            ),
           ),
         );
       },

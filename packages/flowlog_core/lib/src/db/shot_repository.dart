@@ -5,6 +5,8 @@ import 'package:drift/drift.dart';
 import '../models/shot.dart' as models;
 import '../models/shot_sample.dart' as models;
 import 'flowlog_database.dart';
+import 'shot_list_filters.dart';
+import 'type_converters.dart';
 
 /// Persists and loads [models.Shot] records with optional samples.
 class ShotRepository {
@@ -47,14 +49,21 @@ class ShotRepository {
     return _shotFromRow(row, samples: const []);
   }
 
-  /// Returns all shots ordered by [models.Shot.startedAt] descending.
+  /// Returns shots ordered by [models.Shot.startedAt] descending.
   ///
   /// When [includeSamples] is true, each shot includes samples ordered by
   /// elapsed time (useful for history sparklines).
-  Future<List<models.Shot>> listShots({bool includeSamples = false}) async {
-    final rows = await (_db.select(_db.shots)
-          ..orderBy([(shot) => OrderingTerm.desc(shot.startedAt)]))
-        .get();
+  ///
+  /// Optional [filters] narrow results by bean, date, taste, and peak pressure.
+  Future<List<models.Shot>> listShots({
+    bool includeSamples = false,
+    ShotListFilters filters = ShotListFilters.empty,
+  }) async {
+    final query = _db.select(_db.shots);
+    await _applyShotListFilters(query, filters);
+    query.orderBy([(shot) => OrderingTerm.desc(shot.startedAt)]);
+
+    final rows = await query.get();
 
     if (!includeSamples) {
       return rows
@@ -77,6 +86,76 @@ class ShotRepository {
       );
     }
     return shots;
+  }
+
+  Future<void> _applyShotListFilters(
+    SimpleSelectStatement<$ShotsTable, ShotRow> query,
+    ShotListFilters filters,
+  ) async {
+    final beanQuery = filters.beanQuery.trim();
+    if (beanQuery.isNotEmpty) {
+      final normalized = beanQuery.toLowerCase();
+      final beanIds = await (_db.select(_db.beans)
+            ..where(
+              (bean) =>
+                  bean.name.lower().like('%$normalized%') |
+                  bean.id.lower().like('%$normalized%'),
+            ))
+          .map((row) => row.id)
+          .get();
+
+      query.where((shot) {
+        final idMatch = shot.beanId.lower().like('%$normalized%');
+        if (beanIds.isEmpty) {
+          return idMatch;
+        }
+        return idMatch | shot.beanId.isIn(beanIds);
+      });
+    }
+
+    if (filters.startedOnOrAfter != null) {
+      final afterIso =
+          const UtcIso8601Converter().toSql(filters.startedOnOrAfter!);
+      query.where((shot) => shot.startedAt.isBiggerOrEqualValue(afterIso));
+    }
+
+    if (filters.startedOnOrBefore != null) {
+      final beforeIso =
+          const UtcIso8601Converter().toSql(filters.startedOnOrBefore!);
+      query.where((shot) => shot.startedAt.isSmallerOrEqualValue(beforeIso));
+    }
+
+    if (filters.minTasteScore != null) {
+      query.where(
+        (shot) =>
+            shot.tasteScore.isBiggerOrEqualValue(filters.minTasteScore!),
+      );
+    }
+
+    if (filters.minPeakPressureBar != null) {
+      final shotIds =
+          await _shotIdsWithMinPeakPressure(filters.minPeakPressureBar!);
+      if (shotIds.isEmpty) {
+        query.where((shot) => const Constant(false));
+      } else {
+        query.where((shot) => shot.id.isIn(shotIds));
+      }
+    }
+  }
+
+  Future<List<String>> _shotIdsWithMinPeakPressure(double minBar) async {
+    final rows = await _db.customSelect(
+      '''
+      SELECT shot_id
+      FROM shot_samples
+      GROUP BY shot_id
+      HAVING MAX(pressure_bar) >= ?
+      ''',
+      variables: [Variable.withReal(minBar)],
+      readsFrom: {_db.shotSamples},
+    ).get();
+
+    return rows.map((row) => row.read<String>('shot_id')).toList();
   }
 
   /// Returns a shot with its samples ordered by elapsed time.

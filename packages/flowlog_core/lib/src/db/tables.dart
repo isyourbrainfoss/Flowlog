@@ -24,6 +24,20 @@ class Shots extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+/// Coffee bean inventory entry.
+@DataClassName('BeanRow')
+class Beans extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get origin => text().nullable()();
+  TextColumn get roastLevel => text().nullable()();
+  RealColumn get stockG => real().nullable()();
+  TextColumn get notes => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 /// Time-series samples captured during a shot.
 @DataClassName('ShotSampleRow')
 class ShotSamples extends Table {
