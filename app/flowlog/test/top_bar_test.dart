@@ -1,4 +1,7 @@
 import 'package:flowlog/main.dart';
+import 'package:flowlog/screens/more/sensors_screen.dart';
+import 'package:flowlog/sensors/sensor_hub.dart';
+import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog/shell/top_bar.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
@@ -110,6 +113,33 @@ void main() {
 
       expect(prsIcon.state, ConnectionState.connected);
       expect(scaleIcon.state, ConnectionState.disconnected);
+    });
+
+    testWidgets('sensor icons open Sensors screen', (tester) async {
+      final hub = SensorHub();
+      addTearDown(hub.dispose);
+
+      await tester.pumpWidget(
+        SensorHubScope(
+          hub: hub,
+          child: MaterialApp(
+            home: FlowlogShellScope(
+              switchTab: (_) {},
+              child: Scaffold(
+                appBar: const FlowlogTopBar(beanName: kDefaultBeanName),
+                body: const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('top_bar_prs_status')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sensors'), findsWidgets);
+      expect(find.byType(SensorsScreen), findsOneWidget);
     });
   });
 

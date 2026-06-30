@@ -150,6 +150,24 @@ void main() {
       expect(chips, contains(ConnectionState.error));
     });
 
+    testWidgets('shows disconnect for connected device', (tester) async {
+      final hub = SensorHub(initialDevices: [
+        PairedSensorEntry(
+          id: 'prs-connected',
+          name: 'PRS39739',
+          kind: SensorKind.pressensor,
+          state: ConnectionState.connected,
+          bleRemoteId: 'E5:98:75:7D:9B:3B',
+        ),
+      ]);
+      addTearDown(hub.dispose);
+
+      await pumpSensorsScreen(tester, hub: hub);
+
+      expect(find.byKey(const Key('disconnect_prs-connected')), findsOneWidget);
+      expect(find.text('Connect'), findsNothing);
+    });
+
     testWidgets('opens diagnostics screen from link', (tester) async {
       await pumpSensorsScreen(tester);
 

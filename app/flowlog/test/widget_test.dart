@@ -171,6 +171,27 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Phone landscape keeps bottom navigation bar', (tester) async {
+    tester.view.physicalSize = const Size(900, 400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SensorHubScope(
+          hub: SensorHub(),
+          child: const FlowlogShell(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Short height uses bottom bar even when wide', (tester) async {
     tester.view.physicalSize = const Size(800, 280);
     tester.view.devicePixelRatio = 1.0;
