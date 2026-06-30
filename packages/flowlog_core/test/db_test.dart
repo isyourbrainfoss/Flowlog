@@ -105,6 +105,29 @@ void main() {
       expect(loaded, shot);
     });
 
+    test('deleteShot removes shot, samples, and annotations', () async {
+      final shot = Shot(
+        id: 'shot-delete-me',
+        startedAt: DateTime.utc(2026, 6, 29, 10, 0),
+        samples: const [
+          ShotSample(elapsedMs: 0, pressureBar: 1.0),
+        ],
+        annotations: const [
+          ShotAnnotation(
+            elapsedMs: 500,
+            label: 'Channel 1',
+            type: ShotAnnotationType.channel,
+          ),
+        ],
+      );
+
+      await repository.insertShot(shot);
+      await repository.deleteShot(shot.id);
+
+      expect(await repository.getShotById(shot.id), isNull);
+      expect(await repository.getShotWithSamples(shot.id), isNull);
+    });
+
     test('re-insert replaces samples for the same shot id', () async {
       final original = Shot(
         id: 'shot-replace',

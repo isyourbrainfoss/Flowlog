@@ -51,13 +51,31 @@ void main() {
     });
   });
 
+  group('profileFromKeyframes', () {
+    test('expands keyframes into a saved profile', () {
+      const keyframes = [
+        PressureKeyframe(elapsedMs: 0, pressureBar: 0),
+        PressureKeyframe(elapsedMs: 6000, pressureBar: 6),
+        PressureKeyframe(elapsedMs: 12000, pressureBar: 9),
+      ];
+
+      final profile = profileFromKeyframes(keyframes, name: 'Test curve');
+
+      expect(profile.name, 'Test curve');
+      expect(profile.pressureSamples, isNotEmpty);
+      expect(profile.pressureSamples.last.pressureBar, closeTo(9, 0.01));
+    });
+  });
+
   group('SimulatorScreen', () {
     late FlowlogDatabase db;
     late ProfileRepository profileRepository;
+    late ShotRepository shotRepository;
 
     setUp(() {
       db = FlowlogDatabase.inMemory();
       profileRepository = ProfileRepository(db);
+      shotRepository = ShotRepository(db);
     });
 
     tearDown(() async {
@@ -181,6 +199,61 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(harness.keyframes.last.pressureBar, greaterThan(beforePressure));
+    });
+
+    testWidgets('import shot loads keyframes from saved shot', (tester) async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      await shotRepository.insertShot(shot);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SimulatorScreen(
+            profileRepository: profileRepository,
+            shotRepository: shotRepository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('simulator_import_shot')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(Key('simulator_import_shot_${shot.id}')));
+      await tester.pumpAndSettle();
+
+      expect(find.text(shot.id), findsOneWidget);
+      expect(find.byKey(const Key('simulator_profile_editor')), findsOneWidget);
+    });
+
+    testWidgets('export profile persists keyframes to repository', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SimulatorScreen(
+            profileRepository: profileRepository,
+            shotRepository: shotRepository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('simulator_export_profile')));
+      await tester.pumpAndSettle();
+
+      await tester.showKeyboard(
+        find.byKey(const Key('simulator_profile_name_field')),
+      );
+      await tester.enterText(
+        find.byKey(const Key('simulator_profile_name_field')),
+        'Exported curve',
+      );
+      await tester.tap(find.byKey(const Key('simulator_profile_name_save')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      final profiles = await profileRepository.listProfiles();
+      expect(profiles.any((profile) => profile.name == 'Exported curve'), isTrue);
     });
   });
 

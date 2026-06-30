@@ -71,35 +71,7 @@ void main() {
     });
   });
 
-  group('StarShotFab', () {
-    testWidgets('is visible on Live tab', (tester) async {
-      await _pumpLiveScreen(tester);
-
-      expect(find.byKey(const Key('star_shot_fab')), findsOneWidget);
-      expect(find.text('Star shot'), findsOneWidget);
-    });
-
-    testWidgets('is disabled until session is stopped with samples', (
-      tester,
-    ) async {
-      final harness = await _pumpLiveScreen(tester);
-
-      final fab = tester.widget<FloatingActionButton>(
-        find.byKey(const Key('star_shot_fab')),
-      );
-      expect(fab.onPressed, isNull);
-
-      await _startAndStopSession(tester, harness.controller);
-
-      expect(harness.controller.canSaveShot, isTrue);
-      final enabledFab = tester.widget<FloatingActionButton>(
-        find.byKey(const Key('star_shot_fab')),
-      );
-      expect(enabledFab.onPressed, isNotNull);
-    });
-  });
-
-  group('runStarShotSaveFlow', () {
+  group('runAutoSaveFlow', () {
     late FlowlogDatabase db;
     late ShotRepository repository;
 
@@ -112,7 +84,7 @@ void main() {
       await db.close();
     });
 
-    testWidgets('opens metadata sheet, saves shot, and shows snackbar', (
+    testWidgets('auto-saves on stop and shows snackbar with actions', (
       tester,
     ) async {
       Shot? savedShot;
@@ -125,7 +97,29 @@ void main() {
 
       await _startAndStopSession(tester, harness.controller);
 
-      await tester.tap(find.byKey(const Key('star_shot_fab')));
+      expect(find.byKey(const Key('shot_saved_snackbar')), findsOneWidget);
+      expect(find.text('Shot saved'), findsOneWidget);
+      expect(find.byKey(const Key('shot_add_notes_action')), findsOneWidget);
+      expect(find.byKey(const Key('shot_discard_action')), findsOneWidget);
+      expect(savedShot, isNotNull);
+      expect(savedShot!.id, 'shot-widget-test');
+      expect(savedShot!.samples, harness.controller.samples);
+
+      final loaded = await repository.getShotWithSamples('shot-widget-test');
+      expect(loaded, savedShot);
+    });
+
+    testWidgets('add notes opens metadata sheet and updates saved shot', (
+      tester,
+    ) async {
+      final harness = await _pumpLiveScreen(
+        tester,
+        repository: repository,
+        shotIdGenerator: () => 'shot-notes-test',
+      );
+
+      await _startAndStopSession(tester, harness.controller);
+      await tester.tap(find.byKey(const Key('shot_add_notes_action')));
       await tester.pumpAndSettle();
 
       expect(find.text('Shot metadata'), findsOneWidget);
@@ -135,16 +129,28 @@ void main() {
       await tester.tap(find.byKey(const Key('metadata_save')));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('shot_saved_snackbar')), findsOneWidget);
-      expect(find.text('Shot saved'), findsOneWidget);
-      expect(savedShot, isNotNull);
-      expect(savedShot!.id, 'shot-widget-test');
-      expect(savedShot!.samples, harness.controller.samples);
-      expect(savedShot!.doseG, 18);
-      expect(savedShot!.yieldG, 36);
+      final loaded = await repository.getShotWithSamples('shot-notes-test');
+      expect(loaded?.doseG, 18);
+      expect(loaded?.yieldG, 36);
+    });
 
-      final loaded = await repository.getShotWithSamples('shot-widget-test');
-      expect(loaded, savedShot);
+    testWidgets('discard removes auto-saved shot from repository', (
+      tester,
+    ) async {
+      final harness = await _pumpLiveScreen(
+        tester,
+        repository: repository,
+        shotIdGenerator: () => 'shot-discard-test',
+      );
+
+      await _startAndStopSession(tester, harness.controller);
+      await tester.tap(find.byKey(const Key('shot_discard_action')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+
+      final loaded = await repository.getShotWithSamples('shot-discard-test');
+      expect(loaded, isNull);
     });
   });
 

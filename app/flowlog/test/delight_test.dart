@@ -266,7 +266,7 @@ void main() {
 
       await _startAndStopSession(tester, harness.controller);
 
-      await tester.tap(find.byKey(const Key('star_shot_fab')));
+      await tester.tap(find.byKey(const Key('shot_add_notes_action')));
       await tester.pumpAndSettle();
 
       final slider = tester.widget<Slider>(

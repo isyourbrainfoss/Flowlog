@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flowlog/screens/live/repeat_shot.dart';
+import 'package:flowlog/shell/app_destinations.dart';
+import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -501,15 +504,35 @@ class _PressureProfileEditorPainter extends CustomPainter {
   }
 }
 
+/// Builds a [SavedProfile] from editable simulator keyframes.
+SavedProfile profileFromKeyframes(
+  List<PressureKeyframe> keyframes, {
+  String? name,
+  String? sourceShotId,
+}) {
+  final pressureSamples = expandKeyframesToProfile(keyframes);
+  return SavedProfile(
+    id: generateProfileId(),
+    name: name ?? 'Simulator profile',
+    createdAt: DateTime.now().toUtc(),
+    sourceShotId: sourceShotId,
+    pressureSamples: pressureSamples,
+  );
+}
+
 /// What-if curve simulator: edit pressure and preview predicted flow.
 class SimulatorScreen extends StatefulWidget {
   const SimulatorScreen({
     super.key,
     this.profileRepository,
+    this.shotRepository,
   });
 
   /// Optional repository override for tests or dependency injection.
   final ProfileRepository? profileRepository;
+
+  /// Optional shot repository for importing saved shots.
+  final ShotRepository? shotRepository;
 
   @override
   State<SimulatorScreen> createState() => _SimulatorScreenState();
@@ -517,8 +540,9 @@ class SimulatorScreen extends StatefulWidget {
 
 class _SimulatorScreenState extends State<SimulatorScreen> {
   ProfileRepository? _profileRepository;
+  ShotRepository? _shotRepository;
   FlowlogDatabase? _database;
-  bool _ownsRepository = false;
+  bool _ownsRepositories = false;
   late Future<_SimulatorState> _stateFuture;
 
   List<PressureKeyframe> _keyframes = const [];
@@ -531,7 +555,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     _stateFuture = _loadState();
   }
 
-  Future<ProfileRepository> _ensureRepository() async {
+  Future<ProfileRepository> _ensureProfileRepository() async {
     if (widget.profileRepository != null) {
       return widget.profileRepository!;
     }
@@ -539,15 +563,37 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       return _profileRepository!;
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
-    _profileRepository = ProfileRepository(_database!);
-    _ownsRepository = true;
+    final database = await _ensureDatabase();
+    _profileRepository = ProfileRepository(database);
     return _profileRepository!;
   }
 
+  Future<ShotRepository> _ensureShotRepository() async {
+    if (widget.shotRepository != null) {
+      return widget.shotRepository!;
+    }
+    if (_shotRepository != null) {
+      return _shotRepository!;
+    }
+
+    final database = await _ensureDatabase();
+    _shotRepository = ShotRepository(database);
+    return _shotRepository!;
+  }
+
+  Future<FlowlogDatabase> _ensureDatabase() async {
+    if (_database != null) {
+      return _database!;
+    }
+
+    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
+    _database = FlowlogDatabase.openFile(dbPath);
+    _ownsRepositories = true;
+    return _database!;
+  }
+
   Future<_SimulatorState> _loadState() async {
-    final repository = await _ensureRepository();
+    final repository = await _ensureProfileRepository();
     final profiles = await repository.listProfiles(includeSamples: true);
     final profile = profiles.isNotEmpty
         ? profiles.first
@@ -577,9 +623,105 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     setState(() => _keyframes = keyframes);
   }
 
+  Future<void> _onImportShotPressed() async {
+    final repository = await _ensureShotRepository();
+    if (!mounted) {
+      return;
+    }
+
+    final shot = await pickShotForSimulator(context, repository: repository);
+    if (shot == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _profile = SavedProfile.fromShot(
+        shot,
+        id: _profile?.id ?? 'simulator-draft',
+        name: shot.id,
+      );
+      _keyframes = keyframesFromPressureSamples(shot.samples);
+    });
+  }
+
+  Future<void> _onExportProfilePressed() async {
+    if (_keyframes.isEmpty || !mounted) {
+      return;
+    }
+
+    final name = await promptSimulatorProfileName(
+      context,
+      initialName: _profile?.name ?? 'Simulator profile',
+    );
+    if (name == null || !mounted) {
+      return;
+    }
+
+    final profile = profileFromKeyframes(
+      _keyframes,
+      name: name,
+      sourceShotId: _profile?.sourceShotId,
+    );
+    final repository = await _ensureProfileRepository();
+    await repository.insertProfile(profile);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _profile = profile);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        key: const Key('simulator_export_snackbar'),
+        content: Text('Exported $name'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _onUseOnLivePressed() async {
+    if (_keyframes.isEmpty || !mounted) {
+      return;
+    }
+
+    final name = await promptSimulatorProfileName(
+      context,
+      initialName: _profile?.name ?? 'Simulator profile',
+    );
+    if (name == null || !mounted) {
+      return;
+    }
+
+    final profile = profileFromKeyframes(
+      _keyframes,
+      name: name,
+      sourceShotId: _profile?.sourceShotId,
+    );
+    final repository = await _ensureProfileRepository();
+    await repository.insertProfile(profile);
+
+    final repeatController = RepeatShotScope.maybeOf(context);
+    repeatController?.setPrefill(RepeatShotPrefill.fromProfile(profile));
+
+    FlowlogShellScope.maybeOf(context)?.switchTab(AppTab.live);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _profile = profile);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        key: const Key('simulator_use_on_live_snackbar'),
+        content: Text('Target curve ready on Live — $name'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   void dispose() {
-    if (_ownsRepository) {
+    if (_ownsRepositories) {
       _database?.close();
     }
     super.dispose();
@@ -610,13 +752,14 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             ? 30000
             : _keyframes.map((k) => k.elapsedMs).reduce(math.max);
 
-        return RefreshIndicator(
-          onRefresh: _refresh,
-          child: ListView(
-            key: const Key('simulator_screen'),
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
-            children: [
+        return Scaffold(
+          body: RefreshIndicator(
+            onRefresh: _refresh,
+            child: ListView(
+              key: const Key('simulator_screen'),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              children: [
               Text(
                 'What-if simulator',
                 style: Theme.of(context).textTheme.titleLarge,
@@ -631,6 +774,31 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 'Drag the control points to shape a target pressure curve. '
                 'Predicted flow is a simple stub (higher pressure → higher g/s).',
                 style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    key: const Key('simulator_import_shot'),
+                    onPressed: _onImportShotPressed,
+                    icon: const Icon(Icons.download_outlined),
+                    label: const Text('Import shot'),
+                  ),
+                  OutlinedButton.icon(
+                    key: const Key('simulator_export_profile'),
+                    onPressed: _onExportProfilePressed,
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('Export profile'),
+                  ),
+                  FilledButton.icon(
+                    key: const Key('simulator_use_on_live'),
+                    onPressed: _onUseOnLivePressed,
+                    icon: const Icon(Icons.play_arrow_outlined),
+                    label: const Text('Use on Live'),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               Text(
@@ -659,7 +827,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 enableInteraction: false,
                 targetPressureSamples: pressureProfile,
               ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -766,6 +935,138 @@ Shot _loadDemoShotFromFixture() {
       jsonDecode(File(_fixturePath('shots/minimal_shot.json')).readAsStringSync())
           as Map<String, dynamic>;
   return Shot.fromJson(json);
+}
+
+/// Prompts for a profile name before export or Live handoff.
+Future<String?> promptSimulatorProfileName(
+  BuildContext context, {
+  required String initialName,
+}) {
+  return showDialog<String>(
+    context: context,
+    builder: (dialogContext) => _SimulatorProfileNameDialog(
+      initialName: initialName,
+    ),
+  );
+}
+
+class _SimulatorProfileNameDialog extends StatefulWidget {
+  const _SimulatorProfileNameDialog({required this.initialName});
+
+  final String initialName;
+
+  @override
+  State<_SimulatorProfileNameDialog> createState() =>
+      _SimulatorProfileNameDialogState();
+}
+
+class _SimulatorProfileNameDialogState extends State<_SimulatorProfileNameDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final trimmed = _controller.text.trim();
+    Navigator.of(context).pop(trimmed.isEmpty ? null : trimmed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      key: const Key('simulator_profile_name_dialog'),
+      title: const Text('Profile name'),
+      content: TextField(
+        key: const Key('simulator_profile_name_field'),
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(
+          labelText: 'Name',
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('simulator_profile_name_save'),
+          onPressed: _submit,
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Shows a picker dialog for importing a saved shot into the simulator.
+Future<Shot?> pickShotForSimulator(
+  BuildContext context, {
+  required ShotRepository repository,
+}) async {
+  final shots = await repository.listShots(includeSamples: true);
+  if (!context.mounted) {
+    return null;
+  }
+
+  if (shots.isEmpty) {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: const Key('simulator_import_empty_dialog'),
+        title: const Text('No shots yet'),
+        content: const Text(
+          'Record a shot on the Live tab first, then import it here.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+    return null;
+  }
+
+  return showDialog<Shot>(
+    context: context,
+    builder: (context) {
+      return SimpleDialog(
+        key: const Key('simulator_import_shot_dialog'),
+        title: const Text('Import shot'),
+        children: [
+          for (final shot in shots)
+            SimpleDialogOption(
+              key: Key('simulator_import_shot_${shot.id}'),
+              onPressed: () => Navigator.of(context).pop(shot),
+              child: Text(_shotPickerLabel(shot)),
+            ),
+        ],
+      );
+    },
+  );
+}
+
+String _shotPickerLabel(Shot shot) {
+  final started = shot.startedAt.toLocal();
+  final label =
+      '${started.year}-${started.month.toString().padLeft(2, '0')}-${started.day.toString().padLeft(2, '0')} '
+      '${started.hour.toString().padLeft(2, '0')}:${started.minute.toString().padLeft(2, '0')}';
+  if (shot.yieldG != null) {
+    return '$label · ${shot.yieldG!.toStringAsFixed(0)} g';
+  }
+  return '$label · ${shot.samples.length} samples';
 }
 
 String _fixturePath(String relativePath) {

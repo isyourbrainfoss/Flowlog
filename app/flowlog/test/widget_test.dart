@@ -12,7 +12,7 @@ void main() {
 
     expect(find.text('Live'), findsWidgets);
     expect(find.text('Session: idle'), findsOneWidget);
-    expect(find.byKey(const Key('live_start')), findsOneWidget);
+    expect(find.byKey(const Key('live_brew')), findsOneWidget);
     expect(find.byType(NavigationRail), findsOneWidget);
   });
 
@@ -116,7 +116,7 @@ void main() {
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
     expect(find.text('Session: idle'), findsOneWidget);
-    expect(find.byKey(const Key('live_start')), findsOneWidget);
+    expect(find.byKey(const Key('live_brew')), findsOneWidget);
   });
 
   testWidgets('Ultra-short window hides app bar and does not overflow', (
@@ -142,7 +142,7 @@ void main() {
     expect(find.byType(AppBar), findsNothing);
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.text('Session: idle'), findsOneWidget);
-    expect(find.byKey(const Key('live_start')), findsOneWidget);
+    expect(find.byKey(const Key('live_brew')), findsOneWidget);
   });
 
   testWidgets('resize to mobile preserves live session samples', (
@@ -164,10 +164,16 @@ void main() {
     expect(samplesFinder, findsOneWidget);
     final samplesBefore = tester.widget<Text>(samplesFinder).data!;
 
-    tester.view.physicalSize = const Size(400, 800);
-    await tester.pumpAndSettle();
+    final countBefore = int.parse(samplesBefore.split(' ').first);
 
-    expect(find.text(samplesBefore), findsOneWidget);
+    tester.view.physicalSize = const Size(400, 800);
+    await tester.pump();
+
+    await tester.ensureVisible(find.textContaining('samples'));
+    final samplesAfter =
+        tester.widget<Text>(find.textContaining('samples')).data!;
+    final countAfter = int.parse(samplesAfter.split(' ').first);
+    expect(countAfter, greaterThanOrEqualTo(countBefore));
     expect(tester.takeException(), isNull);
   });
 
