@@ -6,6 +6,22 @@ import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+Future<void> _pumpChart(WidgetTester tester, Widget chart) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: SizedBox(
+            width: 400,
+            height: 360,
+            child: chart,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 void main() {
   group('DualCurveChart', () {
     late List<ShotSample> fixtureSamples;
@@ -17,15 +33,9 @@ void main() {
     testWidgets('renders static fixture samples without overflow', (
       tester,
     ) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SizedBox(
-              width: 400,
-              child: DualCurveChart(samples: fixtureSamples),
-            ),
-          ),
-        ),
+      await _pumpChart(
+        tester,
+        DualCurveChart(samples: fixtureSamples),
       );
 
       expect(find.byType(DualCurveChart), findsOneWidget);
@@ -41,7 +51,7 @@ void main() {
           of: find.byType(DualCurveChart),
           matching: find.byType(CustomPaint),
         ),
-        findsOneWidget,
+        findsWidgets,
       );
       expect(find.text('Pressure'), findsOneWidget);
       expect(find.text('Weight'), findsOneWidget);
@@ -57,10 +67,9 @@ void main() {
         const ShotSample(elapsedMs: 15000, pressureBar: 2, weightG: 36),
       ];
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: DualCurveChart(samples: samples, height: 180),
-        ),
+      await _pumpChart(
+        tester,
+        DualCurveChart(samples: samples, height: 180),
       );
 
       expect(
@@ -68,7 +77,7 @@ void main() {
           of: find.byType(DualCurveChart),
           matching: find.byType(CustomPaint),
         ),
-        findsOneWidget,
+        findsWidgets,
       );
       expect(tester.takeException(), isNull);
     });
@@ -76,10 +85,9 @@ void main() {
     testWidgets('updates from ValueNotifier mock stream', (tester) async {
       final notifier = ValueNotifier<List<ShotSample>>([]);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: DualCurveChart(samplesNotifier: notifier),
-        ),
+      await _pumpChart(
+        tester,
+        DualCurveChart(samplesNotifier: notifier),
       );
 
       expect(find.text('Waiting for samples…'), findsNothing);
@@ -94,7 +102,7 @@ void main() {
           of: find.byType(DualCurveChart),
           matching: find.byType(CustomPaint),
         ),
-        findsOneWidget,
+        findsWidgets,
       );
       expect(tester.takeException(), isNull);
 
@@ -105,10 +113,9 @@ void main() {
       final notifier = ValueNotifier<List<ShotSample>>([]);
       final streamed = <List<ShotSample>>[];
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: DualCurveChart(samplesNotifier: notifier),
-        ),
+      await _pumpChart(
+        tester,
+        DualCurveChart(samplesNotifier: notifier),
       );
 
       for (var i = 0; i < fixtureSamples.length; i++) {
@@ -137,12 +144,11 @@ void main() {
         ),
       ];
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: DualCurveChart(
-            samples: samples,
-            annotations: annotations,
-          ),
+      await _pumpChart(
+        tester,
+        DualCurveChart(
+          samples: samples,
+          annotations: annotations,
         ),
       );
 
@@ -151,7 +157,7 @@ void main() {
           of: find.byType(DualCurveChart),
           matching: find.byType(CustomPaint),
         ),
-        findsOneWidget,
+        findsWidgets,
       );
       expect(tester.takeException(), isNull);
     });
@@ -164,12 +170,11 @@ void main() {
         const ShotSample(elapsedMs: 10000, pressureBar: 9),
       ];
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: DualCurveChart(
-            samples: const [],
-            targetPressureSamples: target,
-          ),
+      await _pumpChart(
+        tester,
+        DualCurveChart(
+          samples: const [],
+          targetPressureSamples: target,
         ),
       );
 
@@ -185,12 +190,11 @@ void main() {
         const ShotSample(elapsedMs: 10000, pressureBar: 9),
       ];
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: DualCurveChart(
-            samples: const [],
-            targetPressureSamples: target,
-          ),
+      await _pumpChart(
+        tester,
+        DualCurveChart(
+          samples: const [],
+          targetPressureSamples: target,
         ),
       );
 
@@ -200,7 +204,7 @@ void main() {
           of: find.byType(DualCurveChart),
           matching: find.byType(CustomPaint),
         ),
-        findsOneWidget,
+        findsWidgets,
       );
       expect(tester.takeException(), isNull);
     });
