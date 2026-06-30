@@ -206,7 +206,7 @@ class _LiveScreenState extends State<LiveScreen> {
       return;
     }
 
-    await promptShotNoteAnnotation(
+    await promptChartAnnotationAction(
       context: context,
       controller: _annotationController,
       elapsedMs: elapsedMs,

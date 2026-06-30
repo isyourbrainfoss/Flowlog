@@ -79,6 +79,41 @@ void main() {
     });
   });
 
+  group('promptChartAnnotationAction', () {
+    testWidgets('mark channel here adds channel at elapsed time', (tester) async {
+      final controller = ShotAnnotationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: FilledButton(
+                  onPressed: () => promptChartAnnotationAction(
+                    context: context,
+                    controller: controller,
+                    elapsedMs: 4200,
+                  ),
+                  child: const Text('Annotate'),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Annotate'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('annotate_mark_channel_here')));
+      await tester.pumpAndSettle();
+
+      expect(controller.annotations, hasLength(1));
+      expect(controller.annotations.single.type, ShotAnnotationType.channel);
+      expect(controller.annotations.single.elapsedMs, 4200);
+    });
+  });
+
   group('promptShotNoteAnnotation', () {
     testWidgets('adds a note annotation from dialog', (tester) async {
       final controller = ShotAnnotationController();
