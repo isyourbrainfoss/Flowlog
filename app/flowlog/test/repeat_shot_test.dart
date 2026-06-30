@@ -160,6 +160,11 @@ void main() {
     testWidgets('live repeat button saves profile from stopped session', (
       tester,
     ) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       await tester.pumpWidget(
         MaterialApp(
           home: RepeatShotScope(
@@ -176,10 +181,16 @@ void main() {
       await tester.pump();
 
       await _startAndStopSession(tester, liveController);
-
-      await tester.tap(find.byKey(const Key('repeat_shot_button')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
+
+      expect(liveController.canSaveShot, isTrue);
+      await tester.ensureVisible(find.byKey(const Key('repeat_shot_button')));
+      await tester.runAsync(() async {
+        await tester.tap(find.byKey(const Key('repeat_shot_button')));
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      });
+      await tester.pump();
 
       expect(repeatController.prefill, isNotNull);
       expect(repeatController.prefill!.targetPressureSamples, isNotEmpty);

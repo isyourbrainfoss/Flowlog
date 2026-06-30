@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flowlog/screens/live/metadata_sheet.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -55,6 +57,124 @@ void showShotSavedSnackBar(BuildContext context, {String? message}) {
   );
 }
 
+ShotMetadata defaultMetadataFromSamples(List<ShotSample> samples) {
+  final last = samples.last;
+  return ShotMetadata(
+    yieldG: last.weightG,
+    waterTempC: last.tempC,
+  );
+}
+
+/// Persists a stopped session immediately with inferred metadata.
+Future<Shot?> runAutoSaveFlow({
+  required BuildContext context,
+  required ShotRepository repository,
+  required List<ShotSample> samples,
+  required DateTime startedAt,
+  DateTime? endedAt,
+  ShotMetadata? initialMetadata,
+  List<ShotAnnotation> annotations = const [],
+  ShotIdGenerator idGenerator = generateShotId,
+  void Function(Shot shot)? onSaved,
+  Future<void> Function(Shot shot)? onAddNotes,
+  Future<void> Function(Shot shot)? onDiscard,
+}) async {
+  if (samples.isEmpty) {
+    return null;
+  }
+
+  final metadata =
+      initialMetadata ?? defaultMetadataFromSamples(samples);
+
+  final shot = buildShotFromSession(
+    samples: samples,
+    startedAt: startedAt,
+    endedAt: endedAt,
+    metadata: metadata,
+    annotations: annotations,
+    idGenerator: idGenerator,
+  );
+
+  await saveShot(repository: repository, shot: shot);
+  onSaved?.call(shot);
+
+  if (context.mounted) {
+    showAutoSavedSnackBar(
+      context,
+      onAddNotes: onAddNotes == null
+          ? null
+          : () async {
+              await onAddNotes(shot);
+            },
+      onDiscard: onDiscard == null
+          ? null
+          : () async {
+              await onDiscard(shot);
+            },
+    );
+  }
+
+  return shot;
+}
+
+/// Snackbar after auto-save with optional follow-up actions.
+void showAutoSavedSnackBar(
+  BuildContext context, {
+  Future<void> Function()? onAddNotes,
+  Future<void> Function()? onDiscard,
+}) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      key: const Key('shot_saved_snackbar'),
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 4),
+      content: Row(
+        children: [
+          const Expanded(child: Text('Shot saved')),
+          if (onAddNotes != null)
+            TextButton(
+              key: const Key('shot_add_notes_action'),
+              onPressed: () => unawaited(onAddNotes()),
+              child: const Text('Add notes'),
+            ),
+          if (onDiscard != null)
+            TextButton(
+              key: const Key('shot_discard_action'),
+              onPressed: () => unawaited(onDiscard()),
+              child: const Text('Discard'),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Opens the metadata sheet and updates an already-saved shot.
+Future<Shot?> runAddNotesFlow({
+  required BuildContext context,
+  required ShotRepository repository,
+  required Shot shot,
+  void Function(Shot shot)? onSaved,
+}) async {
+  final metadata = await showMetadataSheet(
+    context,
+    initial: ShotMetadata.fromShot(shot),
+  );
+  if (metadata == null || !context.mounted) {
+    return null;
+  }
+
+  final updated = metadata.applyTo(shot);
+  await saveShot(repository: repository, shot: updated);
+  onSaved?.call(updated);
+
+  if (context.mounted) {
+    showShotSavedSnackBar(context, message: 'Notes saved');
+  }
+
+  return updated;
+}
+
 /// Opens the metadata sheet and persists the stopped session when confirmed.
 Future<Shot?> runStarShotSaveFlow({
   required BuildContext context,
@@ -73,7 +193,7 @@ Future<Shot?> runStarShotSaveFlow({
 
   final metadata = await showMetadataSheet(
     context,
-    initial: initialMetadata ?? _defaultMetadataFromSamples(samples),
+    initial: initialMetadata ?? defaultMetadataFromSamples(samples),
   );
   if (metadata == null || !context.mounted) {
     return null;
@@ -96,49 +216,4 @@ Future<Shot?> runStarShotSaveFlow({
   }
 
   return shot;
-}
-
-ShotMetadata _defaultMetadataFromSamples(List<ShotSample> samples) {
-  final last = samples.last;
-  return ShotMetadata(
-    yieldG: last.weightG,
-    waterTempC: last.tempC,
-  );
-}
-
-/// Floating action button for saving a standout completed shot.
-class StarShotFab extends StatelessWidget {
-  const StarShotFab({
-    required this.enabled,
-    required this.onPressed,
-    super.key,
-  });
-
-  final bool enabled;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: enabled
-          ? 'Save star shot'
-          : 'Save star shot, unavailable until recording stops',
-      child: ExcludeSemantics(
-        child: FloatingActionButton.extended(
-          key: const Key('star_shot_fab'),
-          onPressed: enabled ? onPressed : null,
-          tooltip: 'Save star shot',
-          icon: Icon(
-            Icons.auto_awesome,
-            color: enabled ? null : theme.disabledColor,
-          ),
-          label: const Text('Star shot'),
-        ),
-      ),
-    );
-  }
 }

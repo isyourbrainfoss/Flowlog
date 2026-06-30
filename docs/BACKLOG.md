@@ -55,9 +55,9 @@ Parallel waves: [`docs/PARALLEL.md`](PARALLEL.md).
 | H1 | Remove AI Coach tab | done | H2, H3 |
 | H2 | Phone landscape + sensor nav | done | H1, H3 |
 | H3 | Sensor disconnect + scan UX | done | H1, H2 |
-| H4 | Live Start/Stop brew control | pending | H6, H7 |
-| H5 | Auto-save all shots | pending | after H4 |
-| H6 | Target curves on Live | pending | H4, H7 |
-| H7 | Simulator import/export target | pending | H6 |
+| H4 | Live Start/Stop brew control | done | H6, H7 |
+| H5 | Auto-save all shots | done | after H4 |
+| H6 | Target curves on Live | done | H4, H7 |
+| H7 | Simulator import/export target | done | H6 |
 | H8 | Auto-start on pressure | pending | after H4 |
 | H9 | Fullscreen plot mode | pending | after H6 |

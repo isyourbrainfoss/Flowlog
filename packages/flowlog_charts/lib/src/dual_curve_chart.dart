@@ -872,12 +872,16 @@ class DualCurveChartPainter extends CustomPainter {
     _drawAxes(canvas, plotRect, scales);
 
     if (samples.isEmpty && targetPressureSamples.isEmpty) {
-      _drawEmptyLabel(canvas, plotRect);
+      _drawEmptyLabel(canvas, plotRect, 'Waiting for samples…');
       return;
     }
 
     if (showPressure && targetPressureSamples.isNotEmpty) {
       _drawTargetPressure(canvas, plotRect, scales);
+    }
+
+    if (samples.isEmpty && targetPressureSamples.isNotEmpty) {
+      _drawEmptyLabel(canvas, plotRect, 'Follow the target curve');
     }
 
     if (showPressure) {
@@ -985,10 +989,10 @@ class DualCurveChartPainter extends CustomPainter {
     );
   }
 
-  void _drawEmptyLabel(Canvas canvas, Rect plotRect) {
+  void _drawEmptyLabel(Canvas canvas, Rect plotRect, String message) {
     _paintText(
       canvas,
-      'Waiting for samples…',
+      message,
       Offset(plotRect.left, plotRect.center.dy - 6),
       const TextStyle(
         color: FlowlogChartColors.axisLabel,
@@ -1248,8 +1252,11 @@ class _ChartScales {
     for (final sample in samples) {
       considerSample(sample);
     }
+
     for (final sample in targetPressureSamples) {
-      considerSample(sample);
+      if (sample.pressureBar != null) {
+        pressureMax = math.max(pressureMax, sample.pressureBar! * 1.1);
+      }
     }
 
     return _ChartScales(

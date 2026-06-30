@@ -80,8 +80,10 @@ class _LiveScreenState extends State<LiveScreen> {
   ProfileRepository? _profileRepository;
   FlowlogDatabase? _database;
   bool _ownsRepository = false;
-  bool _savingShot = false;
+  bool _autoSavingShot = false;
+  String? _lastAutoSavedShotId;
   ShotSessionState _lastSessionState = ShotSessionState.idle;
+  bool _wasBrewing = false;
   FlowlogShortcutRegistry? _shortcutRegistry;
   RepeatShotController? _repeatShotController;
   final ConfettiController _confettiController = ConfettiController();
@@ -108,8 +110,11 @@ class _LiveScreenState extends State<LiveScreen> {
 
   void _bindController(LiveShotController controller) {
     _controller?.removeListener(_syncSamples);
+    _controller?.removeListener(_onSessionLifecycle);
     _controller = controller;
     _controller!.addListener(_syncSamples);
+    _controller!.addListener(_onSessionLifecycle);
+    _wasBrewing = _controller!.isBrewing;
     _syncSamples();
   }
 
@@ -157,6 +162,7 @@ class _LiveScreenState extends State<LiveScreen> {
     _confettiController.dispose();
     _chartInteractionController.dispose();
     _controller?.removeListener(_syncSamples);
+    _controller?.removeListener(_onSessionLifecycle);
     _annotationController.removeListener(_syncAnnotations);
     _annotationController.dispose();
     _annotationsNotifier.dispose();
@@ -289,9 +295,22 @@ class _LiveScreenState extends State<LiveScreen> {
     return _profileRepository!;
   }
 
-  Future<void> _onStarShotPressed() async {
+  void _onSessionLifecycle() {
     final controller = _controller;
-    if (controller == null || !controller.canSaveShot || _savingShot) {
+    if (controller == null) {
+      return;
+    }
+
+    final brewing = controller.isBrewing;
+    if (_wasBrewing && !brewing && controller.canSaveShot) {
+      unawaited(_autoSaveStoppedSession());
+    }
+    _wasBrewing = brewing;
+  }
+
+  Future<void> _autoSaveStoppedSession() async {
+    final controller = _controller;
+    if (controller == null || !controller.canSaveShot || _autoSavingShot) {
       return;
     }
 
@@ -300,14 +319,14 @@ class _LiveScreenState extends State<LiveScreen> {
       return;
     }
 
-    setState(() => _savingShot = true);
+    setState(() => _autoSavingShot = true);
     try {
       final repository = await _ensureShotRepository();
       if (!mounted) {
         return;
       }
 
-      final shot = await runStarShotSaveFlow(
+      final shot = await runAutoSaveFlow(
         context: context,
         repository: repository,
         samples: controller.samples,
@@ -316,7 +335,12 @@ class _LiveScreenState extends State<LiveScreen> {
         initialMetadata: _repeatShotController?.prefill?.metadata,
         annotations: _annotationController.annotations,
         idGenerator: widget.shotIdGenerator,
-        onSaved: widget.onShotSaved,
+        onSaved: (saved) {
+          _lastAutoSavedShotId = saved.id;
+          widget.onShotSaved?.call(saved);
+        },
+        onAddNotes: (saved) => _onAddNotesToSavedShot(saved),
+        onDiscard: (saved) => _onDiscardSavedShot(saved),
       );
 
       await celebratePersonalBestTasteScore(
@@ -326,8 +350,48 @@ class _LiveScreenState extends State<LiveScreen> {
       );
     } finally {
       if (mounted) {
-        setState(() => _savingShot = false);
+        setState(() => _autoSavingShot = false);
       }
+    }
+  }
+
+  Future<void> _onAddNotesToSavedShot(Shot shot) async {
+    final repository = await _ensureShotRepository();
+    if (!mounted) {
+      return;
+    }
+
+    final updated = await runAddNotesFlow(
+      context: context,
+      repository: repository,
+      shot: shot,
+      onSaved: widget.onShotSaved,
+    );
+
+    if (updated != null) {
+      await celebratePersonalBestTasteScore(
+        repository: repository,
+        shot: updated,
+        confettiController: _confettiController,
+      );
+    }
+  }
+
+  Future<void> _onDiscardSavedShot(Shot shot) async {
+    final repository = await _ensureShotRepository();
+    await repository.deleteShot(shot.id);
+    if (_lastAutoSavedShotId == shot.id) {
+      _lastAutoSavedShotId = null;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          key: Key('shot_discarded_snackbar'),
+          content: Text('Shot discarded'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -352,7 +416,8 @@ class _LiveScreenState extends State<LiveScreen> {
       context: context,
       shot: shot,
       profileRepository: await _ensureProfileRepository(),
-      repeatController: _repeatShotController,
+      repeatController:
+          _repeatShotController ?? widget.repeatShotController,
     );
   }
 
@@ -484,7 +549,7 @@ class _LiveScreenState extends State<LiveScreen> {
                           Align(
                             alignment: Alignment.center,
                             child: RepeatShotButton(
-                              onPressed: _onRepeatShotPressed,
+                              onPressed: () => unawaited(_onRepeatShotPressed()),
                             ),
                           ),
                         if (controller.canSaveShot) const SizedBox(height: 16),
@@ -530,10 +595,6 @@ class _LiveScreenState extends State<LiveScreen> {
                     ),
                   );
                 },
-              ),
-              floatingActionButton: StarShotFab(
-                enabled: controller.canSaveShot && !_savingShot,
-                onPressed: _onStarShotPressed,
               ),
             ),
           ),

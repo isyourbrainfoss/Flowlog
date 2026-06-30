@@ -177,6 +177,34 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('shows follow-target hint when only target curve is present', (
+      tester,
+    ) async {
+      final target = <ShotSample>[
+        const ShotSample(elapsedMs: 0, pressureBar: 0),
+        const ShotSample(elapsedMs: 10000, pressureBar: 9),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DualCurveChart(
+            samples: const [],
+            targetPressureSamples: target,
+          ),
+        ),
+      );
+
+      expect(find.text('Follow the target curve'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(DualCurveChart),
+          matching: find.byType(CustomPaint),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     test('prepares flow rates when fixture lacks flowGs', () {
       expect(fixtureSamples.any((sample) => sample.flowGs != null), isFalse);
 

@@ -53,6 +53,8 @@ class LiveShotController extends ChangeNotifier {
       sessionState == ShotSessionState.recording ||
       sessionState == ShotSessionState.paused;
 
+  bool get isBrewing => canStop;
+
   /// Tares the scale, connects [sampleAdapter], and begins [ShotSession].
   Future<void> start() async {
     if (!canStart) {
@@ -130,7 +132,7 @@ class LiveShotController extends ChangeNotifier {
   }
 }
 
-/// Start / pause / resume / stop controls for a live shot recording.
+/// Single start/stop brew control for a live shot recording.
 class LiveControls extends StatelessWidget {
   const LiveControls({
     required this.controller,
@@ -144,66 +146,34 @@ class LiveControls extends StatelessWidget {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
-        return Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          alignment: WrapAlignment.center,
-          children: [
-            Semantics(
-              button: true,
-              enabled: controller.canStart,
-              label: 'Start recording',
-              child: ExcludeSemantics(
-                child: FilledButton(
-                  key: const Key('live_start'),
-                  onPressed:
-                      controller.canStart ? () => controller.start() : null,
-                  child: const Text('Start'),
-                ),
-              ),
+        final brewing = controller.isBrewing;
+        final enabled = brewing ? controller.canStop : controller.canStart;
+
+        return Semantics(
+          button: true,
+          enabled: enabled,
+          label: brewing ? 'Stop brew' : 'Start brew',
+          child: ExcludeSemantics(
+            child: FilledButton(
+              key: const Key('live_brew'),
+              style: brewing
+                  ? FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                      foregroundColor: Theme.of(context).colorScheme.onError,
+                    )
+                  : null,
+              onPressed: enabled
+                  ? () async {
+                      if (brewing) {
+                        await controller.stop();
+                      } else {
+                        await controller.start();
+                      }
+                    }
+                  : null,
+              child: Text(brewing ? 'Stop brew' : 'Start brew'),
             ),
-            Semantics(
-              button: true,
-              enabled: controller.canPause,
-              label: 'Pause recording',
-              child: ExcludeSemantics(
-                child: FilledButton.tonal(
-                  key: const Key('live_pause'),
-                  onPressed: controller.canPause ? controller.pause : null,
-                  child: const Text('Pause'),
-                ),
-              ),
-            ),
-            Semantics(
-              button: true,
-              enabled: controller.canResume,
-              label: 'Resume recording',
-              child: ExcludeSemantics(
-                child: FilledButton.tonal(
-                  key: const Key('live_resume'),
-                  onPressed: controller.canResume ? controller.resume : null,
-                  child: const Text('Resume'),
-                ),
-              ),
-            ),
-            Semantics(
-              button: true,
-              enabled: controller.canStop,
-              label: 'Stop recording',
-              child: ExcludeSemantics(
-                child: FilledButton(
-                  key: const Key('live_stop'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.error,
-                    foregroundColor: Theme.of(context).colorScheme.onError,
-                  ),
-                  onPressed:
-                      controller.canStop ? () => controller.stop() : null,
-                  child: const Text('Stop'),
-                ),
-              ),
-            ),
-          ],
+          ),
         );
       },
     );

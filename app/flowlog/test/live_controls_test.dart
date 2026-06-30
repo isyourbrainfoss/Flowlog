@@ -108,54 +108,38 @@ void main() {
       );
     }
 
-    testWidgets('start button begins recording', (tester) async {
+    testWidgets('start brew button begins recording', (tester) async {
       await pumpControls(tester);
 
-      expect(find.byKey(const Key('live_start')), findsOneWidget);
-      expect(find.byKey(const Key('live_pause')), findsOneWidget);
-      expect(find.byKey(const Key('live_stop')), findsOneWidget);
+      expect(find.byKey(const Key('live_brew')), findsOneWidget);
+      expect(find.text('Start brew'), findsOneWidget);
 
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('live_start')));
+        await tester.tap(find.byKey(const Key('live_brew')));
         await tester.pumpAndSettle();
       });
 
       expect(controller.sessionState, ShotSessionState.recording);
+      expect(find.text('Stop brew'), findsOneWidget);
       expect(scaleTransport.writtenCommands, isNotEmpty);
       expect(scaleTransport.writtenCommands.first, DecentScaleCommands.tare());
     });
 
-    testWidgets('stop button finalizes session', (tester) async {
+    testWidgets('stop brew button finalizes session', (tester) async {
       await pumpControls(tester);
 
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('live_start')));
+        await tester.tap(find.byKey(const Key('live_brew')));
         await tester.pumpAndSettle();
       });
 
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('live_stop')));
+        await tester.tap(find.byKey(const Key('live_brew')));
         await tester.pumpAndSettle();
       });
 
       expect(controller.sessionState, ShotSessionState.stopped);
-    });
-
-    testWidgets('pause and resume buttons control session', (tester) async {
-      await pumpControls(tester);
-
-      await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('live_start')));
-        await tester.pumpAndSettle();
-      });
-
-      await tester.tap(find.byKey(const Key('live_pause')));
-      await tester.pumpAndSettle();
-      expect(controller.sessionState, ShotSessionState.paused);
-
-      await tester.tap(find.byKey(const Key('live_resume')));
-      await tester.pumpAndSettle();
-      expect(controller.sessionState, ShotSessionState.recording);
+      expect(find.text('Start brew'), findsOneWidget);
     });
   });
 }

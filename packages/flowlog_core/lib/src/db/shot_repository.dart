@@ -201,6 +201,21 @@ class ShotRepository {
     return rows.map((row) => row.read<String>('shot_id')).toList();
   }
 
+  /// Deletes a shot and its related samples, annotations, and tag links.
+  Future<void> deleteShot(String id) async {
+    await _db.transaction(() async {
+      await (_db.delete(_db.shotSamples)
+            ..where((row) => row.shotId.equals(id)))
+          .go();
+      await (_db.delete(_db.shotAnnotations)
+            ..where((row) => row.shotId.equals(id)))
+          .go();
+      await (_db.delete(_db.shotTags)..where((row) => row.shotId.equals(id)))
+          .go();
+      await (_db.delete(_db.shots)..where((shot) => shot.id.equals(id))).go();
+    });
+  }
+
   /// Returns a shot with its samples ordered by elapsed time.
   Future<models.Shot?> getShotWithSamples(String id) async {
     final row = await (_db.select(_db.shots)

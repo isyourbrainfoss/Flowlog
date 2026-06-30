@@ -216,7 +216,7 @@ void main() {
     testWidgets('start without sensors keeps chart empty', (tester) async {
       await pumpLiveScreen(tester);
 
-      final startButton = find.byKey(const Key('live_start'));
+      final startButton = find.byKey(const Key('live_brew'));
       await tester.ensureVisible(startButton);
       await tester.pumpAndSettle();
 

@@ -244,12 +244,12 @@ void main() {
       );
 
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('live_start')));
+        await tester.tap(find.byKey(const Key('live_brew')));
         await tester.pump();
       });
 
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('live_stop')));
+        await tester.tap(find.byKey(const Key('live_brew')));
         await tester.pump();
       });
 
