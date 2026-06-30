@@ -172,6 +172,29 @@ void main() {
       expect(find.textContaining('bar'), findsWidgets);
       expect(find.text(_formatElapsed(latest.elapsedMs)), findsOneWidget);
     });
+
+    testWidgets('preserves samples when resizing across layout breakpoints', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final harness = await _pumpLiveScreen(tester);
+      await _startSession(tester, harness.controller);
+      await tester.pump(const Duration(milliseconds: 200));
+
+      final samplesBefore = harness.controller.sampleCount;
+      expect(samplesBefore, greaterThan(0));
+
+      tester.view.physicalSize = const Size(400, 800);
+      await tester.pumpAndSettle();
+
+      expect(harness.controller.sampleCount, samplesBefore);
+      expect(find.text('$samplesBefore samples'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 }
 

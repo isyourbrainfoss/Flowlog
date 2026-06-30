@@ -51,27 +51,44 @@ Future<void> showShareProfileDialog(
   await showDialog<void>(
     context: context,
     builder: (dialogContext) {
+      final maxLinkHeight = MediaQuery.sizeOf(dialogContext).height * 0.35;
+
       return AlertDialog(
         key: const Key('share_profile_dialog'),
         title: const Text('Share profile'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Share an anonymised pressure curve. Bean, shot, and personal '
-              'notes are not included.',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            SelectableText(
-              link,
-              key: const Key('share_profile_link'),
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontFamily: 'monospace',
+        content: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Share an anonymised pressure curve. Bean, shot, and personal '
+                'notes are not included.',
+                style: theme.textTheme.bodyMedium,
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: maxLinkHeight),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(12),
+                    child: SelectableText(
+                      link,
+                      key: const Key('share_profile_link'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(

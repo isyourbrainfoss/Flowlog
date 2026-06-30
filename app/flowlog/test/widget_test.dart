@@ -145,6 +145,32 @@ void main() {
     expect(find.byKey(const Key('live_start')), findsOneWidget);
   });
 
+  testWidgets('resize to mobile preserves live session samples', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const FlowlogApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('live_try_demo')));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    final samplesFinder = find.textContaining('samples');
+    expect(samplesFinder, findsOneWidget);
+    final samplesBefore = tester.widget<Text>(samplesFinder).data!;
+
+    tester.view.physicalSize = const Size(400, 800);
+    await tester.pumpAndSettle();
+
+    expect(find.text(samplesBefore), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Short height uses bottom bar even when wide', (tester) async {
     tester.view.physicalSize = const Size(800, 280);
     tester.view.devicePixelRatio = 1.0;

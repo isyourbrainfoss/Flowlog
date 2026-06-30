@@ -84,6 +84,7 @@ class _LiveScreenState extends State<LiveScreen> {
   FlowlogShortcutRegistry? _shortcutRegistry;
   RepeatShotController? _repeatShotController;
   final ConfettiController _confettiController = ConfettiController();
+  late final ChartInteractionController _chartInteractionController;
 
   @override
   void initState() {
@@ -96,6 +97,7 @@ class _LiveScreenState extends State<LiveScreen> {
       List<ShotAnnotation>.from(_annotationController.annotations),
     );
     _annotationController.addListener(_syncAnnotations);
+    _chartInteractionController = ChartInteractionController();
 
     if (widget.controller != null) {
       _bindController(widget.controller!);
@@ -151,6 +153,7 @@ class _LiveScreenState extends State<LiveScreen> {
   void dispose() {
     _shortcutRegistry?.setToggleLiveShot(null);
     _confettiController.dispose();
+    _chartInteractionController.dispose();
     _controller?.removeListener(_syncSamples);
     _annotationController.removeListener(_syncAnnotations);
     _annotationController.dispose();
@@ -416,6 +419,7 @@ class _LiveScreenState extends State<LiveScreen> {
                           height: chartHeight,
                           samplesNotifier: _samplesNotifier,
                           annotationsNotifier: _annotationsNotifier,
+                          interactionController: _chartInteractionController,
                           targetPressureSamples:
                               repeatPrefill?.targetPressureSamples ?? const [],
                           onAnnotateAtElapsedMs:
@@ -487,24 +491,34 @@ class _LiveScreenState extends State<LiveScreen> {
                     ),
                   );
 
-                  final pinChart = useCompactLayout &&
-                      constraints.maxHeight.isFinite &&
+                  final pinChart = constraints.maxHeight.isFinite &&
                       constraints.maxHeight >= 360;
 
                   if (pinChart) {
-                    // Pin the chart on phone / bottom-nav layouts so it stays
-                    // visible while controls scroll underneath.
+                    // Pin the chart so it stays visible while controls scroll.
                     return Column(
+                      key: const ValueKey('live-pinned-layout'),
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         chartSection,
-                        Expanded(child: SingleChildScrollView(child: controlsSection)),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: EdgeInsets.only(
+                              top: useCompactLayout ? 0 : 8,
+                            ),
+                            child: controlsSection,
+                          ),
+                        ),
                       ],
                     );
                   }
 
+                  // Ultra-short windows: scroll everything together.
                   return SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(vertical: useCompactLayout ? 12 : 24),
+                    key: const ValueKey('live-scroll-layout'),
+                    padding: EdgeInsets.symmetric(
+                      vertical: useCompactLayout ? 12 : 24,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
