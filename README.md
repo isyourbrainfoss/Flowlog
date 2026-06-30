@@ -9,14 +9,25 @@ Personal coffee intelligence hub — live shot curves, history, bean library, an
 USB debugging is the preferred way while you are actively developing:
 
 1. On your phone: **Settings → Developer options → USB debugging** (enable).
-2. Connect via USB and confirm the debugging prompt on the phone.
-3. From this repo:
+2. Connect via USB and tap **Allow** on the authorization prompt.
+3. Point the app at a full Android SDK (Arch's `/opt/android-sdk` is often platform-tools only):
+
+```bash
+# One-time setup (example: user-local SDK)
+export ANDROID_SDK_ROOT="$HOME/Android/Sdk"
+export ANDROID_HOME="$ANDROID_SDK_ROOT"
+
+# app/flowlog/android/local.properties should contain:
+# sdk.dir=/home/<you>/Android/Sdk
+```
+
+4. From this repo:
 
 ```bash
 cd app/flowlog
 flutter pub get
-flutter devices          # confirm your phone is listed
-flutter run              # debug build with hot reload
+flutter devices          # confirm your phone is listed (e.g. FP5)
+flutter run -d <device>  # debug build with hot reload
 ```
 
 Useful variants:
