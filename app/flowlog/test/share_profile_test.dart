@@ -92,6 +92,34 @@ void main() {
   });
 
   group('ShareProfileButton', () {
+    testWidgets('dialog does not overflow with large profile link', (
+      tester,
+    ) async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      final profile = SavedProfile.fromShot(shot, id: shot.id);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: FilledButton(
+                onPressed: () => showShareProfileDialog(context, profile),
+                child: const Text('Share'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Share'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('share_profile_dialog')), findsOneWidget);
+      expect(find.byKey(const Key('share_profile_link')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('opens dialog with generated link', (tester) async {
       final profile = SavedProfile(
         id: 'profile-ui',

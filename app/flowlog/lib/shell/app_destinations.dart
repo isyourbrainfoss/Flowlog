@@ -37,7 +37,7 @@ const List<AppDestination> appDestinations = [
     label: 'Live',
     semanticsLabel: 'Live shot recording',
     icon: Icons.play_circle_outline,
-    screen: LiveScreen(),
+    screen: LiveScreen(key: ValueKey('screen-live')),
   ),
   AppDestination(
     tab: AppTab.history,
@@ -45,7 +45,7 @@ const List<AppDestination> appDestinations = [
     label: 'History',
     semanticsLabel: 'Shot history',
     icon: Icons.history,
-    screen: HistoryScreen(),
+    screen: HistoryScreen(key: ValueKey('screen-history')),
   ),
   AppDestination(
     tab: AppTab.library,
@@ -53,7 +53,7 @@ const List<AppDestination> appDestinations = [
     label: 'Library',
     semanticsLabel: 'Bean library',
     icon: Icons.local_cafe_outlined,
-    screen: LibraryScreen(),
+    screen: LibraryScreen(key: ValueKey('screen-library')),
   ),
   AppDestination(
     tab: AppTab.more,
@@ -61,7 +61,7 @@ const List<AppDestination> appDestinations = [
     label: 'More',
     semanticsLabel: 'More settings',
     icon: Icons.tune,
-    screen: MoreScreen(),
+    screen: MoreScreen(key: ValueKey('screen-more')),
   ),
 ];
 

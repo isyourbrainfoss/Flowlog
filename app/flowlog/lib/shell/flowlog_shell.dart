@@ -80,52 +80,51 @@ class _FlowlogShellState extends State<FlowlogShell> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final shell = _useBottomNav(constraints)
-            ? Scaffold(
-                body: _ShellContent(
+        final useBottomNav = _useBottomNav(constraints);
+        // Keep a stable body tree so tab screens (e.g. Live) survive resize.
+        final shell = Scaffold(
+          body: Row(
+            children: [
+              if (!useBottomNav) ...[
+                NavigationRail(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: _onDestinationSelected,
+                  extended: true,
+                  minExtendedWidth: 200,
+                  labelType: NavigationRailLabelType.none,
+                  destinations: [
+                    for (final item in appDestinations)
+                      NavigationRailDestination(
+                        icon: Icon(item.icon),
+                        selectedIcon: Icon(item.icon),
+                        label: Semantics(
+                          label: item.semanticsLabel,
+                          child: ExcludeSemantics(
+                            child: Text(item.label),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const VerticalDivider(width: 1),
+              ],
+              Expanded(
+                key: const ValueKey('shell-main-panel'),
+                child: _ShellContent(
                   beanName: _beanName,
                   onBeanNameChanged: _onBeanNameChanged,
                   child: destination.screen,
                 ),
-                bottomNavigationBar: _FlowlogBottomBar(
+              ),
+            ],
+          ),
+          bottomNavigationBar: useBottomNav
+              ? _FlowlogBottomBar(
                   selectedIndex: _selectedIndex,
                   onDestinationSelected: _onDestinationSelected,
-                ),
-              )
-            : Scaffold(
-                body: Row(
-                  children: [
-                    NavigationRail(
-                      selectedIndex: _selectedIndex,
-                      onDestinationSelected: _onDestinationSelected,
-                      extended: true,
-                      minExtendedWidth: 200,
-                      labelType: NavigationRailLabelType.none,
-                      destinations: [
-                        for (final item in appDestinations)
-                          NavigationRailDestination(
-                            icon: Icon(item.icon),
-                            selectedIcon: Icon(item.icon),
-                            label: Semantics(
-                              label: item.semanticsLabel,
-                              child: ExcludeSemantics(
-                                child: Text(item.label),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const VerticalDivider(width: 1),
-                    Expanded(
-                      child: _ShellContent(
-                        beanName: _beanName,
-                        onBeanNameChanged: _onBeanNameChanged,
-                        child: destination.screen,
-                      ),
-                    ),
-                  ],
-                ),
-              );
+                )
+              : null,
+        );
 
         return RepeatShotScope(
           controller: _repeatShotController,
