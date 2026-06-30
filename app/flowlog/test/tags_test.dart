@@ -24,7 +24,34 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('No tags yet'), findsOneWidget);
+      expect(find.byKey(const Key('tag_suggestion_funky')), findsOneWidget);
       expect(find.byType(TagCard), findsNothing);
+    });
+
+    testWidgets('creates tag from empty-state suggestion chip', (tester) async {
+      await _pumpTagsScreen(
+        tester,
+        tagRepository: tagRepository,
+        tagIdGenerator: () => 'tag-funky',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('tag_suggestion_funky')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('tag_editor_add')), findsOneWidget);
+      expect(
+        tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'Name'))
+            .controller
+            ?.text,
+        'Funky',
+      );
+
+      await tester.tap(find.byKey(const Key('tag_editor_save')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('tag_card_tag-funky')), findsOneWidget);
+      expect(find.text('Funky'), findsOneWidget);
     });
 
     testWidgets('creates tag from add dialog', (tester) async {

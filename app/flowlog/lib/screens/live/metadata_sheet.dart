@@ -124,7 +124,17 @@ const List<String> kFlavourTagOptions = [
   'sweet',
   'floral',
   'caramel',
+  'funky',
 ];
+
+/// Preset chips plus any custom tags the user added this session.
+List<String> flavourTagsForDisplay(Set<String> selected) {
+  final custom = selected
+      .where((tag) => !kFlavourTagOptions.contains(tag))
+      .toList()
+    ..sort();
+  return [...kFlavourTagOptions, ...custom];
+}
 
 /// Shows a scrollable bottom sheet for entering shot metadata.
 Future<ShotMetadata?> showMetadataSheet(
@@ -167,6 +177,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
   late final TextEditingController _notesController;
   late double _tasteScore;
   late Set<String> _selectedFlavourTags;
+  final _customTagController = TextEditingController();
 
   @override
   void initState() {
@@ -198,7 +209,28 @@ class _MetadataSheetState extends State<MetadataSheet> {
     _beanController.dispose();
     _tempController.dispose();
     _notesController.dispose();
+    _customTagController.dispose();
     super.dispose();
+  }
+
+  void _addCustomFlavourTag() {
+    final tag = _normalizeFlavourTag(_customTagController.text);
+    if (tag == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedFlavourTags.add(tag);
+      _customTagController.clear();
+    });
+  }
+
+  String? _normalizeFlavourTag(String raw) {
+    final tag = raw.trim().toLowerCase();
+    if (tag.isEmpty) {
+      return null;
+    }
+    return tag;
   }
 
   String _formatDouble(double? value) {
@@ -388,7 +420,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  for (final tag in kFlavourTagOptions)
+                  for (final tag in flavourTagsForDisplay(_selectedFlavourTags))
                     FilterChip(
                       key: Key('metadata_flavour_$tag'),
                       label: Text(tag),
@@ -403,6 +435,32 @@ class _MetadataSheetState extends State<MetadataSheet> {
                         });
                       },
                     ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      key: const Key('metadata_custom_flavour_input'),
+                      controller: _customTagController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'New tag',
+                        hintText: 'e.g. funky, jammy',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      onSubmitted: (_) => _addCustomFlavourTag(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.tonal(
+                    key: const Key('metadata_add_flavour_tag'),
+                    onPressed: _addCustomFlavourTag,
+                    child: const Text('Add'),
+                  ),
                 ],
               ),
                   ],

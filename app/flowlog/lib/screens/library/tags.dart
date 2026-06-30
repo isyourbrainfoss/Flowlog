@@ -68,7 +68,7 @@ class _TagsScreenState extends State<TagsScreen> {
     await _tagsFuture;
   }
 
-  Future<void> _openTagEditor({Tag? tag}) async {
+  Future<void> _openTagEditor({Tag? tag, String? initialName}) async {
     final repository = await _ensureRepository();
     if (!mounted) {
       return;
@@ -76,6 +76,7 @@ class _TagsScreenState extends State<TagsScreen> {
     final saved = await showTagEditorDialog(
       context: context,
       tag: tag,
+      initialName: initialName,
       tagIdGenerator: widget.tagIdGenerator,
     );
 
@@ -149,7 +150,10 @@ class _TagsScreenState extends State<TagsScreen> {
 
         return Scaffold(
           body: tags.isEmpty
-              ? const Center(child: Text('No tags yet'))
+              ? _EmptyTagsState(
+                  onAddTag: ({String? initialName}) =>
+                      _openTagEditor(initialName: initialName),
+                )
               : RefreshIndicator(
                   onRefresh: _refresh,
                   child: ListView.builder(
@@ -173,6 +177,64 @@ class _TagsScreenState extends State<TagsScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Empty library tags state with quick-start suggestions.
+class _EmptyTagsState extends StatelessWidget {
+  const _EmptyTagsState({required this.onAddTag});
+
+  final Future<void> Function({String? initialName}) onAddTag;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'No tags yet',
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Tags organize shots in History filters — e.g. Practice, Dial-in, Funky.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  for (final suggestion in const ['Practice', 'Dial-in', 'Funky'])
+                    ActionChip(
+                      key: Key('tag_suggestion_${suggestion.toLowerCase()}'),
+                      label: Text(suggestion),
+                      onPressed: () => onAddTag(initialName: suggestion),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                key: const Key('tags_add_empty_button'),
+                onPressed: () => onAddTag(),
+                icon: const Icon(Icons.add),
+                label: const Text('Add tag'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -238,12 +300,14 @@ class TagCard extends StatelessWidget {
 Future<Tag?> showTagEditorDialog({
   required BuildContext context,
   Tag? tag,
+  String? initialName,
   TagIdGenerator tagIdGenerator = generateTagId,
 }) {
   return showDialog<Tag>(
     context: context,
     builder: (dialogContext) => _TagEditorDialog(
       tag: tag,
+      initialName: initialName,
       tagIdGenerator: tagIdGenerator,
     ),
   );
@@ -252,10 +316,12 @@ Future<Tag?> showTagEditorDialog({
 class _TagEditorDialog extends StatefulWidget {
   const _TagEditorDialog({
     required this.tag,
+    required this.initialName,
     required this.tagIdGenerator,
   });
 
   final Tag? tag;
+  final String? initialName;
   final TagIdGenerator tagIdGenerator;
 
   @override
@@ -269,7 +335,9 @@ class _TagEditorDialogState extends State<_TagEditorDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.tag?.name ?? '');
+    _nameController = TextEditingController(
+      text: widget.tag?.name ?? widget.initialName ?? '',
+    );
   }
 
   @override

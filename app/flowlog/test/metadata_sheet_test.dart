@@ -165,6 +165,27 @@ void main() {
       expect(nuttyChip.selected, isTrue);
     });
 
+    testWidgets('includes funky preset flavour tag', (tester) async {
+      await pumpSheet(tester);
+
+      expect(find.byKey(const Key('metadata_flavour_funky')), findsOneWidget);
+    });
+
+    testWidgets('adds custom flavour tag via input row', (tester) async {
+      await pumpSheet(tester);
+
+      await tester.enterText(
+        find.byKey(const Key('metadata_custom_flavour_input')),
+        'Jammy',
+      );
+      await tapVisible(tester, find.byKey(const Key('metadata_add_flavour_tag')));
+
+      final jammyChip = tester.widget<FilterChip>(
+        find.byKey(const Key('metadata_flavour_jammy')),
+      );
+      expect(jammyChip.selected, isTrue);
+    });
+
     testWidgets('toggles flavour tag selection', (tester) async {
       await pumpSheet(tester);
 
