@@ -1,0 +1,55 @@
+name: Android Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Accept Android licenses
+        run: yes | flutter doctor --android-licenses
+
+      - name: Build release APK
+        working-directory: app/flowlog
+        run: flutter build apk --release --build-number=${{ github.run_number }}
+
+      - name: Prepare release asset
+        run: cp app/flowlog/build/app/outputs/flutter-apk/app-release.apk flowlog-release.apk
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          body: |
+            Automated Android build for commit ${{ github.sha }}.
+
+            **Obtainium:** add `https://github.com/${{ github.repository }}` as a GitHub source.
+            APK filter: `flowlog-release.apk`
+          files: flowlog-release.apk
+          draft: false
+          prerelease: false
