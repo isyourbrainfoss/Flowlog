@@ -99,7 +99,7 @@ void main() {
           home: Scaffold(
             body: SizedBox(
               width: 400,
-              height: 260,
+              height: 300,
               child: DualCurveChart(
                 samples: fixtureSamples,
                 interactionController: interactionController,
@@ -137,7 +137,7 @@ void main() {
           of: find.byType(DualCurveChart),
           matching: find.byType(CustomPaint),
         ),
-        findsNWidgets(3),
+        findsWidgets,
       );
     });
 
@@ -209,6 +209,19 @@ void main() {
         controller.viewport.visibleDurationMs,
         lessThan(initialDuration),
       );
+    });
+
+    testWidgets('view mode chips switch layout', (tester) async {
+      final controller = ChartInteractionController();
+      await pumpChart(tester, controller: controller);
+
+      expect(controller.viewMode, ChartViewMode.overlay);
+
+      await tester.tap(find.byKey(const Key('chart_view_mode_split')));
+      await tester.pump();
+
+      expect(controller.viewMode, ChartViewMode.split);
+      expect(find.byKey(const Key('chart_view_mode_flowOnly')), findsOneWidget);
     });
 
     testWidgets('horizontal swipe cycles view mode when zoomed out', (

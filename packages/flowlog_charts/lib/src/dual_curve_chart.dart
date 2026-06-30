@@ -243,7 +243,9 @@ class _DualCurveChartState extends State<DualCurveChart> {
 
     return RepaintBoundary(
       child: Semantics(
-        label: _semanticsLabel(viewMode),
+        label: widget.enableInteraction
+            ? '${_semanticsLabel(viewMode)}. Swipe left or right to change view.'
+            : _semanticsLabel(viewMode),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -305,6 +307,9 @@ class _DualCurveChartState extends State<DualCurveChart> {
               showFlow: visibility.showFlow,
               showTarget: widget.targetPressureSamples.isNotEmpty,
               viewMode: viewMode,
+              interactionController: widget.enableInteraction
+                  ? _interactionController
+                  : null,
             ),
           ],
         ),
@@ -590,6 +595,7 @@ class _Legend extends StatelessWidget {
     required this.showFlow,
     required this.showTarget,
     required this.viewMode,
+    this.interactionController,
   });
 
   final bool showPressure;
@@ -597,6 +603,7 @@ class _Legend extends StatelessWidget {
   final bool showFlow;
   final bool showTarget;
   final ChartViewMode viewMode;
+  final ChartInteractionController? interactionController;
 
   @override
   Widget build(BuildContext context) {
@@ -627,20 +634,41 @@ class _Legend extends StatelessWidget {
       );
     }
 
-    return Row(
-      children: [
-        Expanded(
-          child: Wrap(
-            spacing: 16,
-            runSpacing: 4,
-            children: items,
+    if (interactionController == null) {
+      return Row(
+        children: [
+          Expanded(
+            child: Wrap(
+              spacing: 16,
+              runSpacing: 4,
+              children: items,
+            ),
           ),
+          Text(
+            _viewModeLabel(viewMode),
+            style: const TextStyle(
+              color: FlowlogChartColors.axisLabel,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: 16,
+          runSpacing: 4,
+          children: items,
         ),
-        Text(
-          _viewModeLabel(viewMode),
-          style: const TextStyle(
-            color: FlowlogChartColors.axisLabel,
-            fontSize: 11,
+        const SizedBox(height: 6),
+        Align(
+          alignment: Alignment.centerRight,
+          child: _ViewModePicker(
+            viewMode: viewMode,
+            onModeSelected: interactionController!.setViewMode,
           ),
         ),
       ],
@@ -653,6 +681,42 @@ class _Legend extends StatelessWidget {
       ChartViewMode.split => 'Split',
       ChartViewMode.flowOnly => 'Flow only',
     };
+  }
+}
+
+class _ViewModePicker extends StatelessWidget {
+  const _ViewModePicker({
+    required this.viewMode,
+    required this.onModeSelected,
+  });
+
+  final ChartViewMode viewMode;
+  final ValueChanged<ChartViewMode> onModeSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 4,
+      children: [
+        for (final mode in ChartViewMode.values)
+          ChoiceChip(
+            key: Key('chart_view_mode_${mode.name}'),
+            label: Text(
+              _Legend._viewModeLabel(mode),
+              style: const TextStyle(fontSize: 11),
+            ),
+            selected: viewMode == mode,
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+            onSelected: (selected) {
+              if (selected) {
+                onModeSelected(mode);
+              }
+            },
+          ),
+      ],
+    );
   }
 }
 

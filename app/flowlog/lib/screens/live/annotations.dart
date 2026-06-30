@@ -123,6 +123,70 @@ class _NoteAnnotationDialogState extends State<_NoteAnnotationDialog> {
   }
 }
 
+/// Bottom sheet: mark a channel switch or add a note at [elapsedMs].
+Future<void> promptChartAnnotationAction({
+  required BuildContext context,
+  required ShotAnnotationController controller,
+  required int elapsedMs,
+}) async {
+  final seconds = (elapsedMs / 1000).toStringAsFixed(1);
+  final action = await showModalBottomSheet<ChartAnnotationAction>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'At ${seconds}s',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            ListTile(
+              key: const Key('annotate_mark_channel_here'),
+              leading: const Icon(Icons.swap_vert),
+              title: const Text('Mark channel here'),
+              subtitle: const Text('Vertical marker at this point in the shot'),
+              onTap: () =>
+                  Navigator.pop(context, ChartAnnotationAction.channel),
+            ),
+            ListTile(
+              key: const Key('annotate_add_note'),
+              leading: const Icon(Icons.sticky_note_2_outlined),
+              title: const Text('Add note'),
+              onTap: () => Navigator.pop(context, ChartAnnotationAction.note),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+
+  if (!context.mounted || action == null) {
+    return;
+  }
+
+  switch (action) {
+    case ChartAnnotationAction.channel:
+      controller.markChannel(elapsedMs: elapsedMs);
+    case ChartAnnotationAction.note:
+      await promptShotNoteAnnotation(
+        context: context,
+        controller: controller,
+        elapsedMs: elapsedMs,
+      );
+  }
+}
+
+enum ChartAnnotationAction {
+  channel,
+  note,
+}
+
 /// Mark channel and undo controls shown under the live chart.
 class AnnotationControls extends StatelessWidget {
   const AnnotationControls({
@@ -138,25 +202,43 @@ class AnnotationControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
-        return Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          alignment: WrapAlignment.center,
+        return Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            FilledButton.tonalIcon(
-              key: const Key('mark_channel_button'),
-              onPressed: canMarkChannel ? onMarkChannel : null,
-              icon: const Icon(Icons.swap_vert),
-              label: const Text('Mark channel'),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                Tooltip(
+                  message: 'Place a channel marker at the current moment',
+                  child: FilledButton.tonalIcon(
+                    key: const Key('mark_channel_button'),
+                    onPressed: canMarkChannel ? onMarkChannel : null,
+                    icon: const Icon(Icons.swap_vert),
+                    label: const Text('Mark channel'),
+                  ),
+                ),
+                IconButton(
+                  key: const Key('undo_annotation_button'),
+                  tooltip: 'Undo last annotation',
+                  onPressed: controller.canUndo ? controller.undo : null,
+                  icon: const Icon(Icons.undo),
+                ),
+              ],
             ),
-            IconButton(
-              key: const Key('undo_annotation_button'),
-              tooltip: 'Undo annotation',
-              onPressed: controller.canUndo ? controller.undo : null,
-              icon: const Icon(Icons.undo),
+            const SizedBox(height: 6),
+            Text(
+              'Marks now · long-press chart to place at a time · undo to remove',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         );
