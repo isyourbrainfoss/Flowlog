@@ -1,4 +1,3 @@
-import 'package:flowlog/screens/library/ai_insights.dart';
 import 'package:flowlog/screens/library/beans.dart';
 import 'package:flowlog/screens/library/compare.dart';
 import 'package:flowlog/screens/library/insights.dart';
@@ -6,14 +5,14 @@ import 'package:flowlog/screens/library/simulator.dart';
 import 'package:flowlog/screens/library/tags.dart';
 import 'package:flutter/material.dart';
 
-/// Library tab: beans, tags, insights, compare, simulator, and AI coach.
+/// Library tab: beans, tags, insights, compare, and simulator.
 class LibraryScreen extends StatelessWidget {
   const LibraryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 6,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Library'),
@@ -25,7 +24,6 @@ class LibraryScreen extends StatelessWidget {
               Tab(key: Key('library_tab_insights'), text: 'Insights'),
               Tab(key: Key('library_tab_compare'), text: 'Compare'),
               Tab(key: Key('library_tab_simulator'), text: 'Simulator'),
-              Tab(key: Key('library_tab_ai_coach'), text: 'AI Coach'),
             ],
           ),
         ),
@@ -36,7 +34,6 @@ class LibraryScreen extends StatelessWidget {
             InsightsScreen(),
             CompareScreen(),
             SimulatorScreen(),
-            AiInsightsScreen(),
           ],
         ),
       ),

@@ -195,19 +195,14 @@ void main() {
   });
 
   group('LibraryScreen', () {
-    testWidgets('exposes AI Coach tab in library', (tester) async {
+    testWidgets('does not expose AI Coach tab', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(home: LibraryScreen()),
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('library_tab_ai_coach')), findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('library_tab_ai_coach')));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(AiInsightsScreen), findsOneWidget);
-      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('library_tab_ai_coach')), findsNothing);
+      expect(find.text('Simulator'), findsOneWidget);
     });
   });
 }

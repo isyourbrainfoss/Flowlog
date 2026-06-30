@@ -1,3 +1,6 @@
+import 'package:flowlog/screens/more/sensors_screen.dart';
+import 'package:flowlog/shell/app_destinations.dart';
+import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
 import 'package:flutter/material.dart' hide ConnectionState;
@@ -84,6 +87,7 @@ class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
                   label: 'Pressensor PRS',
                   icon: Icons.speed,
                   state: pressensorState,
+                  onTap: () => _openSensorsScreen(context),
                 ),
                 const SizedBox(width: 4),
                 SensorConnectionIcon(
@@ -91,10 +95,23 @@ class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
                   label: 'Decent Scale',
                   icon: Icons.scale,
                   state: scaleState,
+                  onTap: () => _openSensorsScreen(context),
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _openSensorsScreen(BuildContext context) {
+    FlowlogShellScope.maybeOf(context)?.switchTab(AppTab.more);
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          appBar: AppBar(title: const Text('Sensors')),
+          body: const SensorsScreen(),
         ),
       ),
     );
@@ -171,28 +188,40 @@ class SensorConnectionIcon extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.state,
+    this.onTap,
   });
 
   final String label;
   final IconData icon;
   final ConnectionState state;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final (tooltip, color, background) = _styleForState(scheme, state);
 
-    return Tooltip(
-      message: '$label: $tooltip',
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(FlowlogColors.cardRadius),
-          border: Border.all(color: scheme.outline.withValues(alpha: 0.4)),
-        ),
-        child: Icon(icon, size: 20, color: color),
+    final child = Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(FlowlogColors.cardRadius),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.4)),
       ),
+      child: Icon(icon, size: 20, color: color),
+    );
+
+    return Tooltip(
+      message: onTap != null
+          ? '$label: $tooltip — tap to open Sensors'
+          : '$label: $tooltip',
+      child: onTap == null
+          ? child
+          : InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(FlowlogColors.cardRadius),
+              child: child,
+            ),
     );
   }
 

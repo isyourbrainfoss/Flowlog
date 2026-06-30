@@ -70,7 +70,11 @@ class _FlowlogShellState extends State<FlowlogShell> {
   }
 
   bool _useBottomNav(BoxConstraints constraints) {
-    return constraints.maxWidth < ShellBreakpoints.sidebar ||
+    final shortestSide = constraints.maxWidth < constraints.maxHeight
+        ? constraints.maxWidth
+        : constraints.maxHeight;
+    // Phones in landscape exceed width 600 but should keep bottom nav.
+    return shortestSide < ShellBreakpoints.sidebar ||
         constraints.maxHeight < ShellBreakpoints.minRailHeight;
   }
 

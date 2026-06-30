@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flowlog/screens/more/diagnostics.dart';
 import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
@@ -42,6 +44,7 @@ class SensorsScreen extends StatelessWidget {
             _PairedDeviceCard(
               device: device,
               onConnect: () => _connect(context, hub, device.id),
+              onDisconnect: () => _disconnect(context, hub, device.id),
               onScan: () => _runSensorScanFlow(context, hub, device.kind),
               onRemove: () => hub.removeDevice(device.id),
             ),
@@ -58,6 +61,27 @@ class SensorsScreen extends StatelessWidget {
           label: const Text('Sensor diagnostics'),
         ),
       ],
+    );
+  }
+
+  Future<void> _disconnect(
+    BuildContext context,
+    SensorHub hub,
+    String deviceId,
+  ) async {
+    final device = hub.devices.firstWhere((entry) => entry.id == deviceId);
+    await hub.disconnect(deviceId);
+    if (!context.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Disconnected from ${device.name}. Another device can connect now.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -205,15 +229,36 @@ Future<void> _runSensorScanFlow(
   SensorKind kind,
 ) async {
   final messenger = ScaffoldMessenger.of(context);
-  messenger.showSnackBar(
-    SnackBar(
-      content: Text('Scanning for ${kind.defaultName}…'),
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 2),
+  final navigator = Navigator.of(context, rootNavigator: true);
+
+  // Keep a visible progress dialog for the full BLE scan window.
+  unawaited(
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        key: Key('scan_progress_${kind.name}'),
+        title: Text('Scanning for ${kind.defaultName}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const LinearProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Keep ${kind.defaultName} powered on and nearby.',
+              style: Theme.of(dialogContext).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
     ),
   );
 
   final result = await hub.scanAndAssign(kind);
+  if (navigator.mounted) {
+    navigator.pop();
+  }
   if (!context.mounted) {
     return;
   }
@@ -230,12 +275,21 @@ Future<void> _runSensorScanFlow(
         ),
       );
     case BleScanAssignOutcome.notFound:
-      messenger.showSnackBar(
-        const SnackBar(
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          key: const Key('scan_not_found_dialog'),
+          title: const Text('Sensor not found'),
           content: Text(
-            'No nearby sensor found. Power it on and tap Scan to try again.',
+            'No nearby ${kind.defaultName} was detected. Power it on, '
+            'stay within range, then tap Scan again.',
           ),
-          behavior: SnackBarBehavior.floating,
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('OK'),
+            ),
+          ],
         ),
       );
     case BleScanAssignOutcome.multiple:
@@ -263,12 +317,19 @@ Future<void> _runSensorScanFlow(
         }
       }
     case BleScanAssignOutcome.unavailable:
-      messenger.showSnackBar(
-        SnackBar(
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Bluetooth unavailable'),
           content: Text(
             result.message ?? 'Bluetooth is not available on this device.',
           ),
-          behavior: SnackBarBehavior.floating,
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('OK'),
+            ),
+          ],
         ),
       );
   }
@@ -391,12 +452,14 @@ class _PairedDeviceCard extends StatelessWidget {
   const _PairedDeviceCard({
     required this.device,
     required this.onConnect,
+    required this.onDisconnect,
     required this.onScan,
     required this.onRemove,
   });
 
   final PairedSensorEntry device;
   final VoidCallback onConnect;
+  final VoidCallback onDisconnect;
   final VoidCallback onScan;
   final VoidCallback onRemove;
 
@@ -404,6 +467,7 @@ class _PairedDeviceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final canConnect = device.state == ConnectionState.disconnected ||
         device.state == ConnectionState.error;
+    final canDisconnect = device.state == ConnectionState.connected;
 
     return Card(
       elevation: FlowlogColors.cardElevation,
@@ -458,10 +522,18 @@ class _PairedDeviceCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                FilledButton.tonal(
-                  onPressed: canConnect ? onConnect : null,
-                  child: const Text('Connect'),
-                ),
+                if (canConnect)
+                  FilledButton.tonal(
+                    key: Key('connect_${device.id}'),
+                    onPressed: onConnect,
+                    child: const Text('Connect'),
+                  ),
+                if (canDisconnect)
+                  FilledButton.tonal(
+                    key: Key('disconnect_${device.id}'),
+                    onPressed: onDisconnect,
+                    child: const Text('Disconnect'),
+                  ),
                 OutlinedButton(
                   key: Key('scan_${device.kind.name}_button'),
                   onPressed: onScan,
