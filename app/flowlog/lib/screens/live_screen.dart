@@ -16,6 +16,7 @@ import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Live shot tab: recording controls, live chart, metrics, and god-shot save.
 class LiveScreen extends StatefulWidget {
@@ -117,7 +118,8 @@ class _LiveScreenState extends State<LiveScreen> {
     _sensorSource = widget.sensorSource ??
         LiveSensorSource(
           hub: hub,
-          demoFixturePath: _defaultFixturePath(),
+          demoFixturePath: _resolveDemoFixtureFilePath(),
+          demoFixtureLoader: _loadBundledDemoFixture,
           pressureAdapterFactory: widget.pressureAdapterFactory,
           weightAdapterFactory: widget.weightAdapterFactory,
         );
@@ -554,7 +556,9 @@ double _liveChartHeight(BoxConstraints constraints) {
   return 220;
 }
 
-String _defaultFixturePath() {
+const String kBundledDemoFixtureAsset = 'assets/demo_shot.jsonl';
+
+String? _resolveDemoFixtureFilePath() {
   const candidates = [
     '../../fixtures/sensor_streams/demo_shot.jsonl',
     '../../../fixtures/sensor_streams/demo_shot.jsonl',
@@ -568,7 +572,13 @@ String _defaultFixturePath() {
     }
   }
 
-  throw StateError(
-    'demo_shot.jsonl fixture not found; run from the Flowlog workspace root.',
+  return null;
+}
+
+Future<List<SensorSample>> _loadBundledDemoFixture() async {
+  final content = await rootBundle.loadString(kBundledDemoFixtureAsset);
+  return MockReplayAdapter.parseLines(
+    content.split('\n'),
+    source: kBundledDemoFixtureAsset,
   );
 }

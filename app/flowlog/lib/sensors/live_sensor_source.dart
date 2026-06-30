@@ -113,14 +113,17 @@ class SessionSensorAdapter implements SensorAdapter {
 class LiveSensorSource {
   LiveSensorSource({
     required SensorHub hub,
-    required String demoFixturePath,
+    String? demoFixturePath,
+    Future<List<SensorSample>> Function()? demoFixtureLoader,
     this.pressureAdapterFactory,
     this.weightAdapterFactory,
-  }) : _hub = hub,
-       _demoFixturePath = demoFixturePath;
+  })  : _hub = hub,
+        _demoFixturePath = demoFixturePath,
+        _demoFixtureLoader = demoFixtureLoader;
 
   final SensorHub _hub;
-  final String _demoFixturePath;
+  final String? _demoFixturePath;
+  final Future<List<SensorSample>> Function()? _demoFixtureLoader;
   final PressureAdapterFactory? pressureAdapterFactory;
   final WeightAdapterFactory? weightAdapterFactory;
 
@@ -148,6 +151,7 @@ class LiveSensorSource {
     if (_demoMode) {
       return MockReplayAdapter(
         fixturePath: _demoFixturePath,
+        fixtureLoader: _demoFixtureLoader,
         speed: 1.0,
       );
     }
