@@ -216,10 +216,15 @@ void main() {
     testWidgets('start without sensors keeps chart empty', (tester) async {
       await pumpLiveScreen(tester);
 
+      final startButton = find.byKey(const Key('live_start'));
+      await tester.ensureVisible(startButton);
+      await tester.pumpAndSettle();
+
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('live_start')));
-        await tester.pumpAndSettle();
+        await tester.tap(startButton);
+        await Future<void>.delayed(Duration.zero);
       });
+      await tester.pumpAndSettle();
 
       expect(find.text('0 samples'), findsOneWidget);
       expect(find.text('Session: recording'), findsOneWidget);

@@ -15,12 +15,19 @@ import '../sample.dart';
 /// all samples instantly.
 class MockReplayAdapter implements SensorAdapter {
   MockReplayAdapter({
-    required this.fixturePath,
+    this.fixturePath,
+    this.fixtureLoader,
     this.speed = 1.0,
-  });
+  }) : assert(
+          fixturePath != null || fixtureLoader != null,
+          'Provide fixturePath or fixtureLoader',
+        );
 
-  /// Path to a JSONL fixture file.
-  final String fixturePath;
+  /// Path to a JSONL fixture file (dev/tests on a filesystem).
+  final String? fixturePath;
+
+  /// Optional async loader for bundled fixtures (e.g. Flutter assets).
+  final Future<List<SensorSample>> Function()? fixtureLoader;
 
   /// Replay speed multiplier (`1.0` = real-time, `0` = instant).
   final double speed;
@@ -66,12 +73,29 @@ class MockReplayAdapter implements SensorAdapter {
   }
 
   Future<List<SensorSample>> _loadSamples() async {
-    _cachedSamples ??= await _parseFixture(File(fixturePath));
+    if (_cachedSamples != null) {
+      return _cachedSamples!;
+    }
+
+    if (fixtureLoader != null) {
+      _cachedSamples = await fixtureLoader!();
+      return _cachedSamples!;
+    }
+
+    _cachedSamples = await parseFixtureFile(File(fixturePath!));
     return _cachedSamples!;
   }
 
-  static Future<List<SensorSample>> _parseFixture(File file) async {
-    final lines = await file.readAsLines();
+  /// Parses a JSONL fixture from disk.
+  static Future<List<SensorSample>> parseFixtureFile(File file) async {
+    return parseLines(await file.readAsLines(), source: file.path);
+  }
+
+  /// Parses JSONL fixture lines into samples.
+  static List<SensorSample> parseLines(
+    Iterable<String> lines, {
+    String source = 'fixture',
+  }) {
     final samples = <SensorSample>[];
 
     for (final line in lines) {
@@ -85,7 +109,7 @@ class MockReplayAdapter implements SensorAdapter {
     }
 
     if (samples.isEmpty) {
-      throw StateError('Fixture contains no samples: ${file.path}');
+      throw StateError('Fixture contains no samples: $source');
     }
 
     return samples;
