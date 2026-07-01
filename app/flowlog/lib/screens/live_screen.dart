@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flowlog/screens/live/annotations.dart';
+import 'package:flowlog/screens/live/auto_start.dart';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/delight.dart';
 import 'package:flowlog/screens/live/feedback.dart';
+import 'package:flowlog/screens/live/fullscreen_chart.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
@@ -103,6 +105,7 @@ class _LiveScreenState extends State<LiveScreen> {
     _chartInteractionController = ChartInteractionController();
 
     if (widget.controller != null) {
+      _sensorSource = widget.sensorSource;
       _bindController(widget.controller!);
       _controllerReady = true;
     }
@@ -395,6 +398,45 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
+  void _onOpenFullscreenChart() {
+    unawaited(
+      openLiveFullscreenChart(
+        context,
+        samplesNotifier: _samplesNotifier,
+        annotationsNotifier: _annotationsNotifier,
+        interactionController: _chartInteractionController,
+        targetPressureSamples:
+            _repeatShotController?.prefill?.targetPressureSamples ??
+                const [],
+        onAnnotateAtElapsedMs: _controller?.sessionState ==
+                ShotSessionState.idle
+            ? null
+            : _onAnnotateAtElapsedMs,
+      ),
+    );
+  }
+
+  bool _showAutoStartBanner({
+    required bool demoModeActive,
+    required bool canStart,
+  }) {
+    if (demoModeActive || !canStart) {
+      return false;
+    }
+
+    final hub = SensorHubScope.maybeOf(context);
+    final source = _sensorSource;
+    if (hub?.activeAdapterFor(SensorKind.pressensor) != null) {
+      return true;
+    }
+
+    if (source == null || !source.hasConnectedSensors) {
+      return false;
+    }
+
+    return source.resolveSampleAdapter() is! IdleSensorAdapter;
+  }
+
   Future<void> _onRepeatShotPressed() async {
     final controller = _controller;
     if (controller == null || !controller.canSaveShot) {
@@ -452,7 +494,12 @@ class _LiveScreenState extends State<LiveScreen> {
             state != ShotSessionState.idle && samples.isNotEmpty;
         final repeatPrefill = _repeatShotController?.prefill;
 
-        return ConfettiOverlay(
+        final showAutoStart = _showAutoStartBanner(
+          demoModeActive: demoModeActive,
+          canStart: controller.canStart,
+        );
+
+        final shell = ConfettiOverlay(
           controller: _confettiController,
           child: LiveShotEndListener(
             controller: controller,
@@ -482,6 +529,14 @@ class _LiveScreenState extends State<LiveScreen> {
                             onDismiss: _repeatShotController!.clear,
                           ),
                         if (repeatPrefill != null) const SizedBox(height: 8),
+                        if (showAutoStart)
+                          AutoStartArmedBanner(
+                            thresholdBar: kDefaultAutoStartPressureBar,
+                          ),
+                        if (showAutoStart) const SizedBox(height: 8),
+                        LiveFullscreenChartButton(
+                          onPressed: _onOpenFullscreenChart,
+                        ),
                         DualCurveChart(
                           height: chartHeight,
                           samplesNotifier: _samplesNotifier,
@@ -598,6 +653,19 @@ class _LiveScreenState extends State<LiveScreen> {
               ),
             ),
           ),
+        );
+
+        final hub = SensorHubScope.maybeOf(context);
+        if (hub == null) {
+          return shell;
+        }
+
+        return LiveAutoStartListener(
+          controller: controller,
+          hub: hub,
+          sensorSource: _sensorSource,
+          isDemoMode: demoModeActive,
+          child: shell,
         );
       },
     );
