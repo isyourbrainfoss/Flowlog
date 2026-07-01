@@ -24,7 +24,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('No tags yet'), findsOneWidget);
-      expect(find.byKey(const Key('tag_suggestion_funky')), findsOneWidget);
+      expect(find.byKey(const Key('tag_suggestion_competition')), findsOneWidget);
       expect(find.byType(TagCard), findsNothing);
     });
 
@@ -32,11 +32,11 @@ void main() {
       await _pumpTagsScreen(
         tester,
         tagRepository: tagRepository,
-        tagIdGenerator: () => 'tag-funky',
+        tagIdGenerator: () => 'tag-competition',
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('tag_suggestion_funky')));
+      await tester.tap(find.byKey(const Key('tag_suggestion_competition')));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('tag_editor_add')), findsOneWidget);
@@ -44,14 +44,14 @@ void main() {
         tester.widget<TextFormField>(find.widgetWithText(TextFormField, 'Name'))
             .controller
             ?.text,
-        'Funky',
+        'Competition',
       );
 
       await tester.tap(find.byKey(const Key('tag_editor_save')));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('tag_card_tag-funky')), findsOneWidget);
-      expect(find.text('Funky'), findsOneWidget);
+      expect(find.byKey(const Key('tag_card_tag-competition')), findsOneWidget);
+      expect(find.text('Competition'), findsOneWidget);
     });
 
     testWidgets('creates tag from add dialog', (tester) async {

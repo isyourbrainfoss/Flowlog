@@ -51,6 +51,54 @@ class BeanRepository {
     return _beanFromRow(row);
   }
 
+  /// Returns beans with most recently used (in shots) first, then alphabetical.
+  Future<List<models.Bean>> listBeansByRecentUse() async {
+    final beans = await listBeans();
+    if (beans.isEmpty) {
+      return beans;
+    }
+
+    final recentIds = await _recentBeanIdsFromShots();
+    beans.sort((a, b) {
+      final aIndex = recentIds.indexOf(a.id);
+      final bIndex = recentIds.indexOf(b.id);
+      if (aIndex >= 0 && bIndex >= 0) {
+        return aIndex.compareTo(bIndex);
+      }
+      if (aIndex >= 0) {
+        return -1;
+      }
+      if (bIndex >= 0) {
+        return 1;
+      }
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return beans;
+  }
+
+  /// Finds a bean by [name] or [id], or creates one when [name] is new.
+  Future<models.Bean> ensureBeanForName(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(name, 'name', 'Bean name must not be empty');
+    }
+
+    final beans = await listBeans();
+    for (final bean in beans) {
+      if (bean.id == trimmed ||
+          bean.name.toLowerCase() == trimmed.toLowerCase()) {
+        return bean;
+      }
+    }
+
+    final bean = models.Bean(
+      id: 'bean-${DateTime.now().toUtc().millisecondsSinceEpoch}',
+      name: trimmed,
+    );
+    await upsertBean(bean);
+    return bean;
+  }
+
   /// Returns all beans ordered by name.
   Future<List<models.Bean>> listBeans() async {
     final rows = await (_db.select(_db.beans)
@@ -78,6 +126,23 @@ class BeanRepository {
   Future<int> countShotsForBean(String beanId) async {
     final counts = await _shotCountsByBeanId(beanIds: {beanId});
     return counts[beanId] ?? 0;
+  }
+
+  Future<List<String>> _recentBeanIdsFromShots() async {
+    final rows = await (_db.select(_db.shots)
+          ..orderBy([(shot) => OrderingTerm.desc(shot.startedAt)]))
+        .get();
+
+    final seen = <String>{};
+    final recent = <String>[];
+    for (final row in rows) {
+      final beanId = row.beanId;
+      if (beanId == null || beanId.isEmpty || !seen.add(beanId)) {
+        continue;
+      }
+      recent.add(beanId);
+    }
+    return recent;
   }
 
   Future<Map<String, int>> _shotCountsByBeanId({Set<String>? beanIds}) async {

@@ -66,7 +66,7 @@ void main() {
       await tester.tap(find.byKey(const Key('top_bar_bean_name')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Bean name'), findsOneWidget);
+      expect(find.text('Active bean'), findsOneWidget);
       expect(find.byKey(const Key('top_bar_bean_edit_field')), findsOneWidget);
       expect(
         tester.widget<TextField>(find.byKey(const Key('top_bar_bean_edit_field')))

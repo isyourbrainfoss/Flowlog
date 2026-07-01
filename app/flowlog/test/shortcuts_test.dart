@@ -46,7 +46,7 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    expect(find.text('Session: recording'), findsOneWidget);
+    expect(find.text('Stop brew'), findsOneWidget);
 
     await tester.runAsync(() async {
       await sendShortcut(tester, key: LogicalKeyboardKey.space);
@@ -54,6 +54,7 @@ void main() {
     });
 
     expect(find.text('Session: stopped'), findsOneWidget);
+    expect(find.text('Start brew'), findsOneWidget);
   });
 
   testWidgets('Space on non-Live tab does not start a shot', (tester) async {

@@ -79,6 +79,7 @@ class _LiveScreenState extends State<LiveScreen> {
   late final ShotAnnotationController _annotationController;
   late final ValueNotifier<List<ShotAnnotation>> _annotationsNotifier;
   ShotRepository? _shotRepository;
+  BeanRepository? _beanRepository;
   ProfileRepository? _profileRepository;
   FlowlogDatabase? _database;
   bool _ownsRepository = false;
@@ -272,6 +273,16 @@ class _LiveScreenState extends State<LiveScreen> {
     return _database!;
   }
 
+  Future<BeanRepository> _ensureBeanRepository() async {
+    if (_beanRepository != null) {
+      return _beanRepository!;
+    }
+
+    final database = await _ensureDatabase();
+    _beanRepository = BeanRepository(database);
+    return _beanRepository!;
+  }
+
   Future<ShotRepository> _ensureShotRepository() async {
     if (widget.shotRepository != null) {
       return widget.shotRepository!;
@@ -367,6 +378,7 @@ class _LiveScreenState extends State<LiveScreen> {
     final updated = await runAddNotesFlow(
       context: context,
       repository: repository,
+      beanRepository: await _ensureBeanRepository(),
       shot: shot,
       onSaved: widget.onShotSaved,
     );
@@ -399,9 +411,15 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   void _onOpenFullscreenChart() {
+    final controller = _controller;
+    if (controller == null) {
+      return;
+    }
+
     unawaited(
       openLiveFullscreenChart(
         context,
+        controller: controller,
         samplesNotifier: _samplesNotifier,
         annotationsNotifier: _annotationsNotifier,
         interactionController: _chartInteractionController,
@@ -574,19 +592,21 @@ class _LiveScreenState extends State<LiveScreen> {
                           const LiveMetricsRow(
                             metrics: LiveMetrics(elapsedMs: 0),
                           ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Session: ${state.name}',
-                          style: Theme.of(context).textTheme.titleMedium,
-                          textAlign: TextAlign.center,
-                        ),
                         const SizedBox(height: 8),
                         Text(
                           '${controller.sampleCount} samples',
-                          style: Theme.of(context).textTheme.bodyMedium,
+                          style: Theme.of(context).textTheme.bodySmall,
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 16),
+                        if (!controller.isBrewing) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Session: ${state.name}',
+                            style: Theme.of(context).textTheme.titleMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                        ],
                         if (showTryDemoButton)
                           Align(
                             alignment: Alignment.center,

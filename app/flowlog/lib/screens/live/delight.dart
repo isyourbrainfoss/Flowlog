@@ -141,14 +141,22 @@ class RecordingBeanFillIndicator extends StatelessWidget {
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              BeanFillIcon(progress: progress),
-              const SizedBox(width: 8),
               Text(
-                '${(progress * 100).round()}%',
-                style: Theme.of(context).textTheme.labelLarge,
+                'Brew progress ${(progress * 100).round()}%',
+                style: Theme.of(context).textTheme.labelMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  key: const Key('bean_fill_icon'),
+                  value: progress,
+                  minHeight: 6,
+                ),
               ),
             ],
           ),
