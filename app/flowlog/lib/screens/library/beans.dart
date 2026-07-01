@@ -12,8 +12,8 @@ const List<String> kBeanRoastLevels = [
   'Dark',
 ];
 
-/// Common retail bag sizes in grams.
-const List<int> kBeanStockPresetsG = [200, 250, 340, 454, 1000];
+/// Common retail bag sizes in grams (250g EU specialty, 500g half-kilo, 1kg).
+const List<int> kBeanStockPresetsG = [200, 250, 500, 1000];
 
 String _formatBeanDate(DateTime date) {
   final local = date.toLocal();
@@ -651,8 +651,15 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Bag size',
+                'Bag size (g)',
                 style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Tap a common size or type any weight below',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -680,10 +687,12 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
               ),
               const SizedBox(height: 8),
               TextFormField(
+                key: const Key('bean_stock_custom_field'),
                 controller: _stockController,
                 decoration: const InputDecoration(
-                  labelText: 'Stock (g)',
-                  hintText: 'Custom amount',
+                  labelText: 'Custom bag size (g)',
+                  hintText: 'e.g. 340 or 454',
+                  border: OutlineInputBorder(),
                 ),
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),

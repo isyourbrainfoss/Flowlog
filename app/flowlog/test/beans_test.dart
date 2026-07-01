@@ -76,6 +76,37 @@ void main() {
       expect(saved.process, 'Washed');
     });
 
+    testWidgets('creates bean with custom bag size', (tester) async {
+      await _pumpBeansScreen(
+        tester,
+        beanRepository: beanRepository,
+        beanIdGenerator: () => 'bean-custom-bag',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('beans_add_fab')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Name'),
+        'Custom Bag',
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('bean_stock_custom_field')),
+      );
+      await tester.enterText(
+        find.byKey(const Key('bean_stock_custom_field')),
+        '340',
+      );
+      await tester.ensureVisible(find.byKey(const Key('bean_editor_save')));
+      await tester.tap(find.byKey(const Key('bean_editor_save')));
+      await tester.pumpAndSettle();
+
+      final saved = await beanRepository.getBeanById('bean-custom-bag');
+      expect(saved?.stockG, 340);
+      expect(find.byKey(const Key('bean_card_bean-custom-bag')), findsOneWidget);
+    });
+
     testWidgets('shows linked shot count on bean card', (tester) async {
       const bean = Bean(id: 'bean-linked', name: 'Linked Bean');
       await beanRepository.upsertBean(bean);
