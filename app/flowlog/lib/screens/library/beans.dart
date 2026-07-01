@@ -22,6 +22,16 @@ String _formatBeanDate(DateTime date) {
   return '${local.year}-$month-$day';
 }
 
+/// Interpolates roast slider color from light tan to dark brown.
+Color _roastSliderColor(double sliderValue) {
+  final t = sliderValue / (kBeanRoastLevels.length - 1);
+  return Color.lerp(
+    const Color(0xFFD4B896),
+    const Color(0xFF2E1A0E),
+    t.clamp(0.0, 1.0),
+  )!;
+}
+
 /// Generates a unique bean id for persistence.
 typedef BeanIdGenerator = String Function();
 
@@ -601,14 +611,25 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
-              Slider(
-                key: const Key('bean_editor_roast_slider'),
-                value: _roastSliderValue,
-                min: 0,
-                max: (kBeanRoastLevels.length - 1).toDouble(),
-                divisions: kBeanRoastLevels.length - 1,
-                label: _sliderToRoastLevel(_roastSliderValue),
-                onChanged: (value) => setState(() => _roastSliderValue = value),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: _roastSliderColor(_roastSliderValue),
+                  inactiveTrackColor: _roastSliderColor(_roastSliderValue)
+                      .withValues(alpha: 0.28),
+                  thumbColor: _roastSliderColor(_roastSliderValue),
+                  overlayColor: _roastSliderColor(_roastSliderValue)
+                      .withValues(alpha: 0.14),
+                ),
+                child: Slider(
+                  key: const Key('bean_editor_roast_slider'),
+                  value: _roastSliderValue,
+                  min: 0,
+                  max: (kBeanRoastLevels.length - 1).toDouble(),
+                  divisions: kBeanRoastLevels.length - 1,
+                  label: _sliderToRoastLevel(_roastSliderValue),
+                  onChanged: (value) =>
+                      setState(() => _roastSliderValue = value),
+                ),
               ),
               ListTile(
                 key: const Key('bean_editor_roast_date'),
