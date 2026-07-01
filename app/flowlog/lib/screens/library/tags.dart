@@ -169,12 +169,14 @@ class _TagsScreenState extends State<TagsScreen> {
                     },
                   ),
                 ),
-          floatingActionButton: FloatingActionButton(
-            key: const Key('tags_add_fab'),
-            onPressed: () => _openTagEditor(),
-            tooltip: 'Add tag',
-            child: const Icon(Icons.add),
-          ),
+          floatingActionButton: tags.isEmpty
+              ? null
+              : FloatingActionButton(
+                  key: const Key('tags_add_fab'),
+                  onPressed: () => _openTagEditor(),
+                  tooltip: 'Add tag',
+                  child: const Icon(Icons.add),
+                ),
         );
       },
     );
@@ -205,7 +207,17 @@ class _EmptyTagsState extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Tags organize shots in History filters — e.g. Practice, Dial-in, Funky.',
+                'Library tags organize and filter shots in History. They are '
+                'separate from flavour tags (chocolate, nutty, etc.) you add '
+                'when saving a shot.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Suggestions below are quick starts — tap one to create it.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,

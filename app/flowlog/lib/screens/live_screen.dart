@@ -504,15 +504,13 @@ class _LiveScreenState extends State<LiveScreen> {
           child: LiveShotEndListener(
             controller: controller,
             shotEndFeedback: widget.shotEndFeedback,
-            child: Scaffold(
-              primary: false,
-              body: LayoutBuilder(
-                builder: (context, constraints) {
-                  final useCompactLayout =
-                      constraints.maxWidth < ShellBreakpoints.sidebar ||
-                      constraints.maxHeight < ShellBreakpoints.minRailHeight;
-                  final horizontalPadding = useCompactLayout ? 8.0 : 24.0;
-                  final chartHeight = _liveChartHeight(constraints);
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final useCompactLayout =
+                    constraints.maxWidth < ShellBreakpoints.sidebar ||
+                    constraints.maxHeight < ShellBreakpoints.minRailHeight;
+                final horizontalPadding = useCompactLayout ? 8.0 : 24.0;
+                final chartHeight = _liveChartHeight(constraints);
 
                   final chartSection = Padding(
                     padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
@@ -608,7 +606,6 @@ class _LiveScreenState extends State<LiveScreen> {
                             ),
                           ),
                         if (controller.canSaveShot) const SizedBox(height: 16),
-                        LiveControls(controller: controller),
                       ],
                     ),
                   );
@@ -616,43 +613,57 @@ class _LiveScreenState extends State<LiveScreen> {
                   final pinChart = constraints.maxHeight.isFinite &&
                       constraints.maxHeight >= 360;
 
-                  if (pinChart) {
-                    // Pin the chart so it stays visible while controls scroll.
-                    return Column(
-                      key: const ValueKey('live-pinned-layout'),
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        chartSection,
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: EdgeInsets.only(
-                              top: useCompactLayout ? 0 : 8,
+                  final body = pinChart
+                      ? Column(
+                          key: const ValueKey('live-pinned-layout'),
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            chartSection,
+                            Expanded(
+                              child: SingleChildScrollView(
+                                padding: EdgeInsets.only(
+                                  top: useCompactLayout ? 0 : 8,
+                                ),
+                                child: controlsSection,
+                              ),
                             ),
-                            child: controlsSection,
+                          ],
+                        )
+                      : SingleChildScrollView(
+                          key: const ValueKey('live-scroll-layout'),
+                          padding: EdgeInsets.symmetric(
+                            vertical: useCompactLayout ? 12 : 24,
                           ),
-                        ),
-                      ],
-                    );
-                  }
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              chartSection,
+                              controlsSection,
+                            ],
+                          ),
+                        );
 
-                  // Ultra-short windows: scroll everything together.
-                  return SingleChildScrollView(
-                    key: const ValueKey('live-scroll-layout'),
-                    padding: EdgeInsets.symmetric(
-                      vertical: useCompactLayout ? 12 : 24,
+                  return Scaffold(
+                    primary: false,
+                    bottomNavigationBar: SafeArea(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPadding,
+                          8,
+                          horizontalPadding,
+                          useCompactLayout ? 8 : 12,
+                        ),
+                        child: LiveControls(
+                          controller: controller,
+                          prominent: useCompactLayout,
+                        ),
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        chartSection,
-                        controlsSection,
-                      ],
-                    ),
+                    body: body,
                   );
                 },
               ),
             ),
-          ),
         );
 
         final hub = SensorHubScope.maybeOf(context);

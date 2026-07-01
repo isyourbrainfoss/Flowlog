@@ -162,6 +162,29 @@ class _CompareScreenState extends State<CompareScreen> {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
+            if (_selectedShotIds.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  children: [
+                    Text(
+                      '${_selectedShotIds.length} selected',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      key: const Key('compare_clear_all'),
+                      onPressed: () {
+                        setState(() {
+                          _selectedShotIds.clear();
+                          _showDeltaHighlight = false;
+                        });
+                      },
+                      child: const Text('Clear all'),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               child: shots.isEmpty
                   ? const Center(child: Text('No saved shots yet'))
