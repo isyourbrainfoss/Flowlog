@@ -62,7 +62,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('tags_add_fab')));
+      await tester.tap(find.byKey(const Key('tags_add_empty_button')));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('tag_editor_add')), findsOneWidget);

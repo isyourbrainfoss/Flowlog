@@ -136,10 +136,14 @@ class LiveShotController extends ChangeNotifier {
 class LiveControls extends StatelessWidget {
   const LiveControls({
     required this.controller,
+    this.prominent = false,
     super.key,
   });
 
   final LiveShotController controller;
+
+  /// When true, renders a large pill-shaped primary action for phones.
+  final bool prominent;
 
   @override
   Widget build(BuildContext context) {
@@ -149,6 +153,17 @@ class LiveControls extends StatelessWidget {
         final brewing = controller.isBrewing;
         final enabled = brewing ? controller.canStop : controller.canStart;
 
+        final baseStyle = prominent
+            ? FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(64),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+                shape: const StadiumBorder(),
+                textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              )
+            : null;
+
         return Semantics(
           button: true,
           enabled: enabled,
@@ -157,11 +172,13 @@ class LiveControls extends StatelessWidget {
             child: FilledButton(
               key: const Key('live_brew'),
               style: brewing
-                  ? FilledButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.error,
-                      foregroundColor: Theme.of(context).colorScheme.onError,
+                  ? (baseStyle ?? FilledButton.styleFrom()).merge(
+                      FilledButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                        foregroundColor: Theme.of(context).colorScheme.onError,
+                      ),
                     )
-                  : null,
+                  : baseStyle,
               onPressed: enabled
                   ? () async {
                       if (brewing) {

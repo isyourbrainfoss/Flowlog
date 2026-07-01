@@ -25,8 +25,8 @@ class SensorsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Pair your Pressensor and scale here. Scan after adding to capture '
-          'the BLE device id, then connect when hardware is nearby.',
+          'Pair your Pressensor and scale here. Flowlog scans automatically '
+          'after you add a sensor, then connect when hardware is nearby.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -202,25 +202,9 @@ class _AddSensorButtons extends StatelessWidget {
     }
 
     if (context.mounted) {
-      await _offerScanAfterAdd(context, hub, kind);
+      await _runSensorScanFlow(context, hub, kind);
     }
   }
-}
-
-Future<void> _offerScanAfterAdd(
-  BuildContext context,
-  SensorHub hub,
-  SensorKind kind,
-) async {
-  final shouldScan = await showDialog<bool>(
-    context: context,
-    builder: (dialogContext) => _ScanAfterAddDialog(kind: kind),
-  );
-  if (shouldScan != true || !context.mounted) {
-    return;
-  }
-
-  await _runSensorScanFlow(context, hub, kind);
 }
 
 Future<void> _runSensorScanFlow(
@@ -332,34 +316,6 @@ Future<void> _runSensorScanFlow(
           ],
         ),
       );
-  }
-}
-
-class _ScanAfterAddDialog extends StatelessWidget {
-  const _ScanAfterAddDialog({required this.kind});
-
-  final SensorKind kind;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Scan for ${kind.defaultName}?'),
-      content: Text(
-        'Look for a nearby ${kind.defaultName} and assign its BLE device id '
-        'automatically.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Skip'),
-        ),
-        FilledButton(
-          key: const Key('scan_after_add_button'),
-          onPressed: () => Navigator.pop(context, true),
-          child: const Text('Scan'),
-        ),
-      ],
-    );
   }
 }
 

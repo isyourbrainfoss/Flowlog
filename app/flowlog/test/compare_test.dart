@@ -77,6 +77,33 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('clear all deselects shots and hides chart', (tester) async {
+      final baseline = _loadFixtureShot('shots/minimal_shot.json');
+      final comparison = baseline.copyWith(
+        id: 'shot-minimal-002',
+        startedAt: DateTime.utc(2026, 6, 29, 11),
+      );
+
+      await repository.insertShot(baseline);
+      await repository.insertShot(comparison);
+
+      await _pumpCompareScreen(tester, repository: repository);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('compare_select_shot-minimal-001')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('compare_select_shot-minimal-002')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('compare_overlay_chart')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('compare_clear_all')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('compare_overlay_chart')), findsNothing);
+      expect(find.text('Select 2 or more shots to compare'), findsOneWidget);
+    });
+
     testWidgets('delta highlight toggle updates chart state', (tester) async {
       final baseline = _loadFixtureShot('shots/minimal_shot.json');
       final comparison = baseline.copyWith(

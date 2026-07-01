@@ -238,6 +238,7 @@ class PressureProfileEditor extends StatefulWidget {
     this.durationMs = 30000,
     this.height = 200,
     this.pressureMax = 12,
+    this.onGestureActiveChanged,
   });
 
   final List<PressureKeyframe> keyframes;
@@ -246,12 +247,24 @@ class PressureProfileEditor extends StatefulWidget {
   final double height;
   final double pressureMax;
 
+  /// Called when the user begins or ends dragging a control point.
+  final ValueChanged<bool>? onGestureActiveChanged;
+
   @override
   State<PressureProfileEditor> createState() => _PressureProfileEditorState();
 }
 
 class _PressureProfileEditorState extends State<PressureProfileEditor> {
+  static const _handleHitRadius = 28.0;
+  static const _minKeyframeSpacingMs = 1500;
+
   int? _activeIndex;
+  Offset? _pointerDown;
+  bool _dragged = false;
+
+  void _setGestureActive(bool active) {
+    widget.onGestureActiveChanged?.call(active);
+  }
 
   void _updateKeyframePressure(int index, double pressureBar) {
     final updated = List<PressureKeyframe>.from(widget.keyframes);
@@ -262,7 +275,6 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
   }
 
   int? _hitTestKeyframe(Offset localPosition, Size size) {
-    const handleRadius = 18.0;
     for (var i = 0; i < widget.keyframes.length; i++) {
       final point = _PressureProfileEditorPainter.pointFor(
         keyframe: widget.keyframes[i],
@@ -270,11 +282,78 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
         durationMs: widget.durationMs,
         pressureMax: widget.pressureMax,
       );
-      if ((localPosition - point).distance <= handleRadius) {
+      if ((localPosition - point).distance <= _handleHitRadius) {
         return i;
       }
     }
     return null;
+  }
+
+  void _tryAddKeyframeAt(Offset localPosition, Size size) {
+    final plotRect = _PressureProfileEditorPainter.plotRect(size);
+    if (!plotRect.contains(localPosition)) {
+      return;
+    }
+
+    final elapsedMs = ((localPosition.dx - plotRect.left) /
+            plotRect.width *
+            widget.durationMs)
+        .round()
+        .clamp(0, widget.durationMs);
+
+    for (final keyframe in widget.keyframes) {
+      if ((keyframe.elapsedMs - elapsedMs).abs() < _minKeyframeSpacingMs) {
+        return;
+      }
+    }
+
+    final profile = expandKeyframesToProfile(widget.keyframes);
+    final pressure = pressureAtElapsedMs(elapsedMs, profile) ?? 0;
+
+    final updated = List<PressureKeyframe>.from(widget.keyframes)
+      ..add(
+        PressureKeyframe(
+          elapsedMs: elapsedMs,
+          pressureBar: pressure.clamp(0, widget.pressureMax).toDouble(),
+        ),
+      )
+      ..sort((a, b) => a.elapsedMs.compareTo(b.elapsedMs));
+    widget.onKeyframesChanged(updated);
+  }
+
+  void _onPointerDown(PointerDownEvent event, Size size) {
+    _pointerDown = event.localPosition;
+    _dragged = false;
+    final index = _hitTestKeyframe(event.localPosition, size);
+    setState(() => _activeIndex = index);
+    if (index != null) {
+      _setGestureActive(true);
+    }
+  }
+
+  void _onPointerMove(PointerMoveEvent event, Size size) {
+    final index = _activeIndex;
+    if (index == null) {
+      return;
+    }
+
+    _dragged = true;
+    final plotRect = _PressureProfileEditorPainter.plotRect(size);
+    final normalizedY = 1 -
+        ((event.localPosition.dy - plotRect.top) / plotRect.height)
+            .clamp(0.0, 1.0);
+    _updateKeyframePressure(index, normalizedY * widget.pressureMax);
+  }
+
+  void _onPointerEnd(Offset localPosition, Size size) {
+    if (_activeIndex != null) {
+      setState(() => _activeIndex = null);
+      _setGestureActive(false);
+    } else if (_pointerDown != null && !_dragged) {
+      _tryAddKeyframeAt(localPosition, size);
+    }
+    _pointerDown = null;
+    _dragged = false;
   }
 
   @override
@@ -288,30 +367,12 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final size = Size(constraints.maxWidth, widget.height);
-            return GestureDetector(
+            return Listener(
               behavior: HitTestBehavior.opaque,
-              onPanStart: (details) {
-                setState(() {
-                  _activeIndex = _hitTestKeyframe(details.localPosition, size);
-                });
-              },
-              onPanUpdate: (details) {
-                final index = _activeIndex;
-                if (index == null) {
-                  return;
-                }
-
-                final plotRect = _PressureProfileEditorPainter.plotRect(size);
-                final normalizedY = 1 -
-                    ((details.localPosition.dy - plotRect.top) / plotRect.height)
-                        .clamp(0.0, 1.0);
-                _updateKeyframePressure(
-                  index,
-                  normalizedY * widget.pressureMax,
-                );
-              },
-              onPanEnd: (_) => setState(() => _activeIndex = null),
-              onPanCancel: () => setState(() => _activeIndex = null),
+              onPointerDown: (event) => _onPointerDown(event, size),
+              onPointerMove: (event) => _onPointerMove(event, size),
+              onPointerUp: (event) => _onPointerEnd(event.localPosition, size),
+              onPointerCancel: (event) => _onPointerEnd(event.localPosition, size),
               child: CustomPaint(
                 painter: _PressureProfileEditorPainter(
                   keyframes: widget.keyframes,
@@ -467,8 +528,8 @@ class _PressureProfileEditorPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2;
 
-      canvas.drawCircle(point, isActive ? 9 : 7, fillPaint);
-      canvas.drawCircle(point, isActive ? 9 : 7, strokePaint);
+      canvas.drawCircle(point, isActive ? 12 : 10, fillPaint);
+      canvas.drawCircle(point, isActive ? 12 : 10, strokePaint);
     }
   }
 
@@ -548,6 +609,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   List<PressureKeyframe> _keyframes = const [];
   SavedProfile? _profile;
   bool _initialized = false;
+  bool _profileEditorActive = false;
 
   @override
   void initState() {
@@ -757,7 +819,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
             onRefresh: _refresh,
             child: ListView(
               key: const Key('simulator_screen'),
-              physics: const AlwaysScrollableScrollPhysics(),
+              physics: _profileEditorActive
+                  ? const NeverScrollableScrollPhysics()
+                  : const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               children: [
               Text(
@@ -771,8 +835,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Drag the control points to shape a target pressure curve. '
-                'Predicted flow is a simple stub (higher pressure → higher g/s).',
+                'Drag the dots to adjust pressure, or tap the curve to add a '
+                'point. Predicted flow is a simple stub (higher pressure → '
+                'higher g/s).',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 16),
@@ -810,6 +875,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 keyframes: _keyframes,
                 durationMs: durationMs,
                 onKeyframesChanged: _onKeyframesChanged,
+                onGestureActiveChanged: (active) {
+                  setState(() => _profileEditorActive = active);
+                },
               ),
               const SizedBox(height: 16),
               _PredictedFlowMetrics(

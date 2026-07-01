@@ -1,11 +1,32 @@
 import 'package:flowlog/screens/more/diagnostics.dart';
 import 'package:flowlog/screens/more/sensors_screen.dart';
+import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
-import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
-
+import 'package:flowlog_sensors/flowlog_sensors.dart'
+    show ConnectionState, SensorAdapter;
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_test/flutter_test.dart';
+
+class _ReadyBleBackend extends BleConnectionBackend {
+  @override
+  Future<String?> ensureReady() async => null;
+
+  @override
+  Future<List<BleDiscoveredDevice>> scan(
+    SensorKind kind, {
+    Duration timeout = const Duration(seconds: 8),
+  }) async =>
+      const [];
+
+  @override
+  Future<SensorAdapter> createAdapter({
+    required SensorKind kind,
+    required String bleRemoteId,
+  }) {
+    throw UnimplementedError();
+  }
+}
 
 void main() {
   Future<void> pumpSensorsScreen(
@@ -13,7 +34,7 @@ void main() {
     SensorHub? hub,
     ThemeData? theme,
   }) async {
-    final sensorHub = hub ?? SensorHub();
+    final sensorHub = hub ?? SensorHub(bleBackend: _ReadyBleBackend());
     if (hub == null) {
       addTearDown(sensorHub.dispose);
     }
@@ -32,6 +53,21 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> addSensorAndDismissScanNotFound(WidgetTester tester) async {
+    await tester.tap(find.text('Add'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    if (find.byKey(const Key('scan_not_found_dialog')).evaluate().isEmpty) {
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.byKey(const Key('scan_not_found_dialog')), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+  }
+
   group('SensorsScreen', () {
     testWidgets('starts empty with add buttons', (tester) async {
       await pumpSensorsScreen(tester);
@@ -47,10 +83,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('add_pressensor_button')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Add'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Skip'));
-      await tester.pumpAndSettle();
+      await addSensorAndDismissScanNotFound(tester);
 
       expect(find.text('Pressensor PRS'), findsOneWidget);
       expect(find.text('Disconnected'), findsOneWidget);
@@ -58,16 +91,19 @@ void main() {
       await tester.tap(find.byKey(const Key('add_scale_button')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Add'));
+      await tester.pump();
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Skip'));
+      if (find.text('OK').evaluate().isNotEmpty) {
+        await tester.tap(find.text('OK'));
+      }
       await tester.pumpAndSettle();
 
       expect(find.text('Decent Scale'), findsOneWidget);
       expect(find.text('Disconnected'), findsNWidgets(2));
     });
 
-    testWidgets('offers scan flow after add', (tester) async {
-      final hub = SensorHub();
+    testWidgets('starts scan automatically after add', (tester) async {
+      final hub = SensorHub(bleBackend: _ReadyBleBackend());
       addTearDown(hub.dispose);
 
       await pumpSensorsScreen(tester, hub: hub);
@@ -75,12 +111,7 @@ void main() {
       await tester.tap(find.byKey(const Key('add_pressensor_button')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Add'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Scan for Pressensor PRS?'), findsOneWidget);
-      expect(find.byKey(const Key('scan_after_add_button')), findsOneWidget);
-
-      await tester.tap(find.text('Skip'));
+      await tester.pump();
       await tester.pumpAndSettle();
 
       expect(hub.devices.first.bleRemoteId, isNull);
@@ -179,4 +210,3 @@ void main() {
     });
   });
 }
-
