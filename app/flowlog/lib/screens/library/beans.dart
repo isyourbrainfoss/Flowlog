@@ -3,6 +3,24 @@ import 'dart:io';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+/// Roast labels from light to dark for the bean editor slider.
+const List<String> kBeanRoastLevels = [
+  'Light',
+  'Medium-Light',
+  'Medium',
+  'Medium-Dark',
+  'Dark',
+];
+
+/// Common retail bag sizes in grams.
+const List<int> kBeanStockPresetsG = [200, 250, 340, 454, 1000];
+
+String _formatBeanDate(DateTime date) {
+  final local = date.toLocal();
+  final month = local.month.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  return '${local.year}-$month-$day';
+}
 
 /// Generates a unique bean id for persistence.
 typedef BeanIdGenerator = String Function();
@@ -207,6 +225,8 @@ class BeanCard extends StatelessWidget {
       if (bean.origin != null && bean.origin!.isNotEmpty) bean.origin,
       if (bean.roastLevel != null && bean.roastLevel!.isNotEmpty)
         bean.roastLevel,
+      if (bean.roastDate != null)
+        'Roasted ${_formatBeanDate(bean.roastDate!)}',
     ].join(' · ');
 
     return Card(
@@ -401,9 +421,11 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _originController;
-  late final TextEditingController _roastController;
   late final TextEditingController _stockController;
   late final TextEditingController _notesController;
+  late double _roastSliderValue;
+  DateTime? _roastDate;
+  int? _selectedStockPreset;
 
   @override
   void initState() {
@@ -411,18 +433,42 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
     final bean = widget.bean;
     _nameController = TextEditingController(text: bean?.name ?? '');
     _originController = TextEditingController(text: bean?.origin ?? '');
-    _roastController = TextEditingController(text: bean?.roastLevel ?? '');
     _stockController = TextEditingController(
       text: bean?.stockG?.toString() ?? '',
     );
     _notesController = TextEditingController(text: bean?.notes ?? '');
+    _roastSliderValue = _roastLevelToSlider(bean?.roastLevel);
+    _roastDate = bean?.roastDate;
+    _selectedStockPreset = _matchingStockPreset(bean?.stockG);
+  }
+
+  double _roastLevelToSlider(String? level) {
+    if (level == null || level.isEmpty) {
+      return 2;
+    }
+    final index = kBeanRoastLevels.indexWhere(
+      (label) => label.toLowerCase() == level.toLowerCase(),
+    );
+    return (index >= 0 ? index : 2).toDouble();
+  }
+
+  String? _sliderToRoastLevel(double value) {
+    final index = value.round().clamp(0, kBeanRoastLevels.length - 1);
+    return kBeanRoastLevels[index];
+  }
+
+  int? _matchingStockPreset(double? stockG) {
+    if (stockG == null) {
+      return null;
+    }
+    final rounded = stockG.round();
+    return kBeanStockPresetsG.contains(rounded) ? rounded : null;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _originController.dispose();
-    _roastController.dispose();
     _stockController.dispose();
     _notesController.dispose();
     super.dispose();
@@ -460,11 +506,26 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
         id: widget.bean?.id ?? widget.beanIdGenerator(),
         name: _nameController.text.trim(),
         origin: _optionalText(_originController.text),
-        roastLevel: _optionalText(_roastController.text),
+        roastLevel: _sliderToRoastLevel(_roastSliderValue),
+        roastDate: _roastDate,
         stockG: stock,
         notes: _optionalText(_notesController.text),
       ),
     );
+  }
+
+  Future<void> _pickRoastDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _roastDate ?? now,
+      firstDate: DateTime(now.year - 2),
+      lastDate: now,
+      helpText: 'Roast date',
+    );
+    if (picked != null) {
+      setState(() => _roastDate = picked);
+    }
   }
 
   @override
@@ -496,18 +557,88 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
                 decoration: const InputDecoration(labelText: 'Origin'),
                 textCapitalization: TextCapitalization.words,
               ),
-              TextFormField(
-                controller: _roastController,
-                decoration: const InputDecoration(labelText: 'Roast'),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Roast: ${_sliderToRoastLevel(_roastSliderValue)}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
               ),
+              Slider(
+                key: const Key('bean_editor_roast_slider'),
+                value: _roastSliderValue,
+                min: 0,
+                max: (kBeanRoastLevels.length - 1).toDouble(),
+                divisions: kBeanRoastLevels.length - 1,
+                label: _sliderToRoastLevel(_roastSliderValue),
+                onChanged: (value) => setState(() => _roastSliderValue = value),
+              ),
+              ListTile(
+                key: const Key('bean_editor_roast_date'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Roast date'),
+                subtitle: Text(
+                  _roastDate == null
+                      ? 'Tap to pick a day'
+                      : _formatBeanDate(_roastDate!),
+                ),
+                trailing: _roastDate == null
+                    ? const Icon(Icons.calendar_today_outlined)
+                    : IconButton(
+                        tooltip: 'Clear roast date',
+                        onPressed: () => setState(() => _roastDate = null),
+                        icon: const Icon(Icons.clear),
+                      ),
+                onTap: _pickRoastDate,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Bag size',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final preset in kBeanStockPresetsG)
+                    FilterChip(
+                      key: Key('bean_stock_preset_$preset'),
+                      label: Text('${preset}g'),
+                      selected: _selectedStockPreset == preset,
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedStockPreset = preset;
+                            _stockController.text = preset.toString();
+                          } else if (_selectedStockPreset == preset) {
+                            _selectedStockPreset = null;
+                            _stockController.clear();
+                          }
+                        });
+                      },
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _stockController,
-                decoration: const InputDecoration(labelText: 'Stock (g)'),
+                decoration: const InputDecoration(
+                  labelText: 'Stock (g)',
+                  hintText: 'Custom amount',
+                ),
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                 ],
+                onChanged: (value) {
+                  final parsed = double.tryParse(value.trim());
+                  setState(() {
+                    _selectedStockPreset = _matchingStockPreset(parsed);
+                  });
+                },
               ),
               TextFormField(
                 controller: _notesController,

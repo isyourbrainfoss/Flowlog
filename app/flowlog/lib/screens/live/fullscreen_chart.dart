@@ -4,7 +4,7 @@ import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
 /// Space below the plot area for legend and view-mode controls.
-const double kLiveFullscreenChartLegendReserve = 88;
+const double kLiveFullscreenChartLegendReserve = 72;
 
 /// Opens a fullscreen live chart route sharing the active notifiers.
 Future<void> openLiveFullscreenChart(
@@ -52,41 +52,61 @@ class LiveFullscreenChartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final landscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final controlsReserve = landscape ? 52.0 : 76.0;
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       key: const Key('live_fullscreen_chart'),
-      appBar: AppBar(
-        toolbarHeight: 44,
-        title: const Text('Live chart'),
-        leading: IconButton(
-          key: const Key('live_fullscreen_close'),
-          tooltip: 'Close fullscreen chart',
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.close),
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: LiveControls(controller: controller, prominent: true),
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final plotHeight = (constraints.maxHeight -
-                    kLiveFullscreenChartLegendReserve)
-                .clamp(180.0, 1200.0);
-            return DualCurveChart(
-              key: const Key('live_fullscreen_dual_chart'),
-              height: plotHeight,
-              samplesNotifier: samplesNotifier,
-              annotationsNotifier: annotationsNotifier,
-              interactionController: interactionController,
-              targetPressureSamples: targetPressureSamples,
-              onAnnotateAtElapsedMs: onAnnotateAtElapsedMs,
-            );
-          },
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(4, 4, 4, controlsReserve),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final plotHeight = (constraints.maxHeight -
+                          kLiveFullscreenChartLegendReserve)
+                      .clamp(180.0, 1200.0);
+                  return DualCurveChart(
+                    key: const Key('live_fullscreen_dual_chart'),
+                    height: plotHeight,
+                    samplesNotifier: samplesNotifier,
+                    annotationsNotifier: annotationsNotifier,
+                    interactionController: interactionController,
+                    targetPressureSamples: targetPressureSamples,
+                    onAnnotateAtElapsedMs: onAnnotateAtElapsedMs,
+                  );
+                },
+              ),
+            ),
+            Positioned(
+              top: 4,
+              left: 4,
+              child: Material(
+                color: scheme.surfaceContainerHighest.withValues(alpha: 0.92),
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: IconButton(
+                  key: const Key('live_fullscreen_close'),
+                  tooltip: 'Minimize chart',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.fullscreen_exit),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: landscape ? 4 : 8,
+              child: LiveControls(
+                controller: controller,
+                prominent: !landscape,
+                compact: landscape,
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -57,11 +57,25 @@ void showShotSavedSnackBar(BuildContext context, {String? message}) {
   );
 }
 
-ShotMetadata defaultMetadataFromSamples(List<ShotSample> samples) {
+Future<ShotMetadata> defaultMetadataFromSamples(
+  List<ShotSample> samples, {
+  BeanRepository? beanRepository,
+  String? activeBeanName,
+  String? activeBeanId,
+}) async {
   final last = samples.last;
+  var beanId = activeBeanId;
+  if (beanId == null &&
+      beanRepository != null &&
+      activeBeanName != null &&
+      activeBeanName.trim().isNotEmpty) {
+    beanId = (await beanRepository.ensureBeanForName(activeBeanName.trim())).id;
+  }
+
   return ShotMetadata(
     yieldG: last.weightG,
     waterTempC: last.tempC,
+    beanId: beanId,
   );
 }
 
@@ -73,6 +87,9 @@ Future<Shot?> runAutoSaveFlow({
   required DateTime startedAt,
   DateTime? endedAt,
   ShotMetadata? initialMetadata,
+  BeanRepository? beanRepository,
+  String? activeBeanName,
+  String? activeBeanId,
   List<ShotAnnotation> annotations = const [],
   ShotIdGenerator idGenerator = generateShotId,
   void Function(Shot shot)? onSaved,
@@ -83,8 +100,26 @@ Future<Shot?> runAutoSaveFlow({
     return null;
   }
 
-  final metadata =
-      initialMetadata ?? defaultMetadataFromSamples(samples);
+  ShotMetadata metadata;
+  if (initialMetadata != null) {
+    metadata = initialMetadata;
+    if (metadata.beanId == null && beanRepository != null) {
+      if (activeBeanId != null) {
+        metadata = metadata.copyWith(beanId: activeBeanId);
+      } else if (activeBeanName != null && activeBeanName.trim().isNotEmpty) {
+        final bean =
+            await beanRepository.ensureBeanForName(activeBeanName.trim());
+        metadata = metadata.copyWith(beanId: bean.id);
+      }
+    }
+  } else {
+    metadata = await defaultMetadataFromSamples(
+      samples,
+      beanRepository: beanRepository,
+      activeBeanName: activeBeanName,
+      activeBeanId: activeBeanId,
+    );
+  }
 
   final shot = buildShotFromSession(
     samples: samples,
@@ -195,7 +230,8 @@ Future<Shot?> runStarShotSaveFlow({
 
   final metadata = await showMetadataSheet(
     context,
-    initial: initialMetadata ?? defaultMetadataFromSamples(samples),
+    initial: initialMetadata ??
+        await defaultMetadataFromSamples(samples),
   );
   if (metadata == null || !context.mounted) {
     return null;

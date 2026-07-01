@@ -170,6 +170,7 @@ class BeanRepository {
       name: bean.name,
       origin: Value(bean.origin),
       roastLevel: Value(bean.roastLevel),
+      roastDate: Value(bean.roastDate),
       stockG: Value(bean.stockG),
       notes: Value(bean.notes),
     );
@@ -181,6 +182,7 @@ class BeanRepository {
       name: row.name,
       origin: row.origin,
       roastLevel: row.roastLevel,
+      roastDate: row.roastDate,
       stockG: row.stockG,
       notes: row.notes,
     );
