@@ -43,5 +43,26 @@ void main() {
         'House Blend · no roast date',
       );
     });
+
+    test('uses process to disambiguate duplicate names', () {
+      const washed = Bean(
+        id: 'bean-washed',
+        name: 'Ethiopia',
+        process: 'Washed',
+      );
+      const natural = Bean(
+        id: 'bean-natural',
+        name: 'Ethiopia',
+        process: 'Natural',
+      );
+      expect(
+        formatBeanDisplayLabel(washed, allBeans: [washed, natural]),
+        'Ethiopia · Washed',
+      );
+      expect(
+        formatBeanDisplayLabel(natural, allBeans: [washed, natural]),
+        'Ethiopia · Natural',
+      );
+    });
   });
 }

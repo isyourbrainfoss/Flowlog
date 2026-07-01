@@ -82,6 +82,7 @@ class BeanRepository {
     DateTime? roastDate,
     String? origin,
     String? roastLevel,
+    String? process,
     double? stockG,
     String? notes,
   }) async {
@@ -96,6 +97,7 @@ class BeanRepository {
       roastDate: roastDate,
       origin: origin,
       roastLevel: roastLevel,
+      process: process,
       stockG: stockG,
       notes: notes,
     );
@@ -205,6 +207,7 @@ class BeanRepository {
       origin: Value(bean.origin),
       roastLevel: Value(bean.roastLevel),
       roastDate: Value(bean.roastDate),
+      process: Value(bean.process),
       stockG: Value(bean.stockG),
       notes: Value(bean.notes),
     );
@@ -217,6 +220,7 @@ class BeanRepository {
       origin: row.origin,
       roastLevel: row.roastLevel,
       roastDate: row.roastDate,
+      process: row.process,
       stockG: row.stockG,
       notes: row.notes,
     );

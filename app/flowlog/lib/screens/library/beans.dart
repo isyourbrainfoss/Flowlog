@@ -230,6 +230,7 @@ class BeanCard extends StatelessWidget {
     final title = formatBeanDisplayLabel(bean, allBeans: allBeans);
     final subtitle = [
       if (bean.origin != null && bean.origin!.isNotEmpty) bean.origin,
+      if (bean.process != null && bean.process!.isNotEmpty) bean.process,
       if (bean.roastLevel != null && bean.roastLevel!.isNotEmpty)
         bean.roastLevel,
       if (bean.roastDate != null && title == bean.name)
@@ -432,6 +433,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
   late final TextEditingController _notesController;
   late double _roastSliderValue;
   DateTime? _roastDate;
+  String? _selectedProcess;
   int? _selectedStockPreset;
 
   @override
@@ -446,6 +448,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
     _notesController = TextEditingController(text: bean?.notes ?? '');
     _roastSliderValue = _roastLevelToSlider(bean?.roastLevel);
     _roastDate = bean?.roastDate;
+    _selectedProcess = bean?.process;
     _selectedStockPreset = _matchingStockPreset(bean?.stockG);
   }
 
@@ -515,6 +518,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
         origin: _optionalText(_originController.text),
         roastLevel: _sliderToRoastLevel(_roastSliderValue),
         roastDate: _roastDate,
+        process: _selectedProcess,
         stockG: stock,
         notes: _optionalText(_notesController.text),
       ),
@@ -564,7 +568,32 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
                 decoration: const InputDecoration(labelText: 'Origin'),
                 textCapitalization: TextCapitalization.words,
               ),
+              const SizedBox(height: 12),
+              Text(
+                'Process',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
               const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final method in kBeanProcessMethods)
+                    FilterChip(
+                      key: Key(
+                        'bean_process_${method.toLowerCase().replaceAll(' ', '_')}',
+                      ),
+                      label: Text(method),
+                      selected: _selectedProcess == method,
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedProcess = selected ? method : null;
+                        });
+                      },
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(

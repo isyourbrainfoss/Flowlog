@@ -1523,6 +1523,17 @@ class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       ).withConverter<DateTime?>($BeansTable.$converterroastDate);
+  static const VerificationMeta _processMeta = const VerificationMeta(
+    'process',
+  );
+  @override
+  late final GeneratedColumn<String> process = GeneratedColumn<String>(
+    'process',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _stockGMeta = const VerificationMeta('stockG');
   @override
   late final GeneratedColumn<double> stockG = GeneratedColumn<double>(
@@ -1548,6 +1559,7 @@ class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
     origin,
     roastLevel,
     roastDate,
+    process,
     stockG,
     notes,
   ];
@@ -1586,6 +1598,12 @@ class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
       context.handle(
         _roastLevelMeta,
         roastLevel.isAcceptableOrUnknown(data['roast_level']!, _roastLevelMeta),
+      );
+    }
+    if (data.containsKey('process')) {
+      context.handle(
+        _processMeta,
+        process.isAcceptableOrUnknown(data['process']!, _processMeta),
       );
     }
     if (data.containsKey('stock_g')) {
@@ -1631,6 +1649,10 @@ class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
           data['${effectivePrefix}roast_date'],
         ),
       ),
+      process: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}process'],
+      ),
       stockG: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}stock_g'],
@@ -1657,6 +1679,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
   final String? origin;
   final String? roastLevel;
   final DateTime? roastDate;
+  final String? process;
   final double? stockG;
   final String? notes;
   const BeanRow({
@@ -1665,6 +1688,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     this.origin,
     this.roastLevel,
     this.roastDate,
+    this.process,
     this.stockG,
     this.notes,
   });
@@ -1683,6 +1707,9 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
       map['roast_date'] = Variable<String>(
         $BeansTable.$converterroastDate.toSql(roastDate),
       );
+    }
+    if (!nullToAbsent || process != null) {
+      map['process'] = Variable<String>(process);
     }
     if (!nullToAbsent || stockG != null) {
       map['stock_g'] = Variable<double>(stockG);
@@ -1706,6 +1733,9 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
       roastDate: roastDate == null && nullToAbsent
           ? const Value.absent()
           : Value(roastDate),
+      process: process == null && nullToAbsent
+          ? const Value.absent()
+          : Value(process),
       stockG: stockG == null && nullToAbsent
           ? const Value.absent()
           : Value(stockG),
@@ -1726,6 +1756,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
       origin: serializer.fromJson<String?>(json['origin']),
       roastLevel: serializer.fromJson<String?>(json['roastLevel']),
       roastDate: serializer.fromJson<DateTime?>(json['roastDate']),
+      process: serializer.fromJson<String?>(json['process']),
       stockG: serializer.fromJson<double?>(json['stockG']),
       notes: serializer.fromJson<String?>(json['notes']),
     );
@@ -1739,6 +1770,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
       'origin': serializer.toJson<String?>(origin),
       'roastLevel': serializer.toJson<String?>(roastLevel),
       'roastDate': serializer.toJson<DateTime?>(roastDate),
+      'process': serializer.toJson<String?>(process),
       'stockG': serializer.toJson<double?>(stockG),
       'notes': serializer.toJson<String?>(notes),
     };
@@ -1750,6 +1782,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     Value<String?> origin = const Value.absent(),
     Value<String?> roastLevel = const Value.absent(),
     Value<DateTime?> roastDate = const Value.absent(),
+    Value<String?> process = const Value.absent(),
     Value<double?> stockG = const Value.absent(),
     Value<String?> notes = const Value.absent(),
   }) => BeanRow(
@@ -1758,6 +1791,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     origin: origin.present ? origin.value : this.origin,
     roastLevel: roastLevel.present ? roastLevel.value : this.roastLevel,
     roastDate: roastDate.present ? roastDate.value : this.roastDate,
+    process: process.present ? process.value : this.process,
     stockG: stockG.present ? stockG.value : this.stockG,
     notes: notes.present ? notes.value : this.notes,
   );
@@ -1770,6 +1804,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
           ? data.roastLevel.value
           : this.roastLevel,
       roastDate: data.roastDate.present ? data.roastDate.value : this.roastDate,
+      process: data.process.present ? data.process.value : this.process,
       stockG: data.stockG.present ? data.stockG.value : this.stockG,
       notes: data.notes.present ? data.notes.value : this.notes,
     );
@@ -1783,6 +1818,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
           ..write('origin: $origin, ')
           ..write('roastLevel: $roastLevel, ')
           ..write('roastDate: $roastDate, ')
+          ..write('process: $process, ')
           ..write('stockG: $stockG, ')
           ..write('notes: $notes')
           ..write(')'))
@@ -1790,8 +1826,16 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, origin, roastLevel, roastDate, stockG, notes);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    origin,
+    roastLevel,
+    roastDate,
+    process,
+    stockG,
+    notes,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1801,6 +1845,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
           other.origin == this.origin &&
           other.roastLevel == this.roastLevel &&
           other.roastDate == this.roastDate &&
+          other.process == this.process &&
           other.stockG == this.stockG &&
           other.notes == this.notes);
 }
@@ -1811,6 +1856,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
   final Value<String?> origin;
   final Value<String?> roastLevel;
   final Value<DateTime?> roastDate;
+  final Value<String?> process;
   final Value<double?> stockG;
   final Value<String?> notes;
   final Value<int> rowid;
@@ -1820,6 +1866,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
     this.origin = const Value.absent(),
     this.roastLevel = const Value.absent(),
     this.roastDate = const Value.absent(),
+    this.process = const Value.absent(),
     this.stockG = const Value.absent(),
     this.notes = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1830,6 +1877,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
     this.origin = const Value.absent(),
     this.roastLevel = const Value.absent(),
     this.roastDate = const Value.absent(),
+    this.process = const Value.absent(),
     this.stockG = const Value.absent(),
     this.notes = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1841,6 +1889,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
     Expression<String>? origin,
     Expression<String>? roastLevel,
     Expression<String>? roastDate,
+    Expression<String>? process,
     Expression<double>? stockG,
     Expression<String>? notes,
     Expression<int>? rowid,
@@ -1851,6 +1900,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
       if (origin != null) 'origin': origin,
       if (roastLevel != null) 'roast_level': roastLevel,
       if (roastDate != null) 'roast_date': roastDate,
+      if (process != null) 'process': process,
       if (stockG != null) 'stock_g': stockG,
       if (notes != null) 'notes': notes,
       if (rowid != null) 'rowid': rowid,
@@ -1863,6 +1913,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
     Value<String?>? origin,
     Value<String?>? roastLevel,
     Value<DateTime?>? roastDate,
+    Value<String?>? process,
     Value<double?>? stockG,
     Value<String?>? notes,
     Value<int>? rowid,
@@ -1873,6 +1924,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
       origin: origin ?? this.origin,
       roastLevel: roastLevel ?? this.roastLevel,
       roastDate: roastDate ?? this.roastDate,
+      process: process ?? this.process,
       stockG: stockG ?? this.stockG,
       notes: notes ?? this.notes,
       rowid: rowid ?? this.rowid,
@@ -1899,6 +1951,9 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
         $BeansTable.$converterroastDate.toSql(roastDate.value),
       );
     }
+    if (process.present) {
+      map['process'] = Variable<String>(process.value);
+    }
     if (stockG.present) {
       map['stock_g'] = Variable<double>(stockG.value);
     }
@@ -1919,6 +1974,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
           ..write('origin: $origin, ')
           ..write('roastLevel: $roastLevel, ')
           ..write('roastDate: $roastDate, ')
+          ..write('process: $process, ')
           ..write('stockG: $stockG, ')
           ..write('notes: $notes, ')
           ..write('rowid: $rowid')
@@ -4601,6 +4657,7 @@ typedef $$BeansTableCreateCompanionBuilder =
       Value<String?> origin,
       Value<String?> roastLevel,
       Value<DateTime?> roastDate,
+      Value<String?> process,
       Value<double?> stockG,
       Value<String?> notes,
       Value<int> rowid,
@@ -4612,6 +4669,7 @@ typedef $$BeansTableUpdateCompanionBuilder =
       Value<String?> origin,
       Value<String?> roastLevel,
       Value<DateTime?> roastDate,
+      Value<String?> process,
       Value<double?> stockG,
       Value<String?> notes,
       Value<int> rowid,
@@ -4651,6 +4709,11 @@ class $$BeansTableFilterComposer
         column: $table.roastDate,
         builder: (column) => ColumnWithTypeConverterFilters(column),
       );
+
+  ColumnFilters<String> get process => $composableBuilder(
+    column: $table.process,
+    builder: (column) => ColumnFilters(column),
+  );
 
   ColumnFilters<double> get stockG => $composableBuilder(
     column: $table.stockG,
@@ -4697,6 +4760,11 @@ class $$BeansTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get process => $composableBuilder(
+    column: $table.process,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get stockG => $composableBuilder(
     column: $table.stockG,
     builder: (column) => ColumnOrderings(column),
@@ -4733,6 +4801,9 @@ class $$BeansTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<DateTime?, String> get roastDate =>
       $composableBuilder(column: $table.roastDate, builder: (column) => column);
+
+  GeneratedColumn<String> get process =>
+      $composableBuilder(column: $table.process, builder: (column) => column);
 
   GeneratedColumn<double> get stockG =>
       $composableBuilder(column: $table.stockG, builder: (column) => column);
@@ -4774,6 +4845,7 @@ class $$BeansTableTableManager
                 Value<String?> origin = const Value.absent(),
                 Value<String?> roastLevel = const Value.absent(),
                 Value<DateTime?> roastDate = const Value.absent(),
+                Value<String?> process = const Value.absent(),
                 Value<double?> stockG = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -4783,6 +4855,7 @@ class $$BeansTableTableManager
                 origin: origin,
                 roastLevel: roastLevel,
                 roastDate: roastDate,
+                process: process,
                 stockG: stockG,
                 notes: notes,
                 rowid: rowid,
@@ -4794,6 +4867,7 @@ class $$BeansTableTableManager
                 Value<String?> origin = const Value.absent(),
                 Value<String?> roastLevel = const Value.absent(),
                 Value<DateTime?> roastDate = const Value.absent(),
+                Value<String?> process = const Value.absent(),
                 Value<double?> stockG = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -4803,6 +4877,7 @@ class $$BeansTableTableManager
                 origin: origin,
                 roastLevel: roastLevel,
                 roastDate: roastDate,
+                process: process,
                 stockG: stockG,
                 notes: notes,
                 rowid: rowid,
