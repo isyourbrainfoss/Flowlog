@@ -194,6 +194,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
   final _customTagController = TextEditingController();
   List<Bean> _beans = const [];
   bool _beansReady = false;
+  String? _selectedBeanId;
 
   @override
   void initState() {
@@ -246,13 +247,35 @@ class _MetadataSheetState extends State<MetadataSheet> {
       _beansReady = true;
       final beanId = widget.initial?.beanId;
       if (beanId != null) {
-        final match = beans.where((bean) => bean.id == beanId).firstOrNull;
+        Bean? match;
+        for (final bean in beans) {
+          if (bean.id == beanId) {
+            match = bean;
+            break;
+          }
+        }
         if (match != null) {
-          _beanController.text = match.name;
+          _selectedBeanId = match.id;
+          _beanController.text =
+              formatBeanDisplayLabel(match, allBeans: beans);
         }
       } else if (_beanController.text.isEmpty &&
           widget.activeBeanName != null) {
-        _beanController.text = widget.activeBeanName!.trim();
+        Bean? activeMatch;
+        for (final bean in beans) {
+          if (bean.name.toLowerCase() ==
+              widget.activeBeanName!.trim().toLowerCase()) {
+            activeMatch = bean;
+            break;
+          }
+        }
+        if (activeMatch != null) {
+          _selectedBeanId = activeMatch.id;
+          _beanController.text =
+              formatBeanDisplayLabel(activeMatch, allBeans: beans);
+        } else {
+          _beanController.text = widget.activeBeanName!.trim();
+        }
       }
     });
   }
@@ -312,15 +335,42 @@ class _MetadataSheetState extends State<MetadataSheet> {
     return trimmed.isEmpty ? null : trimmed;
   }
 
+  Future<String?> _resolveBeanId() async {
+    final repository = widget.beanRepository;
+    final typed = _parseString(_beanController.text);
+    if (typed == null) {
+      return null;
+    }
+
+    if (repository == null) {
+      return typed;
+    }
+
+    if (_selectedBeanId != null) {
+      final selected = await repository.getBeanById(_selectedBeanId!);
+      if (selected != null) {
+        return selected.id;
+      }
+    }
+
+    final byId = await repository.getBeanById(typed);
+    if (byId != null) {
+      return byId.id;
+    }
+
+    return (await repository.createBean(name: typed)).id;
+  }
+
   Future<ShotMetadata> _buildMetadata() async {
-    final beanInput = _parseString(_beanController.text);
-    String? beanId;
-    if (beanInput != null && widget.beanRepository != null) {
-      final bean = await widget.beanRepository!.ensureBeanForName(beanInput);
-      beanId = bean.id;
-      ActiveBeanScope.maybeOf(context)?.onNameChanged(bean.name);
-    } else {
-      beanId = beanInput;
+    final beanId = await _resolveBeanId();
+    if (beanId != null && widget.beanRepository != null) {
+      final bean = await widget.beanRepository!.getBeanById(beanId);
+      if (bean != null) {
+        ActiveBeanScope.maybeOf(context)?.onActiveBeanChanged(
+          bean.name,
+          beanId: bean.id,
+        );
+      }
     }
 
     return ShotMetadata(
@@ -427,26 +477,29 @@ class _MetadataSheetState extends State<MetadataSheet> {
                 ],
               ),
               const SizedBox(height: 12),
-              Autocomplete<String>(
+              Autocomplete<Bean>(
                 initialValue: TextEditingValue(text: _beanController.text),
+                displayStringForOption: (bean) =>
+                    formatBeanDisplayLabel(bean, allBeans: _beans),
                 optionsBuilder: (value) {
                   final query = value.text.trim().toLowerCase();
-                  final names = [
-                    for (final bean in _beans) bean.name,
-                    if (query.isNotEmpty &&
-                        !_beans.any(
-                          (bean) => bean.name.toLowerCase() == query,
-                        ))
-                      value.text.trim(),
-                  ];
                   if (query.isEmpty) {
-                    return names;
+                    return _beans;
                   }
-                  return names
-                      .where((name) => name.toLowerCase().contains(query))
-                      .toList();
+                  return _beans.where((bean) {
+                    final label = formatBeanDisplayLabel(
+                      bean,
+                      allBeans: _beans,
+                    ).toLowerCase();
+                    return label.contains(query) ||
+                        bean.name.toLowerCase().contains(query);
+                  });
                 },
-                onSelected: (value) => _beanController.text = value,
+                onSelected: (bean) {
+                  _selectedBeanId = bean.id;
+                  _beanController.text =
+                      formatBeanDisplayLabel(bean, allBeans: _beans);
+                },
                 fieldViewBuilder: (
                   context,
                   controller,
@@ -466,9 +519,13 @@ class _MetadataSheetState extends State<MetadataSheet> {
                       labelText: 'Bean',
                       border: OutlineInputBorder(),
                       helperText:
-                          'Pick a saved bean or type a new name to create it',
+                          'Pick a saved bag (date shown when names repeat) '
+                          'or type a new name to add another',
                     ),
-                    onChanged: (value) => _beanController.text = value,
+                    onChanged: (value) {
+                      _beanController.text = value;
+                      _selectedBeanId = null;
+                    },
                     onSubmitted: (_) => onFieldSubmitted(),
                   );
                 },

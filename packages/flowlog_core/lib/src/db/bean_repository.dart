@@ -76,27 +76,61 @@ class BeanRepository {
     return beans;
   }
 
-  /// Finds a bean by [name] or [id], or creates one when [name] is new.
-  Future<models.Bean> ensureBeanForName(String name) async {
+  /// Creates a new bean entry (duplicate names are allowed).
+  Future<models.Bean> createBean({
+    required String name,
+    DateTime? roastDate,
+    String? origin,
+    String? roastLevel,
+    double? stockG,
+    String? notes,
+  }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
       throw ArgumentError.value(name, 'name', 'Bean name must not be empty');
     }
 
-    final beans = await listBeans();
-    for (final bean in beans) {
-      if (bean.id == trimmed ||
-          bean.name.toLowerCase() == trimmed.toLowerCase()) {
-        return bean;
-      }
-    }
-
     final bean = models.Bean(
       id: 'bean-${DateTime.now().toUtc().millisecondsSinceEpoch}',
       name: trimmed,
+      roastDate: roastDate,
+      origin: origin,
+      roastLevel: roastLevel,
+      stockG: stockG,
+      notes: notes,
     );
     await upsertBean(bean);
     return bean;
+  }
+
+  /// Resolves the active session bean id from a known id or display name.
+  ///
+  /// When only [name] is provided, returns the most recently used matching
+  /// bean or creates a new entry if none exist.
+  Future<String?> resolveActiveBeanId({
+    String? beanId,
+    String? name,
+  }) async {
+    if (beanId != null && beanId.trim().isNotEmpty) {
+      final existing = await getBeanById(beanId.trim());
+      if (existing != null) {
+        return existing.id;
+      }
+    }
+
+    final trimmedName = name?.trim();
+    if (trimmedName == null || trimmedName.isEmpty) {
+      return null;
+    }
+
+    final recent = await listBeansByRecentUse();
+    for (final bean in recent) {
+      if (bean.name.toLowerCase() == trimmedName.toLowerCase()) {
+        return bean.id;
+      }
+    }
+
+    return (await createBean(name: trimmedName)).id;
   }
 
   /// Returns all beans ordered by name.

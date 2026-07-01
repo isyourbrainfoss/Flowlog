@@ -290,12 +290,32 @@ void main() {
         olderBean.id,
       ]);
 
-      final created = await beanRepository.ensureBeanForName('Fresh Bag');
+      final created = await beanRepository.createBean(name: 'Fresh Bag');
       expect(created.name, 'Fresh Bag');
       expect(await beanRepository.getBeanById(created.id), created);
 
-      final reused = await beanRepository.ensureBeanForName('test');
-      expect(reused.id, newerBean.id);
+      final duplicate = await beanRepository.createBean(name: 'Test');
+      expect(duplicate.id, isNot(newerBean.id));
+      expect(duplicate.name, 'Test');
+
+      final resolved = await beanRepository.resolveActiveBeanId(
+        name: 'Test',
+      );
+      expect(resolved, newerBean.id);
+    });
+
+    test('createBean allows same name with different roast dates', () async {
+      final first = await beanRepository.createBean(
+        name: 'House Blend',
+        roastDate: DateTime.utc(2026, 3, 1),
+      );
+      final second = await beanRepository.createBean(
+        name: 'House Blend',
+        roastDate: DateTime.utc(2026, 4, 15),
+      );
+
+      expect(first.id, isNot(second.id));
+      expect((await beanRepository.listBeans()).where((b) => b.name == 'House Blend'), hasLength(2));
     });
 
     test('counts shots linked by beanId', () async {

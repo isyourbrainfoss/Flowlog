@@ -180,8 +180,12 @@ class _BeansScreenState extends State<BeansScreen> {
                     itemCount: beans.length,
                     itemBuilder: (context, index) {
                       final entry = beans[index];
+                      final allBeanModels = [
+                        for (final item in beans) item.bean,
+                      ];
                       return BeanCard(
                         entry: entry,
+                        allBeans: allBeanModels,
                         onTap: () => _openBeanEditor(bean: entry.bean),
                         onDelete: () => _deleteBean(entry.bean),
                         onStockChanged: (stockG) =>
@@ -207,12 +211,14 @@ class BeanCard extends StatelessWidget {
   const BeanCard({
     super.key,
     required this.entry,
+    this.allBeans,
     required this.onTap,
     required this.onDelete,
     required this.onStockChanged,
   });
 
   final BeanWithShotCount entry;
+  final List<Bean>? allBeans;
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final ValueChanged<double?> onStockChanged;
@@ -221,11 +227,12 @@ class BeanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bean = entry.bean;
+    final title = formatBeanDisplayLabel(bean, allBeans: allBeans);
     final subtitle = [
       if (bean.origin != null && bean.origin!.isNotEmpty) bean.origin,
       if (bean.roastLevel != null && bean.roastLevel!.isNotEmpty)
         bean.roastLevel,
-      if (bean.roastDate != null)
+      if (bean.roastDate != null && title == bean.name)
         'Roasted ${_formatBeanDate(bean.roastDate!)}',
     ].join(' · ');
 
@@ -244,7 +251,7 @@ class BeanCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      bean.name,
+                      title,
                       style: theme.textTheme.titleMedium,
                     ),
                   ),
