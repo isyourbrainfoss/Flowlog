@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -258,13 +259,23 @@ class PressureProfileEditor extends StatefulWidget {
 class _PressureProfileEditorState extends State<PressureProfileEditor> {
   static const _handleHitRadius = 28.0;
   static const _minKeyframeSpacingMs = 1500;
+  static const _longPressDuration = Duration(milliseconds: 500);
+  static const _axisLockThreshold = 8.0;
 
   int? _activeIndex;
   Offset? _pointerDown;
   bool _dragged = false;
+  bool? _dragVertical;
+  Timer? _longPressTimer;
+  bool _longPressHandled = false;
 
   void _setGestureActive(bool active) {
     widget.onGestureActiveChanged?.call(active);
+  }
+
+  void _cancelLongPress() {
+    _longPressTimer?.cancel();
+    _longPressTimer = null;
   }
 
   void _updateKeyframePressure(int index, double pressureBar) {
@@ -273,6 +284,45 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
       pressureBar: pressureBar.clamp(0, widget.pressureMax).toDouble(),
     );
     widget.onKeyframesChanged(updated);
+  }
+
+  void _updateKeyframeTime(int index, int elapsedMs, Size size) {
+    final keyframes = widget.keyframes;
+    if (index <= 0 || index >= keyframes.length - 1) {
+      return;
+    }
+
+    final minMs = keyframes[index - 1].elapsedMs + _minKeyframeSpacingMs;
+    final maxMs = keyframes[index + 1].elapsedMs - _minKeyframeSpacingMs;
+    final clamped = elapsedMs.clamp(minMs, maxMs);
+
+    final updated = List<PressureKeyframe>.from(keyframes);
+    updated[index] = updated[index].copyWith(elapsedMs: clamped);
+    updated.sort((a, b) => a.elapsedMs.compareTo(b.elapsedMs));
+    widget.onKeyframesChanged(updated);
+  }
+
+  void _deleteKeyframe(int index) {
+    if (widget.keyframes.length <= 2) {
+      return;
+    }
+    if (index <= 0 || index >= widget.keyframes.length - 1) {
+      return;
+    }
+
+    final updated = List<PressureKeyframe>.from(widget.keyframes)
+      ..removeAt(index);
+    widget.onKeyframesChanged(updated);
+    HapticFeedback.mediumImpact();
+  }
+
+  int _elapsedMsAt(Offset localPosition, Size size) {
+    final plotRect = _PressureProfileEditorPainter.plotRect(size);
+    return ((localPosition.dx - plotRect.left) /
+            plotRect.width *
+            widget.durationMs)
+        .round()
+        .clamp(0, widget.durationMs);
   }
 
   int? _hitTestKeyframe(Offset localPosition, Size size) {
@@ -325,20 +375,58 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
   void _onPointerDown(PointerDownEvent event, Size size) {
     _pointerDown = event.localPosition;
     _dragged = false;
+    _dragVertical = null;
+    _longPressHandled = false;
+    _cancelLongPress();
+
     final index = _hitTestKeyframe(event.localPosition, size);
     setState(() => _activeIndex = index);
     if (index != null) {
       _setGestureActive(true);
+      _longPressTimer = Timer(_longPressDuration, () {
+        if (!mounted || _activeIndex != index) {
+          return;
+        }
+        _longPressHandled = true;
+        _dragged = true;
+        _deleteKeyframe(index);
+        setState(() => _activeIndex = null);
+        _setGestureActive(false);
+      });
+    } else {
+      final plotRect = _PressureProfileEditorPainter.plotRect(size);
+      if (plotRect.contains(event.localPosition)) {
+        _setGestureActive(true);
+      }
     }
   }
 
   void _onPointerMove(PointerMoveEvent event, Size size) {
     final index = _activeIndex;
-    if (index == null) {
+    if (index == null || _longPressHandled) {
       return;
     }
 
+    if (_pointerDown != null) {
+      final delta = event.localPosition - _pointerDown!;
+      if (_dragVertical == null &&
+          (delta.dx.abs() > _axisLockThreshold ||
+              delta.dy.abs() > _axisLockThreshold)) {
+        _dragVertical = delta.dy.abs() >= delta.dx.abs();
+        _cancelLongPress();
+      }
+    }
+
     _dragged = true;
+    _cancelLongPress();
+
+    if (_dragVertical == false &&
+        index > 0 &&
+        index < widget.keyframes.length - 1) {
+      _updateKeyframeTime(index, _elapsedMsAt(event.localPosition, size), size);
+      return;
+    }
+
     final plotRect = _PressureProfileEditorPainter.plotRect(size);
     final normalizedY = 1 -
         ((event.localPosition.dy - plotRect.top) / plotRect.height)
@@ -347,14 +435,28 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
   }
 
   void _onPointerEnd(Offset localPosition, Size size) {
+    _cancelLongPress();
+
     if (_activeIndex != null) {
       setState(() => _activeIndex = null);
       _setGestureActive(false);
-    } else if (_pointerDown != null && !_dragged) {
+    } else if (_pointerDown != null && !_dragged && !_longPressHandled) {
       _tryAddKeyframeAt(localPosition, size);
+      _setGestureActive(false);
+    } else {
+      _setGestureActive(false);
     }
+
     _pointerDown = null;
     _dragged = false;
+    _dragVertical = null;
+    _longPressHandled = false;
+  }
+
+  @override
+  void dispose() {
+    _cancelLongPress();
+    super.dispose();
   }
 
   @override
@@ -836,8 +938,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Drag the dots to adjust pressure, or tap the curve to add a '
-                'point. Predicted flow is a simple stub (higher pressure → '
+                'Drag vertically for pressure, horizontally to move a point in '
+                'time. Tap the curve to add a point; long-press a point to '
+                'remove it. Predicted flow is a simple stub (higher pressure → '
                 'higher g/s).',
                 style: Theme.of(context).textTheme.bodySmall,
               ),

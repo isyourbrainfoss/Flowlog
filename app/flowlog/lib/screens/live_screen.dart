@@ -12,6 +12,7 @@ import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog/sensors/live_sensor_source.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
+import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog/shell/shell_breakpoints.dart';
 import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
@@ -340,6 +341,7 @@ class _LiveScreenState extends State<LiveScreen> {
         return;
       }
 
+      final activeBean = ActiveBeanScope.maybeOf(context);
       final shot = await runAutoSaveFlow(
         context: context,
         repository: repository,
@@ -347,6 +349,9 @@ class _LiveScreenState extends State<LiveScreen> {
         startedAt: startedAt,
         endedAt: controller.sessionEndedAt,
         initialMetadata: _repeatShotController?.prefill?.metadata,
+        beanRepository: await _ensureBeanRepository(),
+        activeBeanName: activeBean?.name,
+        activeBeanId: activeBean?.beanId,
         annotations: _annotationController.annotations,
         idGenerator: widget.shotIdGenerator,
         onSaved: (saved) {

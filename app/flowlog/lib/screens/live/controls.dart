@@ -137,6 +137,7 @@ class LiveControls extends StatelessWidget {
   const LiveControls({
     required this.controller,
     this.prominent = false,
+    this.compact = false,
     super.key,
   });
 
@@ -144,6 +145,9 @@ class LiveControls extends StatelessWidget {
 
   /// When true, renders a large pill-shaped primary action for phones.
   final bool prominent;
+
+  /// When true, renders a shorter bar suited to landscape fullscreen.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -153,16 +157,26 @@ class LiveControls extends StatelessWidget {
         final brewing = controller.isBrewing;
         final enabled = brewing ? controller.canStop : controller.canStart;
 
-        final baseStyle = prominent
+        final baseStyle = compact
             ? FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(64),
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+                minimumSize: const Size.fromHeight(44),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
                 shape: const StadiumBorder(),
-                textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+                textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
               )
-            : null;
+            : prominent
+                ? FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(64),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+                    shape: const StadiumBorder(),
+                    textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  )
+                : null;
 
         return Semantics(
           button: true,

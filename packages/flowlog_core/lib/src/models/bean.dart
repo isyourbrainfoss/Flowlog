@@ -8,6 +8,7 @@ class Bean {
     required this.name,
     this.origin,
     this.roastLevel,
+    this.roastDate,
     this.stockG,
     this.notes,
   });
@@ -16,6 +17,7 @@ class Bean {
   final String name;
   final String? origin;
   final String? roastLevel;
+  final DateTime? roastDate;
   final double? stockG;
   final String? notes;
 
@@ -25,6 +27,9 @@ class Bean {
       name: json['name'] as String,
       origin: json['origin'] as String?,
       roastLevel: json['roastLevel'] as String?,
+      roastDate: json['roastDate'] == null
+          ? null
+          : DateTime.parse(json['roastDate'] as String).toUtc(),
       stockG: (json['stockG'] as num?)?.toDouble(),
       notes: json['notes'] as String?,
     );
@@ -36,6 +41,7 @@ class Bean {
       'name': name,
       if (origin != null) 'origin': origin,
       if (roastLevel != null) 'roastLevel': roastLevel,
+      if (roastDate != null) 'roastDate': roastDate!.toUtc().toIso8601String(),
       if (stockG != null) 'stockG': stockG,
       if (notes != null) 'notes': notes,
     };
@@ -46,6 +52,7 @@ class Bean {
     String? name,
     String? origin,
     String? roastLevel,
+    DateTime? roastDate,
     double? stockG,
     String? notes,
   }) {
@@ -54,6 +61,7 @@ class Bean {
       name: name ?? this.name,
       origin: origin ?? this.origin,
       roastLevel: roastLevel ?? this.roastLevel,
+      roastDate: roastDate ?? this.roastDate,
       stockG: stockG ?? this.stockG,
       notes: notes ?? this.notes,
     );
@@ -67,16 +75,17 @@ class Bean {
             name == other.name &&
             origin == other.origin &&
             roastLevel == other.roastLevel &&
+            roastDate == other.roastDate &&
             stockG == other.stockG &&
             notes == other.notes;
   }
 
   @override
   int get hashCode =>
-      Object.hash(id, name, origin, roastLevel, stockG, notes);
+      Object.hash(id, name, origin, roastLevel, roastDate, stockG, notes);
 
   @override
   String toString() =>
       'Bean(id: $id, name: $name, origin: $origin, roastLevel: $roastLevel, '
-      'stockG: $stockG, notes: $notes)';
+      'roastDate: $roastDate, stockG: $stockG, notes: $notes)';
 }

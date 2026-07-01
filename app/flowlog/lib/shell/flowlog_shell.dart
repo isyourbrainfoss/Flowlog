@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
@@ -6,6 +9,7 @@ import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog/shell/shell_breakpoints.dart';
 import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog/shell/top_bar.dart';
+import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
 /// Adaptive app shell: bottom bar when narrow/short, labeled sidebar when wide.
@@ -28,6 +32,9 @@ class FlowlogShell extends StatefulWidget {
 class _FlowlogShellState extends State<FlowlogShell> {
   late int _selectedIndex;
   String _beanName = kDefaultBeanName;
+  String? _beanId;
+  BeanRepository? _beanRepository;
+  FlowlogDatabase? _database;
   final FlowlogShortcutRegistry _shortcutRegistry = FlowlogShortcutRegistry();
   late final RepeatShotController _repeatShotController;
   late final bool _ownsRepeatShotController;
@@ -43,6 +50,31 @@ class _FlowlogShellState extends State<FlowlogShell> {
     if (_selectedIndex < 0) {
       _selectedIndex = 0;
     }
+    unawaited(_loadActiveBean());
+  }
+
+  Future<BeanRepository> _ensureBeanRepository() async {
+    if (_beanRepository != null) {
+      return _beanRepository!;
+    }
+
+    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
+    _database = FlowlogDatabase.openFile(dbPath);
+    _beanRepository = BeanRepository(_database!);
+    return _beanRepository!;
+  }
+
+  Future<void> _loadActiveBean() async {
+    final repository = await _ensureBeanRepository();
+    final beans = await repository.listBeansByRecentUse();
+    if (!mounted || beans.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _beanName = beans.first.name;
+      _beanId = beans.first.id;
+    });
   }
 
   @override
@@ -50,11 +82,21 @@ class _FlowlogShellState extends State<FlowlogShell> {
     if (_ownsRepeatShotController) {
       _repeatShotController.dispose();
     }
+    _database?.close();
     super.dispose();
   }
 
-  void _onBeanNameChanged(String name) {
-    setState(() => _beanName = name);
+  Future<void> _onBeanNameChanged(String name) async {
+    final repository = await _ensureBeanRepository();
+    final bean = await repository.ensureBeanForName(name);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _beanName = bean.name;
+      _beanId = bean.id;
+    });
   }
 
   void _onDestinationSelected(int index) {
@@ -117,7 +159,8 @@ class _FlowlogShellState extends State<FlowlogShell> {
                 key: const ValueKey('shell-main-panel'),
                 child: _ShellContent(
                   beanName: _beanName,
-                  onBeanNameChanged: _onBeanNameChanged,
+                  beanId: _beanId,
+                  onBeanNameChanged: (name) => unawaited(_onBeanNameChanged(name)),
                   child: destination.screen,
                 ),
               ),
@@ -150,11 +193,13 @@ class _FlowlogShellState extends State<FlowlogShell> {
 class _ShellContent extends StatelessWidget {
   const _ShellContent({
     required this.beanName,
+    required this.beanId,
     required this.onBeanNameChanged,
     required this.child,
   });
 
   final String beanName;
+  final String? beanId;
   final ValueChanged<String> onBeanNameChanged;
   final Widget child;
 
@@ -174,6 +219,7 @@ class _ShellContent extends StatelessWidget {
 
         return ActiveBeanScope(
           name: beanName,
+          beanId: beanId,
           onNameChanged: onBeanNameChanged,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

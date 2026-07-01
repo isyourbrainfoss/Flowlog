@@ -48,27 +48,22 @@ void main() {
         find.widgetWithText(TextFormField, 'Origin'),
         'Brazil',
       );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Roast'),
-        'medium',
-      );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Stock (g)'),
-        '500',
-      );
+      await tester.tap(find.byKey(const Key('bean_stock_preset_250')));
+      await tester.pump();
 
       await tester.tap(find.byKey(const Key('bean_editor_save')));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('bean_card_bean-test')), findsOneWidget);
       expect(find.text('House Blend'), findsOneWidget);
-      expect(find.text('Brazil · medium'), findsOneWidget);
+      expect(find.textContaining('Brazil · Medium'), findsOneWidget);
       expect(find.text('0 shots'), findsOneWidget);
 
       final saved = await beanRepository.getBeanById('bean-test');
       expect(saved, isNotNull);
       expect(saved!.name, 'House Blend');
-      expect(saved.stockG, 500);
+      expect(saved.stockG, 250);
+      expect(saved.roastLevel, 'Medium');
     });
 
     testWidgets('shows linked shot count on bean card', (tester) async {

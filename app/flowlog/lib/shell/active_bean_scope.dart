@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 
-/// Exposes the active brew bean name from the shell top bar to descendant tabs.
+/// Exposes the active brew bean from the shell top bar to descendant tabs.
 class ActiveBeanScope extends InheritedWidget {
   const ActiveBeanScope({
     required this.name,
+    this.beanId,
     required this.onNameChanged,
     required super.child,
     super.key,
   });
 
   final String name;
+
+  /// Persisted bean id when the active bean exists in the database.
+  final String? beanId;
+
   final ValueChanged<String> onNameChanged;
 
   static ActiveBeanScope? maybeOf(BuildContext context) {
@@ -18,6 +23,6 @@ class ActiveBeanScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(covariant ActiveBeanScope oldWidget) {
-    return name != oldWidget.name;
+    return name != oldWidget.name || beanId != oldWidget.beanId;
   }
 }
