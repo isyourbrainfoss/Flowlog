@@ -64,13 +64,12 @@ Future<ShotMetadata> defaultMetadataFromSamples(
   String? activeBeanId,
 }) async {
   final last = samples.last;
-  var beanId = activeBeanId;
-  if (beanId == null &&
-      beanRepository != null &&
-      activeBeanName != null &&
-      activeBeanName.trim().isNotEmpty) {
-    beanId = (await beanRepository.ensureBeanForName(activeBeanName.trim())).id;
-  }
+  final beanId = beanRepository == null
+      ? activeBeanId
+      : await beanRepository.resolveActiveBeanId(
+          beanId: activeBeanId,
+          name: activeBeanName,
+        );
 
   return ShotMetadata(
     yieldG: last.weightG,
@@ -104,12 +103,12 @@ Future<Shot?> runAutoSaveFlow({
   if (initialMetadata != null) {
     metadata = initialMetadata;
     if (metadata.beanId == null && beanRepository != null) {
-      if (activeBeanId != null) {
-        metadata = metadata.copyWith(beanId: activeBeanId);
-      } else if (activeBeanName != null && activeBeanName.trim().isNotEmpty) {
-        final bean =
-            await beanRepository.ensureBeanForName(activeBeanName.trim());
-        metadata = metadata.copyWith(beanId: bean.id);
+      final resolvedId = await beanRepository.resolveActiveBeanId(
+        beanId: activeBeanId,
+        name: activeBeanName,
+      );
+      if (resolvedId != null) {
+        metadata = metadata.copyWith(beanId: resolvedId);
       }
     }
   } else {

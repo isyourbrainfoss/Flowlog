@@ -88,14 +88,40 @@ class _FlowlogShellState extends State<FlowlogShell> {
 
   Future<void> _onBeanNameChanged(String name) async {
     final repository = await _ensureBeanRepository();
-    final bean = await repository.ensureBeanForName(name);
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || !mounted) {
+      return;
+    }
+
+    if (_beanId != null) {
+      final existing = await repository.getBeanById(_beanId!);
+      if (existing != null) {
+        final updated = existing.copyWith(name: trimmed);
+        await repository.updateBean(updated);
+        setState(() {
+          _beanName = updated.name;
+        });
+        return;
+      }
+    }
+
+    final created = await repository.createBean(name: trimmed);
     if (!mounted) {
       return;
     }
 
     setState(() {
-      _beanName = bean.name;
-      _beanId = bean.id;
+      _beanName = created.name;
+      _beanId = created.id;
+    });
+  }
+
+  void _onActiveBeanChanged(String name, {String? beanId}) {
+    setState(() {
+      _beanName = name;
+      if (beanId != null) {
+        _beanId = beanId;
+      }
     });
   }
 
@@ -160,7 +186,9 @@ class _FlowlogShellState extends State<FlowlogShell> {
                 child: _ShellContent(
                   beanName: _beanName,
                   beanId: _beanId,
-                  onBeanNameChanged: (name) => unawaited(_onBeanNameChanged(name)),
+                  onBeanNameChanged: (name) =>
+                      unawaited(_onBeanNameChanged(name)),
+                  onActiveBeanChanged: _onActiveBeanChanged,
                   child: destination.screen,
                 ),
               ),
@@ -195,12 +223,14 @@ class _ShellContent extends StatelessWidget {
     required this.beanName,
     required this.beanId,
     required this.onBeanNameChanged,
+    required this.onActiveBeanChanged,
     required this.child,
   });
 
   final String beanName;
   final String? beanId;
   final ValueChanged<String> onBeanNameChanged;
+  final void Function(String name, {String? beanId}) onActiveBeanChanged;
   final Widget child;
 
   @override
@@ -220,7 +250,7 @@ class _ShellContent extends StatelessWidget {
         return ActiveBeanScope(
           name: beanName,
           beanId: beanId,
-          onNameChanged: onBeanNameChanged,
+          onActiveBeanChanged: onActiveBeanChanged,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

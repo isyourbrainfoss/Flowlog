@@ -5,7 +5,7 @@ class ActiveBeanScope extends InheritedWidget {
   const ActiveBeanScope({
     required this.name,
     this.beanId,
-    required this.onNameChanged,
+    required this.onActiveBeanChanged,
     required super.child,
     super.key,
   });
@@ -15,7 +15,7 @@ class ActiveBeanScope extends InheritedWidget {
   /// Persisted bean id when the active bean exists in the database.
   final String? beanId;
 
-  final ValueChanged<String> onNameChanged;
+  final void Function(String name, {String? beanId}) onActiveBeanChanged;
 
   static ActiveBeanScope? maybeOf(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<ActiveBeanScope>();
