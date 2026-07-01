@@ -382,4 +382,10 @@ class SensorHubScope extends InheritedNotifier<SensorHub> {
     assert(scope != null, 'SensorHubScope not found in context');
     return scope!.notifier!;
   }
+
+  static SensorHub? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<SensorHubScope>()
+        ?.notifier;
+  }
 }

@@ -59,5 +59,5 @@ Parallel waves: [`docs/PARALLEL.md`](PARALLEL.md).
 | H5 | Auto-save all shots | done | after H4 |
 | H6 | Target curves on Live | done | H4, H7 |
 | H7 | Simulator import/export target | done | H6 |
-| H8 | Auto-start on pressure | pending | after H4 |
-| H9 | Fullscreen plot mode | pending | after H6 |
+| H8 | Auto-start on pressure | done | after H4 |
+| H9 | Fullscreen plot mode | done | after H6 |

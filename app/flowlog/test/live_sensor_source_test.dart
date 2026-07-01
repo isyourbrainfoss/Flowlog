@@ -242,8 +242,12 @@ void main() {
     ) async {
       await pumpLiveScreen(tester);
 
+      final tryDemoButton = find.byKey(const Key('live_try_demo'));
+      await tester.ensureVisible(tryDemoButton);
+      await tester.pumpAndSettle();
+
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('live_try_demo')));
+        await tester.tap(tryDemoButton);
         await tester.pump();
       });
 
@@ -255,8 +259,12 @@ void main() {
     testWidgets('dismissing demo banner exits demo mode', (tester) async {
       await pumpLiveScreen(tester);
 
+      final tryDemoButton = find.byKey(const Key('live_try_demo'));
+      await tester.ensureVisible(tryDemoButton);
+      await tester.pumpAndSettle();
+
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('live_try_demo')));
+        await tester.tap(tryDemoButton);
         await tester.pump();
       });
 
