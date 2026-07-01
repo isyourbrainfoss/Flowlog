@@ -7,11 +7,11 @@ import 'package:test/test.dart';
 
 void main() {
   group('schema', () {
-    test('schema version is 6', () async {
+    test('schema version is 7', () async {
       final db = FlowlogDatabase.inMemory();
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 6);
+      expect(db.schemaVersion, 7);
     });
 
     test(
@@ -356,13 +356,13 @@ void main() {
         final shot = _loadFixtureShot('shots/minimal_shot.json');
 
         await writerRepo.insertShot(shot);
-        expect(writer.schemaVersion, 6);
+        expect(writer.schemaVersion, 7);
         await writer.close();
 
         final reader = FlowlogDatabase.openFile(dbPath);
         final readerRepo = ShotRepository(reader);
 
-        expect(reader.schemaVersion, 6);
+        expect(reader.schemaVersion, 7);
         expect(await readerRepo.getShotWithSamples(shot.id), shot);
 
         await reader.close();
@@ -412,7 +412,7 @@ void main() {
         final migrated = FlowlogDatabase.openFile(dbPath);
         addTearDown(migrated.close);
 
-        expect(migrated.schemaVersion, 6);
+        expect(migrated.schemaVersion, 7);
 
         final tables = await migrated
             .customSelect(
@@ -440,7 +440,7 @@ void main() {
             )
             .map((row) => row.read<String>('name'))
             .get();
-        expect(beanColumns, contains('roast_date'));
+        expect(beanColumns, containsAll(['roast_date', 'process']));
 
         final shotRepo = ShotRepository(migrated);
         final loaded = await shotRepo.getShotById('legacy-shot');
@@ -502,7 +502,7 @@ void main() {
         final migrated = FlowlogDatabase.openFile(dbPath);
         addTearDown(migrated.close);
 
-        expect(migrated.schemaVersion, 6);
+        expect(migrated.schemaVersion, 7);
 
         final tables = await migrated
             .customSelect(

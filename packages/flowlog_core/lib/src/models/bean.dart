@@ -1,5 +1,12 @@
 import 'package:meta/meta.dart';
 
+/// Coffee processing methods for bean inventory.
+const List<String> kBeanProcessMethods = [
+  'Washed',
+  'Natural',
+  'Anaerobic natural',
+];
+
 /// Coffee bean inventory entry.
 @immutable
 class Bean {
@@ -9,6 +16,7 @@ class Bean {
     this.origin,
     this.roastLevel,
     this.roastDate,
+    this.process,
     this.stockG,
     this.notes,
   });
@@ -18,6 +26,7 @@ class Bean {
   final String? origin;
   final String? roastLevel;
   final DateTime? roastDate;
+  final String? process;
   final double? stockG;
   final String? notes;
 
@@ -30,6 +39,7 @@ class Bean {
       roastDate: json['roastDate'] == null
           ? null
           : DateTime.parse(json['roastDate'] as String).toUtc(),
+      process: json['process'] as String?,
       stockG: (json['stockG'] as num?)?.toDouble(),
       notes: json['notes'] as String?,
     );
@@ -42,6 +52,7 @@ class Bean {
       if (origin != null) 'origin': origin,
       if (roastLevel != null) 'roastLevel': roastLevel,
       if (roastDate != null) 'roastDate': roastDate!.toUtc().toIso8601String(),
+      if (process != null) 'process': process,
       if (stockG != null) 'stockG': stockG,
       if (notes != null) 'notes': notes,
     };
@@ -53,6 +64,7 @@ class Bean {
     String? origin,
     String? roastLevel,
     DateTime? roastDate,
+    String? process,
     double? stockG,
     String? notes,
   }) {
@@ -62,6 +74,7 @@ class Bean {
       origin: origin ?? this.origin,
       roastLevel: roastLevel ?? this.roastLevel,
       roastDate: roastDate ?? this.roastDate,
+      process: process ?? this.process,
       stockG: stockG ?? this.stockG,
       notes: notes ?? this.notes,
     );
@@ -76,16 +89,25 @@ class Bean {
             origin == other.origin &&
             roastLevel == other.roastLevel &&
             roastDate == other.roastDate &&
+            process == other.process &&
             stockG == other.stockG &&
             notes == other.notes;
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, origin, roastLevel, roastDate, stockG, notes);
+  int get hashCode => Object.hash(
+        id,
+        name,
+        origin,
+        roastLevel,
+        roastDate,
+        process,
+        stockG,
+        notes,
+      );
 
   @override
   String toString() =>
       'Bean(id: $id, name: $name, origin: $origin, roastLevel: $roastLevel, '
-      'roastDate: $roastDate, stockG: $stockG, notes: $notes)';
+      'roastDate: $roastDate, process: $process, stockG: $stockG, notes: $notes)';
 }
