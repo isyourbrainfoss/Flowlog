@@ -228,7 +228,8 @@ class _EmptyTagsState extends StatelessWidget {
                 spacing: 8,
                 alignment: WrapAlignment.center,
                 children: [
-                  for (final suggestion in const ['Practice', 'Dial-in', 'Funky'])
+                  for (final suggestion
+                      in const ['Practice', 'Dial-in', 'Competition'])
                     ActionChip(
                       key: Key('tag_suggestion_${suggestion.toLowerCase()}'),
                       label: Text(suggestion),

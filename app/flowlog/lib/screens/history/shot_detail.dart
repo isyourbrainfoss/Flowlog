@@ -36,6 +36,7 @@ class ShotDetailScreen extends StatefulWidget {
 class _ShotDetailScreenState extends State<ShotDetailScreen> {
   late Shot _currentShot;
   ShotRepository? _shotRepository;
+  BeanRepository? _beanRepository;
   ProfileRepository? _profileRepository;
   FlowlogDatabase? _database;
   bool _ownsShotRepository = false;
@@ -65,6 +66,37 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
     super.dispose();
   }
 
+  Future<BeanRepository> _ensureBeanRepository() async {
+    if (widget.shotRepository != null && _beanRepository != null) {
+      return _beanRepository!;
+    }
+    if (_beanRepository != null) {
+      return _beanRepository!;
+    }
+
+    final database = await _ensureDatabase();
+    _beanRepository = BeanRepository(database);
+    return _beanRepository!;
+  }
+
+  Future<FlowlogDatabase> _ensureDatabase() async {
+    if (_database != null) {
+      return _database!;
+    }
+
+    if (widget.shotRepository != null) {
+      final dbPath = '${Directory.systemTemp.path}/flowlog.db';
+      _database = FlowlogDatabase.openFile(dbPath);
+      _ownsShotRepository = true;
+      return _database!;
+    }
+
+    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
+    _database = FlowlogDatabase.openFile(dbPath);
+    _ownsShotRepository = true;
+    return _database!;
+  }
+
   Future<ShotRepository> _ensureShotRepository() async {
     if (widget.shotRepository != null) {
       return widget.shotRepository!;
@@ -73,9 +105,8 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
       return _shotRepository!;
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
-    _shotRepository = ShotRepository(_database!);
+    final database = await _ensureDatabase();
+    _shotRepository = ShotRepository(database);
     _ownsShotRepository = true;
     return _shotRepository!;
   }
@@ -107,6 +138,7 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
       final updated = await runAddNotesFlow(
         context: context,
         repository: await _ensureShotRepository(),
+        beanRepository: await _ensureBeanRepository(),
         shot: _currentShot,
       );
       if (updated != null && mounted) {

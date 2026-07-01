@@ -8,6 +8,7 @@ import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Default elapsed times for editable pressure keyframes (ms).
 const List<int> defaultSimulatorKeyframeTimes = [
@@ -659,7 +660,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     final profiles = await repository.listProfiles(includeSamples: true);
     final profile = profiles.isNotEmpty
         ? profiles.first
-        : _demoProfileFromFixture();
+        : await _demoProfileFromFixture();
     final keyframes = keyframesFromPressureSamples(profile.pressureSamples);
     return _SimulatorState(profile: profile, keyframes: keyframes);
   }
@@ -988,21 +989,45 @@ class _SimulatorState {
   final List<PressureKeyframe> keyframes;
 }
 
-SavedProfile _demoProfileFromFixture() {
-  final shot = _loadDemoShotFromFixture();
+Future<SavedProfile> _demoProfileFromFixture() async {
+  final shot = await _loadDemoShotFromFixture();
   return SavedProfile.fromShot(
     shot,
     id: 'demo-profile',
-    name: 'Demo profile (fixture)',
+    name: 'Starter profile',
     createdAt: DateTime.utc(2026, 6, 29),
   );
 }
 
-Shot _loadDemoShotFromFixture() {
-  final json =
-      jsonDecode(File(_fixturePath('shots/minimal_shot.json')).readAsStringSync())
-          as Map<String, dynamic>;
-  return Shot.fromJson(json);
+Future<Shot> _loadDemoShotFromFixture() async {
+  try {
+    final bundled = await rootBundle.loadString('assets/minimal_shot.json');
+    return Shot.fromJson(jsonDecode(bundled) as Map<String, dynamic>);
+  } on Object {
+    try {
+      final json = jsonDecode(
+        File(_fixturePath('shots/minimal_shot.json')).readAsStringSync(),
+      ) as Map<String, dynamic>;
+      return Shot.fromJson(json);
+    } on Object {
+      return _builtinDemoShot();
+    }
+  }
+}
+
+Shot _builtinDemoShot() {
+  return Shot(
+    id: 'shot-builtin-demo',
+    startedAt: DateTime.utc(2026, 6, 29, 10),
+    endedAt: DateTime.utc(2026, 6, 29, 10, 0, 28, 500),
+    samples: const [
+      ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0, flowGs: 0),
+      ShotSample(elapsedMs: 6000, pressureBar: 4, weightG: 8, flowGs: 0.8),
+      ShotSample(elapsedMs: 12000, pressureBar: 6, weightG: 16, flowGs: 1.1),
+      ShotSample(elapsedMs: 18000, pressureBar: 8, weightG: 24, flowGs: 1.0),
+      ShotSample(elapsedMs: 28000, pressureBar: 5, weightG: 36, flowGs: 0.6),
+    ],
+  );
 }
 
 /// Prompts for a profile name before export or Live handoff.

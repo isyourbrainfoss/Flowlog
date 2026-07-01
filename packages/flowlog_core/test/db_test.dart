@@ -263,6 +263,41 @@ void main() {
       expect(await beanRepository.listBeans(), isEmpty);
     });
 
+    test('orders beans by recent shot use and ensures new names', () async {
+      const olderBean = Bean(id: 'bean-old', name: 'Old Roast');
+      const newerBean = Bean(id: 'bean-new', name: 'Test');
+      await beanRepository.upsertBean(olderBean);
+      await beanRepository.upsertBean(newerBean);
+
+      await shotRepository.insertShot(
+        Shot(
+          id: 'shot-old',
+          startedAt: DateTime.utc(2026, 6, 28, 10),
+          beanId: olderBean.id,
+        ),
+      );
+      await shotRepository.insertShot(
+        Shot(
+          id: 'shot-new',
+          startedAt: DateTime.utc(2026, 6, 29, 10),
+          beanId: newerBean.id,
+        ),
+      );
+
+      final ordered = await beanRepository.listBeansByRecentUse();
+      expect(ordered.map((bean) => bean.id).toList(), [
+        newerBean.id,
+        olderBean.id,
+      ]);
+
+      final created = await beanRepository.ensureBeanForName('Fresh Bag');
+      expect(created.name, 'Fresh Bag');
+      expect(await beanRepository.getBeanById(created.id), created);
+
+      final reused = await beanRepository.ensureBeanForName('test');
+      expect(reused.id, newerBean.id);
+    });
+
     test('counts shots linked by beanId', () async {
       const bean = Bean(id: 'bean-house', name: 'House Blend');
       await beanRepository.upsertBean(bean);

@@ -154,11 +154,13 @@ Future<Shot?> runAddNotesFlow({
   required BuildContext context,
   required ShotRepository repository,
   required Shot shot,
+  BeanRepository? beanRepository,
   void Function(Shot shot)? onSaved,
 }) async {
   final metadata = await showMetadataSheet(
     context,
     initial: ShotMetadata.fromShot(shot),
+    beanRepository: beanRepository,
   );
   if (metadata == null || !context.mounted) {
     return null;

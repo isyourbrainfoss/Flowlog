@@ -227,7 +227,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('0 samples'), findsOneWidget);
-      expect(find.text('Session: recording'), findsOneWidget);
+      expect(find.text('Stop brew'), findsOneWidget);
     });
 
     testWidgets('shows try demo button only while idle', (tester) async {
@@ -253,7 +253,7 @@ void main() {
 
       expect(find.text('Demo shot — replayed sample data'), findsOneWidget);
       expect(find.byKey(const Key('live_try_demo')), findsNothing);
-      expect(find.text('Session: recording'), findsOneWidget);
+      expect(find.text('Stop brew'), findsOneWidget);
     });
 
     testWidgets('dismissing demo banner exits demo mode', (tester) async {

@@ -1,4 +1,5 @@
 import 'package:flowlog/screens/live/repeat_shot.dart';
+import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/shortcuts.dart';
@@ -171,22 +172,26 @@ class _ShellContent extends StatelessWidget {
 
         final hub = SensorHubScope.of(context);
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ListenableBuilder(
-              listenable: hub,
-              builder: (context, _) {
-                return FlowlogTopBar(
-                  beanName: beanName,
-                  onBeanNameChanged: onBeanNameChanged,
-                  pressensorState: hub.pressensorState,
-                  scaleState: hub.scaleState,
-                );
-              },
-            ),
-            Expanded(child: ClipRect(child: child)),
-          ],
+        return ActiveBeanScope(
+          name: beanName,
+          onNameChanged: onBeanNameChanged,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListenableBuilder(
+                listenable: hub,
+                builder: (context, _) {
+                  return FlowlogTopBar(
+                    beanName: beanName,
+                    onBeanNameChanged: onBeanNameChanged,
+                    pressensorState: hub.pressensorState,
+                    scaleState: hub.scaleState,
+                  );
+                },
+              ),
+              Expanded(child: ClipRect(child: child)),
+            ],
+          ),
         );
       },
     );

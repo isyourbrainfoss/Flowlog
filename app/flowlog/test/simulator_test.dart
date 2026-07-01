@@ -8,6 +8,25 @@ import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Pumps until [SimulatorScreen] finishes loading.
+///
+/// Uses [WidgetTester.runAsync] so bundled fixture loads from [rootBundle]
+/// can complete across widget tests in this file.
+Future<void> settleSimulator(WidgetTester tester) async {
+  await tester.pump();
+  await tester.runAsync(() async {
+    for (var attempt = 0; attempt < 60; attempt++) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await tester.pump();
+      if (find.byKey(const Key('simulator_screen')).evaluate().isNotEmpty) {
+        return;
+      }
+    }
+    fail('Timed out waiting for simulator_screen');
+  });
+  await tester.pump();
+}
+
 void main() {
   group('predictFlowGs', () {
     test('returns zero for near-zero pressure', () {
@@ -85,20 +104,33 @@ void main() {
     testWidgets('smoke test shows editor, metrics, and chart with demo profile', (
       tester,
     ) async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      await profileRepository.insertProfile(
+        SavedProfile.fromShot(
+          shot,
+          id: 'demo-profile',
+          name: 'Starter profile',
+          createdAt: DateTime.utc(2026, 6, 29),
+        ),
+      );
+
       await tester.pumpWidget(
         MaterialApp(
           home: SimulatorScreen(profileRepository: profileRepository),
         ),
       );
-      await tester.pumpAndSettle();
+      await settleSimulator(tester);
 
       expect(find.byKey(const Key('simulator_screen')), findsOneWidget);
       expect(find.byKey(const Key('simulator_profile_editor')), findsOneWidget);
       expect(find.byKey(const Key('simulator_predicted_flow')), findsOneWidget);
       expect(find.byKey(const Key('simulator_flow_chart')), findsOneWidget);
-      expect(find.textContaining('Demo profile'), findsOneWidget);
+      expect(find.textContaining('Starter profile'), findsOneWidget);
       expect(find.textContaining('g/s'), findsWidgets);
       expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
     });
 
     testWidgets('loads saved profile when repository has data', (tester) async {
@@ -115,10 +147,10 @@ void main() {
           home: SimulatorScreen(profileRepository: profileRepository),
         ),
       );
-      await tester.pumpAndSettle();
+      await settleSimulator(tester);
 
       expect(find.text('Saved 9-bar profile'), findsOneWidget);
-      expect(find.textContaining('Demo profile'), findsNothing);
+      expect(find.textContaining('Starter profile'), findsNothing);
     });
 
     test('higher keyframe pressures yield higher predicted peak flow', () {
@@ -204,6 +236,14 @@ void main() {
     testWidgets('import shot loads keyframes from saved shot', (tester) async {
       final shot = _loadFixtureShot('shots/minimal_shot.json');
       await shotRepository.insertShot(shot);
+      await profileRepository.insertProfile(
+        SavedProfile.fromShot(
+          shot,
+          id: 'demo-profile',
+          name: 'Starter profile',
+          createdAt: DateTime.utc(2026, 6, 29),
+        ),
+      );
 
       await tester.pumpWidget(
         MaterialApp(
@@ -213,13 +253,15 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await settleSimulator(tester);
 
       await tester.tap(find.byKey(const Key('simulator_import_shot')));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       await tester.tap(find.byKey(Key('simulator_import_shot_${shot.id}')));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text(shot.id), findsOneWidget);
       expect(find.byKey(const Key('simulator_profile_editor')), findsOneWidget);
@@ -228,6 +270,16 @@ void main() {
     testWidgets('export profile persists keyframes to repository', (
       tester,
     ) async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      await profileRepository.insertProfile(
+        SavedProfile.fromShot(
+          shot,
+          id: 'demo-profile',
+          name: 'Starter profile',
+          createdAt: DateTime.utc(2026, 6, 29),
+        ),
+      );
+
       await tester.pumpWidget(
         MaterialApp(
           home: SimulatorScreen(
@@ -236,10 +288,11 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await settleSimulator(tester);
 
       await tester.tap(find.byKey(const Key('simulator_export_profile')));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       await tester.showKeyboard(
         find.byKey(const Key('simulator_profile_name_field')),

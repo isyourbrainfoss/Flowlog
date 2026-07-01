@@ -155,16 +155,28 @@ class _BeanNameEditDialogState extends State<_BeanNameEditDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Bean name'),
-      content: TextField(
-        key: const Key('top_bar_bean_edit_field'),
-        controller: _controller,
-        autofocus: true,
-        textCapitalization: TextCapitalization.words,
-        decoration: const InputDecoration(
-          labelText: 'Bean',
-          hintText: 'e.g. House Blend',
-        ),
+      title: const Text('Active bean'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'This is the bean you are dialing in right now. New shots '
+            'prefill with this name until you change it.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('top_bar_bean_edit_field'),
+            controller: _controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Bean',
+              hintText: 'e.g. House Blend',
+            ),
+          ),
+        ],
       ),
       actions: [
         TextButton(

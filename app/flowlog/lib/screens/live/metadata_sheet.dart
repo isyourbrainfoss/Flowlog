@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:meta/meta.dart';
@@ -140,6 +143,8 @@ List<String> flavourTagsForDisplay(Set<String> selected) {
 Future<ShotMetadata?> showMetadataSheet(
   BuildContext context, {
   ShotMetadata? initial,
+  BeanRepository? beanRepository,
+  String? activeBeanName,
 }) {
   return showModalBottomSheet<ShotMetadata>(
     context: context,
@@ -149,7 +154,12 @@ Future<ShotMetadata?> showMetadataSheet(
       final sheetHeight = MediaQuery.sizeOf(context).height * 0.85;
       return SizedBox(
         height: sheetHeight,
-        child: MetadataSheet(initial: initial),
+        child: MetadataSheet(
+          initial: initial,
+          beanRepository: beanRepository,
+          activeBeanName: activeBeanName ??
+              ActiveBeanScope.maybeOf(context)?.name,
+        ),
       );
     },
   );
@@ -160,9 +170,13 @@ class MetadataSheet extends StatefulWidget {
   const MetadataSheet({
     super.key,
     this.initial,
+    this.beanRepository,
+    this.activeBeanName,
   });
 
   final ShotMetadata? initial;
+  final BeanRepository? beanRepository;
+  final String? activeBeanName;
 
   @override
   State<MetadataSheet> createState() => _MetadataSheetState();
@@ -178,6 +192,8 @@ class _MetadataSheetState extends State<MetadataSheet> {
   late double _tasteScore;
   late Set<String> _selectedFlavourTags;
   final _customTagController = TextEditingController();
+  List<Bean> _beans = const [];
+  bool _beansReady = false;
 
   @override
   void initState() {
@@ -192,13 +208,53 @@ class _MetadataSheetState extends State<MetadataSheet> {
     _grindController = TextEditingController(
       text: _formatDouble(initial?.grindSetting),
     );
-    _beanController = TextEditingController(text: initial?.beanId ?? '');
+    _beanController = TextEditingController(
+      text: _initialBeanLabel(initial?.beanId),
+    );
     _tempController = TextEditingController(
       text: _formatDouble(initial?.waterTempC),
     );
     _notesController = TextEditingController(text: initial?.notes ?? '');
     _tasteScore = (initial?.tasteScore ?? 5).toDouble();
     _selectedFlavourTags = Set<String>.from(initial?.flavourTags ?? const []);
+    unawaited(_loadBeans());
+  }
+
+  String _initialBeanLabel(String? beanId) {
+    if (beanId != null && beanId.trim().isNotEmpty) {
+      return beanId;
+    }
+    return widget.activeBeanName?.trim() ?? '';
+  }
+
+  Future<void> _loadBeans() async {
+    final repository = widget.beanRepository;
+    if (repository == null) {
+      if (mounted) {
+        setState(() => _beansReady = true);
+      }
+      return;
+    }
+
+    final beans = await repository.listBeansByRecentUse();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _beans = beans;
+      _beansReady = true;
+      final beanId = widget.initial?.beanId;
+      if (beanId != null) {
+        final match = beans.where((bean) => bean.id == beanId).firstOrNull;
+        if (match != null) {
+          _beanController.text = match.name;
+        }
+      } else if (_beanController.text.isEmpty &&
+          widget.activeBeanName != null) {
+        _beanController.text = widget.activeBeanName!.trim();
+      }
+    });
   }
 
   @override
@@ -256,12 +312,22 @@ class _MetadataSheetState extends State<MetadataSheet> {
     return trimmed.isEmpty ? null : trimmed;
   }
 
-  ShotMetadata _buildMetadata() {
+  Future<ShotMetadata> _buildMetadata() async {
+    final beanInput = _parseString(_beanController.text);
+    String? beanId;
+    if (beanInput != null && widget.beanRepository != null) {
+      final bean = await widget.beanRepository!.ensureBeanForName(beanInput);
+      beanId = bean.id;
+      ActiveBeanScope.maybeOf(context)?.onNameChanged(bean.name);
+    } else {
+      beanId = beanInput;
+    }
+
     return ShotMetadata(
       doseG: _parseDouble(_doseController.text),
       yieldG: _parseDouble(_yieldController.text),
       grindSetting: _parseDouble(_grindController.text),
-      beanId: _parseString(_beanController.text),
+      beanId: beanId,
       waterTempC: _parseDouble(_tempController.text),
       notes: _parseString(_notesController.text),
       tasteScore: _tasteScore.round(),
@@ -269,8 +335,11 @@ class _MetadataSheetState extends State<MetadataSheet> {
     );
   }
 
-  void _save() {
-    Navigator.of(context).pop(_buildMetadata());
+  Future<void> _save() async {
+    final metadata = await _buildMetadata();
+    if (mounted) {
+      Navigator.of(context).pop(metadata);
+    }
   }
 
   @override
@@ -358,13 +427,51 @@ class _MetadataSheetState extends State<MetadataSheet> {
                 ],
               ),
               const SizedBox(height: 12),
-              TextField(
-                key: const Key('metadata_bean'),
-                controller: _beanController,
-                decoration: const InputDecoration(
-                  labelText: 'Bean',
-                  border: OutlineInputBorder(),
-                ),
+              Autocomplete<String>(
+                initialValue: TextEditingValue(text: _beanController.text),
+                optionsBuilder: (value) {
+                  final query = value.text.trim().toLowerCase();
+                  final names = [
+                    for (final bean in _beans) bean.name,
+                    if (query.isNotEmpty &&
+                        !_beans.any(
+                          (bean) => bean.name.toLowerCase() == query,
+                        ))
+                      value.text.trim(),
+                  ];
+                  if (query.isEmpty) {
+                    return names;
+                  }
+                  return names
+                      .where((name) => name.toLowerCase().contains(query))
+                      .toList();
+                },
+                onSelected: (value) => _beanController.text = value,
+                fieldViewBuilder: (
+                  context,
+                  controller,
+                  focusNode,
+                  onFieldSubmitted,
+                ) {
+                  if (controller.text != _beanController.text) {
+                    controller.text = _beanController.text;
+                  }
+                  return TextField(
+                    key: const Key('metadata_bean'),
+                    controller: controller,
+                    focusNode: focusNode,
+                    enabled: _beansReady,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Bean',
+                      border: OutlineInputBorder(),
+                      helperText:
+                          'Pick a saved bean or type a new name to create it',
+                    ),
+                    onChanged: (value) => _beanController.text = value,
+                    onSubmitted: (_) => onFieldSubmitted(),
+                  );
+                },
               ),
               const SizedBox(height: 12),
               TextField(
@@ -471,7 +578,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: FilledButton(
                 key: const Key('metadata_save'),
-                onPressed: _save,
+                onPressed: () => unawaited(_save()),
                 child: const Text('Save'),
               ),
             ),

@@ -1,0 +1,29 @@
+{
+  "id": "shot-minimal-001",
+  "startedAt": "2026-06-29T10:00:00.000Z",
+  "endedAt": "2026-06-29T10:00:28.500Z",
+  "doseG": 18.0,
+  "yieldG": 36.0,
+  "grindSetting": 14.0,
+  "beanId": "bean-house-blend",
+  "waterTempC": 93.0,
+  "notes": "Minimal fixture shot for tests and mock replay.",
+  "tasteScore": 7,
+  "flavourTags": ["chocolate", "nutty"],
+  "samples": [
+    {
+      "elapsedMs": 0,
+      "pressureBar": 0.0,
+      "weightG": 0.0,
+      "flowGs": 0.0,
+      "tempC": 93.0
+    },
+    {
+      "elapsedMs": 15000,
+      "pressureBar": 9.0,
+      "weightG": 18.5,
+      "flowGs": 1.2,
+      "tempC": 92.5
+    }
+  ]
+}

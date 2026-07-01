@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets('opens and closes fullscreen live chart route', (tester) async {
-    tester.view.physicalSize = const Size(800, 900);
+    tester.view.physicalSize = const Size(800, 1000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -39,6 +39,7 @@ void main() {
 
     expect(find.byKey(const Key('live_fullscreen_chart')), findsOneWidget);
     expect(find.byKey(const Key('live_fullscreen_dual_chart')), findsOneWidget);
+    expect(find.byKey(const Key('live_brew')), findsOneWidget);
     expect(find.byType(DualCurveChart), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('live_fullscreen_close')));
