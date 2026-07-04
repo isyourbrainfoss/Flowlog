@@ -66,7 +66,7 @@ abstract final class FlowlogChartColors {
         colorblindSafe: colorblindTargetPressureLine,
       );
 
-  static const grid = Color(0xFF8A7B6E);
+  static const grid = Color(0xFF9A8B7E);
   static const axisLabel = Color(0xFFD4C9BC);
   static const background = Color(0xFF241C16);
 
@@ -860,8 +860,6 @@ class DualCurveChartPainter extends CustomPainter {
       Paint()..color = backgroundColor,
     );
 
-    _drawGrid(canvas, plotRect);
-
     final scales = _ChartScales.fromSamples(
       samples,
       maxDurationMs: maxDurationMs,
@@ -869,6 +867,7 @@ class DualCurveChartPainter extends CustomPainter {
       targetPressureSamples: targetPressureSamples,
     );
 
+    _drawGrid(canvas, plotRect, scales);
     _drawAxes(canvas, plotRect, scales);
 
     if (samples.isEmpty && targetPressureSamples.isEmpty) {
@@ -919,30 +918,132 @@ class DualCurveChartPainter extends CustomPainter {
     );
   }
 
-  void _drawGrid(Canvas canvas, Rect plotRect) {
-    final gridPaint = Paint()
-      ..color = FlowlogChartColors.grid.withValues(alpha: 0.25)
-      ..strokeWidth = 1;
-
-    final horizontalLines = compact ? 2 : 4;
-    for (var i = 0; i <= horizontalLines; i++) {
-      final y = plotRect.top + (plotRect.height / horizontalLines) * i;
-      canvas.drawLine(
-        Offset(plotRect.left, y),
-        Offset(plotRect.right, y),
-        gridPaint,
+  void _drawGrid(Canvas canvas, Rect plotRect, _ChartScales scales) {
+    if (showPressure) {
+      _drawValueGrid(
+        canvas,
+        plotRect,
+        maxValue: scales.pressureMax,
+        step: 2,
+        labelStep: compact ? 4 : 2,
+        emphasizeValues: {8},
+      );
+    } else if (showWeight) {
+      _drawValueGrid(
+        canvas,
+        plotRect,
+        maxValue: scales.weightMax,
+        step: _gridStepForMax(scales.weightMax, targetLines: compact ? 3 : 5),
+        labelStep: null,
+      );
+    } else if (showFlow) {
+      _drawValueGrid(
+        canvas,
+        plotRect,
+        maxValue: scales.flowMax,
+        step: 1,
+        labelStep: compact ? 2 : 1,
       );
     }
 
-    const verticalLines = 5;
-    for (var i = 0; i <= verticalLines; i++) {
-      final x = plotRect.left + (plotRect.width / verticalLines) * i;
+    _drawTimeGrid(canvas, plotRect, scales);
+  }
+
+  double _gridStepForMax(double maxValue, {required int targetLines}) {
+    final rawStep = maxValue / targetLines;
+    if (rawStep <= 5) {
+      return 5;
+    }
+    if (rawStep <= 10) {
+      return 10;
+    }
+    return (rawStep / 10).ceil() * 10.0;
+  }
+
+  void _drawValueGrid(
+    Canvas canvas,
+    Rect plotRect, {
+    required double maxValue,
+    required double step,
+    double? labelStep,
+    Set<double> emphasizeValues = const {},
+  }) {
+    if (maxValue <= 0 || step <= 0) {
+      return;
+    }
+
+    final tickStyle = TextStyle(
+      color: FlowlogChartColors.axisLabel.withValues(alpha: 0.9),
+      fontSize: compact ? 9 : 10,
+    );
+    final effectiveLabelStep = labelStep ?? step;
+
+    for (var value = 0.0; value <= maxValue + 0.001; value += step) {
+      final y = plotRect.bottom - (value / maxValue) * plotRect.height;
+      final emphasized =
+          emphasizeValues.contains(value) || (value > 0 && value % 4 == 0);
+      final linePaint = Paint()
+        ..color = FlowlogChartColors.grid.withValues(
+          alpha: emphasized ? 0.58 : 0.38,
+        )
+        ..strokeWidth = emphasized ? 1.25 : 1;
+
+      canvas.drawLine(
+        Offset(plotRect.left, y),
+        Offset(plotRect.right, y),
+        linePaint,
+      );
+
+      if (value > 0 &&
+          effectiveLabelStep > 0 &&
+          (value % effectiveLabelStep).abs() < 0.001) {
+        _paintText(
+          canvas,
+          _formatGridValue(value),
+          Offset(0, y - 7),
+          tickStyle,
+          maxWidth: leftPad - 6,
+          align: TextAlign.right,
+        );
+      }
+    }
+  }
+
+  void _drawTimeGrid(Canvas canvas, Rect plotRect, _ChartScales scales) {
+    final stepMs = scales.timeSpanMs <= 20000
+        ? 5000
+        : scales.timeSpanMs <= 50000
+            ? 10000
+            : 15000;
+
+    final startTick =
+        ((scales.timeOffsetMs + stepMs - 1) ~/ stepMs) * stepMs;
+    final gridPaint = Paint()
+      ..color = FlowlogChartColors.grid.withValues(alpha: 0.32)
+      ..strokeWidth = 1;
+
+    for (var elapsedMs = startTick;
+        elapsedMs <= scales.visibleEndMs;
+        elapsedMs += stepMs) {
+      final normalizedTime =
+          (elapsedMs - scales.timeOffsetMs) / scales.timeSpanMs;
+      if (normalizedTime < 0 || normalizedTime > 1) {
+        continue;
+      }
+      final x = plotRect.left + normalizedTime * plotRect.width;
       canvas.drawLine(
         Offset(x, plotRect.top),
         Offset(x, plotRect.bottom),
         gridPaint,
       );
     }
+  }
+
+  String _formatGridValue(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+    return value.toStringAsFixed(1);
   }
 
   void _drawAxes(Canvas canvas, Rect plotRect, _ChartScales scales) {
@@ -1263,9 +1364,14 @@ class _ChartScales {
       timeOffsetMs: viewport.visibleStartMs,
       timeSpanMs: math.max(viewport.visibleDurationMs, 1),
       visibleEndMs: viewport.visibleEndMs,
-      pressureMax: pressureMax,
-      weightMax: weightMax,
-      flowMax: flowMax,
+      pressureMax: _snapAxisMax(pressureMax, step: 4, minimum: 12),
+      weightMax: _snapAxisMax(weightMax, step: 10, minimum: 50),
+      flowMax: _snapAxisMax(flowMax, step: 1, minimum: 5),
     );
   }
+}
+
+double _snapAxisMax(double value, {required double step, required double minimum}) {
+  final snapped = math.max(minimum, (value / step).ceil() * step);
+  return snapped;
 }
