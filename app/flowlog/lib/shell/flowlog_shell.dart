@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flowlog/screens/live/repeat_shot.dart';
+import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/app_destinations.dart';
@@ -50,7 +51,15 @@ class _FlowlogShellState extends State<FlowlogShell> {
     if (_selectedIndex < 0) {
       _selectedIndex = 0;
     }
-    unawaited(_loadActiveBean());
+    unawaited(_loadActiveBeanAndSync());
+  }
+
+  Future<void> _loadActiveBeanAndSync() async {
+    await _loadActiveBean();
+    final database = _database;
+    if (database != null) {
+      unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
+    }
   }
 
   Future<BeanRepository> _ensureBeanRepository() async {

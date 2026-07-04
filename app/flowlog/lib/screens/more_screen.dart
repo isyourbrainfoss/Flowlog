@@ -29,6 +29,13 @@ class MoreScreen extends StatelessWidget {
           ),
         ),
         ListTile(
+          leading: const Icon(Icons.cloud_sync),
+          title: const Text('Nextcloud sync'),
+          subtitle: const Text('Auto-sync shots with your Nextcloud server'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => openNextcloudSyncScreen(context),
+        ),
+        ListTile(
           leading: const Icon(Icons.sync),
           title: const Text('Backup & restore'),
           subtitle: const Text('Export or merge shots, profiles, and beans'),

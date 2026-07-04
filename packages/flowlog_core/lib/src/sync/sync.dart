@@ -15,7 +15,9 @@
 library;
 
 export 'encrypted_sync_blob.dart';
+export 'nextcloud_sync.dart';
 export 'sync_backup.dart';
 export 'sync_blob.dart';
 export 'sync_config.dart';
 export 'sync_merge.dart';
+export 'webdav_client.dart';

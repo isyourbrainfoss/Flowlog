@@ -10,6 +10,7 @@ import 'package:flowlog/screens/live/fullscreen_chart.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
+import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog/sensors/live_sensor_source.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/active_bean_scope.dart';
@@ -367,6 +368,13 @@ class _LiveScreenState extends State<LiveScreen> {
         shot: shot,
         confettiController: _confettiController,
       );
+
+      if (shot != null) {
+        final database = await _ensureDatabase();
+        unawaited(
+          FlowlogSyncCoordinator.syncIfEnabled(database: database),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _autoSavingShot = false);

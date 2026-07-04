@@ -1,5 +1,6 @@
 import 'package:flowlog/screens/more/backup.dart';
 import 'package:flowlog/screens/more/export.dart';
+import 'package:flowlog/screens/more/nextcloud_sync.dart';
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -50,6 +51,18 @@ class FlowlogShortcutsScope extends InheritedWidget {
     return currentTab != oldWidget.currentTab ||
         registry != oldWidget.registry;
   }
+}
+
+/// Opens the Nextcloud WebDAV sync settings screen.
+void openNextcloudSyncScreen(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (context) => Scaffold(
+        appBar: AppBar(title: const Text('Nextcloud sync')),
+        body: const NextcloudSyncScreen(),
+      ),
+    ),
+  );
 }
 
 /// Opens the full backup export/import screen.
