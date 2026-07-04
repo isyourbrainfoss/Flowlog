@@ -29,8 +29,15 @@ class MoreScreen extends StatelessWidget {
           ),
         ),
         ListTile(
+          leading: const Icon(Icons.sync),
+          title: const Text('Backup & restore'),
+          subtitle: const Text('Export or merge shots, profiles, and beans'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => openBackupScreen(context),
+        ),
+        ListTile(
           leading: const Icon(Icons.ios_share),
-          title: const Text('Export shots'),
+          title: const Text('Export shots (CSV)'),
           subtitle: const Text('Batch CSV export and share'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => openExportScreen(context),

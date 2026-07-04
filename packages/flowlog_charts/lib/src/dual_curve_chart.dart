@@ -80,6 +80,49 @@ abstract final class FlowlogChartColors {
   }
 }
 
+/// Plot surface colors resolved from the active [ColorScheme].
+@immutable
+class ChartSurfaceStyle {
+  const ChartSurfaceStyle({
+    required this.background,
+    required this.grid,
+    required this.axisLabel,
+  });
+
+  final Color background;
+  final Color grid;
+  final Color axisLabel;
+
+  /// Uses coffee-dark constants in dark mode; theme tokens in light mode.
+  static ChartSurfaceStyle fromColorScheme(ColorScheme scheme) {
+    if (scheme.brightness == Brightness.dark) {
+      return const ChartSurfaceStyle(
+        background: FlowlogChartColors.background,
+        grid: FlowlogChartColors.grid,
+        axisLabel: FlowlogChartColors.axisLabel,
+      );
+    }
+
+    return ChartSurfaceStyle(
+      background: scheme.surface,
+      grid: scheme.outline,
+      axisLabel: scheme.onSurfaceVariant,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ChartSurfaceStyle &&
+            background == other.background &&
+            grid == other.grid &&
+            axisLabel == other.axisLabel;
+  }
+
+  @override
+  int get hashCode => Object.hash(background, grid, axisLabel);
+}
+
 /// Live dual-axis chart for espresso pressure, weight, and flow.
 ///
 /// Provide either a static [samples] list or a live [samplesNotifier] stream.
@@ -95,7 +138,7 @@ class DualCurveChart extends StatefulWidget {
     this.showPressure = true,
     this.showWeight = true,
     this.showFlow = true,
-    this.backgroundColor = FlowlogChartColors.background,
+    this.backgroundColor,
     this.enableInteraction = true,
     this.interactionController,
     this.initialViewMode = ChartViewMode.overlay,
@@ -123,7 +166,9 @@ class DualCurveChart extends StatefulWidget {
   final bool showPressure;
   final bool showWeight;
   final bool showFlow;
-  final Color backgroundColor;
+
+  /// When null, follows [Theme.of] via [ChartSurfaceStyle].
+  final Color? backgroundColor;
 
   /// Pinch/zoom, pan, and swipe view-mode gestures.
   final bool enableInteraction;
@@ -196,27 +241,41 @@ class _DualCurveChartState extends State<DualCurveChart> {
     if (widget.samplesNotifier != null) {
       return ValueListenableBuilder<List<ShotSample>>(
         valueListenable: widget.samplesNotifier!,
-        builder: (context, samples, _) => _buildWithAnnotations(samples),
+        builder: (context, samples, _) =>
+            _buildWithAnnotations(context, samples),
       );
     }
-    return _buildWithAnnotations(widget.samples!);
+    return _buildWithAnnotations(context, widget.samples!);
   }
 
-  Widget _buildWithAnnotations(List<ShotSample> samples) {
+  Widget _buildWithAnnotations(BuildContext context, List<ShotSample> samples) {
     if (widget.annotationsNotifier != null) {
       return ValueListenableBuilder<List<ShotAnnotation>>(
         valueListenable: widget.annotationsNotifier!,
         builder: (context, annotations, _) =>
-            _buildChart(samples, annotations),
+            _buildChart(context, samples, annotations),
       );
     }
-    return _buildChart(samples, widget.annotations ?? const []);
+    return _buildChart(
+      context,
+      samples,
+      widget.annotations ?? const [],
+    );
   }
 
   Widget _buildChart(
+    BuildContext context,
     List<ShotSample> rawSamples,
     List<ShotAnnotation> annotations,
   ) {
+    final themeStyle = ChartSurfaceStyle.fromColorScheme(
+      Theme.of(context).colorScheme,
+    );
+    final surfaceStyle = ChartSurfaceStyle(
+      background: widget.backgroundColor ?? themeStyle.background,
+      grid: themeStyle.grid,
+      axisLabel: themeStyle.axisLabel,
+    );
     final prepared = _prepareSamples(rawSamples);
     final totalDurationMs = _resolveTotalDurationMs(prepared);
 
@@ -261,7 +320,7 @@ class _DualCurveChartState extends State<DualCurveChart> {
                           maxDurationMs: widget.maxDurationMs,
                           viewport: viewport,
                           visibility: visibility,
-                          backgroundColor: widget.backgroundColor,
+                          surfaceStyle: surfaceStyle,
                           annotations: annotations,
                           targetPressureSamples: widget.targetPressureSamples,
                         )
@@ -270,7 +329,7 @@ class _DualCurveChartState extends State<DualCurveChart> {
                           maxDurationMs: widget.maxDurationMs,
                           viewport: viewport,
                           visibility: visibility,
-                          backgroundColor: widget.backgroundColor,
+                          surfaceStyle: surfaceStyle,
                           annotations: annotations,
                           targetPressureSamples: widget.targetPressureSamples,
                         );
@@ -403,7 +462,7 @@ class _OverlayChart extends StatelessWidget {
     required this.maxDurationMs,
     required this.viewport,
     required this.visibility,
-    required this.backgroundColor,
+    required this.surfaceStyle,
     required this.annotations,
     required this.targetPressureSamples,
   });
@@ -412,7 +471,7 @@ class _OverlayChart extends StatelessWidget {
   final int? maxDurationMs;
   final ChartViewport viewport;
   final _SeriesVisibility visibility;
-  final Color backgroundColor;
+  final ChartSurfaceStyle surfaceStyle;
   final List<ShotAnnotation> annotations;
   final List<ShotSample> targetPressureSamples;
 
@@ -426,7 +485,7 @@ class _OverlayChart extends StatelessWidget {
         showPressure: visibility.showPressure,
         showWeight: visibility.showWeight,
         showFlow: visibility.showFlow,
-        backgroundColor: backgroundColor,
+        surfaceStyle: surfaceStyle,
         annotations: annotations,
         targetPressureSamples: targetPressureSamples,
       ),
@@ -440,7 +499,7 @@ class _SplitCharts extends StatelessWidget {
     required this.maxDurationMs,
     required this.viewport,
     required this.visibility,
-    required this.backgroundColor,
+    required this.surfaceStyle,
     required this.annotations,
     required this.targetPressureSamples,
   });
@@ -449,7 +508,7 @@ class _SplitCharts extends StatelessWidget {
   final int? maxDurationMs;
   final ChartViewport viewport;
   final _SeriesVisibility visibility;
-  final Color backgroundColor;
+  final ChartSurfaceStyle surfaceStyle;
   final List<ShotAnnotation> annotations;
   final List<ShotSample> targetPressureSamples;
 
@@ -460,10 +519,7 @@ class _SplitCharts extends StatelessWidget {
       panels.add(
         _SplitPanel(
           label: 'Pressure',
-          samples: samples,
-          maxDurationMs: maxDurationMs,
-          viewport: viewport,
-          backgroundColor: backgroundColor,
+          surfaceStyle: surfaceStyle,
           painter: DualCurveChartPainter(
             samples: samples,
             maxDurationMs: maxDurationMs,
@@ -471,7 +527,7 @@ class _SplitCharts extends StatelessWidget {
             showPressure: true,
             showWeight: false,
             showFlow: false,
-            backgroundColor: backgroundColor,
+            surfaceStyle: surfaceStyle,
             compact: true,
             axisUnitLabel: 'bar',
             annotations: annotations,
@@ -484,10 +540,7 @@ class _SplitCharts extends StatelessWidget {
       panels.add(
         _SplitPanel(
           label: 'Weight',
-          samples: samples,
-          maxDurationMs: maxDurationMs,
-          viewport: viewport,
-          backgroundColor: backgroundColor,
+          surfaceStyle: surfaceStyle,
           painter: DualCurveChartPainter(
             samples: samples,
             maxDurationMs: maxDurationMs,
@@ -495,7 +548,7 @@ class _SplitCharts extends StatelessWidget {
             showPressure: false,
             showWeight: true,
             showFlow: false,
-            backgroundColor: backgroundColor,
+            surfaceStyle: surfaceStyle,
             compact: true,
             axisUnitLabel: 'g',
             annotations: annotations,
@@ -507,10 +560,7 @@ class _SplitCharts extends StatelessWidget {
       panels.add(
         _SplitPanel(
           label: 'Flow',
-          samples: samples,
-          maxDurationMs: maxDurationMs,
-          viewport: viewport,
-          backgroundColor: backgroundColor,
+          surfaceStyle: surfaceStyle,
           painter: DualCurveChartPainter(
             samples: samples,
             maxDurationMs: maxDurationMs,
@@ -518,7 +568,7 @@ class _SplitCharts extends StatelessWidget {
             showPressure: false,
             showWeight: false,
             showFlow: true,
-            backgroundColor: backgroundColor,
+            surfaceStyle: surfaceStyle,
             compact: true,
             axisUnitLabel: 'g/s',
             annotations: annotations,
@@ -533,7 +583,7 @@ class _SplitCharts extends StatelessWidget {
           samples: samples,
           maxDurationMs: maxDurationMs,
           viewport: viewport,
-          backgroundColor: backgroundColor,
+          surfaceStyle: surfaceStyle,
           annotations: annotations,
         ),
       );
@@ -553,18 +603,12 @@ class _SplitCharts extends StatelessWidget {
 class _SplitPanel extends StatelessWidget {
   const _SplitPanel({
     required this.label,
-    required this.samples,
-    required this.maxDurationMs,
-    required this.viewport,
-    required this.backgroundColor,
+    required this.surfaceStyle,
     required this.painter,
   });
 
   final String label;
-  final List<ShotSample> samples;
-  final int? maxDurationMs;
-  final ChartViewport viewport;
-  final Color backgroundColor;
+  final ChartSurfaceStyle surfaceStyle;
   final DualCurveChartPainter painter;
 
   @override
@@ -574,8 +618,8 @@ class _SplitPanel extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: FlowlogChartColors.axisLabel,
+          style: TextStyle(
+            color: surfaceStyle.axisLabel,
             fontSize: 10,
           ),
         ),
@@ -801,12 +845,18 @@ class DualCurveChartPainter extends CustomPainter {
     this.showPressure = true,
     this.showWeight = true,
     this.showFlow = true,
-    this.backgroundColor = FlowlogChartColors.background,
+    ChartSurfaceStyle? surfaceStyle,
     this.compact = false,
     this.axisUnitLabel,
     this.annotations = const [],
     this.targetPressureSamples = const [],
-  }) : viewport = viewport ??
+  })  : surfaceStyle = surfaceStyle ??
+            const ChartSurfaceStyle(
+              background: FlowlogChartColors.background,
+              grid: FlowlogChartColors.grid,
+              axisLabel: FlowlogChartColors.axisLabel,
+            ),
+        viewport = viewport ??
             ChartViewport(
               totalDurationMs: math.max(
                 1,
@@ -821,7 +871,7 @@ class DualCurveChartPainter extends CustomPainter {
   final bool showPressure;
   final bool showWeight;
   final bool showFlow;
-  final Color backgroundColor;
+  final ChartSurfaceStyle surfaceStyle;
   final bool compact;
   final String? axisUnitLabel;
   final List<ShotAnnotation> annotations;
@@ -857,7 +907,7 @@ class DualCurveChartPainter extends CustomPainter {
 
     canvas.drawRect(
       Offset.zero & size,
-      Paint()..color = backgroundColor,
+      Paint()..color = surfaceStyle.background,
     );
 
     final scales = _ChartScales.fromSamples(
@@ -973,7 +1023,7 @@ class DualCurveChartPainter extends CustomPainter {
     }
 
     final tickStyle = TextStyle(
-      color: FlowlogChartColors.axisLabel.withValues(alpha: 0.9),
+      color: surfaceStyle.axisLabel.withValues(alpha: 0.9),
       fontSize: compact ? 9 : 10,
     );
     final effectiveLabelStep = labelStep ?? step;
@@ -983,7 +1033,7 @@ class DualCurveChartPainter extends CustomPainter {
       final emphasized =
           emphasizeValues.contains(value) || (value > 0 && value % 4 == 0);
       final linePaint = Paint()
-        ..color = FlowlogChartColors.grid.withValues(
+        ..color = surfaceStyle.grid.withValues(
           alpha: emphasized ? 0.58 : 0.38,
         )
         ..strokeWidth = emphasized ? 1.25 : 1;
@@ -1019,7 +1069,7 @@ class DualCurveChartPainter extends CustomPainter {
     final startTick =
         ((scales.timeOffsetMs + stepMs - 1) ~/ stepMs) * stepMs;
     final gridPaint = Paint()
-      ..color = FlowlogChartColors.grid.withValues(alpha: 0.32)
+      ..color = surfaceStyle.grid.withValues(alpha: 0.32)
       ..strokeWidth = 1;
 
     for (var elapsedMs = startTick;
@@ -1048,7 +1098,7 @@ class DualCurveChartPainter extends CustomPainter {
 
   void _drawAxes(Canvas canvas, Rect plotRect, _ChartScales scales) {
     final textStyle = TextStyle(
-      color: FlowlogChartColors.axisLabel,
+      color: surfaceStyle.axisLabel,
       fontSize: compact ? 9 : 10,
     );
 
@@ -1095,8 +1145,8 @@ class DualCurveChartPainter extends CustomPainter {
       canvas,
       message,
       Offset(plotRect.left, plotRect.center.dy - 6),
-      const TextStyle(
-        color: FlowlogChartColors.axisLabel,
+      TextStyle(
+        color: surfaceStyle.axisLabel,
         fontSize: 12,
       ),
       maxWidth: plotRect.width,
@@ -1297,7 +1347,7 @@ class DualCurveChartPainter extends CustomPainter {
         oldDelegate.showPressure != showPressure ||
         oldDelegate.showWeight != showWeight ||
         oldDelegate.showFlow != showFlow ||
-        oldDelegate.backgroundColor != backgroundColor ||
+        oldDelegate.surfaceStyle != surfaceStyle ||
         oldDelegate.compact != compact ||
         oldDelegate.axisUnitLabel != axisUnitLabel ||
         oldDelegate.annotations != annotations ||

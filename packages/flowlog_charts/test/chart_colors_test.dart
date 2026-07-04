@@ -40,6 +40,22 @@ void main() {
       expect(lineColors.length, 3);
     });
 
+    test('ChartSurfaceStyle uses light theme surface in café mode', () {
+      final scheme = ColorScheme.fromSeed(
+        seedColor: const Color(0xFF6F4E37),
+        brightness: Brightness.light,
+        surface: const Color(0xFFEDE6DC),
+        outline: const Color(0xFF8A7B6E),
+      );
+
+      final style = ChartSurfaceStyle.fromColorScheme(scheme);
+
+      expect(style.background, scheme.surface);
+      expect(style.grid, scheme.outline);
+      expect(style.axisLabel, scheme.onSurfaceVariant);
+      expect(style.background, isNot(FlowlogChartColors.background));
+    });
+
     test('palette switch updates active getters', () {
       FlowlogChartColors.palette = FlowlogChartPalette.coffee;
       final coffeePressure = FlowlogChartColors.pressureLine;

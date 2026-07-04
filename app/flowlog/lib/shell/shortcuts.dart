@@ -1,3 +1,4 @@
+import 'package:flowlog/screens/more/backup.dart';
 import 'package:flowlog/screens/more/export.dart';
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flutter/material.dart';
@@ -51,7 +52,19 @@ class FlowlogShortcutsScope extends InheritedWidget {
   }
 }
 
-/// Opens the batch export screen (shared with More → Export shots).
+/// Opens the full backup export/import screen.
+void openBackupScreen(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (context) => Scaffold(
+        appBar: AppBar(title: const Text('Backup & restore')),
+        body: const BackupScreen(),
+      ),
+    ),
+  );
+}
+
+/// Opens the batch CSV export screen (shared with More → Export shots).
 void openExportScreen(BuildContext context) {
   Navigator.of(context).push(
     MaterialPageRoute<void>(

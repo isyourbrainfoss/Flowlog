@@ -70,7 +70,7 @@ void main() {
       );
       final payload = importSyncBlob(blob);
 
-      expect(payload.version, syncBlobVersion);
+      expect(payload.version, syncPayloadVersion);
       expect(payload.exportedAt, exportedAt);
       expect(payload.config.accountEnabled, isFalse);
       expect(payload.shots, [shot]);
