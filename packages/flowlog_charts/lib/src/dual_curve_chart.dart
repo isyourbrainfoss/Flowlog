@@ -879,8 +879,9 @@ class DualCurveChartPainter extends CustomPainter {
 
   static const leftPad = 40.0;
   static const rightPad = 40.0;
-  static const topPad = 12.0;
+  static const topPad = 16.0;
   static const bottomPad = 24.0;
+  static const axisUnitTop = 2.0;
 
   static int _fallbackDuration(
     List<ShotSample> samples,
@@ -1046,11 +1047,13 @@ class DualCurveChartPainter extends CustomPainter {
 
       if (value > 0 &&
           effectiveLabelStep > 0 &&
-          (value % effectiveLabelStep).abs() < 0.001) {
+          (value % effectiveLabelStep).abs() < 0.001 &&
+          value < maxValue - 0.001) {
+        final labelY = y <= plotRect.top + 1 ? y + 3 : y - 7;
         _paintText(
           canvas,
           _formatGridValue(value),
-          Offset(0, y - 7),
+          Offset(0, labelY),
           tickStyle,
           maxWidth: leftPad - 6,
           align: TextAlign.right,
@@ -1107,20 +1110,20 @@ class DualCurveChartPainter extends CustomPainter {
       _drawAxisLabel(
         canvas,
         unit,
-        Offset(4, plotRect.top),
+        Offset(4, axisUnitTop),
         textStyle,
       );
     } else {
       _drawAxisLabel(
         canvas,
         'bar',
-        Offset(4, plotRect.top),
+        Offset(4, axisUnitTop),
         textStyle,
       );
       _drawAxisLabel(
         canvas,
         'g',
-        Offset(plotRect.right + 6, plotRect.top),
+        Offset(plotRect.right + 6, axisUnitTop),
         textStyle,
       );
       _drawAxisLabel(
