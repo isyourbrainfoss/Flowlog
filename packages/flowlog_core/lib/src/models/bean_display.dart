@@ -36,6 +36,10 @@ String formatBeanDisplayLabel(Bean bean, {List<Bean>? allBeans}) {
     return '${bean.name} · ${bean.process!.trim()}';
   }
 
+  if (bean.variety != null && bean.variety!.trim().isNotEmpty) {
+    return '${bean.name} · ${bean.variety!.trim()}';
+  }
+
   if (bean.origin != null && bean.origin!.trim().isNotEmpty) {
     return '${bean.name} · ${bean.origin!.trim()}';
   }

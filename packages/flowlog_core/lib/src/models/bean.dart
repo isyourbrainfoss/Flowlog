@@ -17,6 +17,7 @@ class Bean {
     this.roastLevel,
     this.roastDate,
     this.process,
+    this.variety,
     this.stockG,
     this.notes,
   });
@@ -27,6 +28,7 @@ class Bean {
   final String? roastLevel;
   final DateTime? roastDate;
   final String? process;
+  final String? variety;
   final double? stockG;
   final String? notes;
 
@@ -40,6 +42,7 @@ class Bean {
           ? null
           : DateTime.parse(json['roastDate'] as String).toUtc(),
       process: json['process'] as String?,
+      variety: json['variety'] as String?,
       stockG: (json['stockG'] as num?)?.toDouble(),
       notes: json['notes'] as String?,
     );
@@ -53,6 +56,7 @@ class Bean {
       if (roastLevel != null) 'roastLevel': roastLevel,
       if (roastDate != null) 'roastDate': roastDate!.toUtc().toIso8601String(),
       if (process != null) 'process': process,
+      if (variety != null) 'variety': variety,
       if (stockG != null) 'stockG': stockG,
       if (notes != null) 'notes': notes,
     };
@@ -65,6 +69,7 @@ class Bean {
     String? roastLevel,
     DateTime? roastDate,
     String? process,
+    String? variety,
     double? stockG,
     String? notes,
   }) {
@@ -75,6 +80,7 @@ class Bean {
       roastLevel: roastLevel ?? this.roastLevel,
       roastDate: roastDate ?? this.roastDate,
       process: process ?? this.process,
+      variety: variety ?? this.variety,
       stockG: stockG ?? this.stockG,
       notes: notes ?? this.notes,
     );
@@ -90,6 +96,7 @@ class Bean {
             roastLevel == other.roastLevel &&
             roastDate == other.roastDate &&
             process == other.process &&
+            variety == other.variety &&
             stockG == other.stockG &&
             notes == other.notes;
   }
@@ -102,6 +109,7 @@ class Bean {
         roastLevel,
         roastDate,
         process,
+        variety,
         stockG,
         notes,
       );
@@ -109,5 +117,6 @@ class Bean {
   @override
   String toString() =>
       'Bean(id: $id, name: $name, origin: $origin, roastLevel: $roastLevel, '
-      'roastDate: $roastDate, process: $process, stockG: $stockG, notes: $notes)';
+      'roastDate: $roastDate, process: $process, variety: $variety, '
+      'stockG: $stockG, notes: $notes)';
 }

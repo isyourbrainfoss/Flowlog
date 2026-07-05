@@ -44,6 +44,27 @@ void main() {
       );
     });
 
+    test('uses variety to disambiguate duplicate names', () {
+      const catuai = Bean(
+        id: 'bean-catuai',
+        name: 'Rosimeire',
+        variety: 'Yellow Catuai',
+      );
+      const bourbon = Bean(
+        id: 'bean-bourbon',
+        name: 'Rosimeire',
+        variety: 'Red Bourbon',
+      );
+      expect(
+        formatBeanDisplayLabel(catuai, allBeans: [catuai, bourbon]),
+        'Rosimeire · Yellow Catuai',
+      );
+      expect(
+        formatBeanDisplayLabel(bourbon, allBeans: [catuai, bourbon]),
+        'Rosimeire · Red Bourbon',
+      );
+    });
+
     test('uses process to disambiguate duplicate names', () {
       const washed = Bean(
         id: 'bean-washed',

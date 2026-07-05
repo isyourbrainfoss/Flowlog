@@ -48,6 +48,10 @@ void main() {
         find.widgetWithText(TextFormField, 'Origin'),
         'Brazil',
       );
+      await tester.enterText(
+        find.byKey(const Key('bean_editor_variety')),
+        'Yellow Catuai',
+      );
       await tester.ensureVisible(
         find.byKey(const Key('bean_process_washed')),
       );
@@ -65,7 +69,10 @@ void main() {
 
       expect(find.byKey(const Key('bean_card_bean-test')), findsOneWidget);
       expect(find.text('House Blend'), findsOneWidget);
-      expect(find.textContaining('Brazil · Washed · Medium'), findsOneWidget);
+      expect(
+        find.textContaining('Brazil · Yellow Catuai · Washed · Medium'),
+        findsOneWidget,
+      );
       expect(find.text('0 shots'), findsOneWidget);
 
       final saved = await beanRepository.getBeanById('bean-test');
@@ -74,6 +81,7 @@ void main() {
       expect(saved.stockG, 250);
       expect(saved.roastLevel, 'Medium');
       expect(saved.process, 'Washed');
+      expect(saved.variety, 'Yellow Catuai');
     });
 
     testWidgets('creates bean with custom bag size', (tester) async {

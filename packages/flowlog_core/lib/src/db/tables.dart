@@ -37,6 +37,7 @@ class Beans extends Table {
   TextColumn get roastDate =>
       text().nullable().map(const NullableUtcIso8601Converter())();
   TextColumn get process => text().nullable()();
+  TextColumn get variety => text().nullable()();
   RealColumn get stockG => real().nullable()();
   TextColumn get notes => text().nullable()();
 

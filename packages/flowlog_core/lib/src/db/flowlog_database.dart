@@ -26,7 +26,7 @@ class FlowlogDatabase extends _$FlowlogDatabase {
   FlowlogDatabase(super.executor);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -78,6 +78,18 @@ class FlowlogDatabase extends _$FlowlogDatabase {
           if (from < 9) {
             await m.addColumn(shots, shots.latitude);
             await m.addColumn(shots, shots.longitude);
+          }
+          if (from < 10) {
+            final beanColumns = await m.database
+                .customSelect(
+                  'PRAGMA table_info(beans)',
+                  readsFrom: {beans},
+                )
+                .map((row) => row.read<String>('name'))
+                .get();
+            if (!beanColumns.contains('variety')) {
+              await m.addColumn(beans, beans.variety);
+            }
           }
         },
       );

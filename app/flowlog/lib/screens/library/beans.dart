@@ -240,6 +240,7 @@ class BeanCard extends StatelessWidget {
     final title = formatBeanDisplayLabel(bean, allBeans: allBeans);
     final subtitle = [
       if (bean.origin != null && bean.origin!.isNotEmpty) bean.origin,
+      if (bean.variety != null && bean.variety!.isNotEmpty) bean.variety,
       if (bean.process != null && bean.process!.isNotEmpty) bean.process,
       if (bean.roastLevel != null && bean.roastLevel!.isNotEmpty)
         bean.roastLevel,
@@ -440,6 +441,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _originController;
+  late final TextEditingController _varietyController;
   late final TextEditingController _stockController;
   late final TextEditingController _notesController;
   late double _roastSliderValue;
@@ -453,6 +455,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
     final bean = widget.bean;
     _nameController = TextEditingController(text: bean?.name ?? '');
     _originController = TextEditingController(text: bean?.origin ?? '');
+    _varietyController = TextEditingController(text: bean?.variety ?? '');
     _stockController = TextEditingController(
       text: bean?.stockG?.toString() ?? '',
     );
@@ -490,6 +493,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
   void dispose() {
     _nameController.dispose();
     _originController.dispose();
+    _varietyController.dispose();
     _stockController.dispose();
     _notesController.dispose();
     super.dispose();
@@ -516,6 +520,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
     if (bean == null) {
       return _nameController.text.trim().isNotEmpty ||
           _originController.text.trim().isNotEmpty ||
+          _varietyController.text.trim().isNotEmpty ||
           _stockController.text.trim().isNotEmpty ||
           _notesController.text.trim().isNotEmpty ||
           _roastSliderValue != 2 ||
@@ -526,6 +531,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
     final stock = _optionalStock(_stockController.text);
     return _nameController.text.trim() != bean.name ||
         _optionalText(_originController.text) != bean.origin ||
+        _optionalText(_varietyController.text) != bean.variety ||
         _sliderToRoastLevel(_roastSliderValue) != bean.roastLevel ||
         _roastDate != bean.roastDate ||
         _selectedProcess != bean.process ||
@@ -580,6 +586,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
         id: widget.bean?.id ?? widget.beanIdGenerator(),
         name: _nameController.text.trim(),
         origin: _optionalText(_originController.text),
+        variety: _optionalText(_varietyController.text),
         roastLevel: _sliderToRoastLevel(_roastSliderValue),
         roastDate: _roastDate,
         process: _selectedProcess,
@@ -644,6 +651,15 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
               TextFormField(
                 controller: _originController,
                 decoration: const InputDecoration(labelText: 'Origin'),
+                textCapitalization: TextCapitalization.words,
+              ),
+              TextFormField(
+                key: const Key('bean_editor_variety'),
+                controller: _varietyController,
+                decoration: const InputDecoration(
+                  labelText: 'Variety',
+                  hintText: 'e.g. Yellow Catuai',
+                ),
                 textCapitalization: TextCapitalization.words,
               ),
               const SizedBox(height: 12),
