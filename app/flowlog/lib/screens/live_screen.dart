@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flowlog/location/brew_gps.dart';
 import 'package:flowlog/screens/live/annotations.dart';
 import 'package:flowlog/screens/live/auto_start.dart';
+import 'package:flowlog/screens/live/brew_complete_banner.dart';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/delight.dart';
 import 'package:flowlog/screens/live/feedback.dart';
@@ -38,6 +40,8 @@ class LiveScreen extends StatefulWidget {
     this.sensorSource,
     this.pressureAdapterFactory,
     this.weightAdapterFactory,
+    this.brewLocationStore,
+    this.brewGpsCapture,
   });
 
   /// Optional override for tests or dependency injection.
@@ -70,6 +74,12 @@ class LiveScreen extends StatefulWidget {
   /// Generates ids for newly saved shots.
   final ShotIdGenerator shotIdGenerator;
 
+  /// Optional brew location settings override for tests.
+  final BrewLocationStore? brewLocationStore;
+
+  /// Optional GPS capture override for tests.
+  final BrewGpsCapture? brewGpsCapture;
+
   @override
   State<LiveScreen> createState() => _LiveScreenState();
 }
@@ -96,8 +106,10 @@ class _LiveScreenState extends State<LiveScreen> {
   final ConfettiController _confettiController = ConfettiController();
   late final ChartInteractionController _chartInteractionController;
   final AutoStartSettingsStore _autoStartSettingsStore = AutoStartSettingsStore();
-  final BrewLocationStore _brewLocationStore = BrewLocationStore();
+  late final BrewLocationStore _brewLocationStore;
+  late final BrewGpsCapture _brewGpsCapture;
   AutoStartSettings _autoStartSettings = const AutoStartSettings();
+  BrewSummary? _lastBrewSummary;
   SensorHub? _sensorHub;
   ConnectionState? _lastPressensorState;
 
@@ -105,6 +117,8 @@ class _LiveScreenState extends State<LiveScreen> {
   void initState() {
     super.initState();
     _ownsController = widget.controller == null;
+    _brewLocationStore = widget.brewLocationStore ?? BrewLocationStore();
+    _brewGpsCapture = widget.brewGpsCapture ?? const BrewGpsCapture();
 
     _samplesNotifier = ValueNotifier<List<ShotSample>>(const []);
     _annotationController = ShotAnnotationController();
@@ -380,6 +394,9 @@ class _LiveScreenState extends State<LiveScreen> {
     }
 
     final brewing = controller.isBrewing;
+    if (brewing && _lastBrewSummary != null) {
+      setState(() => _lastBrewSummary = null);
+    }
     if (_wasBrewing && !brewing && controller.canSaveShot) {
       unawaited(_autoSaveStoppedSession());
     }
@@ -405,7 +422,11 @@ class _LiveScreenState extends State<LiveScreen> {
       }
 
       final activeBean = ActiveBeanScope.maybeOf(context);
-      final brewLocation = await _brewLocationStore.load();
+      final locationSettings = await _brewLocationStore.loadSettings();
+      BrewGpsPosition? gps;
+      if (locationSettings.autoGpsEnabled) {
+        gps = await _brewGpsCapture.captureCurrentPosition();
+      }
       final shot = await runAutoSaveFlow(
         context: context,
         repository: repository,
@@ -417,7 +438,9 @@ class _LiveScreenState extends State<LiveScreen> {
         activeBeanName: activeBean?.name,
         activeBeanId: activeBean?.beanId,
         annotations: _annotationController.annotations,
-        location: brewLocation,
+        location: locationSettings.currentLocation,
+        latitude: gps?.latitude,
+        longitude: gps?.longitude,
         idGenerator: widget.shotIdGenerator,
         onSaved: (saved) {
           _lastAutoSavedShotId = saved.id;
@@ -434,6 +457,9 @@ class _LiveScreenState extends State<LiveScreen> {
       );
 
       if (shot != null) {
+        if (mounted) {
+          setState(() => _lastBrewSummary = BrewSummary.fromShot(shot));
+        }
         final database = await _ensureDatabase();
         unawaited(
           FlowlogSyncCoordinator.syncIfEnabled(database: database),
@@ -633,6 +659,14 @@ class _LiveScreenState extends State<LiveScreen> {
                                 unawaited(_onAutoStartThresholdChanged(value)),
                           ),
                         if (showAutoStart) const SizedBox(height: 8),
+                        if (_lastBrewSummary != null && !controller.isBrewing) ...[
+                          BrewCompleteBanner(
+                            summary: _lastBrewSummary!,
+                            onDismiss: () =>
+                                setState(() => _lastBrewSummary = null),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
                         LiveFullscreenChartButton(
                           onPressed: _onOpenFullscreenChart,
                         ),

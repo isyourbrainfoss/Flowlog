@@ -1,3 +1,4 @@
+export 'brew_summary.dart';
 export 'bean.dart';
 export 'bean_display.dart';
 export 'device.dart';

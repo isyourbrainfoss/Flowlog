@@ -40,5 +40,26 @@ void main() {
 
       expect(await store.load(), isNull);
     });
+
+    test('saveSettings persists auto GPS toggle', () async {
+      final store = BrewLocationStore(settingsPath: settingsPath);
+
+      await store.saveSettings(
+        const BrewLocationSettings(
+          currentLocation: 'Cafe',
+          autoGpsEnabled: false,
+        ),
+      );
+
+      final loaded = await store.loadSettings();
+      expect(loaded.currentLocation, 'Cafe');
+      expect(loaded.autoGpsEnabled, isFalse);
+    });
+
+    test('loadSettings defaults auto GPS to enabled', () async {
+      final store = BrewLocationStore(settingsPath: settingsPath);
+
+      expect((await store.loadSettings()).autoGpsEnabled, isTrue);
+    });
   });
 }

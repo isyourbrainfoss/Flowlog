@@ -258,6 +258,8 @@ class ShotRepository {
       waterTempC: Value(shot.waterTempC),
       notes: Value(shot.notes),
       location: Value(shot.location),
+      latitude: Value(shot.latitude),
+      longitude: Value(shot.longitude),
       tasteScore: Value(shot.tasteScore),
       flavourTags: Value(jsonEncode(shot.flavourTags)),
     );
@@ -305,6 +307,8 @@ class ShotRepository {
       waterTempC: row.waterTempC,
       notes: row.notes,
       location: row.location,
+      latitude: row.latitude,
+      longitude: row.longitude,
       tasteScore: row.tasteScore,
       flavourTags: _decodeFlavourTags(row.flavourTags),
       samples: samples,

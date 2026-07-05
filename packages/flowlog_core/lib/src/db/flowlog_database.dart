@@ -26,7 +26,7 @@ class FlowlogDatabase extends _$FlowlogDatabase {
   FlowlogDatabase(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -74,6 +74,10 @@ class FlowlogDatabase extends _$FlowlogDatabase {
           }
           if (from < 8) {
             await m.addColumn(shots, shots.location);
+          }
+          if (from < 9) {
+            await m.addColumn(shots, shots.latitude);
+            await m.addColumn(shots, shots.longitude);
           }
         },
       );

@@ -21,6 +21,8 @@ Shot buildShotFromSession({
   List<ShotAnnotation> annotations = const [],
   String? id,
   String? location,
+  double? latitude,
+  double? longitude,
   ShotIdGenerator idGenerator = generateShotId,
 }) {
   var shot = Shot(
@@ -28,6 +30,8 @@ Shot buildShotFromSession({
     startedAt: startedAt,
     endedAt: endedAt ?? DateTime.now().toUtc(),
     location: location,
+    latitude: latitude,
+    longitude: longitude,
     samples: List<ShotSample>.from(samples),
     annotations: List<ShotAnnotation>.from(annotations),
   );
@@ -93,6 +97,8 @@ Future<Shot?> runAutoSaveFlow({
   String? activeBeanId,
   List<ShotAnnotation> annotations = const [],
   String? location,
+  double? latitude,
+  double? longitude,
   ShotIdGenerator idGenerator = generateShotId,
   void Function(Shot shot)? onSaved,
   Future<void> Function(Shot shot)? onAddNotes,
@@ -130,6 +136,8 @@ Future<Shot?> runAutoSaveFlow({
     metadata: metadata,
     annotations: annotations,
     location: location,
+    latitude: latitude,
+    longitude: longitude,
     idGenerator: idGenerator,
   );
 
@@ -139,6 +147,7 @@ Future<Shot?> runAutoSaveFlow({
   if (context.mounted) {
     showAutoSavedSnackBar(
       context,
+      summary: BrewSummary.fromShot(shot),
       onAddNotes: onAddNotes == null
           ? null
           : () async {
@@ -158,17 +167,20 @@ Future<Shot?> runAutoSaveFlow({
 /// Snackbar after auto-save with optional follow-up actions.
 void showAutoSavedSnackBar(
   BuildContext context, {
+  BrewSummary? summary,
   Future<void> Function()? onAddNotes,
   Future<void> Function()? onDiscard,
 }) {
+  final message = summary?.savedMessage() ?? 'Shot saved';
+
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       key: const Key('shot_saved_snackbar'),
       behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 4),
+      duration: const Duration(seconds: 5),
       content: Row(
         children: [
-          const Expanded(child: Text('Shot saved')),
+          Expanded(child: Text(message)),
           if (onAddNotes != null)
             TextButton(
               key: const Key('shot_add_notes_action'),

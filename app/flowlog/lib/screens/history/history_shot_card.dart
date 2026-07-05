@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flowlog/screens/history/shot_detail.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -99,15 +97,7 @@ class HistoryShotCard extends StatelessWidget {
   }
 
   static double? peakPressureBar(Iterable<ShotSample> samples) {
-    double? peak;
-    for (final sample in samples) {
-      final pressure = sample.pressureBar;
-      if (pressure == null) {
-        continue;
-      }
-      peak = peak == null ? pressure : math.max(peak!, pressure);
-    }
-    return peak;
+    return peakPressureBarFromSamples(samples);
   }
 
   static String _formatStartedAt(DateTime startedAt) {

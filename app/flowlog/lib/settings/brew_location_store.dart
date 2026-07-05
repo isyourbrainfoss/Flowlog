@@ -1,7 +1,56 @@
 import 'dart:convert';
 import 'dart:io';
 
-/// File-backed persistence for the current brew location label.
+import 'package:flutter/foundation.dart';
+
+/// Brew location preferences: optional label and automatic GPS capture.
+@immutable
+class BrewLocationSettings {
+  const BrewLocationSettings({
+    this.currentLocation,
+    this.autoGpsEnabled = true,
+  });
+
+  final String? currentLocation;
+  final bool autoGpsEnabled;
+
+  BrewLocationSettings copyWith({
+    String? currentLocation,
+    bool? autoGpsEnabled,
+    bool clearCurrentLocation = false,
+  }) {
+    return BrewLocationSettings(
+      currentLocation:
+          clearCurrentLocation ? null : (currentLocation ?? this.currentLocation),
+      autoGpsEnabled: autoGpsEnabled ?? this.autoGpsEnabled,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      if (currentLocation != null) 'currentLocation': currentLocation,
+      'autoGpsEnabled': autoGpsEnabled,
+    };
+  }
+
+  factory BrewLocationSettings.fromJson(Map<String, dynamic> json) {
+    final location = json['currentLocation'];
+    String? currentLocation;
+    if (location is String) {
+      final trimmed = location.trim();
+      if (trimmed.isNotEmpty) {
+        currentLocation = trimmed;
+      }
+    }
+
+    return BrewLocationSettings(
+      currentLocation: currentLocation,
+      autoGpsEnabled: json['autoGpsEnabled'] as bool? ?? true,
+    );
+  }
+}
+
+/// File-backed persistence for brew location settings.
 class BrewLocationStore {
   BrewLocationStore({String? settingsPath})
       : _settingsPath = settingsPath ?? _defaultSettingsPath;
@@ -11,36 +60,43 @@ class BrewLocationStore {
 
   final String _settingsPath;
 
-  Future<String?> load() async {
+  Future<BrewLocationSettings> loadSettings() async {
     final file = File(_settingsPath);
     if (!file.existsSync()) {
-      return null;
+      return const BrewLocationSettings();
     }
 
     try {
       final decoded = jsonDecode(await file.readAsString());
       if (decoded is! Map<String, dynamic>) {
-        return null;
+        return const BrewLocationSettings();
       }
-      final location = decoded['currentLocation'];
-      if (location is! String) {
-        return null;
-      }
-      final trimmed = location.trim();
-      return trimmed.isEmpty ? null : trimmed;
+      return BrewLocationSettings.fromJson(decoded);
     } catch (_) {
-      return null;
+      return const BrewLocationSettings();
     }
   }
 
-  Future<void> save(String? location) async {
+  /// Legacy helper for the current location label only.
+  Future<String?> load() async {
+    return (await loadSettings()).currentLocation;
+  }
+
+  Future<void> saveSettings(BrewLocationSettings settings) async {
     final file = File(_settingsPath);
     await file.parent.create(recursive: true);
     await file.writeAsString(
-      const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
-        if (location != null && location.trim().isNotEmpty)
-          'currentLocation': location.trim(),
-      }),
+      const JsonEncoder.withIndent('  ').convert(settings.toJson()),
+    );
+  }
+
+  Future<void> save(String? location) async {
+    final current = await loadSettings();
+    await saveSettings(
+      current.copyWith(
+        currentLocation: location,
+        clearCurrentLocation: location == null || location.trim().isEmpty,
+      ),
     );
   }
 }

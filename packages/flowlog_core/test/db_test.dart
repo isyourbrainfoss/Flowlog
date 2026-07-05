@@ -7,11 +7,11 @@ import 'package:test/test.dart';
 
 void main() {
   group('schema', () {
-    test('schema version is 8', () async {
+    test('schema version is 9', () async {
       final db = FlowlogDatabase.inMemory();
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 8);
+      expect(db.schemaVersion, 9);
     });
 
     test(
@@ -84,6 +84,20 @@ void main() {
 
       final loaded = await repository.getShotById('shot-location');
       expect(loaded?.location, 'Home kitchen');
+    });
+
+    test('persists optional GPS coordinates', () async {
+      final shot = Shot(
+        id: 'shot-gps',
+        startedAt: DateTime.utc(2026, 7, 5, 12),
+        latitude: 59.32932,
+        longitude: 18.06861,
+      );
+      await repository.insertShot(shot);
+
+      final loaded = await repository.getShotById('shot-gps');
+      expect(loaded?.latitude, closeTo(59.32932, 0.00001));
+      expect(loaded?.longitude, closeTo(18.06861, 0.00001));
     });
 
     test('getShotById returns null for unknown id', () async {
@@ -369,13 +383,13 @@ void main() {
         final shot = _loadFixtureShot('shots/minimal_shot.json');
 
         await writerRepo.insertShot(shot);
-        expect(writer.schemaVersion, 8);
+        expect(writer.schemaVersion, 9);
         await writer.close();
 
         final reader = FlowlogDatabase.openFile(dbPath);
         final readerRepo = ShotRepository(reader);
 
-        expect(reader.schemaVersion, 8);
+        expect(reader.schemaVersion, 9);
         expect(await readerRepo.getShotWithSamples(shot.id), shot);
 
         await reader.close();
@@ -425,7 +439,7 @@ void main() {
         final migrated = FlowlogDatabase.openFile(dbPath);
         addTearDown(migrated.close);
 
-        expect(migrated.schemaVersion, 8);
+        expect(migrated.schemaVersion, 9);
 
         final tables = await migrated
             .customSelect(
@@ -515,7 +529,7 @@ void main() {
         final migrated = FlowlogDatabase.openFile(dbPath);
         addTearDown(migrated.close);
 
-        expect(migrated.schemaVersion, 8);
+        expect(migrated.schemaVersion, 9);
 
         final tables = await migrated
             .customSelect(

@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/location/brew_gps.dart';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/metadata_sheet.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog/screens/live_screen.dart';
+import 'package:flowlog/settings/brew_location_store.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
@@ -98,7 +100,9 @@ void main() {
       await _startAndStopSession(tester, harness.controller);
 
       expect(find.byKey(const Key('shot_saved_snackbar')), findsOneWidget);
-      expect(find.text('Shot saved'), findsOneWidget);
+      expect(find.textContaining('Shot saved'), findsOneWidget);
+      expect(find.textContaining('peak'), findsOneWidget);
+      expect(find.byKey(const Key('brew_complete_banner')), findsOneWidget);
       expect(find.byKey(const Key('shot_add_notes_action')), findsOneWidget);
       expect(find.byKey(const Key('shot_discard_action')), findsOneWidget);
       expect(savedShot, isNotNull);
@@ -132,6 +136,27 @@ void main() {
       final loaded = await repository.getShotWithSamples('shot-notes-test');
       expect(loaded?.doseG, 18);
       expect(loaded?.yieldG, 36);
+    });
+
+    test('buildShotFromSession stores GPS coordinates and location label', () {
+      const samples = [
+        ShotSample(elapsedMs: 0, pressureBar: 0),
+        ShotSample(elapsedMs: 1000, pressureBar: 9),
+      ];
+
+      final shot = buildShotFromSession(
+        samples: samples,
+        startedAt: DateTime.utc(2026, 7, 5, 10),
+        endedAt: DateTime.utc(2026, 7, 5, 10, 0, 30),
+        location: 'Test cafe',
+        latitude: 59.33,
+        longitude: 18.07,
+        id: 'shot-gps-test',
+      );
+
+      expect(shot.location, 'Test cafe');
+      expect(shot.latitude, closeTo(59.33, 0.001));
+      expect(shot.longitude, closeTo(18.07, 0.001));
     });
 
     testWidgets('discard removes auto-saved shot from repository', (
@@ -210,11 +235,15 @@ class _LiveHarness {
   final LiveShotController controller;
 }
 
+Future<BrewGpsPosition?> _nullGpsPosition() async => null;
+
 Future<_LiveHarness> _pumpLiveScreen(
   WidgetTester tester, {
   ShotRepository? repository,
   void Function(Shot shot)? onShotSaved,
   ShotIdGenerator shotIdGenerator = generateShotId,
+  BrewLocationStore? brewLocationStore,
+  BrewGpsCapture? brewGpsCapture,
 }) async {
   final scaleTransport = MockDecentScaleTransport();
   final scaleAdapter = DecentScaleBleAdapter(transport: scaleTransport);
@@ -235,6 +264,9 @@ Future<_LiveHarness> _pumpLiveScreen(
         shotRepository: repository,
         onShotSaved: onShotSaved,
         shotIdGenerator: shotIdGenerator,
+        brewLocationStore: brewLocationStore,
+        brewGpsCapture:
+            brewGpsCapture ?? BrewGpsCapture(debugOverride: _nullGpsPosition),
       ),
     ),
   );

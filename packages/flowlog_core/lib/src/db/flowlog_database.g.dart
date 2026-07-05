@@ -127,6 +127,28 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _latitudeMeta = const VerificationMeta(
+    'latitude',
+  );
+  @override
+  late final GeneratedColumn<double> latitude = GeneratedColumn<double>(
+    'latitude',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _longitudeMeta = const VerificationMeta(
+    'longitude',
+  );
+  @override
+  late final GeneratedColumn<double> longitude = GeneratedColumn<double>(
+    'longitude',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -141,6 +163,8 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     tasteScore,
     flavourTags,
     location,
+    latitude,
+    longitude,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -222,6 +246,18 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         location.isAcceptableOrUnknown(data['location']!, _locationMeta),
       );
     }
+    if (data.containsKey('latitude')) {
+      context.handle(
+        _latitudeMeta,
+        latitude.isAcceptableOrUnknown(data['latitude']!, _latitudeMeta),
+      );
+    }
+    if (data.containsKey('longitude')) {
+      context.handle(
+        _longitudeMeta,
+        longitude.isAcceptableOrUnknown(data['longitude']!, _longitudeMeta),
+      );
+    }
     return context;
   }
 
@@ -283,6 +319,14 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         DriftSqlType.string,
         data['${effectivePrefix}location'],
       ),
+      latitude: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}latitude'],
+      ),
+      longitude: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}longitude'],
+      ),
     );
   }
 
@@ -310,6 +354,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
   final int? tasteScore;
   final String flavourTags;
   final String? location;
+  final double? latitude;
+  final double? longitude;
   const ShotRow({
     required this.id,
     required this.startedAt,
@@ -323,6 +369,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     this.tasteScore,
     required this.flavourTags,
     this.location,
+    this.latitude,
+    this.longitude,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -363,6 +411,12 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     if (!nullToAbsent || location != null) {
       map['location'] = Variable<String>(location);
     }
+    if (!nullToAbsent || latitude != null) {
+      map['latitude'] = Variable<double>(latitude);
+    }
+    if (!nullToAbsent || longitude != null) {
+      map['longitude'] = Variable<double>(longitude);
+    }
     return map;
   }
 
@@ -398,6 +452,12 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       location: location == null && nullToAbsent
           ? const Value.absent()
           : Value(location),
+      latitude: latitude == null && nullToAbsent
+          ? const Value.absent()
+          : Value(latitude),
+      longitude: longitude == null && nullToAbsent
+          ? const Value.absent()
+          : Value(longitude),
     );
   }
 
@@ -419,6 +479,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       tasteScore: serializer.fromJson<int?>(json['tasteScore']),
       flavourTags: serializer.fromJson<String>(json['flavourTags']),
       location: serializer.fromJson<String?>(json['location']),
+      latitude: serializer.fromJson<double?>(json['latitude']),
+      longitude: serializer.fromJson<double?>(json['longitude']),
     );
   }
   @override
@@ -437,6 +499,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       'tasteScore': serializer.toJson<int?>(tasteScore),
       'flavourTags': serializer.toJson<String>(flavourTags),
       'location': serializer.toJson<String?>(location),
+      'latitude': serializer.toJson<double?>(latitude),
+      'longitude': serializer.toJson<double?>(longitude),
     };
   }
 
@@ -453,6 +517,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     Value<int?> tasteScore = const Value.absent(),
     String? flavourTags,
     Value<String?> location = const Value.absent(),
+    Value<double?> latitude = const Value.absent(),
+    Value<double?> longitude = const Value.absent(),
   }) => ShotRow(
     id: id ?? this.id,
     startedAt: startedAt ?? this.startedAt,
@@ -466,6 +532,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     tasteScore: tasteScore.present ? tasteScore.value : this.tasteScore,
     flavourTags: flavourTags ?? this.flavourTags,
     location: location.present ? location.value : this.location,
+    latitude: latitude.present ? latitude.value : this.latitude,
+    longitude: longitude.present ? longitude.value : this.longitude,
   );
   ShotRow copyWithCompanion(ShotsCompanion data) {
     return ShotRow(
@@ -489,6 +557,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           ? data.flavourTags.value
           : this.flavourTags,
       location: data.location.present ? data.location.value : this.location,
+      latitude: data.latitude.present ? data.latitude.value : this.latitude,
+      longitude: data.longitude.present ? data.longitude.value : this.longitude,
     );
   }
 
@@ -506,7 +576,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           ..write('notes: $notes, ')
           ..write('tasteScore: $tasteScore, ')
           ..write('flavourTags: $flavourTags, ')
-          ..write('location: $location')
+          ..write('location: $location, ')
+          ..write('latitude: $latitude, ')
+          ..write('longitude: $longitude')
           ..write(')'))
         .toString();
   }
@@ -525,6 +597,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     tasteScore,
     flavourTags,
     location,
+    latitude,
+    longitude,
   );
   @override
   bool operator ==(Object other) =>
@@ -541,7 +615,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           other.notes == this.notes &&
           other.tasteScore == this.tasteScore &&
           other.flavourTags == this.flavourTags &&
-          other.location == this.location);
+          other.location == this.location &&
+          other.latitude == this.latitude &&
+          other.longitude == this.longitude);
 }
 
 class ShotsCompanion extends UpdateCompanion<ShotRow> {
@@ -557,6 +633,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
   final Value<int?> tasteScore;
   final Value<String> flavourTags;
   final Value<String?> location;
+  final Value<double?> latitude;
+  final Value<double?> longitude;
   final Value<int> rowid;
   const ShotsCompanion({
     this.id = const Value.absent(),
@@ -571,6 +649,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.tasteScore = const Value.absent(),
     this.flavourTags = const Value.absent(),
     this.location = const Value.absent(),
+    this.latitude = const Value.absent(),
+    this.longitude = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ShotsCompanion.insert({
@@ -586,6 +666,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.tasteScore = const Value.absent(),
     this.flavourTags = const Value.absent(),
     this.location = const Value.absent(),
+    this.latitude = const Value.absent(),
+    this.longitude = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        startedAt = Value(startedAt);
@@ -602,6 +684,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Expression<int>? tasteScore,
     Expression<String>? flavourTags,
     Expression<String>? location,
+    Expression<double>? latitude,
+    Expression<double>? longitude,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -617,6 +701,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
       if (tasteScore != null) 'taste_score': tasteScore,
       if (flavourTags != null) 'flavour_tags': flavourTags,
       if (location != null) 'location': location,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -634,6 +720,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Value<int?>? tasteScore,
     Value<String>? flavourTags,
     Value<String?>? location,
+    Value<double?>? latitude,
+    Value<double?>? longitude,
     Value<int>? rowid,
   }) {
     return ShotsCompanion(
@@ -649,6 +737,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
       tasteScore: tasteScore ?? this.tasteScore,
       flavourTags: flavourTags ?? this.flavourTags,
       location: location ?? this.location,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -696,6 +786,12 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     if (location.present) {
       map['location'] = Variable<String>(location.value);
     }
+    if (latitude.present) {
+      map['latitude'] = Variable<double>(latitude.value);
+    }
+    if (longitude.present) {
+      map['longitude'] = Variable<double>(longitude.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -717,6 +813,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
           ..write('tasteScore: $tasteScore, ')
           ..write('flavourTags: $flavourTags, ')
           ..write('location: $location, ')
+          ..write('latitude: $latitude, ')
+          ..write('longitude: $longitude, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3414,6 +3512,8 @@ typedef $$ShotsTableCreateCompanionBuilder =
       Value<int?> tasteScore,
       Value<String> flavourTags,
       Value<String?> location,
+      Value<double?> latitude,
+      Value<double?> longitude,
       Value<int> rowid,
     });
 typedef $$ShotsTableUpdateCompanionBuilder =
@@ -3430,6 +3530,8 @@ typedef $$ShotsTableUpdateCompanionBuilder =
       Value<int?> tasteScore,
       Value<String> flavourTags,
       Value<String?> location,
+      Value<double?> latitude,
+      Value<double?> longitude,
       Value<int> rowid,
     });
 
@@ -3563,6 +3665,16 @@ class $$ShotsTableFilterComposer
 
   ColumnFilters<String> get location => $composableBuilder(
     column: $table.location,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get latitude => $composableBuilder(
+    column: $table.latitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get longitude => $composableBuilder(
+    column: $table.longitude,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3710,6 +3822,16 @@ class $$ShotsTableOrderingComposer
     column: $table.location,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<double> get latitude => $composableBuilder(
+    column: $table.latitude,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get longitude => $composableBuilder(
+    column: $table.longitude,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ShotsTableAnnotationComposer
@@ -3764,6 +3886,12 @@ class $$ShotsTableAnnotationComposer
 
   GeneratedColumn<String> get location =>
       $composableBuilder(column: $table.location, builder: (column) => column);
+
+  GeneratedColumn<double> get latitude =>
+      $composableBuilder(column: $table.latitude, builder: (column) => column);
+
+  GeneratedColumn<double> get longitude =>
+      $composableBuilder(column: $table.longitude, builder: (column) => column);
 
   Expression<T> shotSamplesRefs<T extends Object>(
     Expression<T> Function($$ShotSamplesTableAnnotationComposer a) f,
@@ -3885,6 +4013,8 @@ class $$ShotsTableTableManager
                 Value<int?> tasteScore = const Value.absent(),
                 Value<String> flavourTags = const Value.absent(),
                 Value<String?> location = const Value.absent(),
+                Value<double?> latitude = const Value.absent(),
+                Value<double?> longitude = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShotsCompanion(
                 id: id,
@@ -3899,6 +4029,8 @@ class $$ShotsTableTableManager
                 tasteScore: tasteScore,
                 flavourTags: flavourTags,
                 location: location,
+                latitude: latitude,
+                longitude: longitude,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3915,6 +4047,8 @@ class $$ShotsTableTableManager
                 Value<int?> tasteScore = const Value.absent(),
                 Value<String> flavourTags = const Value.absent(),
                 Value<String?> location = const Value.absent(),
+                Value<double?> latitude = const Value.absent(),
+                Value<double?> longitude = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShotsCompanion.insert(
                 id: id,
@@ -3929,6 +4063,8 @@ class $$ShotsTableTableManager
                 tasteScore: tasteScore,
                 flavourTags: flavourTags,
                 location: location,
+                latitude: latitude,
+                longitude: longitude,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

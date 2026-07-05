@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flowlog/settings/brew_location_store.dart';
 import 'package:flutter/material.dart';
 
-/// Simple screen for setting the current brew location label.
+/// Settings for brew location label and automatic GPS capture.
 class BrewLocationScreen extends StatefulWidget {
   const BrewLocationScreen({
     super.key,
@@ -20,6 +20,7 @@ class _BrewLocationScreenState extends State<BrewLocationScreen> {
   late final BrewLocationStore _store;
   late final TextEditingController _controller;
   bool _ready = false;
+  bool _autoGpsEnabled = true;
 
   @override
   void initState() {
@@ -30,12 +31,15 @@ class _BrewLocationScreenState extends State<BrewLocationScreen> {
   }
 
   Future<void> _load() async {
-    final location = await _store.load();
+    final settings = await _store.loadSettings();
     if (!mounted) {
       return;
     }
-    _controller.text = location ?? '';
-    setState(() => _ready = true);
+    _controller.text = settings.currentLocation ?? '';
+    setState(() {
+      _autoGpsEnabled = settings.autoGpsEnabled;
+      _ready = true;
+    });
   }
 
   @override
@@ -46,7 +50,12 @@ class _BrewLocationScreenState extends State<BrewLocationScreen> {
 
   Future<void> _save() async {
     final value = _controller.text.trim();
-    await _store.save(value.isEmpty ? null : value);
+    await _store.saveSettings(
+      BrewLocationSettings(
+        currentLocation: value.isEmpty ? null : value,
+        autoGpsEnabled: _autoGpsEnabled,
+      ),
+    );
     if (mounted) {
       Navigator.of(context).pop();
     }
@@ -70,8 +79,21 @@ class _BrewLocationScreenState extends State<BrewLocationScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            SwitchListTile(
+              key: const Key('brew_location_auto_gps'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Auto-capture GPS'),
+              subtitle: const Text(
+                'Store latitude and longitude on each saved brew',
+              ),
+              value: _autoGpsEnabled,
+              onChanged: _ready
+                  ? (enabled) => setState(() => _autoGpsEnabled = enabled)
+                  : null,
+            ),
+            const SizedBox(height: 16),
             Text(
-              'Optional label saved on new shots (no GPS yet).',
+              'Optional label saved alongside GPS coordinates.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -84,7 +106,7 @@ class _BrewLocationScreenState extends State<BrewLocationScreen> {
               autofocus: true,
               textCapitalization: TextCapitalization.words,
               decoration: const InputDecoration(
-                labelText: 'Current location',
+                labelText: 'Location label',
                 hintText: 'e.g. Home kitchen',
                 border: OutlineInputBorder(),
               ),

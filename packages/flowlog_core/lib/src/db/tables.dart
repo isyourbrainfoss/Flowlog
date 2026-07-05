@@ -20,6 +20,8 @@ class Shots extends Table {
   TextColumn get flavourTags =>
       text().withDefault(const Constant('[]'))();
   TextColumn get location => text().nullable()();
+  RealColumn get latitude => real().nullable()();
+  RealColumn get longitude => real().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

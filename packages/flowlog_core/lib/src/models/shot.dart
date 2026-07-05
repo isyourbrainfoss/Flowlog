@@ -17,6 +17,8 @@ class Shot {
     this.waterTempC,
     this.notes,
     this.location,
+    this.latitude,
+    this.longitude,
     this.tasteScore,
     this.flavourTags = const [],
     this.samples = const [],
@@ -36,6 +38,8 @@ class Shot {
   final double? waterTempC;
   final String? notes;
   final String? location;
+  final double? latitude;
+  final double? longitude;
   final int? tasteScore;
   final List<String> flavourTags;
   final List<ShotSample> samples;
@@ -55,6 +59,8 @@ class Shot {
       waterTempC: (json['waterTempC'] as num?)?.toDouble(),
       notes: json['notes'] as String?,
       location: json['location'] as String?,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
       tasteScore: json['tasteScore'] as int?,
       flavourTags: (json['flavourTags'] as List<dynamic>?)
               ?.map((e) => e as String)
@@ -83,6 +89,8 @@ class Shot {
       if (waterTempC != null) 'waterTempC': waterTempC,
       if (notes != null) 'notes': notes,
       if (location != null) 'location': location,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
       if (tasteScore != null) 'tasteScore': tasteScore,
       if (flavourTags.isNotEmpty) 'flavourTags': flavourTags,
       if (samples.isNotEmpty)
@@ -103,6 +111,8 @@ class Shot {
     double? waterTempC,
     String? notes,
     String? location,
+    double? latitude,
+    double? longitude,
     int? tasteScore,
     List<String>? flavourTags,
     List<ShotSample>? samples,
@@ -119,6 +129,8 @@ class Shot {
       waterTempC: waterTempC ?? this.waterTempC,
       notes: notes ?? this.notes,
       location: location ?? this.location,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
       tasteScore: tasteScore ?? this.tasteScore,
       flavourTags: flavourTags ?? this.flavourTags,
       samples: samples ?? this.samples,
@@ -140,6 +152,8 @@ class Shot {
             waterTempC == other.waterTempC &&
             notes == other.notes &&
             location == other.location &&
+            latitude == other.latitude &&
+            longitude == other.longitude &&
             tasteScore == other.tasteScore &&
             _listEquals(flavourTags, other.flavourTags) &&
             _listEquals(samples, other.samples) &&
@@ -158,6 +172,8 @@ class Shot {
         waterTempC,
         notes,
         location,
+        latitude,
+        longitude,
         tasteScore,
         Object.hashAll(flavourTags),
         Object.hashAll(samples),

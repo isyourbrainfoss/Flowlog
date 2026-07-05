@@ -232,6 +232,7 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
     final shot = _currentShot;
     final theme = Theme.of(context);
     final metadata = ShotMetadata.fromShot(shot);
+    final brewSummary = BrewSummary.fromShot(shot);
 
     return Scaffold(
       key: Key('shot_detail_${shot.id}'),
@@ -263,13 +264,43 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
               annotations: shot.annotations,
               maxDurationMs: _chartDurationMs(shot),
             ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _MetadataField(
+                        label: 'Brew time',
+                        value: brewSummary.formatDuration(),
+                        labelStyle: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        valueStyle: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                    Expanded(
+                      child: _MetadataField(
+                        label: 'Peak pressure',
+                        value: brewSummary.formatPeakPressure(),
+                        labelStyle: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        valueStyle: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 24),
             Text(
               'Metadata',
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
-            _MetadataGrid(metadata: metadata),
+            _MetadataGrid(metadata: metadata, shot: shot),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               key: const Key('shot_edit_metadata_button'),
@@ -340,9 +371,13 @@ void openShotDetail(BuildContext context, Shot shot) {
 }
 
 class _MetadataGrid extends StatelessWidget {
-  const _MetadataGrid({required this.metadata});
+  const _MetadataGrid({
+    required this.metadata,
+    required this.shot,
+  });
 
   final ShotMetadata metadata;
+  final Shot shot;
 
   @override
   Widget build(BuildContext context) {
@@ -403,6 +438,25 @@ class _MetadataGrid extends StatelessWidget {
           labelStyle: labelStyle,
           valueStyle: valueStyle,
         ),
+        if (metadata.location != null) ...[
+          const SizedBox(height: 12),
+          _MetadataField(
+            label: 'Location',
+            value: metadata.location!,
+            labelStyle: labelStyle,
+            valueStyle: valueStyle,
+          ),
+        ],
+        if (shot.latitude != null && shot.longitude != null) ...[
+          const SizedBox(height: 12),
+          _MetadataField(
+            label: 'GPS',
+            value:
+                '${shot.latitude!.toStringAsFixed(5)}, ${shot.longitude!.toStringAsFixed(5)}',
+            labelStyle: labelStyle,
+            valueStyle: valueStyle,
+          ),
+        ],
         const SizedBox(height: 12),
         _MetadataField(
           label: 'Taste',
