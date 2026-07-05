@@ -5,6 +5,17 @@ import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog/sync/nextcloud_settings_store.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+typedef NextcloudLoginFlowStarter = Future<NextcloudLoginSession> Function(
+  String serverUrl,
+);
+
+typedef NextcloudLoginFlowPoller = Future<NextcloudLoginPollResult> Function(
+  NextcloudLoginSession session,
+);
+
+typedef NextcloudUrlLauncher = Future<bool> Function(Uri url);
 
 /// Settings screen for Nextcloud WebDAV auto-sync.
 class NextcloudSyncScreen extends StatefulWidget {
@@ -12,13 +23,23 @@ class NextcloudSyncScreen extends StatefulWidget {
     super.key,
     this.database,
     this.settingsStore,
+    this.loginFlowStarter = startNextcloudLoginFlow,
+    this.loginFlowPoller = pollNextcloudLoginFlow,
+    this.urlLauncher = _defaultUrlLauncher,
   });
 
   final FlowlogDatabase? database;
   final NextcloudSettingsStore? settingsStore;
+  final NextcloudLoginFlowStarter loginFlowStarter;
+  final NextcloudLoginFlowPoller loginFlowPoller;
+  final NextcloudUrlLauncher urlLauncher;
 
   @override
   State<NextcloudSyncScreen> createState() => _NextcloudSyncScreenState();
+}
+
+Future<bool> _defaultUrlLauncher(Uri url) {
+  return launchUrl(url, mode: LaunchMode.externalApplication);
 }
 
 class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
@@ -31,6 +52,7 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
   bool _ownsDatabase = false;
   bool _loading = true;
   bool _isBusy = false;
+  bool _loginCancelled = false;
   bool _autoSyncEnabled = false;
   DateTime? _lastSyncedAt;
   String? _lastSyncMessage;
@@ -89,20 +111,7 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
 
     String? message;
     try {
-      final settings = NextcloudSettings(
-        enabled: _autoSyncEnabled,
-        serverUrl: _serverController.text.trim(),
-        username: _usernameController.text.trim(),
-        lastSyncedAt: _lastSyncedAt,
-        lastSyncMessage: _lastSyncMessage,
-      );
-      await _store.saveSettings(settings);
-
-      final password = _passwordController.text;
-      if (password.isNotEmpty) {
-        await _store.savePassword(password);
-      }
-
+      await _saveSettingsInternal();
       message = 'Settings saved';
     } catch (error) {
       message = 'Save failed: $error';
@@ -116,6 +125,94 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
         });
       }
     }
+  }
+
+  Future<void> _signInWithBrowser() async {
+    final serverUrl = _serverController.text.trim();
+    if (serverUrl.isEmpty) {
+      setState(() => _statusMessage = 'Enter your server URL first');
+      return;
+    }
+
+    setState(() {
+      _isBusy = true;
+      _loginCancelled = false;
+      _statusMessage = 'Starting browser sign-in…';
+    });
+
+    try {
+      final session = await widget.loginFlowStarter(serverUrl);
+      if (!mounted || _loginCancelled) {
+        return;
+      }
+
+      final launched = await widget.urlLauncher(Uri.parse(session.loginUrl));
+      if (!launched) {
+        setState(() => _statusMessage = 'Could not open browser');
+        return;
+      }
+
+      if (!mounted || _loginCancelled) {
+        return;
+      }
+
+      setState(() {
+        _statusMessage =
+            'Complete sign-in in your browser, then return to Flowlog';
+      });
+
+      final credentials = await _waitForBrowserLogin(session);
+      if (!mounted || _loginCancelled || credentials == null) {
+        return;
+      }
+
+      setState(() {
+        _serverController.text = credentials.serverUrl;
+        _usernameController.text = credentials.loginName;
+        _passwordController.text = credentials.appPassword;
+        _statusMessage = 'Signed in as ${credentials.loginName}';
+      });
+
+      await _saveSettingsInternal();
+    } catch (error) {
+      if (mounted && !_loginCancelled) {
+        setState(() => _statusMessage = 'Sign-in failed: $error');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isBusy = false);
+      }
+    }
+  }
+
+  Future<NextcloudLoginCredentials?> _waitForBrowserLogin(
+    NextcloudLoginSession session,
+  ) async {
+    final deadline = DateTime.now().add(const Duration(minutes: 20));
+
+    while (!_loginCancelled && DateTime.now().isBefore(deadline)) {
+      final result = await widget.loginFlowPoller(session);
+      if (result.isCompleted) {
+        return result.credentials;
+      }
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+
+    if (_loginCancelled) {
+      return null;
+    }
+
+    throw const NextcloudLoginTimeoutException(
+      'Nextcloud login timed out after browser sign-in',
+    );
+  }
+
+  void _cancelBrowserSignIn() {
+    setState(() {
+      _loginCancelled = true;
+      _isBusy = false;
+      _statusMessage = 'Sign-in cancelled';
+    });
   }
 
   Future<void> _syncNow() async {
@@ -139,7 +236,7 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
         _lastSyncedAt = settings.lastSyncedAt;
         _lastSyncMessage = settings.lastSyncMessage;
         _statusMessage = result == null
-            ? 'Sync skipped — check server URL, username, and app password'
+            ? 'Sync skipped — sign in or check server URL and credentials'
             : result.message;
       });
     } catch (error) {
@@ -176,6 +273,7 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
 
   @override
   void dispose() {
+    _loginCancelled = true;
     _serverController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -205,13 +303,16 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    final waitingForBrowser =
+        _isBusy && _statusMessage?.contains('Complete sign-in') == true;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         Text(
           'Sync shots, profiles, and beans with your Nextcloud instance '
-          'over WebDAV. Use an app password from your Nextcloud security '
-          'settings.',
+          'over WebDAV. Sign in with your browser (recommended) or paste '
+          'an app password manually.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 16),
@@ -227,7 +328,36 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
           textInputAction: TextInputAction.next,
           enabled: !_isBusy,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          key: const Key('nextcloud_sign_in_button'),
+          onPressed: _isBusy ? null : () => unawaited(_signInWithBrowser()),
+          icon: const Icon(Icons.login),
+          label: const Text('Sign in with Nextcloud'),
+        ),
+        if (waitingForBrowser) ...[
+          const SizedBox(height: 8),
+          OutlinedButton(
+            key: const Key('nextcloud_cancel_sign_in_button'),
+            onPressed: _cancelBrowserSignIn,
+            child: const Text('Cancel sign-in'),
+          ),
+        ],
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            const Expanded(child: Divider()),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                'or enter manually',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            const Expanded(child: Divider()),
+          ],
+        ),
+        const SizedBox(height: 16),
         TextField(
           key: const Key('nextcloud_username_field'),
           controller: _usernameController,

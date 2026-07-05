@@ -15,6 +15,7 @@
 library;
 
 export 'encrypted_sync_blob.dart';
+export 'nextcloud_login_flow.dart';
 export 'nextcloud_sync.dart';
 export 'sync_backup.dart';
 export 'sync_blob.dart';

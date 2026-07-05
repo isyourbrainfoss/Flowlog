@@ -82,6 +82,9 @@ void main() {
     });
 
     Future<void> pumpScreen(WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -95,15 +98,82 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    Future<void> tapKey(WidgetTester tester, Key key) async {
+      await tester.ensureVisible(find.byKey(key));
+      await tester.tap(find.byKey(key));
+      await tester.pump();
+    }
+
     testWidgets('shows form fields and test keys', (tester) async {
       await pumpScreen(tester);
 
       expect(find.byKey(const Key('nextcloud_server_field')), findsOneWidget);
+      expect(find.byKey(const Key('nextcloud_sign_in_button')), findsOneWidget);
       expect(find.byKey(const Key('nextcloud_username_field')), findsOneWidget);
       expect(find.byKey(const Key('nextcloud_password_field')), findsOneWidget);
       expect(find.byKey(const Key('nextcloud_save_button')), findsOneWidget);
       expect(find.byKey(const Key('nextcloud_sync_now_button')), findsOneWidget);
       expect(find.text('Auto-sync with Nextcloud'), findsOneWidget);
+      expect(find.text('Sign in with Nextcloud'), findsOneWidget);
+    });
+
+    testWidgets('browser sign-in fills credentials and saves settings',
+        (tester) async {
+      const session = NextcloudLoginSession(
+        loginUrl: 'https://cloud.example.com/login/v2/abc',
+        pollEndpoint: 'https://cloud.example.com/login/v2/poll/abc',
+        pollToken: 'poll-token',
+      );
+      var launchedUrl = '';
+
+      await tester.binding.setSurfaceSize(const Size(800, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NextcloudSyncScreen(
+              database: db,
+              settingsStore: store,
+              loginFlowStarter: (_) async => session,
+              loginFlowPoller: (_) async {
+                return NextcloudLoginPollResult.completed(
+                  const NextcloudLoginCredentials(
+                    serverUrl: 'https://cloud.example.com',
+                    loginName: 'barista',
+                    appPassword: 'browser-app-password',
+                  ),
+                );
+              },
+              urlLauncher: (url) async {
+                launchedUrl = url.toString();
+                return true;
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('nextcloud_server_field')),
+        'https://cloud.example.com',
+      );
+      await tapKey(tester, const Key('nextcloud_sign_in_button'));
+      await tester.pump();
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        if (store.stagedPassword != null) {
+          break;
+        }
+      }
+      await tester.pumpAndSettle();
+
+      expect(launchedUrl, session.loginUrl);
+      expect(store.stagedSettings?.serverUrl, 'https://cloud.example.com');
+      expect(store.stagedSettings?.username, 'barista');
+      expect(store.stagedPassword, 'browser-app-password');
+      expect(find.textContaining('Signed in as barista'), findsOneWidget);
     });
 
     testWidgets('save settings persists values through store', (tester) async {
@@ -124,8 +194,7 @@ void main() {
       await tester.tap(find.byType(Switch));
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.byKey(const Key('nextcloud_save_button')));
-      await tester.tap(find.byKey(const Key('nextcloud_save_button')));
+      await tapKey(tester, const Key('nextcloud_save_button'));
       await tester.pump();
       for (var i = 0; i < 40; i++) {
         await tester.pump(const Duration(milliseconds: 50));
@@ -150,7 +219,7 @@ void main() {
 
       await pumpScreen(tester);
 
-      await tester.tap(find.byKey(const Key('nextcloud_sync_now_button')));
+      await tapKey(tester, const Key('nextcloud_sync_now_button'));
       await tester.pump();
       for (var i = 0; i < 20 && syncCalls == 0; i++) {
         await tester.pump(const Duration(milliseconds: 50));
@@ -158,7 +227,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(syncCalls, 1);
-      expect(find.textContaining('Synced for barista'), findsOneWidget);
+      expect(find.textContaining('Synced for barista'), findsWidgets);
       expect(store.stagedSettings?.lastSyncMessage, 'Synced for barista');
       expect(store.stagedSettings?.lastSyncedAt, isNotNull);
     });
