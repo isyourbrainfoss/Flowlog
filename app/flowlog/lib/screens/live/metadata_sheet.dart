@@ -15,6 +15,7 @@ class ShotMetadata {
     this.beanId,
     this.waterTempC,
     this.notes,
+    this.location,
     this.tasteScore,
     this.flavourTags = const [],
   }) : assert(
@@ -28,6 +29,7 @@ class ShotMetadata {
   final String? beanId;
   final double? waterTempC;
   final String? notes;
+  final String? location;
   final int? tasteScore;
   final List<String> flavourTags;
 
@@ -39,6 +41,7 @@ class ShotMetadata {
       beanId: shot.beanId,
       waterTempC: shot.waterTempC,
       notes: shot.notes,
+      location: shot.location,
       tasteScore: shot.tasteScore,
       flavourTags: List<String>.from(shot.flavourTags),
     );
@@ -52,6 +55,7 @@ class ShotMetadata {
       beanId: beanId,
       waterTempC: waterTempC,
       notes: notes,
+      location: location,
       tasteScore: tasteScore,
       flavourTags: flavourTags,
     );
@@ -64,6 +68,7 @@ class ShotMetadata {
     String? beanId,
     double? waterTempC,
     String? notes,
+    String? location,
     int? tasteScore,
     List<String>? flavourTags,
   }) {
@@ -74,6 +79,7 @@ class ShotMetadata {
       beanId: beanId ?? this.beanId,
       waterTempC: waterTempC ?? this.waterTempC,
       notes: notes ?? this.notes,
+      location: location ?? this.location,
       tasteScore: tasteScore ?? this.tasteScore,
       flavourTags: flavourTags ?? this.flavourTags,
     );
@@ -89,6 +95,7 @@ class ShotMetadata {
             beanId == other.beanId &&
             waterTempC == other.waterTempC &&
             notes == other.notes &&
+            location == other.location &&
             tasteScore == other.tasteScore &&
             _listEquals(flavourTags, other.flavourTags);
   }
@@ -101,6 +108,7 @@ class ShotMetadata {
         beanId,
         waterTempC,
         notes,
+        location,
         tasteScore,
         Object.hashAll(flavourTags),
       );
@@ -189,6 +197,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
   late final TextEditingController _beanController;
   late final TextEditingController _tempController;
   late final TextEditingController _notesController;
+  late final TextEditingController _locationController;
   late double _tasteScore;
   late Set<String> _selectedFlavourTags;
   final _customTagController = TextEditingController();
@@ -216,6 +225,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
       text: _formatDouble(initial?.waterTempC),
     );
     _notesController = TextEditingController(text: initial?.notes ?? '');
+    _locationController = TextEditingController(text: initial?.location ?? '');
     _tasteScore = (initial?.tasteScore ?? 5).toDouble();
     _selectedFlavourTags = Set<String>.from(initial?.flavourTags ?? const []);
     unawaited(_loadBeans());
@@ -288,6 +298,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
     _beanController.dispose();
     _tempController.dispose();
     _notesController.dispose();
+    _locationController.dispose();
     _customTagController.dispose();
     super.dispose();
   }
@@ -380,6 +391,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
       beanId: beanId,
       waterTempC: _parseDouble(_tempController.text),
       notes: _parseString(_notesController.text),
+      location: _parseString(_locationController.text),
       tasteScore: _tasteScore.round(),
       flavourTags: _selectedFlavourTags.toList()..sort(),
     );
@@ -529,6 +541,17 @@ class _MetadataSheetState extends State<MetadataSheet> {
                     onSubmitted: (_) => onFieldSubmitted(),
                   );
                 },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                key: const Key('metadata_location'),
+                controller: _locationController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Location',
+                  hintText: 'e.g. Home kitchen',
+                  border: OutlineInputBorder(),
+                ),
               ),
               const SizedBox(height: 12),
               TextField(

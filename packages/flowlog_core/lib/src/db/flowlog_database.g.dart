@@ -116,6 +116,17 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     requiredDuringInsert: false,
     defaultValue: const Constant('[]'),
   );
+  static const VerificationMeta _locationMeta = const VerificationMeta(
+    'location',
+  );
+  @override
+  late final GeneratedColumn<String> location = GeneratedColumn<String>(
+    'location',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -129,6 +140,7 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     notes,
     tasteScore,
     flavourTags,
+    location,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -204,6 +216,12 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         ),
       );
     }
+    if (data.containsKey('location')) {
+      context.handle(
+        _locationMeta,
+        location.isAcceptableOrUnknown(data['location']!, _locationMeta),
+      );
+    }
     return context;
   }
 
@@ -261,6 +279,10 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         DriftSqlType.string,
         data['${effectivePrefix}flavour_tags'],
       )!,
+      location: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location'],
+      ),
     );
   }
 
@@ -287,6 +309,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
   final String? notes;
   final int? tasteScore;
   final String flavourTags;
+  final String? location;
   const ShotRow({
     required this.id,
     required this.startedAt,
@@ -299,6 +322,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     this.notes,
     this.tasteScore,
     required this.flavourTags,
+    this.location,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -336,6 +360,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       map['taste_score'] = Variable<int>(tasteScore);
     }
     map['flavour_tags'] = Variable<String>(flavourTags);
+    if (!nullToAbsent || location != null) {
+      map['location'] = Variable<String>(location);
+    }
     return map;
   }
 
@@ -368,6 +395,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           ? const Value.absent()
           : Value(tasteScore),
       flavourTags: Value(flavourTags),
+      location: location == null && nullToAbsent
+          ? const Value.absent()
+          : Value(location),
     );
   }
 
@@ -388,6 +418,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       notes: serializer.fromJson<String?>(json['notes']),
       tasteScore: serializer.fromJson<int?>(json['tasteScore']),
       flavourTags: serializer.fromJson<String>(json['flavourTags']),
+      location: serializer.fromJson<String?>(json['location']),
     );
   }
   @override
@@ -405,6 +436,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       'notes': serializer.toJson<String?>(notes),
       'tasteScore': serializer.toJson<int?>(tasteScore),
       'flavourTags': serializer.toJson<String>(flavourTags),
+      'location': serializer.toJson<String?>(location),
     };
   }
 
@@ -420,6 +452,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     Value<String?> notes = const Value.absent(),
     Value<int?> tasteScore = const Value.absent(),
     String? flavourTags,
+    Value<String?> location = const Value.absent(),
   }) => ShotRow(
     id: id ?? this.id,
     startedAt: startedAt ?? this.startedAt,
@@ -432,6 +465,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     notes: notes.present ? notes.value : this.notes,
     tasteScore: tasteScore.present ? tasteScore.value : this.tasteScore,
     flavourTags: flavourTags ?? this.flavourTags,
+    location: location.present ? location.value : this.location,
   );
   ShotRow copyWithCompanion(ShotsCompanion data) {
     return ShotRow(
@@ -454,6 +488,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       flavourTags: data.flavourTags.present
           ? data.flavourTags.value
           : this.flavourTags,
+      location: data.location.present ? data.location.value : this.location,
     );
   }
 
@@ -470,7 +505,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           ..write('waterTempC: $waterTempC, ')
           ..write('notes: $notes, ')
           ..write('tasteScore: $tasteScore, ')
-          ..write('flavourTags: $flavourTags')
+          ..write('flavourTags: $flavourTags, ')
+          ..write('location: $location')
           ..write(')'))
         .toString();
   }
@@ -488,6 +524,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     notes,
     tasteScore,
     flavourTags,
+    location,
   );
   @override
   bool operator ==(Object other) =>
@@ -503,7 +540,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           other.waterTempC == this.waterTempC &&
           other.notes == this.notes &&
           other.tasteScore == this.tasteScore &&
-          other.flavourTags == this.flavourTags);
+          other.flavourTags == this.flavourTags &&
+          other.location == this.location);
 }
 
 class ShotsCompanion extends UpdateCompanion<ShotRow> {
@@ -518,6 +556,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
   final Value<String?> notes;
   final Value<int?> tasteScore;
   final Value<String> flavourTags;
+  final Value<String?> location;
   final Value<int> rowid;
   const ShotsCompanion({
     this.id = const Value.absent(),
@@ -531,6 +570,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.notes = const Value.absent(),
     this.tasteScore = const Value.absent(),
     this.flavourTags = const Value.absent(),
+    this.location = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ShotsCompanion.insert({
@@ -545,6 +585,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.notes = const Value.absent(),
     this.tasteScore = const Value.absent(),
     this.flavourTags = const Value.absent(),
+    this.location = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        startedAt = Value(startedAt);
@@ -560,6 +601,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Expression<String>? notes,
     Expression<int>? tasteScore,
     Expression<String>? flavourTags,
+    Expression<String>? location,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -574,6 +616,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
       if (notes != null) 'notes': notes,
       if (tasteScore != null) 'taste_score': tasteScore,
       if (flavourTags != null) 'flavour_tags': flavourTags,
+      if (location != null) 'location': location,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -590,6 +633,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Value<String?>? notes,
     Value<int?>? tasteScore,
     Value<String>? flavourTags,
+    Value<String?>? location,
     Value<int>? rowid,
   }) {
     return ShotsCompanion(
@@ -604,6 +648,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
       notes: notes ?? this.notes,
       tasteScore: tasteScore ?? this.tasteScore,
       flavourTags: flavourTags ?? this.flavourTags,
+      location: location ?? this.location,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -648,6 +693,9 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     if (flavourTags.present) {
       map['flavour_tags'] = Variable<String>(flavourTags.value);
     }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -668,6 +716,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
           ..write('notes: $notes, ')
           ..write('tasteScore: $tasteScore, ')
           ..write('flavourTags: $flavourTags, ')
+          ..write('location: $location, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3364,6 +3413,7 @@ typedef $$ShotsTableCreateCompanionBuilder =
       Value<String?> notes,
       Value<int?> tasteScore,
       Value<String> flavourTags,
+      Value<String?> location,
       Value<int> rowid,
     });
 typedef $$ShotsTableUpdateCompanionBuilder =
@@ -3379,6 +3429,7 @@ typedef $$ShotsTableUpdateCompanionBuilder =
       Value<String?> notes,
       Value<int?> tasteScore,
       Value<String> flavourTags,
+      Value<String?> location,
       Value<int> rowid,
     });
 
@@ -3507,6 +3558,11 @@ class $$ShotsTableFilterComposer
 
   ColumnFilters<String> get flavourTags => $composableBuilder(
     column: $table.flavourTags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get location => $composableBuilder(
+    column: $table.location,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3649,6 +3705,11 @@ class $$ShotsTableOrderingComposer
     column: $table.flavourTags,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ShotsTableAnnotationComposer
@@ -3700,6 +3761,9 @@ class $$ShotsTableAnnotationComposer
     column: $table.flavourTags,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => column);
 
   Expression<T> shotSamplesRefs<T extends Object>(
     Expression<T> Function($$ShotSamplesTableAnnotationComposer a) f,
@@ -3820,6 +3884,7 @@ class $$ShotsTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<int?> tasteScore = const Value.absent(),
                 Value<String> flavourTags = const Value.absent(),
+                Value<String?> location = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShotsCompanion(
                 id: id,
@@ -3833,6 +3898,7 @@ class $$ShotsTableTableManager
                 notes: notes,
                 tasteScore: tasteScore,
                 flavourTags: flavourTags,
+                location: location,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3848,6 +3914,7 @@ class $$ShotsTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<int?> tasteScore = const Value.absent(),
                 Value<String> flavourTags = const Value.absent(),
+                Value<String?> location = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShotsCompanion.insert(
                 id: id,
@@ -3861,6 +3928,7 @@ class $$ShotsTableTableManager
                 notes: notes,
                 tasteScore: tasteScore,
                 flavourTags: flavourTags,
+                location: location,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -415,6 +415,7 @@ Future<Bean?> showBeanEditorDialog({
 }) {
   return showDialog<Bean>(
     context: context,
+    barrierDismissible: false,
     builder: (dialogContext) => _BeanEditorDialog(
       bean: bean,
       beanIdGenerator: beanIdGenerator,
@@ -510,6 +511,59 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
     return double.tryParse(trimmed);
   }
 
+  bool get _isDirty {
+    final bean = widget.bean;
+    if (bean == null) {
+      return _nameController.text.trim().isNotEmpty ||
+          _originController.text.trim().isNotEmpty ||
+          _stockController.text.trim().isNotEmpty ||
+          _notesController.text.trim().isNotEmpty ||
+          _roastSliderValue != 2 ||
+          _roastDate != null ||
+          _selectedProcess != null;
+    }
+
+    final stock = _optionalStock(_stockController.text);
+    return _nameController.text.trim() != bean.name ||
+        _optionalText(_originController.text) != bean.origin ||
+        _sliderToRoastLevel(_roastSliderValue) != bean.roastLevel ||
+        _roastDate != bean.roastDate ||
+        _selectedProcess != bean.process ||
+        stock != bean.stockG ||
+        _optionalText(_notesController.text) != bean.notes;
+  }
+
+  Future<bool> _confirmDiscard() async {
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Discard changes?'),
+        content: const Text('Discard unsaved bean changes?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep editing'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    return discard == true;
+  }
+
+  Future<void> _cancel() async {
+    if (!_isDirty) {
+      Navigator.pop(context);
+      return;
+    }
+    if (await _confirmDiscard() && mounted) {
+      Navigator.pop(context);
+    }
+  }
+
   void _save() {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -553,7 +607,21 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
   Widget build(BuildContext context) {
     final isEditing = widget.bean != null;
 
-    return AlertDialog(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) {
+          return;
+        }
+        if (!_isDirty) {
+          Navigator.pop(context);
+          return;
+        }
+        if (await _confirmDiscard() && context.mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: AlertDialog(
       key: Key(isEditing ? 'bean_editor_edit' : 'bean_editor_add'),
       title: Text(isEditing ? 'Edit bean' : 'Add bean'),
       content: SingleChildScrollView(
@@ -717,7 +785,8 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          key: const Key('bean_editor_cancel'),
+          onPressed: _cancel,
           child: const Text('Cancel'),
         ),
         FilledButton(
@@ -726,6 +795,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
           child: Text(isEditing ? 'Save' : 'Add'),
         ),
       ],
+    ),
     );
   }
 }

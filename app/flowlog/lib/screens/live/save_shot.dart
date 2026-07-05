@@ -20,12 +20,14 @@ Shot buildShotFromSession({
   ShotMetadata? metadata,
   List<ShotAnnotation> annotations = const [],
   String? id,
+  String? location,
   ShotIdGenerator idGenerator = generateShotId,
 }) {
   var shot = Shot(
     id: id ?? idGenerator(),
     startedAt: startedAt,
     endedAt: endedAt ?? DateTime.now().toUtc(),
+    location: location,
     samples: List<ShotSample>.from(samples),
     annotations: List<ShotAnnotation>.from(annotations),
   );
@@ -90,6 +92,7 @@ Future<Shot?> runAutoSaveFlow({
   String? activeBeanName,
   String? activeBeanId,
   List<ShotAnnotation> annotations = const [],
+  String? location,
   ShotIdGenerator idGenerator = generateShotId,
   void Function(Shot shot)? onSaved,
   Future<void> Function(Shot shot)? onAddNotes,
@@ -126,6 +129,7 @@ Future<Shot?> runAutoSaveFlow({
     endedAt: endedAt,
     metadata: metadata,
     annotations: annotations,
+    location: location,
     idGenerator: idGenerator,
   );
 

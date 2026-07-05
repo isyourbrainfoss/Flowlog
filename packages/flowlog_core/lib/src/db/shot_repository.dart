@@ -257,6 +257,7 @@ class ShotRepository {
       beanId: Value(shot.beanId),
       waterTempC: Value(shot.waterTempC),
       notes: Value(shot.notes),
+      location: Value(shot.location),
       tasteScore: Value(shot.tasteScore),
       flavourTags: Value(jsonEncode(shot.flavourTags)),
     );
@@ -303,6 +304,7 @@ class ShotRepository {
       beanId: row.beanId,
       waterTempC: row.waterTempC,
       notes: row.notes,
+      location: row.location,
       tasteScore: row.tasteScore,
       flavourTags: _decodeFlavourTags(row.flavourTags),
       samples: samples,

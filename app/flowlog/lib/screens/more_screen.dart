@@ -1,11 +1,45 @@
+import 'dart:async';
+
+import 'package:flowlog/screens/more/brew_location_screen.dart';
 import 'package:flowlog/screens/more/diagnostics.dart';
 import 'package:flowlog/screens/more/sensors_screen.dart';
+import 'package:flowlog/settings/brew_location_store.dart';
 import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flutter/material.dart';
 
-class MoreScreen extends StatelessWidget {
+class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
+
+  @override
+  State<MoreScreen> createState() => _MoreScreenState();
+}
+
+class _MoreScreenState extends State<MoreScreen> {
+  final BrewLocationStore _brewLocationStore = BrewLocationStore();
+  String? _brewLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadBrewLocation());
+  }
+
+  Future<void> _loadBrewLocation() async {
+    final location = await _brewLocationStore.load();
+    if (mounted) {
+      setState(() => _brewLocation = location);
+    }
+  }
+
+  Future<void> _openBrewLocationScreen() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => BrewLocationScreen(store: _brewLocationStore),
+      ),
+    );
+    await _loadBrewLocation();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +61,18 @@ class MoreScreen extends StatelessWidget {
               );
             },
           ),
+        ),
+        ListTile(
+          key: const Key('more_brew_location_tile'),
+          leading: const Icon(Icons.place_outlined),
+          title: const Text('Brew location'),
+          subtitle: Text(
+            _brewLocation?.isNotEmpty == true
+                ? _brewLocation!
+                : 'Optional label for new shots',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => unawaited(_openBrewLocationScreen()),
         ),
         ListTile(
           leading: const Icon(Icons.cloud_sync),

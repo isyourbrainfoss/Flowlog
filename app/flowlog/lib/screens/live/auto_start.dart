@@ -244,6 +244,45 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
   Widget build(BuildContext context) => widget.child;
 }
 
+/// Expandable threshold control shown below [AutoStartArmedBanner].
+class AutoStartThresholdPanel extends StatelessWidget {
+  const AutoStartThresholdPanel({
+    required this.thresholdBar,
+    required this.onThresholdChanged,
+    super.key,
+  });
+
+  final double thresholdBar;
+  final ValueChanged<double> onThresholdChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        title: Text(
+          'Auto-start threshold',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        subtitle: Text('${thresholdBar.toStringAsFixed(1)} bar'),
+        children: [
+          Slider(
+            key: const Key('auto_start_threshold_slider'),
+            value: thresholdBar.clamp(0.5, 2.5),
+            min: 0.5,
+            max: 2.5,
+            divisions: 20,
+            label: '${thresholdBar.toStringAsFixed(1)} bar',
+            onChanged: onThresholdChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Banner shown when auto-start is monitoring pressure while idle.
 class AutoStartArmedBanner extends StatelessWidget {
   const AutoStartArmedBanner({

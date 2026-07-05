@@ -7,11 +7,11 @@ import 'package:test/test.dart';
 
 void main() {
   group('schema', () {
-    test('schema version is 7', () async {
+    test('schema version is 8', () async {
       final db = FlowlogDatabase.inMemory();
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 7);
+      expect(db.schemaVersion, 8);
     });
 
     test(
@@ -71,6 +71,19 @@ void main() {
 
       final withSamples = await repository.getShotWithSamples(shot.id);
       expect(withSamples, shot);
+    });
+
+    test('persists optional location field', () async {
+      final shot = Shot(
+        id: 'shot-location',
+        startedAt: DateTime.utc(2026, 6, 29, 10, 0),
+        location: 'Home kitchen',
+      );
+
+      await repository.insertShot(shot);
+
+      final loaded = await repository.getShotById('shot-location');
+      expect(loaded?.location, 'Home kitchen');
     });
 
     test('getShotById returns null for unknown id', () async {
@@ -356,13 +369,13 @@ void main() {
         final shot = _loadFixtureShot('shots/minimal_shot.json');
 
         await writerRepo.insertShot(shot);
-        expect(writer.schemaVersion, 7);
+        expect(writer.schemaVersion, 8);
         await writer.close();
 
         final reader = FlowlogDatabase.openFile(dbPath);
         final readerRepo = ShotRepository(reader);
 
-        expect(reader.schemaVersion, 7);
+        expect(reader.schemaVersion, 8);
         expect(await readerRepo.getShotWithSamples(shot.id), shot);
 
         await reader.close();
@@ -412,7 +425,7 @@ void main() {
         final migrated = FlowlogDatabase.openFile(dbPath);
         addTearDown(migrated.close);
 
-        expect(migrated.schemaVersion, 7);
+        expect(migrated.schemaVersion, 8);
 
         final tables = await migrated
             .customSelect(
@@ -502,7 +515,7 @@ void main() {
         final migrated = FlowlogDatabase.openFile(dbPath);
         addTearDown(migrated.close);
 
-        expect(migrated.schemaVersion, 7);
+        expect(migrated.schemaVersion, 8);
 
         final tables = await migrated
             .customSelect(

@@ -10,6 +10,8 @@ import 'package:flowlog/screens/live/fullscreen_chart.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
+import 'package:flowlog/settings/auto_start_settings_store.dart';
+import 'package:flowlog/settings/brew_location_store.dart';
 import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog/sensors/live_sensor_source.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
@@ -19,7 +21,7 @@ import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter/services.dart';
 
 /// Live shot tab: recording controls, live chart, metrics, and god-shot save.
@@ -93,6 +95,11 @@ class _LiveScreenState extends State<LiveScreen> {
   RepeatShotController? _repeatShotController;
   final ConfettiController _confettiController = ConfettiController();
   late final ChartInteractionController _chartInteractionController;
+  final AutoStartSettingsStore _autoStartSettingsStore = AutoStartSettingsStore();
+  final BrewLocationStore _brewLocationStore = BrewLocationStore();
+  AutoStartSettings _autoStartSettings = const AutoStartSettings();
+  SensorHub? _sensorHub;
+  ConnectionState? _lastPressensorState;
 
   @override
   void initState() {
@@ -111,6 +118,52 @@ class _LiveScreenState extends State<LiveScreen> {
       _sensorSource = widget.sensorSource;
       _bindController(widget.controller!);
       _controllerReady = true;
+    }
+
+    unawaited(_loadAutoStartSettings());
+  }
+
+  Future<void> _loadAutoStartSettings() async {
+    final settings = await _autoStartSettingsStore.load();
+    if (mounted) {
+      setState(() => _autoStartSettings = settings);
+    }
+  }
+
+  Future<void> _onAutoStartThresholdChanged(double value) async {
+    final updated = AutoStartSettings(
+      enabled: _autoStartSettings.enabled,
+      startThresholdBar: value,
+      releaseFraction: _autoStartSettings.releaseFraction,
+    );
+    setState(() => _autoStartSettings = updated);
+    await _autoStartSettingsStore.save(updated);
+  }
+
+  void _onSensorHubChanged() {
+    final hub = _sensorHub;
+    if (hub == null) {
+      return;
+    }
+
+    final current = hub.pressensorState;
+    final previous = _lastPressensorState;
+    _lastPressensorState = current;
+
+    if (previous != null &&
+        previous != ConnectionState.connected &&
+        current == ConnectionState.connected &&
+        mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          key: const Key('pressensor_connected_snackbar'),
+          content: Text(
+            'Pressensor connected — auto-start at '
+            '${_autoStartSettings.startThresholdBar.toStringAsFixed(1)} bar',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -160,10 +213,19 @@ class _LiveScreenState extends State<LiveScreen> {
     }
     _repeatShotController =
         widget.repeatShotController ?? RepeatShotScope.maybeOf(context);
+
+    final hub = SensorHubScope.maybeOf(context);
+    if (hub != _sensorHub) {
+      _sensorHub?.removeListener(_onSensorHubChanged);
+      _sensorHub = hub;
+      _lastPressensorState = hub?.pressensorState;
+      hub?.addListener(_onSensorHubChanged);
+    }
   }
 
   @override
   void dispose() {
+    _sensorHub?.removeListener(_onSensorHubChanged);
     _shortcutRegistry?.setToggleLiveShot(null);
     _confettiController.dispose();
     _chartInteractionController.dispose();
@@ -343,6 +405,7 @@ class _LiveScreenState extends State<LiveScreen> {
       }
 
       final activeBean = ActiveBeanScope.maybeOf(context);
+      final brewLocation = await _brewLocationStore.load();
       final shot = await runAutoSaveFlow(
         context: context,
         repository: repository,
@@ -354,6 +417,7 @@ class _LiveScreenState extends State<LiveScreen> {
         activeBeanName: activeBean?.name,
         activeBeanId: activeBean?.beanId,
         annotations: _annotationController.annotations,
+        location: brewLocation,
         idGenerator: widget.shotIdGenerator,
         onSaved: (saved) {
           _lastAutoSavedShotId = saved.id;
@@ -560,7 +624,13 @@ class _LiveScreenState extends State<LiveScreen> {
                         if (repeatPrefill != null) const SizedBox(height: 8),
                         if (showAutoStart)
                           AutoStartArmedBanner(
-                            thresholdBar: kDefaultAutoStartPressureBar,
+                            thresholdBar: _autoStartSettings.startThresholdBar,
+                          ),
+                        if (showAutoStart)
+                          AutoStartThresholdPanel(
+                            thresholdBar: _autoStartSettings.startThresholdBar,
+                            onThresholdChanged: (value) =>
+                                unawaited(_onAutoStartThresholdChanged(value)),
                           ),
                         if (showAutoStart) const SizedBox(height: 8),
                         LiveFullscreenChartButton(
@@ -708,6 +778,7 @@ class _LiveScreenState extends State<LiveScreen> {
           controller: controller,
           hub: hub,
           sensorSource: _sensorSource,
+          settings: _autoStartSettings,
           isDemoMode: demoModeActive,
           child: shell,
         );

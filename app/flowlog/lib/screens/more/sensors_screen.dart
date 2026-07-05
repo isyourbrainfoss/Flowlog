@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flowlog/screens/more/diagnostics.dart';
+import 'package:flowlog/settings/auto_start_settings_store.dart';
 import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
@@ -96,12 +97,7 @@ class SensorsScreen extends StatelessWidget {
     }
 
     final device = hub.devices.firstWhere((entry) => entry.id == deviceId);
-    final message = switch (device.state) {
-      ConnectionState.connected => 'Connected to ${device.name}.',
-      ConnectionState.connecting => 'Connecting to ${device.name}…',
-      _ => hub.lastError ??
-          'Could not connect to ${device.name}. Check Bluetooth and try again.',
-    };
+    final message = await _connectMessage(hub: hub, device: device);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -110,6 +106,26 @@ class SensorsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<String> _connectMessage({
+  required SensorHub hub,
+  required PairedSensorEntry device,
+}) async {
+  return switch (device.state) {
+    ConnectionState.connected => device.kind == SensorKind.pressensor
+        ? _pressensorConnectedMessage(device.name)
+        : 'Connected to ${device.name}.',
+    ConnectionState.connecting => 'Connecting to ${device.name}…',
+    _ => hub.lastError ??
+        'Could not connect to ${device.name}. Check Bluetooth and try again.',
+  };
+}
+
+Future<String> _pressensorConnectedMessage(String deviceName) async {
+  final settings = await AutoStartSettingsStore().load();
+  return 'Connected to $deviceName. Auto-start at '
+      '${settings.startThresholdBar.toStringAsFixed(1)} bar.';
 }
 
 class _EmptySensorsState extends StatelessWidget {

@@ -125,13 +125,27 @@ class _FlowlogShellState extends State<FlowlogShell> {
     });
   }
 
-  void _onActiveBeanChanged(String name, {String? beanId}) {
-    setState(() {
-      _beanName = name;
-      if (beanId != null) {
-        _beanId = beanId;
+  Future<void> _handleActiveBeanChanged(String name, {String? beanId}) async {
+    if (!mounted) {
+      return;
+    }
+
+    if (beanId != null) {
+      final repository = await _ensureBeanRepository();
+      final bean = await repository.getBeanById(beanId);
+      if (!mounted) {
+        return;
       }
-    });
+      if (bean != null) {
+        setState(() {
+          _beanName = bean.name;
+          _beanId = bean.id;
+        });
+        return;
+      }
+    }
+
+    await _onBeanNameChanged(name);
   }
 
   void _onDestinationSelected(int index) {
@@ -195,9 +209,12 @@ class _FlowlogShellState extends State<FlowlogShell> {
                 child: _ShellContent(
                   beanName: _beanName,
                   beanId: _beanId,
-                  onBeanNameChanged: (name) =>
-                      unawaited(_onBeanNameChanged(name)),
-                  onActiveBeanChanged: _onActiveBeanChanged,
+                  loadBeans: () => _ensureBeanRepository().then(
+                    (repository) => repository.listBeansByRecentUse(),
+                  ),
+                  onActiveBeanChanged: (name, {beanId}) => unawaited(
+                    _handleActiveBeanChanged(name, beanId: beanId),
+                  ),
                   child: destination.screen,
                 ),
               ),
@@ -231,14 +248,14 @@ class _ShellContent extends StatelessWidget {
   const _ShellContent({
     required this.beanName,
     required this.beanId,
-    required this.onBeanNameChanged,
+    required this.loadBeans,
     required this.onActiveBeanChanged,
     required this.child,
   });
 
   final String beanName;
   final String? beanId;
-  final ValueChanged<String> onBeanNameChanged;
+  final Future<List<Bean>> Function() loadBeans;
   final void Function(String name, {String? beanId}) onActiveBeanChanged;
   final Widget child;
 
@@ -268,7 +285,8 @@ class _ShellContent extends StatelessWidget {
                 builder: (context, _) {
                   return FlowlogTopBar(
                     beanName: beanName,
-                    onBeanNameChanged: onBeanNameChanged,
+                    loadBeans: loadBeans,
+                    onActiveBeanChanged: onActiveBeanChanged,
                     pressensorState: hub.pressensorState,
                     scaleState: hub.scaleState,
                   );

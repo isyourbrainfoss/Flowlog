@@ -19,6 +19,7 @@ class Shots extends Table {
   IntColumn get tasteScore => integer().nullable()();
   TextColumn get flavourTags =>
       text().withDefault(const Constant('[]'))();
+  TextColumn get location => text().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

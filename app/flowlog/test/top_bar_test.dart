@@ -4,6 +4,7 @@ import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog/shell/top_bar.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
+import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_test/flutter_test.dart';
@@ -12,7 +13,8 @@ void main() {
   Future<void> pumpTopBar(
     WidgetTester tester, {
     String beanName = kDefaultBeanName,
-    ValueChanged<String>? onBeanNameChanged,
+    Future<List<Bean>> Function()? loadBeans,
+    void Function(String name, {String? beanId})? onActiveBeanChanged,
     ConnectionState pressensorState = ConnectionState.disconnected,
     ConnectionState scaleState = ConnectionState.disconnected,
     ThemeData? theme,
@@ -23,7 +25,8 @@ void main() {
         home: Scaffold(
           appBar: FlowlogTopBar(
             beanName: beanName,
-            onBeanNameChanged: onBeanNameChanged,
+            loadBeans: loadBeans,
+            onActiveBeanChanged: onActiveBeanChanged,
             pressensorState: pressensorState,
             scaleState: scaleState,
           ),
@@ -78,10 +81,14 @@ void main() {
 
     testWidgets('saves edited bean name', (tester) async {
       String? updatedName;
+      String? updatedBeanId;
 
       await pumpTopBar(
         tester,
-        onBeanNameChanged: (name) => updatedName = name,
+        onActiveBeanChanged: (name, {beanId}) {
+          updatedName = name;
+          updatedBeanId = beanId;
+        },
       );
 
       await tester.tap(find.byKey(const Key('top_bar_bean_name')));
@@ -95,6 +102,68 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(updatedName, 'Ethiopia Yirgacheffe');
+      expect(updatedBeanId, isNull);
+    });
+
+    testWidgets('shows autocomplete options from bean loader', (tester) async {
+      const beans = [
+        Bean(id: 'bean-1', name: 'Ethiopia Yirgacheffe'),
+        Bean(id: 'bean-2', name: 'Colombia Huila'),
+      ];
+
+      await pumpTopBar(
+        tester,
+        loadBeans: () async => beans,
+      );
+
+      await tester.tap(find.byKey(const Key('top_bar_bean_name')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('top_bar_bean_edit_field')),
+        'Eth',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ethiopia Yirgacheffe'), findsWidgets);
+      expect(find.text('Colombia Huila'), findsNothing);
+    });
+
+    testWidgets('returns bean id when selecting autocomplete option',
+        (tester) async {
+      const beans = [
+        Bean(id: 'bean-eth', name: 'Ethiopia Yirgacheffe'),
+        Bean(id: 'bean-col', name: 'Colombia Huila'),
+      ];
+      String? updatedName;
+      String? updatedBeanId;
+
+      await pumpTopBar(
+        tester,
+        loadBeans: () async => beans,
+        onActiveBeanChanged: (name, {beanId}) {
+          updatedName = name;
+          updatedBeanId = beanId;
+        },
+      );
+
+      await tester.tap(find.byKey(const Key('top_bar_bean_name')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('top_bar_bean_edit_field')),
+        'Eth',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Ethiopia Yirgacheffe').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('top_bar_bean_save')));
+      await tester.pumpAndSettle();
+
+      expect(updatedName, 'Ethiopia Yirgacheffe');
+      expect(updatedBeanId, 'bean-eth');
     });
 
     testWidgets('sensor icons reflect mock connection states', (tester) async {

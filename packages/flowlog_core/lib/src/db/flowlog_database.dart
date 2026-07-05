@@ -26,7 +26,7 @@ class FlowlogDatabase extends _$FlowlogDatabase {
   FlowlogDatabase(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -71,6 +71,9 @@ class FlowlogDatabase extends _$FlowlogDatabase {
             if (!beanColumns.contains('process')) {
               await m.addColumn(beans, beans.process);
             }
+          }
+          if (from < 8) {
+            await m.addColumn(shots, shots.location);
           }
         },
       );

@@ -2,24 +2,30 @@ import 'package:flowlog/screens/more/sensors_screen.dart';
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
+import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
 import 'package:flutter/material.dart' hide ConnectionState;
 
 /// Default active bean label shown in the top bar.
 const String kDefaultBeanName = 'House Blend';
 
+/// Result from the top-bar active bean picker.
+typedef ActiveBeanPickerResult = ({String name, String? beanId});
+
 /// Adaptive shell top bar: active bean name and compact sensor status icons.
 class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
   const FlowlogTopBar({
     super.key,
     required this.beanName,
-    this.onBeanNameChanged,
+    this.loadBeans,
+    this.onActiveBeanChanged,
     this.pressensorState = ConnectionState.disconnected,
     this.scaleState = ConnectionState.disconnected,
   });
 
   final String beanName;
-  final ValueChanged<String>? onBeanNameChanged;
+  final Future<List<Bean>> Function()? loadBeans;
+  final void Function(String name, {String? beanId})? onActiveBeanChanged;
   final ConnectionState pressensorState;
   final ConnectionState scaleState;
 
@@ -118,38 +124,67 @@ class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   Future<void> _showBeanNameDialog(BuildContext context) async {
-    final updated = await showDialog<String>(
+    final updated = await showDialog<ActiveBeanPickerResult>(
       context: context,
-      builder: (dialogContext) => _BeanNameEditDialog(initialName: beanName),
+      builder: (dialogContext) => _BeanNameEditDialog(
+        initialName: beanName,
+        loadBeans: loadBeans ?? () async => const <Bean>[],
+      ),
     );
-    if (updated != null && updated.isNotEmpty && updated != beanName) {
-      onBeanNameChanged?.call(updated);
+    if (updated == null || updated.name.isEmpty) {
+      return;
+    }
+    if (updated.beanId != null || updated.name != beanName) {
+      onActiveBeanChanged?.call(updated.name, beanId: updated.beanId);
     }
   }
 }
 
 class _BeanNameEditDialog extends StatefulWidget {
-  const _BeanNameEditDialog({required this.initialName});
+  const _BeanNameEditDialog({
+    required this.initialName,
+    required this.loadBeans,
+  });
 
   final String initialName;
+  final Future<List<Bean>> Function() loadBeans;
 
   @override
   State<_BeanNameEditDialog> createState() => _BeanNameEditDialogState();
 }
 
 class _BeanNameEditDialogState extends State<_BeanNameEditDialog> {
-  late final TextEditingController _controller;
+  late final TextEditingController _beanController;
+  List<Bean> _beans = const [];
+  bool _beansReady = false;
+  String? _selectedBeanId;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initialName);
+    _beanController = TextEditingController(text: widget.initialName);
+    _loadBeans();
+  }
+
+  Future<void> _loadBeans() async {
+    final beans = await widget.loadBeans();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _beans = beans;
+      _beansReady = true;
+    });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _beanController.dispose();
     super.dispose();
+  }
+
+  ActiveBeanPickerResult _buildResult() {
+    return (name: _beanController.text.trim(), beanId: _selectedBeanId);
   }
 
   @override
@@ -166,15 +201,58 @@ class _BeanNameEditDialogState extends State<_BeanNameEditDialog> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 12),
-          TextField(
-            key: const Key('top_bar_bean_edit_field'),
-            controller: _controller,
-            autofocus: true,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: 'Bean',
-              hintText: 'e.g. House Blend',
-            ),
+          Autocomplete<Bean>(
+            initialValue: TextEditingValue(text: _beanController.text),
+            displayStringForOption: (bean) =>
+                formatBeanDisplayLabel(bean, allBeans: _beans),
+            optionsBuilder: (value) {
+              final query = value.text.trim().toLowerCase();
+              if (query.isEmpty) {
+                return _beans;
+              }
+              return _beans.where((bean) {
+                final label = formatBeanDisplayLabel(
+                  bean,
+                  allBeans: _beans,
+                ).toLowerCase();
+                return label.contains(query) ||
+                    bean.name.toLowerCase().contains(query);
+              });
+            },
+            onSelected: (bean) {
+              _selectedBeanId = bean.id;
+              _beanController.text =
+                  formatBeanDisplayLabel(bean, allBeans: _beans);
+            },
+            fieldViewBuilder: (
+              context,
+              controller,
+              focusNode,
+              onFieldSubmitted,
+            ) {
+              if (controller.text != _beanController.text) {
+                controller.text = _beanController.text;
+              }
+              return TextField(
+                key: const Key('top_bar_bean_edit_field'),
+                controller: controller,
+                focusNode: focusNode,
+                autofocus: true,
+                enabled: _beansReady,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Bean',
+                  hintText: 'e.g. House Blend',
+                  helperText:
+                      'Pick a saved bag or type a new name to create one',
+                ),
+                onChanged: (value) {
+                  _beanController.text = value;
+                  _selectedBeanId = null;
+                },
+                onSubmitted: (_) => onFieldSubmitted(),
+              );
+            },
           ),
         ],
       ),
@@ -185,7 +263,7 @@ class _BeanNameEditDialogState extends State<_BeanNameEditDialog> {
         ),
         FilledButton(
           key: const Key('top_bar_bean_save'),
-          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          onPressed: () => Navigator.pop(context, _buildResult()),
           child: const Text('Save'),
         ),
       ],

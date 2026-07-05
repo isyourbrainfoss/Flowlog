@@ -152,6 +152,46 @@ void main() {
       expect(updated!.stockG, 250);
     });
 
+    testWidgets('bean editor does not dismiss on barrier tap', (tester) async {
+      await _pumpBeansScreen(tester, beanRepository: beanRepository);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('beans_add_fab')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('bean_editor_add')), findsOneWidget);
+
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('bean_editor_add')), findsOneWidget);
+    });
+
+    testWidgets('bean editor confirms discard when dirty on back', (tester) async {
+      await _pumpBeansScreen(tester, beanRepository: beanRepository);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('beans_add_fab')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Name'),
+        'Dirty Bean',
+      );
+      await tester.pump();
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Discard unsaved bean changes?'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Discard'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('bean_editor_add')), findsNothing);
+      expect(find.text('No beans yet'), findsOneWidget);
+    });
+
     testWidgets('deletes bean from card action', (tester) async {
       const bean = Bean(id: 'bean-delete', name: 'Delete Me');
       await beanRepository.upsertBean(bean);

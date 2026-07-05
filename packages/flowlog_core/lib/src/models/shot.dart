@@ -16,6 +16,7 @@ class Shot {
     this.beanId,
     this.waterTempC,
     this.notes,
+    this.location,
     this.tasteScore,
     this.flavourTags = const [],
     this.samples = const [],
@@ -34,6 +35,7 @@ class Shot {
   final String? beanId;
   final double? waterTempC;
   final String? notes;
+  final String? location;
   final int? tasteScore;
   final List<String> flavourTags;
   final List<ShotSample> samples;
@@ -52,6 +54,7 @@ class Shot {
       beanId: json['beanId'] as String?,
       waterTempC: (json['waterTempC'] as num?)?.toDouble(),
       notes: json['notes'] as String?,
+      location: json['location'] as String?,
       tasteScore: json['tasteScore'] as int?,
       flavourTags: (json['flavourTags'] as List<dynamic>?)
               ?.map((e) => e as String)
@@ -79,6 +82,7 @@ class Shot {
       if (beanId != null) 'beanId': beanId,
       if (waterTempC != null) 'waterTempC': waterTempC,
       if (notes != null) 'notes': notes,
+      if (location != null) 'location': location,
       if (tasteScore != null) 'tasteScore': tasteScore,
       if (flavourTags.isNotEmpty) 'flavourTags': flavourTags,
       if (samples.isNotEmpty)
@@ -98,6 +102,7 @@ class Shot {
     String? beanId,
     double? waterTempC,
     String? notes,
+    String? location,
     int? tasteScore,
     List<String>? flavourTags,
     List<ShotSample>? samples,
@@ -113,6 +118,7 @@ class Shot {
       beanId: beanId ?? this.beanId,
       waterTempC: waterTempC ?? this.waterTempC,
       notes: notes ?? this.notes,
+      location: location ?? this.location,
       tasteScore: tasteScore ?? this.tasteScore,
       flavourTags: flavourTags ?? this.flavourTags,
       samples: samples ?? this.samples,
@@ -133,6 +139,7 @@ class Shot {
             beanId == other.beanId &&
             waterTempC == other.waterTempC &&
             notes == other.notes &&
+            location == other.location &&
             tasteScore == other.tasteScore &&
             _listEquals(flavourTags, other.flavourTags) &&
             _listEquals(samples, other.samples) &&
@@ -150,6 +157,7 @@ class Shot {
         beanId,
         waterTempC,
         notes,
+        location,
         tasteScore,
         Object.hashAll(flavourTags),
         Object.hashAll(samples),

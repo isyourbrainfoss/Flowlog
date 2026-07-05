@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flowlog/screens/live/auto_start.dart';
+import 'package:flowlog/settings/auto_start_settings_store.dart';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live_screen.dart';
 import 'package:flowlog/sensors/live_sensor_source.dart';
@@ -45,6 +47,45 @@ class _MockPressensorBleTransport implements PressensorBleTransport {
 }
 
 void main() {
+  group('AutoStartSettingsStore', () {
+    late Directory tempDir;
+    late String settingsPath;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('auto_start_store_');
+      settingsPath = '${tempDir.path}/settings.json';
+    });
+
+    tearDown(() async {
+      if (tempDir.existsSync()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    test('load returns defaults when file is missing', () async {
+      final store = AutoStartSettingsStore(settingsPath: settingsPath);
+
+      final settings = await store.load();
+
+      expect(settings.enabled, isTrue);
+      expect(settings.startThresholdBar, kDefaultAutoStartPressureBar);
+    });
+
+    test('save and load round-trip', () async {
+      final store = AutoStartSettingsStore(settingsPath: settingsPath);
+      const settings = AutoStartSettings(
+        enabled: true,
+        startThresholdBar: 1.5,
+      );
+
+      await store.save(settings);
+      final loaded = await store.load();
+
+      expect(loaded.enabled, isTrue);
+      expect(loaded.startThresholdBar, 1.5);
+    });
+  });
+
   group('AutoStartArming', () {
     const settings = AutoStartSettings(startThresholdBar: 1.0);
 
