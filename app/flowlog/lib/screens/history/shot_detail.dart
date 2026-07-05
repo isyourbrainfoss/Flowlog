@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flowlog/screens/library/share_profile.dart';
+import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog/screens/live/metadata_sheet.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
@@ -43,6 +45,7 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
   bool _ownsProfileRepository = false;
   bool _repeating = false;
   bool _editing = false;
+  bool _deleting = false;
   RepeatShotController? _repeatShotController;
 
   @override
@@ -151,6 +154,56 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
     }
   }
 
+  Future<void> _onDeletePressed() async {
+    if (_deleting) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: Key('shot_delete_dialog_${_currentShot.id}'),
+        title: const Text('Delete brew'),
+        content: const Text(
+          'Delete this brew from history? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() => _deleting = true);
+    try {
+      final repository = await _ensureShotRepository();
+      await repository.deleteShot(_currentShot.id);
+
+      if (widget.shotRepository == null) {
+        final database = await _ensureDatabase();
+        unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
+      }
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _deleting = false);
+      }
+    }
+  }
+
   Future<void> _onRepeatShotPressed() async {
     if (_repeating) {
       return;
@@ -192,6 +245,12 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
             icon: const Icon(Icons.edit_outlined),
           ),
           ShareProfileButton.fromShot(shot),
+          IconButton(
+            key: const Key('shot_delete'),
+            tooltip: 'Delete brew',
+            onPressed: _deleting ? null : _onDeletePressed,
+            icon: const Icon(Icons.delete_outline),
+          ),
         ],
       ),
       body: SingleChildScrollView(

@@ -257,12 +257,14 @@ class PressureProfileEditor extends StatefulWidget {
 }
 
 class _PressureProfileEditorState extends State<PressureProfileEditor> {
-  static const _handleHitRadius = 28.0;
+  static const _handleHitRadius = 36.0;
   static const _minKeyframeSpacingMs = 1500;
-  static const _longPressDuration = Duration(milliseconds: 500);
+  static const _longPressDuration = Duration(milliseconds: 450);
   static const _axisLockThreshold = 8.0;
+  static const _dragStartThreshold = 10.0;
 
   int? _activeIndex;
+  int? _selectedIndex;
   Offset? _pointerDown;
   bool _dragged = false;
   bool? _dragVertical;
@@ -302,17 +304,27 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
     widget.onKeyframesChanged(updated);
   }
 
+  bool _canDeleteKeyframe(int index) {
+    return widget.keyframes.length > 2 &&
+        index > 0 &&
+        index < widget.keyframes.length - 1;
+  }
+
   void _deleteKeyframe(int index) {
-    if (widget.keyframes.length <= 2) {
-      return;
-    }
-    if (index <= 0 || index >= widget.keyframes.length - 1) {
+    if (!_canDeleteKeyframe(index)) {
       return;
     }
 
     final updated = List<PressureKeyframe>.from(widget.keyframes)
       ..removeAt(index);
     widget.onKeyframesChanged(updated);
+    setState(() {
+      if (_selectedIndex == index) {
+        _selectedIndex = null;
+      } else if (_selectedIndex != null && _selectedIndex! > index) {
+        _selectedIndex = _selectedIndex! - 1;
+      }
+    });
     HapticFeedback.mediumImpact();
   }
 
@@ -409,6 +421,10 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
 
     if (_pointerDown != null) {
       final delta = event.localPosition - _pointerDown!;
+      if (delta.distance < _dragStartThreshold) {
+        return;
+      }
+
       if (_dragVertical == null &&
           (delta.dx.abs() > _axisLockThreshold ||
               delta.dy.abs() > _axisLockThreshold)) {
@@ -437,10 +453,15 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
   void _onPointerEnd(Offset localPosition, Size size) {
     _cancelLongPress();
 
-    if (_activeIndex != null) {
+    final activeIndex = _activeIndex;
+    if (activeIndex != null) {
+      if (!_dragged && !_longPressHandled) {
+        setState(() => _selectedIndex = activeIndex);
+      }
       setState(() => _activeIndex = null);
       _setGestureActive(false);
     } else if (_pointerDown != null && !_dragged && !_longPressHandled) {
+      setState(() => _selectedIndex = null);
       _tryAddKeyframeAt(localPosition, size);
       _setGestureActive(false);
     } else {
@@ -459,34 +480,77 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
     super.dispose();
   }
 
+  String _formatSelectedKeyframeLabel() {
+    final index = _selectedIndex;
+    if (index == null || index >= widget.keyframes.length) {
+      return '';
+    }
+
+    final keyframe = widget.keyframes[index];
+    final seconds = (keyframe.elapsedMs / 1000).round();
+    return '${seconds}s · ${keyframe.pressureBar.toStringAsFixed(1)} bar';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final selectedIndex = _selectedIndex;
+    final canRemoveSelected =
+        selectedIndex != null && _canDeleteKeyframe(selectedIndex);
+
     return Semantics(
       label: 'Target pressure profile editor',
-      child: SizedBox(
-        key: const Key('simulator_profile_editor'),
-        height: widget.height,
-        width: double.infinity,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final size = Size(constraints.maxWidth, widget.height);
-            return Listener(
-              behavior: HitTestBehavior.opaque,
-              onPointerDown: (event) => _onPointerDown(event, size),
-              onPointerMove: (event) => _onPointerMove(event, size),
-              onPointerUp: (event) => _onPointerEnd(event.localPosition, size),
-              onPointerCancel: (event) => _onPointerEnd(event.localPosition, size),
-              child: CustomPaint(
-                painter: _PressureProfileEditorPainter(
-                  keyframes: widget.keyframes,
-                  durationMs: widget.durationMs,
-                  pressureMax: widget.pressureMax,
-                  activeIndex: _activeIndex,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            key: const Key('simulator_profile_editor'),
+            height: widget.height,
+            width: double.infinity,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final size = Size(constraints.maxWidth, widget.height);
+                return Listener(
+                  behavior: HitTestBehavior.opaque,
+                  onPointerDown: (event) => _onPointerDown(event, size),
+                  onPointerMove: (event) => _onPointerMove(event, size),
+                  onPointerUp: (event) =>
+                      _onPointerEnd(event.localPosition, size),
+                  onPointerCancel: (event) =>
+                      _onPointerEnd(event.localPosition, size),
+                  child: CustomPaint(
+                    painter: _PressureProfileEditorPainter(
+                      keyframes: widget.keyframes,
+                      durationMs: widget.durationMs,
+                      pressureMax: widget.pressureMax,
+                      activeIndex: _activeIndex,
+                      selectedIndex: _selectedIndex,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (selectedIndex != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Selected: ${_formatSelectedKeyframeLabel()}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
-              ),
-            );
-          },
-        ),
+                if (canRemoveSelected)
+                  TextButton.icon(
+                    key: const Key('simulator_remove_point'),
+                    onPressed: () => _deleteKeyframe(selectedIndex),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Remove point'),
+                  ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -498,12 +562,14 @@ class _PressureProfileEditorPainter extends CustomPainter {
     required this.durationMs,
     required this.pressureMax,
     this.activeIndex,
+    this.selectedIndex,
   });
 
   final List<PressureKeyframe> keyframes;
   final int durationMs;
   final double pressureMax;
   final int? activeIndex;
+  final int? selectedIndex;
 
   static const leftPad = 40.0;
   static const rightPad = 16.0;
@@ -622,17 +688,31 @@ class _PressureProfileEditorPainter extends CustomPainter {
         pressureMax: pressureMax,
       );
       final isActive = activeIndex == i;
+      final isSelected = selectedIndex == i;
+      final radius = isActive || isSelected ? 13.0 : 10.0;
       final fillPaint = Paint()
         ..color = isActive
             ? FlowlogChartColors.pressureHigh
-            : FlowlogChartColors.pressureLine;
+            : isSelected
+                ? FlowlogChartColors.targetPressureLine
+                : FlowlogChartColors.pressureLine;
       final strokePaint = Paint()
         ..color = FlowlogChartColors.axisLabel
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2;
+        ..strokeWidth = isSelected ? 2.5 : 2;
 
-      canvas.drawCircle(point, isActive ? 12 : 10, fillPaint);
-      canvas.drawCircle(point, isActive ? 12 : 10, strokePaint);
+      canvas.drawCircle(point, radius, fillPaint);
+      canvas.drawCircle(point, radius, strokePaint);
+      if (isSelected && !isActive) {
+        canvas.drawCircle(
+          point,
+          radius + 4,
+          Paint()
+            ..color = FlowlogChartColors.targetPressureLine.withValues(alpha: 0.35)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2,
+        );
+      }
     }
   }
 
@@ -664,7 +744,8 @@ class _PressureProfileEditorPainter extends CustomPainter {
     return oldDelegate.keyframes != keyframes ||
         oldDelegate.durationMs != durationMs ||
         oldDelegate.pressureMax != pressureMax ||
-        oldDelegate.activeIndex != activeIndex;
+        oldDelegate.activeIndex != activeIndex ||
+        oldDelegate.selectedIndex != selectedIndex;
   }
 }
 
@@ -939,9 +1020,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
               const SizedBox(height: 8),
               Text(
                 'Drag vertically for pressure, horizontally to move a point in '
-                'time. Tap the curve to add a point; long-press a point to '
-                'remove it. Predicted flow is a simple stub (higher pressure → '
-                'higher g/s).',
+                'time. Tap the curve to add a point. Tap a point to select it, '
+                'then use Remove point — or long-press to delete. Predicted '
+                'flow is a simple stub (higher pressure → higher g/s).',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 16),

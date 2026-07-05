@@ -58,6 +58,29 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('deletes brew from history after confirmation', (tester) async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      await repository.insertShot(shot);
+
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: repository,
+        tagRepository: tagRepository,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(Key('history_delete_${shot.id}')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(Key('history_delete_dialog_${shot.id}')), findsOneWidget);
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(Key('history_shot_card_${shot.id}')), findsNothing);
+      expect(await repository.listShots(), isEmpty);
+      expect(find.text('Brew deleted'), findsOneWidget);
+    });
+
     testWidgets('navigates to shot detail when card is tapped', (tester) async {
       final shot = _loadFixtureShot('shots/minimal_shot.json');
       await repository.insertShot(shot);
@@ -145,9 +168,11 @@ Future<void> _pumpHistoryScreen(
 }) async {
   await tester.pumpWidget(
     MaterialApp(
-      home: HistoryScreen(
-        shotRepository: shotRepository,
-        tagRepository: tagRepository,
+      home: Scaffold(
+        body: HistoryScreen(
+          shotRepository: shotRepository,
+          tagRepository: tagRepository,
+        ),
       ),
     ),
   );

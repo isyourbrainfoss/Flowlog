@@ -180,6 +180,66 @@ void main() {
       expect(highSummary.peakPressureBar, greaterThan(lowSummary.peakPressureBar));
     });
 
+    testWidgets('PressureProfileEditor remove point deletes selected keyframe', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 400,
+                height: 280,
+                child: _ProfileEditorHarness(
+                  initialKeyframes: const [
+                    PressureKeyframe(elapsedMs: 0, pressureBar: 0),
+                    PressureKeyframe(elapsedMs: 6000, pressureBar: 4),
+                    PressureKeyframe(elapsedMs: 12000, pressureBar: 6),
+                    PressureKeyframe(elapsedMs: 18000, pressureBar: 8),
+                    PressureKeyframe(elapsedMs: 28000, pressureBar: 9),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final harness =
+          tester.state<_ProfileEditorHarnessState>(find.byType(_ProfileEditorHarness));
+      expect(harness.keyframes, hasLength(5));
+
+      final editorRect =
+          tester.getRect(find.byKey(const Key('simulator_profile_editor')));
+      const leftPad = 40.0;
+      const rightPad = 16.0;
+      const topPad = 12.0;
+      const bottomPad = 24.0;
+      final plotWidth = editorRect.width - leftPad - rightPad;
+      final plotHeight = editorRect.height - topPad - bottomPad;
+
+      final middlePoint = Offset(
+        editorRect.left + leftPad + (12000 / 28000) * plotWidth,
+        editorRect.top + topPad + plotHeight - (6 / 12) * plotHeight,
+      );
+
+      final gesture = await tester.startGesture(middlePoint);
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('simulator_remove_point')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('simulator_remove_point')));
+      await tester.pumpAndSettle();
+
+      expect(harness.keyframes, hasLength(4));
+      expect(
+        harness.keyframes.any((keyframe) => keyframe.elapsedMs == 12000),
+        isFalse,
+      );
+    });
+
     testWidgets('PressureProfileEditor drag updates keyframe pressure', (
       tester,
     ) async {

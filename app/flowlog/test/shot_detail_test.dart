@@ -9,6 +9,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('ShotDetailScreen', () {
+    late FlowlogDatabase db;
+    late ShotRepository repository;
+
+    setUp(() {
+      db = FlowlogDatabase.inMemory();
+      repository = ShotRepository(db);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
     testWidgets('shows DualCurveChart and read-only metadata from fixture', (
       tester,
     ) async {
@@ -16,7 +28,10 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: ShotDetailScreen(shot: shot),
+          home: ShotDetailScreen(
+            shot: shot,
+            shotRepository: repository,
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -43,6 +58,29 @@ void main() {
       expect(find.text('nutty'), findsOneWidget);
       expect(find.byType(TextField), findsNothing);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('delete brew removes shot and closes detail', (tester) async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      await repository.insertShot(shot);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ShotDetailScreen(
+            shot: shot,
+            shotRepository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('shot_delete')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ShotDetailScreen), findsNothing);
+      expect(await repository.listShots(), isEmpty);
     });
   });
 }

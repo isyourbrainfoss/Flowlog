@@ -11,12 +11,16 @@ class HistoryShotCard extends StatelessWidget {
     super.key,
     required this.shot,
     this.onTap,
+    this.onDelete,
   });
 
   final Shot shot;
 
   /// Called when the card is tapped; defaults to [openShotDetail].
   final VoidCallback? onTap;
+
+  /// Called when the user requests deletion from the card.
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -39,9 +43,22 @@ class HistoryShotCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-            Text(
-              _formatStartedAt(shot.startedAt),
-              style: theme.textTheme.titleSmall,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _formatStartedAt(shot.startedAt),
+                    style: theme.textTheme.titleSmall,
+                  ),
+                ),
+                if (onDelete != null)
+                  IconButton(
+                    key: Key('history_delete_${shot.id}'),
+                    tooltip: 'Delete brew',
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.delete_outline),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             SparklineChart(samples: shot.samples),
