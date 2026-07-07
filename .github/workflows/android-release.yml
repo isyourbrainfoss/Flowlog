@@ -33,12 +33,12 @@ jobs:
       - name: Accept Android licenses
         run: yes | flutter doctor --android-licenses
 
-      - name: Build release APK
+      - name: Build release APK (arm64 only)
         working-directory: app/flowlog
-        run: flutter build apk --release --build-number=${{ github.run_number }}
+        run: flutter build apk --release --split-per-abi --target-platform android-arm64 --build-number=${{ github.run_number }}
 
       - name: Prepare release asset
-        run: cp app/flowlog/build/app/outputs/flutter-apk/app-release.apk flowlog-release.apk
+        run: cp app/flowlog/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk flowlog-release.apk
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2

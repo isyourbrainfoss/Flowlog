@@ -56,6 +56,11 @@ Obtainium will notify you when a new GitHub Release is published.
 > debug builds are signed with a different key than the GitHub release APKs. A leftover install
 > shows as **Conflict** in Obtainium. Release APKs from CI share one consistent upload key so
 > Obtainium updates work across builds.
+>
+> **Download errors:** CI ships an arm64-only APK (~22 MB) for faster, more reliable installs on
+> modern phones. If Obtainium reports `Connection closed while receiving data`, retry on Wi‑Fi or
+> download `flowlog-release.apk` from [Releases](https://github.com/isyourbrainfoss/Flowlog/releases)
+> in your browser and install manually.
 
 ## Linux (Flatpak)
 
