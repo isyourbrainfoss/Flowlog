@@ -52,7 +52,10 @@ This repo publishes a release APK on every push to `main`. Install and update wi
 
 Obtainium will notify you when a new GitHub Release is published.
 
-> **Note:** CI builds are currently signed with the debug keystore so they install easily for testing. For Play Store distribution you would add a proper release keystore.
+> **Note:** If you previously installed Flowlog via USB (`flutter run`), uninstall it first —
+> debug builds are signed with a different key than the GitHub release APKs. A leftover install
+> shows as **Conflict** in Obtainium. Release APKs from CI share one consistent upload key so
+> Obtainium updates work across builds.
 
 ## Linux (Flatpak)
 
