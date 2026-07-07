@@ -57,6 +57,41 @@ void main() {
       expect(await beanRepository.getBeanById(bean.id), bean);
     });
 
+    test('merges shot metadata without wiping samples', () async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json').copyWith(
+        doseG: null,
+        grindSetting: null,
+        notes: '',
+      );
+      final richShot = shot.copyWith(
+        doseG: 18,
+        grindSetting: 14,
+        notes: 'Dialled in',
+      );
+
+      await ShotRepository(db).insertShot(shot);
+
+      final result = await mergeSyncPayloadFromRemote(
+        database: db,
+        payload: SyncPayload(
+          version: syncPayloadVersion,
+          exportedAt: DateTime.utc(2026, 7, 6),
+          config: const SyncConfig(),
+          shots: [richShot],
+          profiles: const [],
+          beans: const [],
+        ),
+        remoteExportedAt: DateTime.utc(2026, 7, 5),
+      );
+
+      expect(result.shotsMerged, 1);
+      final stored = await ShotRepository(db).getShotWithSamples(shot.id);
+      expect(stored?.doseG, 18);
+      expect(stored?.grindSetting, 14);
+      expect(stored?.notes, 'Dialled in');
+      expect(stored?.samples, isNotEmpty);
+    });
+
     test('updates existing records on re-import', () async {
       final shot = _loadFixtureShot('shots/minimal_shot.json');
       final updatedShot = shot.copyWith(notes: 'Updated notes');

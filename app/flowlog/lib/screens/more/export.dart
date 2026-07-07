@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -286,7 +287,7 @@ class ExportScreen extends StatefulWidget {
 class _ExportScreenState extends State<ExportScreen> {
   ShotRepository? _shotRepository;
   FlowlogDatabase? _database;
-  bool _ownsRepository = false;
+
   late final ExportActions _actions;
   late Future<List<Shot>> _shotsFuture;
 
@@ -310,10 +311,8 @@ class _ExportScreenState extends State<ExportScreen> {
       return _shotRepository!;
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
+    _database = await openFlowlogDatabase();
     _shotRepository = ShotRepository(_database!);
-    _ownsRepository = true;
     return _shotRepository!;
   }
 
@@ -385,9 +384,6 @@ class _ExportScreenState extends State<ExportScreen> {
 
   @override
   void dispose() {
-    if (_ownsRepository) {
-      _database?.close();
-    }
     super.dispose();
   }
 

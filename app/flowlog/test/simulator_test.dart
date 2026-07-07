@@ -8,6 +8,8 @@ import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'pump_helpers.dart';
+
 /// Pumps until [SimulatorScreen] finishes loading.
 ///
 /// Uses [WidgetTester.runAsync] so bundled fixture loads from [rootBundle]
@@ -123,9 +125,13 @@ void main() {
 
       expect(find.byKey(const Key('simulator_screen')), findsOneWidget);
       expect(find.byKey(const Key('simulator_profile_editor')), findsOneWidget);
-      expect(find.byKey(const Key('simulator_predicted_flow')), findsOneWidget);
-      expect(find.byKey(const Key('simulator_flow_chart')), findsOneWidget);
       expect(find.textContaining('Starter profile'), findsOneWidget);
+      expect(find.byKey(const Key('simulator_predicted_flow')), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('simulator_flow_chart')),
+        120,
+      );
+      await pumpUntilFound(tester, find.byKey(const Key('simulator_flow_chart')));
       expect(find.textContaining('g/s'), findsWidgets);
       expect(tester.takeException(), isNull);
 
@@ -375,12 +381,12 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(home: LibraryScreen()),
       );
-      await tester.pumpAndSettle();
+      await pumpForAsync(tester);
 
       expect(find.byKey(const Key('library_tab_simulator')), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('library_tab_simulator')));
-      await tester.pumpAndSettle();
+      await pumpForAsync(tester, frames: 5);
 
       expect(find.byType(SimulatorScreen), findsOneWidget);
       expect(tester.takeException(), isNull);

@@ -54,6 +54,53 @@ Obtainium will notify you when a new GitHub Release is published.
 
 > **Note:** CI builds are currently signed with the debug keystore so they install easily for testing. For Play Store distribution you would add a proper release keystore.
 
+## Linux (Flatpak)
+
+Flowlog is published as a Flatpak for **x86_64** desktops and **aarch64** Linux phones
+(PostmarketOS, Mobian, etc.). It is not on Flathub; install from the project's GitHub
+Pages remote or from release bundles.
+
+### Install from remote (recommended)
+
+One-time setup:
+
+```bash
+flatpak remote-add --if-not-exists --user flowlog \
+  https://isyourbrainfoss.github.io/Flowlog/flowlog.flatpakrepo
+flatpak install --user flowlog com.flowlog.flowlog
+```
+
+Updates:
+
+```bash
+flatpak update --user com.flowlog.flowlog
+```
+
+The GNOME 48 runtime is pulled from Flathub automatically on first install.
+
+### Install from a release bundle (offline)
+
+Download the `.flatpak` file for your architecture from
+[GitHub Releases](https://github.com/isyourbrainfoss/Flowlog/releases), then:
+
+```bash
+# x86_64 desktop
+flatpak install --user --bundle com.flowlog.flowlog-x86_64.flatpak
+
+# aarch64 / ARM Linux phone
+flatpak install --user --bundle com.flowlog.flowlog-aarch64.flatpak
+```
+
+### Build locally
+
+```bash
+./flatpak/build-flatpak.sh          # current machine arch
+./flatpak/build-flatpak.sh x86_64   # or aarch64
+```
+
+> **Note:** GitHub Pages must be enabled for the repository (Settings → Pages →
+> "GitHub Actions" source) so the Flatpak remote URL stays online.
+
 ## Development
 
 ```bash

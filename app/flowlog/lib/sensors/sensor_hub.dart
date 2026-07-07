@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_kind.dart';
+import 'package:flowlog/settings/paired_sensors_store.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState, SensorAdapter;
 import 'package:flutter/material.dart' hide ConnectionState;
 
@@ -31,7 +32,7 @@ class SensorReconnectEvent {
   final String? message;
 }
 
-/// A user-paired sensor entry (persisted in memory for this session).
+/// A user-paired sensor entry (persisted to disk across app restarts).
 class PairedSensorEntry {
   PairedSensorEntry({
     required this.id,
@@ -69,10 +70,15 @@ class SensorHub extends ChangeNotifier {
   SensorHub({
     List<PairedSensorEntry>? initialDevices,
     BleConnectionBackend? bleBackend,
+    PairedSensorsStore? pairedSensorsStore,
   })  : _devices = List.of(initialDevices ?? []),
-        _bleBackend = bleBackend ?? const UnsupportedBleConnectionBackend();
+        _bleBackend = bleBackend ?? const UnsupportedBleConnectionBackend(),
+        _pairedSensorsStore = pairedSensorsStore {
+    _syncIdCounterFromDevices();
+  }
 
   final List<PairedSensorEntry> _devices;
+  final PairedSensorsStore? _pairedSensorsStore;
   final List<SensorReconnectEvent> _reconnectLog = [];
   final Map<String, int?> _rssiByDevice = {};
   final Map<String, SensorAdapter> _activeAdapters = {};
@@ -117,6 +123,16 @@ class SensorHub extends ChangeNotifier {
     return null;
   }
 
+  /// Restores a paired device from persisted storage.
+  void restoreDevice(PairedSensorEntry entry) {
+    if (_devices.any((device) => device.id == entry.id || device.kind == entry.kind)) {
+      return;
+    }
+    _devices.add(entry);
+    _syncIdCounterFromDevices();
+    notifyListeners();
+  }
+
   /// Adds a paired device of [kind] if none exists yet.
   bool addDevice(SensorKind kind, {String? name}) {
     if (hasKind(kind)) {
@@ -130,6 +146,7 @@ class SensorHub extends ChangeNotifier {
         kind: kind,
       ),
     );
+    unawaited(_persistDevices());
     notifyListeners();
     return true;
   }
@@ -154,6 +171,7 @@ class SensorHub extends ChangeNotifier {
     if (rssi != null) {
       _rssiByDevice[device.id] = rssi;
     }
+    unawaited(_persistDevices());
     notifyListeners();
     return true;
   }
@@ -194,8 +212,62 @@ class SensorHub extends ChangeNotifier {
     _devices.removeWhere((device) => device.id == id);
     if (_devices.length != before) {
       _rssiByDevice.remove(id);
+      unawaited(_persistDevices());
       notifyListeners();
     }
+  }
+
+  /// Reconnects paired sensors that already have a saved BLE id.
+  Future<void> reconnectPairedDevices() async {
+    for (final device in List<PairedSensorEntry>.from(_devices)) {
+      final bleRemoteId = device.bleRemoteId;
+      if (bleRemoteId == null ||
+          bleRemoteId.isEmpty ||
+          device.state == ConnectionState.connected ||
+          device.state == ConnectionState.connecting) {
+        continue;
+      }
+      await connect(device.id);
+    }
+  }
+
+  void _syncIdCounterFromDevices() {
+    for (final device in _devices) {
+      final match = RegExp(r'^sensor-(\d+)$').firstMatch(device.id);
+      if (match == null) {
+        continue;
+      }
+      final value = int.tryParse(match.group(1) ?? '');
+      if (value != null && value > _idCounter) {
+        _idCounter = value;
+      }
+    }
+  }
+
+  Future<void> _persistDevices() async {
+    final store = _pairedSensorsStore;
+    if (store == null) {
+      return;
+    }
+
+    await store.save([
+      for (final device in _devices)
+        PairedSensorRecord(
+          id: device.id,
+          name: device.name,
+          kind: device.kind,
+          bleRemoteId: device.bleRemoteId,
+        ),
+    ]);
+  }
+
+  static PairedSensorEntry entryFromRecord(PairedSensorRecord record) {
+    return PairedSensorEntry(
+      id: record.id,
+      name: record.name,
+      kind: record.kind,
+      bleRemoteId: record.bleRemoteId,
+    );
   }
 
   /// Records a reconnect attempt for the diagnostics screen.

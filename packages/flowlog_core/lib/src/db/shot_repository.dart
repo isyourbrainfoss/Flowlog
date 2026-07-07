@@ -201,6 +201,17 @@ class ShotRepository {
     return rows.map((row) => row.read<String>('shot_id')).toList();
   }
 
+  /// Returns the grind setting from the most recently saved shot, if any.
+  Future<double?> lastGrindSetting() async {
+    final row = await (_db.select(_db.shots)
+          ..where((shot) => shot.grindSetting.isNotNull())
+          ..orderBy([(shot) => OrderingTerm.desc(shot.startedAt)])
+          ..limit(1))
+        .getSingleOrNull();
+
+    return row?.grindSetting;
+  }
+
   /// Deletes a shot and its related samples, annotations, and tag links.
   Future<void> deleteShot(String id) async {
     await _db.transaction(() async {
@@ -262,6 +273,8 @@ class ShotRepository {
       longitude: Value(shot.longitude),
       tasteScore: Value(shot.tasteScore),
       flavourTags: Value(jsonEncode(shot.flavourTags)),
+      coffeejackRewindTurns: Value(shot.coffeejackRewindTurns),
+      coffeejackPreinfusionTurns: Value(shot.coffeejackPreinfusionTurns),
     );
   }
 
@@ -311,6 +324,8 @@ class ShotRepository {
       longitude: row.longitude,
       tasteScore: row.tasteScore,
       flavourTags: _decodeFlavourTags(row.flavourTags),
+      coffeejackRewindTurns: row.coffeejackRewindTurns,
+      coffeejackPreinfusionTurns: row.coffeejackPreinfusionTurns,
       samples: samples,
       annotations: annotations,
     );

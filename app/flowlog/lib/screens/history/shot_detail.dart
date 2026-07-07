@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flowlog/persistence/flowlog_storage.dart';
+import 'package:flowlog/screens/history/history_fullscreen_chart.dart';
 import 'package:flowlog/screens/library/share_profile.dart';
 import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog/screens/live/metadata_sheet.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
+import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -16,6 +19,7 @@ class ShotDetailScreen extends StatefulWidget {
     super.key,
     required this.shot,
     this.shotRepository,
+    this.beanRepository,
     this.profileRepository,
     this.repeatShotController,
   });
@@ -24,6 +28,9 @@ class ShotDetailScreen extends StatefulWidget {
 
   /// Optional repository override for tests.
   final ShotRepository? shotRepository;
+
+  /// Optional repository override for tests.
+  final BeanRepository? beanRepository;
 
   /// Optional repository override for tests.
   final ProfileRepository? profileRepository;
@@ -44,14 +51,63 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
   bool _ownsShotRepository = false;
   bool _ownsProfileRepository = false;
   bool _repeating = false;
+  bool _settingTarget = false;
   bool _editing = false;
   bool _deleting = false;
   RepeatShotController? _repeatShotController;
+  String? _beanLabel;
+  ShotMetadata? _displayMetadata;
 
   @override
   void initState() {
     super.initState();
     _currentShot = widget.shot;
+    unawaited(_reloadShotAndDisplayMetadata());
+  }
+
+  Future<void> _reloadShotAndDisplayMetadata() async {
+    final repository = await _ensureShotRepository();
+    final loaded = await repository.getShotWithSamples(_currentShot.id);
+    if (!mounted) {
+      return;
+    }
+
+    if (loaded != null) {
+      setState(() => _currentShot = loaded);
+    }
+    await _loadBeanLabel();
+    await _loadDisplayMetadata();
+  }
+
+  Future<void> _loadDisplayMetadata() async {
+    final metadata = await displayMetadataForShot(
+      _currentShot,
+      shotRepository: await _ensureShotRepository(),
+    );
+    if (mounted) {
+      setState(() => _displayMetadata = metadata);
+    }
+  }
+
+  Future<void> _loadBeanLabel() async {
+    final beanId = _currentShot.beanId;
+    if (beanId == null || beanId.trim().isEmpty) {
+      return;
+    }
+
+    final repository = await _ensureBeanRepository();
+    final bean = await repository.getBeanById(beanId);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      if (bean != null) {
+        _beanLabel = formatBeanDisplayLabel(bean);
+      } else {
+        _beanLabel = beanId;
+      }
+    });
   }
 
   @override
@@ -63,15 +119,12 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
 
   @override
   void dispose() {
-    if (_ownsShotRepository || _ownsProfileRepository) {
-      _database?.close();
-    }
     super.dispose();
   }
 
   Future<BeanRepository> _ensureBeanRepository() async {
-    if (widget.shotRepository != null && _beanRepository != null) {
-      return _beanRepository!;
+    if (widget.beanRepository != null) {
+      return widget.beanRepository!;
     }
     if (_beanRepository != null) {
       return _beanRepository!;
@@ -87,15 +140,7 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
       return _database!;
     }
 
-    if (widget.shotRepository != null) {
-      final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-      _database = FlowlogDatabase.openFile(dbPath);
-      _ownsShotRepository = true;
-      return _database!;
-    }
-
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
+    _database = await openFlowlogDatabase();
     _ownsShotRepository = true;
     return _database!;
   }
@@ -123,8 +168,7 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
     }
 
     if (_database == null) {
-      final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-      _database = FlowlogDatabase.openFile(dbPath);
+      _database = await openFlowlogDatabase();
     }
     _profileRepository = ProfileRepository(_database!);
     _ownsProfileRepository = true;
@@ -146,6 +190,8 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
       );
       if (updated != null && mounted) {
         setState(() => _currentShot = updated);
+        await _loadBeanLabel();
+        await _loadDisplayMetadata();
       }
     } finally {
       if (mounted) {
@@ -227,11 +273,31 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
     }
   }
 
+  Future<void> _onSetTargetBrewPressed() async {
+    if (_settingTarget) {
+      return;
+    }
+
+    setState(() => _settingTarget = true);
+    try {
+      await setDefaultTargetBrewFromShot(
+        context: context,
+        shot: _currentShot,
+        profileRepository: await _ensureProfileRepository(),
+        targetBrewController: TargetBrewScope.maybeOf(context),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _settingTarget = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final shot = _currentShot;
     final theme = Theme.of(context);
-    final metadata = ShotMetadata.fromShot(shot);
+    final metadata = _displayMetadata ?? ShotMetadata.fromShot(shot);
     final brewSummary = BrewSummary.fromShot(shot);
 
     return Scaffold(
@@ -259,6 +325,11 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            HistoryFullscreenChartButton(
+              onPressed: () => unawaited(
+                openHistoryFullscreenChart(context, shot: shot),
+              ),
+            ),
             DualCurveChart(
               samples: shot.samples,
               annotations: shot.annotations,
@@ -300,7 +371,11 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
-            _MetadataGrid(metadata: metadata, shot: shot),
+            _MetadataGrid(
+              metadata: metadata,
+              shot: shot,
+              beanLabel: _beanLabel,
+            ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               key: const Key('shot_edit_metadata_button'),
@@ -333,6 +408,10 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
             const SizedBox(height: 24),
             RepeatShotButton(
               onPressed: _repeating ? null : _onRepeatShotPressed,
+            ),
+            const SizedBox(height: 8),
+            SetTargetBrewButton(
+              onPressed: _settingTarget ? null : _onSetTargetBrewPressed,
             ),
           ],
         ),
@@ -374,10 +453,12 @@ class _MetadataGrid extends StatelessWidget {
   const _MetadataGrid({
     required this.metadata,
     required this.shot,
+    this.beanLabel,
   });
 
   final ShotMetadata metadata;
   final Shot shot;
+  final String? beanLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -432,9 +513,30 @@ class _MetadataGrid extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _MetadataField(
+                label: 'Rewind turns',
+                value: _formatTurns(metadata.coffeejackRewindTurns),
+                labelStyle: labelStyle,
+                valueStyle: valueStyle,
+              ),
+            ),
+            Expanded(
+              child: _MetadataField(
+                label: 'Pre-infusion',
+                value: _formatPreinfusionTurns(metadata.coffeejackPreinfusionTurns),
+                labelStyle: labelStyle,
+                valueStyle: valueStyle,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         _MetadataField(
           label: 'Bean',
-          value: metadata.beanId ?? '—',
+          value: beanLabel ?? metadata.beanId ?? '—',
           labelStyle: labelStyle,
           valueStyle: valueStyle,
         ),
@@ -497,6 +599,20 @@ class _MetadataGrid extends StatelessWidget {
       return '—';
     }
     return '$tasteScore/10';
+  }
+
+  static String _formatTurns(int? turns) {
+    if (turns == null) {
+      return '—';
+    }
+    return '$turns turns';
+  }
+
+  static String _formatPreinfusionTurns(int? turns) {
+    if (turns == null) {
+      return '—';
+    }
+    return '$turns slow turns';
   }
 }
 

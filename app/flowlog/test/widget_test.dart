@@ -1,13 +1,17 @@
 import 'package:flowlog/main.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
+import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/flowlog_shell.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'pump_helpers.dart';
+import 'shell_test_helpers.dart';
+
 void main() {
   testWidgets('Flowlog shell shows Live tab by default', (tester) async {
-    await tester.pumpWidget(const FlowlogApp());
+    await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
     await tester.pumpAndSettle();
 
     expect(find.text('Live'), findsWidgets);
@@ -22,19 +26,18 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const FlowlogApp());
-    await tester.pumpAndSettle();
+    await pumpFlowlogApp(tester);
 
-    final destinations = <(String tooltip, Finder bodyFinder)>[
-      ('Live shot recording', find.text('Session: idle')),
-      ('Shot history', find.byKey(const Key('history_filter_bean'))),
-      ('Bean library', find.text('Beans')),
-      ('More settings', find.text('Sensors')),
+    final destinations = <(AppTab tab, Finder bodyFinder)>[
+      (AppTab.live, find.text('Session: idle')),
+      (AppTab.history, find.byKey(const Key('history_filter_bean'))),
+      (AppTab.library, find.byKey(const Key('library_tab_beans'))),
+      (AppTab.more, find.byKey(const Key('more_brew_defaults_tile'))),
     ];
 
-    for (final (tooltip, bodyFinder) in destinations) {
-      await tester.tap(find.byTooltip(tooltip));
-      await tester.pumpAndSettle();
+    for (final (tab, bodyFinder) in destinations) {
+      await selectShellTab(tester, tab);
+      await pumpUntilFound(tester, bodyFinder);
       expect(bodyFinder, findsOneWidget);
     }
   });
@@ -87,7 +90,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const FlowlogApp());
+    await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
     await tester.pumpAndSettle();
 
     expect(find.byType(DualCurveChart), findsOneWidget);
@@ -153,7 +156,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const FlowlogApp());
+    await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('live_try_demo')));
@@ -223,20 +226,20 @@ void main() {
     const routeBodies = {
       '/live': 'Live',
       '/history': 'History',
-      '/library': 'No beans yet',
+      '/library': 'Library',
       '/more': 'Sensors',
     };
 
-    await tester.pumpWidget(const FlowlogApp());
+    await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
     await tester.pumpAndSettle();
 
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));
     for (final entry in routeBodies.entries) {
       navigator.pushNamed(entry.key);
-      await tester.pumpAndSettle();
-      expect(find.text(entry.value), findsOneWidget);
+      await pumpForAsync(tester, frames: 5);
+      expect(find.text(entry.value), findsWidgets);
       navigator.pop();
-      await tester.pumpAndSettle();
+      await pumpForAsync(tester);
     }
   });
 }

@@ -13,6 +13,7 @@ class Bean {
   const Bean({
     required this.id,
     required this.name,
+    this.brand,
     this.origin,
     this.roastLevel,
     this.roastDate,
@@ -24,6 +25,7 @@ class Bean {
 
   final String id;
   final String name;
+  final String? brand;
   final String? origin;
   final String? roastLevel;
   final DateTime? roastDate;
@@ -36,6 +38,7 @@ class Bean {
     return Bean(
       id: json['id'] as String,
       name: json['name'] as String,
+      brand: json['brand'] as String?,
       origin: json['origin'] as String?,
       roastLevel: json['roastLevel'] as String?,
       roastDate: json['roastDate'] == null
@@ -52,6 +55,7 @@ class Bean {
     return {
       'id': id,
       'name': name,
+      if (brand != null) 'brand': brand,
       if (origin != null) 'origin': origin,
       if (roastLevel != null) 'roastLevel': roastLevel,
       if (roastDate != null) 'roastDate': roastDate!.toUtc().toIso8601String(),
@@ -65,6 +69,7 @@ class Bean {
   Bean copyWith({
     String? id,
     String? name,
+    String? brand,
     String? origin,
     String? roastLevel,
     DateTime? roastDate,
@@ -76,6 +81,7 @@ class Bean {
     return Bean(
       id: id ?? this.id,
       name: name ?? this.name,
+      brand: brand ?? this.brand,
       origin: origin ?? this.origin,
       roastLevel: roastLevel ?? this.roastLevel,
       roastDate: roastDate ?? this.roastDate,
@@ -92,6 +98,7 @@ class Bean {
         other is Bean &&
             id == other.id &&
             name == other.name &&
+            brand == other.brand &&
             origin == other.origin &&
             roastLevel == other.roastLevel &&
             roastDate == other.roastDate &&
@@ -105,6 +112,7 @@ class Bean {
   int get hashCode => Object.hash(
         id,
         name,
+        brand,
         origin,
         roastLevel,
         roastDate,
@@ -116,7 +124,7 @@ class Bean {
 
   @override
   String toString() =>
-      'Bean(id: $id, name: $name, origin: $origin, roastLevel: $roastLevel, '
+      'Bean(id: $id, name: $name, brand: $brand, origin: $origin, roastLevel: $roastLevel, '
       'roastDate: $roastDate, process: $process, variety: $variety, '
       'stockG: $stockG, notes: $notes)';
 }

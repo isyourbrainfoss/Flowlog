@@ -3,9 +3,6 @@ import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
-/// Space below the plot area for legend and view-mode controls.
-const double kLiveFullscreenChartLegendReserve = 72;
-
 /// Opens a fullscreen live chart route sharing the active notifiers.
 Future<void> openLiveFullscreenChart(
   BuildContext context, {
@@ -66,17 +63,19 @@ class LiveFullscreenChartScreen extends StatelessWidget {
               padding: EdgeInsets.fromLTRB(4, 4, 4, controlsReserve),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final plotHeight = (constraints.maxHeight -
-                          kLiveFullscreenChartLegendReserve)
-                      .clamp(180.0, 1200.0);
-                  return DualCurveChart(
-                    key: const Key('live_fullscreen_dual_chart'),
-                    height: plotHeight,
+                  return SizedBox(
+                    height: constraints.maxHeight,
+                    child: DualCurveChart(
+                      key: const Key('live_fullscreen_dual_chart'),
+                      height: constraints.maxHeight,
                     samplesNotifier: samplesNotifier,
                     annotationsNotifier: annotationsNotifier,
                     interactionController: interactionController,
+                    denseTimeAxis: true,
+                    enableCrosshair: true,
                     targetPressureSamples: targetPressureSamples,
                     onAnnotateAtElapsedMs: onAnnotateAtElapsedMs,
+                    ),
                   );
                 },
               ),

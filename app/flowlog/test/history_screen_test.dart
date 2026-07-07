@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flowlog/screens/history/history_shot_card.dart';
 import 'package:flowlog/screens/history/shot_detail.dart';
 import 'package:flowlog/screens/history_screen.dart';
+import 'package:flowlog/shell/shot_events.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -100,6 +101,28 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('refreshes list when shot events notifier fires', (
+      tester,
+    ) async {
+      final events = ShotEventsNotifier();
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: repository,
+        tagRepository: tagRepository,
+        shotEventsNotifier: events,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('No saved shots yet'), findsOneWidget);
+
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      await repository.insertShot(shot);
+      events.notifyShotsChanged();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(Key('history_shot_card_${shot.id}')), findsOneWidget);
+    });
+
     testWidgets('sorts shots by startedAt descending', (tester) async {
       final older = _loadFixtureShot('shots/minimal_shot.json').copyWith(
         id: 'shot-older',
@@ -165,14 +188,22 @@ Future<void> _pumpHistoryScreen(
   WidgetTester tester, {
   required ShotRepository shotRepository,
   required TagRepository tagRepository,
+  ShotEventsNotifier? shotEventsNotifier,
 }) async {
+  final history = HistoryScreen(
+    shotRepository: shotRepository,
+    tagRepository: tagRepository,
+  );
+
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
-        body: HistoryScreen(
-          shotRepository: shotRepository,
-          tagRepository: tagRepository,
-        ),
+        body: shotEventsNotifier == null
+            ? history
+            : ShotEventsScope(
+                notifier: shotEventsNotifier,
+                child: history,
+              ),
       ),
     ),
   );

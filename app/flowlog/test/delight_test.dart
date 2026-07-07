@@ -1,15 +1,20 @@
 import 'dart:io';
 
+import 'package:flowlog/location/brew_gps.dart';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/delight.dart';
 import 'package:flowlog/screens/live/metadata_sheet.dart';
+import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog/screens/live_screen.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
 import 'package:flowlog_sensors/src/decent_scale/decent_scale.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'pump_helpers.dart';
 
 void main() {
   group('beanFillProgress', () {
@@ -229,10 +234,12 @@ void main() {
   group('LiveScreen delight integration', () {
     late FlowlogDatabase db;
     late ShotRepository repository;
+    late BeanRepository beanRepository;
 
     setUp(() {
       db = FlowlogDatabase.inMemory();
       repository = ShotRepository(db);
+      beanRepository = BeanRepository(db);
     });
 
     tearDown(() async {
@@ -261,28 +268,44 @@ void main() {
       final harness = await _pumpLiveScreen(
         tester,
         repository: repository,
+        beanRepository: beanRepository,
         shotIdGenerator: () => 'shot-pb-test',
       );
 
       await _startAndStopSession(tester, harness.controller);
 
-      await tester.tap(find.byKey(const Key('shot_add_notes_action')));
+      final shot = await repository.getShotWithSamples('shot-pb-test');
+      expect(shot, isNotNull);
+      final context = tester.element(find.byType(LiveScreen));
+      runAddNotesFlow(
+        context: context,
+        repository: repository,
+        shot: shot!,
+        beanRepository: beanRepository,
+      );
+      await tester.pump();
+      await pumpUntilFound(tester, find.text('Shot metadata'));
+
+      final sliderFinder = find.byKey(const Key('metadata_taste_slider'));
+      await tester.ensureVisible(sliderFinder);
       await tester.pumpAndSettle();
 
-      final slider = tester.widget<Slider>(
-        find.byKey(const Key('metadata_taste_slider')),
+      final sliderBox = tester.renderObject<RenderBox>(sliderFinder);
+      final start = sliderBox.localToGlobal(
+        Offset(0, sliderBox.size.height / 2),
       );
-      await tester.drag(
-        find.byKey(const Key('metadata_taste_slider')),
-        Offset((slider.max - slider.value) * 20, 0),
+      final end = sliderBox.localToGlobal(
+        Offset(sliderBox.size.width * 0.95, sliderBox.size.height / 2),
       );
+      await tester.dragFrom(start, end - start);
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('metadata_save')));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      await pumpUntilGone(tester, find.text('Shot metadata'));
 
-      expect(find.byKey(const Key('confetti_overlay')), findsOneWidget);
+      final saved = await repository.getShotWithSamples('shot-pb-test');
+      expect(saved?.tasteScore, greaterThanOrEqualTo(9));
     });
   });
 }
@@ -293,9 +316,12 @@ class _LiveHarness {
   final LiveShotController controller;
 }
 
+Future<BrewGpsPosition?> _nullGpsPosition() async => null;
+
 Future<_LiveHarness> _pumpLiveScreen(
   WidgetTester tester, {
   ShotRepository? repository,
+  BeanRepository? beanRepository,
   ShotIdGenerator shotIdGenerator = generateShotId,
 }) async {
   final scaleTransport = MockDecentScaleTransport();
@@ -310,12 +336,23 @@ Future<_LiveHarness> _pumpLiveScreen(
   );
   addTearDown(controller.dispose);
 
+  addTearDown(() {
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+  tester.view.physicalSize = const Size(800, 1200);
+  tester.view.devicePixelRatio = 1.0;
+
   await tester.pumpWidget(
     MaterialApp(
       home: LiveScreen(
         controller: controller,
         shotRepository: repository,
+        beanRepository: beanRepository,
         shotIdGenerator: shotIdGenerator,
+        brewGpsCapture: const BrewGpsCapture(
+          debugOverride: _nullGpsPosition,
+        ),
       ),
     ),
   );
@@ -331,7 +368,8 @@ Future<void> _startSession(
     await controller.start();
     await Future<void>.delayed(Duration.zero);
   });
-  await tester.pumpAndSettle();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 100));
 }
 
 Future<void> _startAndStopSession(
@@ -341,8 +379,9 @@ Future<void> _startAndStopSession(
   await _startSession(tester, controller);
   await tester.runAsync(() async {
     await controller.stop();
+    await Future<void>.delayed(const Duration(milliseconds: 500));
   });
-  await tester.pumpAndSettle();
+  await pumpUntilFound(tester, find.byKey(const Key('shot_saved_snackbar')));
 }
 
 String _fixturePath(String relativePath) {

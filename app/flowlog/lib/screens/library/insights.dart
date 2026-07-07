@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/history/history_shot_card.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -185,8 +186,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
       return (shots: _shotRepository!, beans: _beanRepository!);
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
+    _database = await openFlowlogDatabase();
     _shotRepository = ShotRepository(_database!);
     _beanRepository = BeanRepository(_database!);
     _ownsRepositories = true;
@@ -209,9 +209,6 @@ class _InsightsScreenState extends State<InsightsScreen> {
 
   @override
   void dispose() {
-    if (_ownsRepositories) {
-      _database?.close();
-    }
     super.dispose();
   }
 

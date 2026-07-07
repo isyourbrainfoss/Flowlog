@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flutter/foundation.dart';
 
 /// Brew location preferences: optional label and automatic GPS capture.
@@ -53,15 +54,17 @@ class BrewLocationSettings {
 /// File-backed persistence for brew location settings.
 class BrewLocationStore {
   BrewLocationStore({String? settingsPath})
-      : _settingsPath = settingsPath ?? _defaultSettingsPath;
+      : _settingsPathOverride = settingsPath;
 
-  static String get _defaultSettingsPath =>
-      '${Directory.systemTemp.path}/flowlog_brew_location.json';
+  final String? _settingsPathOverride;
 
-  final String _settingsPath;
+  Future<String> _resolveSettingsPath() async {
+    return _settingsPathOverride ??
+        FlowlogStorage.shared.filePath('flowlog_brew_location.json');
+  }
 
   Future<BrewLocationSettings> loadSettings() async {
-    final file = File(_settingsPath);
+    final file = File(await _resolveSettingsPath());
     if (!file.existsSync()) {
       return const BrewLocationSettings();
     }
@@ -83,7 +86,7 @@ class BrewLocationStore {
   }
 
   Future<void> saveSettings(BrewLocationSettings settings) async {
-    final file = File(_settingsPath);
+    final file = File(await _resolveSettingsPath());
     await file.parent.create(recursive: true);
     await file.writeAsString(
       const JsonEncoder.withIndent('  ').convert(settings.toJson()),

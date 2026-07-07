@@ -149,6 +149,27 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _coffeejackRewindTurnsMeta =
+      const VerificationMeta('coffeejackRewindTurns');
+  @override
+  late final GeneratedColumn<int> coffeejackRewindTurns = GeneratedColumn<int>(
+    'coffeejack_rewind_turns',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _coffeejackPreinfusionTurnsMeta =
+      const VerificationMeta('coffeejackPreinfusionTurns');
+  @override
+  late final GeneratedColumn<int> coffeejackPreinfusionTurns =
+      GeneratedColumn<int>(
+        'coffeejack_preinfusion_turns',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -165,6 +186,8 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     location,
     latitude,
     longitude,
+    coffeejackRewindTurns,
+    coffeejackPreinfusionTurns,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -258,6 +281,24 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         longitude.isAcceptableOrUnknown(data['longitude']!, _longitudeMeta),
       );
     }
+    if (data.containsKey('coffeejack_rewind_turns')) {
+      context.handle(
+        _coffeejackRewindTurnsMeta,
+        coffeejackRewindTurns.isAcceptableOrUnknown(
+          data['coffeejack_rewind_turns']!,
+          _coffeejackRewindTurnsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('coffeejack_preinfusion_turns')) {
+      context.handle(
+        _coffeejackPreinfusionTurnsMeta,
+        coffeejackPreinfusionTurns.isAcceptableOrUnknown(
+          data['coffeejack_preinfusion_turns']!,
+          _coffeejackPreinfusionTurnsMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -327,6 +368,14 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         DriftSqlType.double,
         data['${effectivePrefix}longitude'],
       ),
+      coffeejackRewindTurns: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}coffeejack_rewind_turns'],
+      ),
+      coffeejackPreinfusionTurns: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}coffeejack_preinfusion_turns'],
+      ),
     );
   }
 
@@ -356,6 +405,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
   final String? location;
   final double? latitude;
   final double? longitude;
+  final int? coffeejackRewindTurns;
+  final int? coffeejackPreinfusionTurns;
   const ShotRow({
     required this.id,
     required this.startedAt,
@@ -371,6 +422,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     this.location,
     this.latitude,
     this.longitude,
+    this.coffeejackRewindTurns,
+    this.coffeejackPreinfusionTurns,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -417,6 +470,14 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     if (!nullToAbsent || longitude != null) {
       map['longitude'] = Variable<double>(longitude);
     }
+    if (!nullToAbsent || coffeejackRewindTurns != null) {
+      map['coffeejack_rewind_turns'] = Variable<int>(coffeejackRewindTurns);
+    }
+    if (!nullToAbsent || coffeejackPreinfusionTurns != null) {
+      map['coffeejack_preinfusion_turns'] = Variable<int>(
+        coffeejackPreinfusionTurns,
+      );
+    }
     return map;
   }
 
@@ -458,6 +519,13 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       longitude: longitude == null && nullToAbsent
           ? const Value.absent()
           : Value(longitude),
+      coffeejackRewindTurns: coffeejackRewindTurns == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coffeejackRewindTurns),
+      coffeejackPreinfusionTurns:
+          coffeejackPreinfusionTurns == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coffeejackPreinfusionTurns),
     );
   }
 
@@ -481,6 +549,12 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       location: serializer.fromJson<String?>(json['location']),
       latitude: serializer.fromJson<double?>(json['latitude']),
       longitude: serializer.fromJson<double?>(json['longitude']),
+      coffeejackRewindTurns: serializer.fromJson<int?>(
+        json['coffeejackRewindTurns'],
+      ),
+      coffeejackPreinfusionTurns: serializer.fromJson<int?>(
+        json['coffeejackPreinfusionTurns'],
+      ),
     );
   }
   @override
@@ -501,6 +575,10 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       'location': serializer.toJson<String?>(location),
       'latitude': serializer.toJson<double?>(latitude),
       'longitude': serializer.toJson<double?>(longitude),
+      'coffeejackRewindTurns': serializer.toJson<int?>(coffeejackRewindTurns),
+      'coffeejackPreinfusionTurns': serializer.toJson<int?>(
+        coffeejackPreinfusionTurns,
+      ),
     };
   }
 
@@ -519,6 +597,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     Value<String?> location = const Value.absent(),
     Value<double?> latitude = const Value.absent(),
     Value<double?> longitude = const Value.absent(),
+    Value<int?> coffeejackRewindTurns = const Value.absent(),
+    Value<int?> coffeejackPreinfusionTurns = const Value.absent(),
   }) => ShotRow(
     id: id ?? this.id,
     startedAt: startedAt ?? this.startedAt,
@@ -534,6 +614,12 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     location: location.present ? location.value : this.location,
     latitude: latitude.present ? latitude.value : this.latitude,
     longitude: longitude.present ? longitude.value : this.longitude,
+    coffeejackRewindTurns: coffeejackRewindTurns.present
+        ? coffeejackRewindTurns.value
+        : this.coffeejackRewindTurns,
+    coffeejackPreinfusionTurns: coffeejackPreinfusionTurns.present
+        ? coffeejackPreinfusionTurns.value
+        : this.coffeejackPreinfusionTurns,
   );
   ShotRow copyWithCompanion(ShotsCompanion data) {
     return ShotRow(
@@ -559,6 +645,12 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       location: data.location.present ? data.location.value : this.location,
       latitude: data.latitude.present ? data.latitude.value : this.latitude,
       longitude: data.longitude.present ? data.longitude.value : this.longitude,
+      coffeejackRewindTurns: data.coffeejackRewindTurns.present
+          ? data.coffeejackRewindTurns.value
+          : this.coffeejackRewindTurns,
+      coffeejackPreinfusionTurns: data.coffeejackPreinfusionTurns.present
+          ? data.coffeejackPreinfusionTurns.value
+          : this.coffeejackPreinfusionTurns,
     );
   }
 
@@ -578,7 +670,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           ..write('flavourTags: $flavourTags, ')
           ..write('location: $location, ')
           ..write('latitude: $latitude, ')
-          ..write('longitude: $longitude')
+          ..write('longitude: $longitude, ')
+          ..write('coffeejackRewindTurns: $coffeejackRewindTurns, ')
+          ..write('coffeejackPreinfusionTurns: $coffeejackPreinfusionTurns')
           ..write(')'))
         .toString();
   }
@@ -599,6 +693,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     location,
     latitude,
     longitude,
+    coffeejackRewindTurns,
+    coffeejackPreinfusionTurns,
   );
   @override
   bool operator ==(Object other) =>
@@ -617,7 +713,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           other.flavourTags == this.flavourTags &&
           other.location == this.location &&
           other.latitude == this.latitude &&
-          other.longitude == this.longitude);
+          other.longitude == this.longitude &&
+          other.coffeejackRewindTurns == this.coffeejackRewindTurns &&
+          other.coffeejackPreinfusionTurns == this.coffeejackPreinfusionTurns);
 }
 
 class ShotsCompanion extends UpdateCompanion<ShotRow> {
@@ -635,6 +733,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
   final Value<String?> location;
   final Value<double?> latitude;
   final Value<double?> longitude;
+  final Value<int?> coffeejackRewindTurns;
+  final Value<int?> coffeejackPreinfusionTurns;
   final Value<int> rowid;
   const ShotsCompanion({
     this.id = const Value.absent(),
@@ -651,6 +751,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.location = const Value.absent(),
     this.latitude = const Value.absent(),
     this.longitude = const Value.absent(),
+    this.coffeejackRewindTurns = const Value.absent(),
+    this.coffeejackPreinfusionTurns = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ShotsCompanion.insert({
@@ -668,6 +770,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.location = const Value.absent(),
     this.latitude = const Value.absent(),
     this.longitude = const Value.absent(),
+    this.coffeejackRewindTurns = const Value.absent(),
+    this.coffeejackPreinfusionTurns = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        startedAt = Value(startedAt);
@@ -686,6 +790,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Expression<String>? location,
     Expression<double>? latitude,
     Expression<double>? longitude,
+    Expression<int>? coffeejackRewindTurns,
+    Expression<int>? coffeejackPreinfusionTurns,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -703,6 +809,10 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
       if (location != null) 'location': location,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
+      if (coffeejackRewindTurns != null)
+        'coffeejack_rewind_turns': coffeejackRewindTurns,
+      if (coffeejackPreinfusionTurns != null)
+        'coffeejack_preinfusion_turns': coffeejackPreinfusionTurns,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -722,6 +832,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Value<String?>? location,
     Value<double?>? latitude,
     Value<double?>? longitude,
+    Value<int?>? coffeejackRewindTurns,
+    Value<int?>? coffeejackPreinfusionTurns,
     Value<int>? rowid,
   }) {
     return ShotsCompanion(
@@ -739,6 +851,10 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
       location: location ?? this.location,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      coffeejackRewindTurns:
+          coffeejackRewindTurns ?? this.coffeejackRewindTurns,
+      coffeejackPreinfusionTurns:
+          coffeejackPreinfusionTurns ?? this.coffeejackPreinfusionTurns,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -792,6 +908,16 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     if (longitude.present) {
       map['longitude'] = Variable<double>(longitude.value);
     }
+    if (coffeejackRewindTurns.present) {
+      map['coffeejack_rewind_turns'] = Variable<int>(
+        coffeejackRewindTurns.value,
+      );
+    }
+    if (coffeejackPreinfusionTurns.present) {
+      map['coffeejack_preinfusion_turns'] = Variable<int>(
+        coffeejackPreinfusionTurns.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -815,6 +941,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
           ..write('location: $location, ')
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude, ')
+          ..write('coffeejackRewindTurns: $coffeejackRewindTurns, ')
+          ..write('coffeejackPreinfusionTurns: $coffeejackPreinfusionTurns, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1641,6 +1769,15 @@ class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _brandMeta = const VerificationMeta('brand');
+  @override
+  late final GeneratedColumn<String> brand = GeneratedColumn<String>(
+    'brand',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _originMeta = const VerificationMeta('origin');
   @override
   late final GeneratedColumn<String> origin = GeneratedColumn<String>(
@@ -1714,6 +1851,7 @@ class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
   List<GeneratedColumn> get $columns => [
     id,
     name,
+    brand,
     origin,
     roastLevel,
     roastDate,
@@ -1746,6 +1884,12 @@ class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
       );
     } else if (isInserting) {
       context.missing(_nameMeta);
+    }
+    if (data.containsKey('brand')) {
+      context.handle(
+        _brandMeta,
+        brand.isAcceptableOrUnknown(data['brand']!, _brandMeta),
+      );
     }
     if (data.containsKey('origin')) {
       context.handle(
@@ -1800,6 +1944,10 @@ class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      brand: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}brand'],
+      ),
       origin: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}origin'],
@@ -1845,6 +1993,7 @@ class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
 class BeanRow extends DataClass implements Insertable<BeanRow> {
   final String id;
   final String name;
+  final String? brand;
   final String? origin;
   final String? roastLevel;
   final DateTime? roastDate;
@@ -1855,6 +2004,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
   const BeanRow({
     required this.id,
     required this.name,
+    this.brand,
     this.origin,
     this.roastLevel,
     this.roastDate,
@@ -1868,6 +2018,9 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
+    if (!nullToAbsent || brand != null) {
+      map['brand'] = Variable<String>(brand);
+    }
     if (!nullToAbsent || origin != null) {
       map['origin'] = Variable<String>(origin);
     }
@@ -1898,6 +2051,9 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     return BeansCompanion(
       id: Value(id),
       name: Value(name),
+      brand: brand == null && nullToAbsent
+          ? const Value.absent()
+          : Value(brand),
       origin: origin == null && nullToAbsent
           ? const Value.absent()
           : Value(origin),
@@ -1930,6 +2086,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     return BeanRow(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
+      brand: serializer.fromJson<String?>(json['brand']),
       origin: serializer.fromJson<String?>(json['origin']),
       roastLevel: serializer.fromJson<String?>(json['roastLevel']),
       roastDate: serializer.fromJson<DateTime?>(json['roastDate']),
@@ -1945,6 +2102,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
+      'brand': serializer.toJson<String?>(brand),
       'origin': serializer.toJson<String?>(origin),
       'roastLevel': serializer.toJson<String?>(roastLevel),
       'roastDate': serializer.toJson<DateTime?>(roastDate),
@@ -1958,6 +2116,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
   BeanRow copyWith({
     String? id,
     String? name,
+    Value<String?> brand = const Value.absent(),
     Value<String?> origin = const Value.absent(),
     Value<String?> roastLevel = const Value.absent(),
     Value<DateTime?> roastDate = const Value.absent(),
@@ -1968,6 +2127,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
   }) => BeanRow(
     id: id ?? this.id,
     name: name ?? this.name,
+    brand: brand.present ? brand.value : this.brand,
     origin: origin.present ? origin.value : this.origin,
     roastLevel: roastLevel.present ? roastLevel.value : this.roastLevel,
     roastDate: roastDate.present ? roastDate.value : this.roastDate,
@@ -1980,6 +2140,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     return BeanRow(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
+      brand: data.brand.present ? data.brand.value : this.brand,
       origin: data.origin.present ? data.origin.value : this.origin,
       roastLevel: data.roastLevel.present
           ? data.roastLevel.value
@@ -1997,6 +2158,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     return (StringBuffer('BeanRow(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('brand: $brand, ')
           ..write('origin: $origin, ')
           ..write('roastLevel: $roastLevel, ')
           ..write('roastDate: $roastDate, ')
@@ -2012,6 +2174,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
   int get hashCode => Object.hash(
     id,
     name,
+    brand,
     origin,
     roastLevel,
     roastDate,
@@ -2026,6 +2189,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
       (other is BeanRow &&
           other.id == this.id &&
           other.name == this.name &&
+          other.brand == this.brand &&
           other.origin == this.origin &&
           other.roastLevel == this.roastLevel &&
           other.roastDate == this.roastDate &&
@@ -2038,6 +2202,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
 class BeansCompanion extends UpdateCompanion<BeanRow> {
   final Value<String> id;
   final Value<String> name;
+  final Value<String?> brand;
   final Value<String?> origin;
   final Value<String?> roastLevel;
   final Value<DateTime?> roastDate;
@@ -2049,6 +2214,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
   const BeansCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
+    this.brand = const Value.absent(),
     this.origin = const Value.absent(),
     this.roastLevel = const Value.absent(),
     this.roastDate = const Value.absent(),
@@ -2061,6 +2227,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
   BeansCompanion.insert({
     required String id,
     required String name,
+    this.brand = const Value.absent(),
     this.origin = const Value.absent(),
     this.roastLevel = const Value.absent(),
     this.roastDate = const Value.absent(),
@@ -2074,6 +2241,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
   static Insertable<BeanRow> custom({
     Expression<String>? id,
     Expression<String>? name,
+    Expression<String>? brand,
     Expression<String>? origin,
     Expression<String>? roastLevel,
     Expression<String>? roastDate,
@@ -2086,6 +2254,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
+      if (brand != null) 'brand': brand,
       if (origin != null) 'origin': origin,
       if (roastLevel != null) 'roast_level': roastLevel,
       if (roastDate != null) 'roast_date': roastDate,
@@ -2100,6 +2269,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
   BeansCompanion copyWith({
     Value<String>? id,
     Value<String>? name,
+    Value<String?>? brand,
     Value<String?>? origin,
     Value<String?>? roastLevel,
     Value<DateTime?>? roastDate,
@@ -2112,6 +2282,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
     return BeansCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
+      brand: brand ?? this.brand,
       origin: origin ?? this.origin,
       roastLevel: roastLevel ?? this.roastLevel,
       roastDate: roastDate ?? this.roastDate,
@@ -2131,6 +2302,9 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
+    }
+    if (brand.present) {
+      map['brand'] = Variable<String>(brand.value);
     }
     if (origin.present) {
       map['origin'] = Variable<String>(origin.value);
@@ -2166,6 +2340,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
     return (StringBuffer('BeansCompanion(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('brand: $brand, ')
           ..write('origin: $origin, ')
           ..write('roastLevel: $roastLevel, ')
           ..write('roastDate: $roastDate, ')
@@ -3563,6 +3738,8 @@ typedef $$ShotsTableCreateCompanionBuilder =
       Value<String?> location,
       Value<double?> latitude,
       Value<double?> longitude,
+      Value<int?> coffeejackRewindTurns,
+      Value<int?> coffeejackPreinfusionTurns,
       Value<int> rowid,
     });
 typedef $$ShotsTableUpdateCompanionBuilder =
@@ -3581,6 +3758,8 @@ typedef $$ShotsTableUpdateCompanionBuilder =
       Value<String?> location,
       Value<double?> latitude,
       Value<double?> longitude,
+      Value<int?> coffeejackRewindTurns,
+      Value<int?> coffeejackPreinfusionTurns,
       Value<int> rowid,
     });
 
@@ -3724,6 +3903,16 @@ class $$ShotsTableFilterComposer
 
   ColumnFilters<double> get longitude => $composableBuilder(
     column: $table.longitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get coffeejackRewindTurns => $composableBuilder(
+    column: $table.coffeejackRewindTurns,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get coffeejackPreinfusionTurns => $composableBuilder(
+    column: $table.coffeejackPreinfusionTurns,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3881,6 +4070,16 @@ class $$ShotsTableOrderingComposer
     column: $table.longitude,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get coffeejackRewindTurns => $composableBuilder(
+    column: $table.coffeejackRewindTurns,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get coffeejackPreinfusionTurns => $composableBuilder(
+    column: $table.coffeejackPreinfusionTurns,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ShotsTableAnnotationComposer
@@ -3941,6 +4140,16 @@ class $$ShotsTableAnnotationComposer
 
   GeneratedColumn<double> get longitude =>
       $composableBuilder(column: $table.longitude, builder: (column) => column);
+
+  GeneratedColumn<int> get coffeejackRewindTurns => $composableBuilder(
+    column: $table.coffeejackRewindTurns,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get coffeejackPreinfusionTurns => $composableBuilder(
+    column: $table.coffeejackPreinfusionTurns,
+    builder: (column) => column,
+  );
 
   Expression<T> shotSamplesRefs<T extends Object>(
     Expression<T> Function($$ShotSamplesTableAnnotationComposer a) f,
@@ -4064,6 +4273,8 @@ class $$ShotsTableTableManager
                 Value<String?> location = const Value.absent(),
                 Value<double?> latitude = const Value.absent(),
                 Value<double?> longitude = const Value.absent(),
+                Value<int?> coffeejackRewindTurns = const Value.absent(),
+                Value<int?> coffeejackPreinfusionTurns = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShotsCompanion(
                 id: id,
@@ -4080,6 +4291,8 @@ class $$ShotsTableTableManager
                 location: location,
                 latitude: latitude,
                 longitude: longitude,
+                coffeejackRewindTurns: coffeejackRewindTurns,
+                coffeejackPreinfusionTurns: coffeejackPreinfusionTurns,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4098,6 +4311,8 @@ class $$ShotsTableTableManager
                 Value<String?> location = const Value.absent(),
                 Value<double?> latitude = const Value.absent(),
                 Value<double?> longitude = const Value.absent(),
+                Value<int?> coffeejackRewindTurns = const Value.absent(),
+                Value<int?> coffeejackPreinfusionTurns = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShotsCompanion.insert(
                 id: id,
@@ -4114,6 +4329,8 @@ class $$ShotsTableTableManager
                 location: location,
                 latitude: latitude,
                 longitude: longitude,
+                coffeejackRewindTurns: coffeejackRewindTurns,
+                coffeejackPreinfusionTurns: coffeejackPreinfusionTurns,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -4907,6 +5124,7 @@ typedef $$BeansTableCreateCompanionBuilder =
     BeansCompanion Function({
       required String id,
       required String name,
+      Value<String?> brand,
       Value<String?> origin,
       Value<String?> roastLevel,
       Value<DateTime?> roastDate,
@@ -4920,6 +5138,7 @@ typedef $$BeansTableUpdateCompanionBuilder =
     BeansCompanion Function({
       Value<String> id,
       Value<String> name,
+      Value<String?> brand,
       Value<String?> origin,
       Value<String?> roastLevel,
       Value<DateTime?> roastDate,
@@ -4946,6 +5165,11 @@ class $$BeansTableFilterComposer
 
   ColumnFilters<String> get name => $composableBuilder(
     column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get brand => $composableBuilder(
+    column: $table.brand,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5005,6 +5229,11 @@ class $$BeansTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get brand => $composableBuilder(
+    column: $table.brand,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get origin => $composableBuilder(
     column: $table.origin,
     builder: (column) => ColumnOrderings(column),
@@ -5055,6 +5284,9 @@ class $$BeansTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get brand =>
+      $composableBuilder(column: $table.brand, builder: (column) => column);
 
   GeneratedColumn<String> get origin =>
       $composableBuilder(column: $table.origin, builder: (column) => column);
@@ -5110,6 +5342,7 @@ class $$BeansTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
+                Value<String?> brand = const Value.absent(),
                 Value<String?> origin = const Value.absent(),
                 Value<String?> roastLevel = const Value.absent(),
                 Value<DateTime?> roastDate = const Value.absent(),
@@ -5121,6 +5354,7 @@ class $$BeansTableTableManager
               }) => BeansCompanion(
                 id: id,
                 name: name,
+                brand: brand,
                 origin: origin,
                 roastLevel: roastLevel,
                 roastDate: roastDate,
@@ -5134,6 +5368,7 @@ class $$BeansTableTableManager
               ({
                 required String id,
                 required String name,
+                Value<String?> brand = const Value.absent(),
                 Value<String?> origin = const Value.absent(),
                 Value<String?> roastLevel = const Value.absent(),
                 Value<DateTime?> roastDate = const Value.absent(),
@@ -5145,6 +5380,7 @@ class $$BeansTableTableManager
               }) => BeansCompanion.insert(
                 id: id,
                 name: name,
+                brand: brand,
                 origin: origin,
                 roastLevel: roastLevel,
                 roastDate: roastDate,

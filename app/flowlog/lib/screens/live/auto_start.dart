@@ -74,6 +74,7 @@ class LiveAutoStartListener extends StatefulWidget {
     this.sensorSource,
     this.settings = const AutoStartSettings(),
     this.isDemoMode = false,
+    this.pressureBarNotifier,
     super.key,
   });
 
@@ -82,6 +83,9 @@ class LiveAutoStartListener extends StatefulWidget {
   final LiveSensorSource? sensorSource;
   final AutoStartSettings settings;
   final bool isDemoMode;
+
+  /// Updated with the latest live pressensor reading while monitoring.
+  final ValueNotifier<double?>? pressureBarNotifier;
   final Widget child;
 
   @override
@@ -194,6 +198,7 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
   Future<void> _stopMonitoring() async {
     await _pressureSub?.cancel();
     _pressureSub = null;
+    widget.pressureBarNotifier?.value = null;
 
     final owned = _ownedMonitorAdapter;
     _ownedMonitorAdapter = null;
@@ -208,6 +213,8 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
   }
 
   void _onPressureSample(SensorSample sample) {
+    widget.pressureBarNotifier?.value = sample.pressureBar;
+
     if (!mounted || _starting || !widget.controller.canStart) {
       return;
     }
@@ -287,13 +294,24 @@ class AutoStartThresholdPanel extends StatelessWidget {
 class AutoStartArmedBanner extends StatelessWidget {
   const AutoStartArmedBanner({
     required this.thresholdBar,
+    this.pressureBarNotifier,
     super.key,
   });
 
   final double thresholdBar;
+  final ValueNotifier<double?>? pressureBarNotifier;
 
   @override
   Widget build(BuildContext context) {
+    final pressureWidget = pressureBarNotifier == null
+        ? const SizedBox.shrink()
+        : ValueListenableBuilder<double?>(
+            valueListenable: pressureBarNotifier!,
+            builder: (context, pressureBar, _) {
+              return LivePressureReadout(pressureBar: pressureBar);
+            },
+          );
+
     return Material(
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: Padding(
@@ -309,8 +327,53 @@ class AutoStartArmedBanner extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
+            pressureWidget,
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Live pressensor reading shown before a brew starts.
+class LivePressureReadout extends StatelessWidget {
+  const LivePressureReadout({
+    required this.pressureBar,
+    super.key,
+  });
+
+  final double? pressureBar;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final value = pressureBar;
+    final label = value == null ? '—' : value.toStringAsFixed(2);
+
+    return Semantics(
+      label: value == null
+          ? 'Live pressure unavailable'
+          : 'Live pressure $label bar',
+      readOnly: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            key: const Key('live_pressure_readout'),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontFeatures: const [FontFeature.tabularFigures()],
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Text(
+            'bar',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }

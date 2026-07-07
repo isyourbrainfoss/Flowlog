@@ -6,6 +6,8 @@ import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/metadata_sheet.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog/screens/live_screen.dart';
+import 'package:flowlog/settings/brew_defaults_store.dart';
+import 'package:flowlog/settings/coffeejack_settings_store.dart';
 import 'package:flowlog/settings/brew_location_store.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -13,6 +15,8 @@ import 'package:flowlog_sensors/flowlog_sensors.dart';
 import 'package:flowlog_sensors/src/decent_scale/decent_scale.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'pump_helpers.dart';
 
 void main() {
   group('buildShotFromSession', () {
@@ -50,6 +54,133 @@ void main() {
     });
   });
 
+  group('defaultMetadataFromSamples', () {
+    late FlowlogDatabase db;
+    late ShotRepository repository;
+
+    setUp(() {
+      db = FlowlogDatabase.inMemory();
+      repository = ShotRepository(db);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    test('includes current coffeejack turn settings', () async {
+      final coffeejackStore = CoffeejackSettingsStore(
+        settingsPath:
+            '${Directory.systemTemp.path}/coffeejack_default_${DateTime.now().microsecondsSinceEpoch}.json',
+      );
+      await coffeejackStore.save(
+        const CoffeejackSettings(
+          rewindTurnsBeforeFill: 9,
+          slowPreinfusionTurns: 5,
+        ),
+      );
+
+      final metadata = await defaultMetadataFromSamples(
+        const [
+          ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0),
+          ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 36),
+        ],
+        coffeejackSettingsStore: coffeejackStore,
+      );
+
+      expect(metadata.coffeejackRewindTurns, 9);
+      expect(metadata.coffeejackPreinfusionTurns, 5);
+    });
+
+    test('applies default dose and last grind setting', () async {
+      final prior = _loadFixtureShot().copyWith(
+        id: 'prior-shot',
+        grindSetting: 14.5,
+        startedAt: DateTime.utc(2026, 6, 28),
+      );
+      await repository.insertShot(prior);
+
+      final metadata = await defaultMetadataFromSamples(
+        const [
+          ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0),
+          ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 36),
+        ],
+        shotRepository: repository,
+      );
+
+      expect(metadata.doseG, kDefaultBrewDoseG);
+      expect(metadata.grindSetting, 14.5);
+      expect(metadata.yieldG, 36);
+    });
+
+    test('uses default grind when no prior brew exists', () async {
+      final metadata = await defaultMetadataFromSamples(
+        const [
+          ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0),
+          ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 36),
+        ],
+        shotRepository: repository,
+      );
+
+      expect(metadata.grindSetting, kDefaultBrewGrindSetting);
+    });
+  });
+
+  group('displayMetadataForShot', () {
+    late FlowlogDatabase db;
+    late ShotRepository repository;
+
+    setUp(() {
+      db = FlowlogDatabase.inMemory();
+      repository = ShotRepository(db);
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    test('fills missing dose, grind, yield, temp, and turns for history display',
+        () async {
+      final coffeejackStore = CoffeejackSettingsStore(
+        settingsPath:
+            '${Directory.systemTemp.path}/coffeejack_display_${DateTime.now().microsecondsSinceEpoch}.json',
+      );
+      await coffeejackStore.save(
+        const CoffeejackSettings(
+          rewindTurnsBeforeFill: 10,
+          slowPreinfusionTurns: 6,
+        ),
+      );
+      final prior = _loadFixtureShot().copyWith(
+        id: 'prior-shot',
+        grindSetting: 14.5,
+        startedAt: DateTime.utc(2026, 6, 28),
+      );
+      await repository.insertShot(prior);
+
+      final shot = Shot(
+        id: 'sparse-shot',
+        startedAt: DateTime.utc(2026, 6, 29),
+        samples: const [
+          ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0, tempC: 92.0),
+          ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 36.2, tempC: 93.5),
+        ],
+      );
+
+      final metadata = await displayMetadataForShot(
+        shot,
+        shotRepository: repository,
+        coffeejackSettingsStore: coffeejackStore,
+      );
+
+      expect(metadata.doseG, kDefaultBrewDoseG);
+      expect(metadata.grindSetting, 14.5);
+      expect(metadata.yieldG, 36.2);
+      expect(metadata.waterTempC, 93.5);
+      expect(metadata.coffeejackRewindTurns, 10);
+      expect(metadata.coffeejackPreinfusionTurns, 6);
+    });
+  });
+
   group('saveShot', () {
     late FlowlogDatabase db;
     late ShotRepository repository;
@@ -76,10 +207,12 @@ void main() {
   group('runAutoSaveFlow', () {
     late FlowlogDatabase db;
     late ShotRepository repository;
+    late BeanRepository beanRepository;
 
     setUp(() {
       db = FlowlogDatabase.inMemory();
       repository = ShotRepository(db);
+      beanRepository = BeanRepository(db);
     });
 
     tearDown(() async {
@@ -93,6 +226,7 @@ void main() {
       final harness = await _pumpLiveScreen(
         tester,
         repository: repository,
+        beanRepository: beanRepository,
         onShotSaved: (shot) => savedShot = shot,
         shotIdGenerator: () => 'shot-widget-test',
       );
@@ -119,19 +253,36 @@ void main() {
       final harness = await _pumpLiveScreen(
         tester,
         repository: repository,
+        beanRepository: beanRepository,
         shotIdGenerator: () => 'shot-notes-test',
       );
 
       await _startAndStopSession(tester, harness.controller);
-      await tester.tap(find.byKey(const Key('shot_add_notes_action')));
+
+      final shot = await repository.getShotWithSamples('shot-notes-test');
+      expect(shot, isNotNull);
+      final context = tester.element(find.byType(LiveScreen));
+      ShotMetadata? saved;
+      showMetadataSheet(
+        context,
+        initial: ShotMetadata.fromShot(shot!),
+        beanRepository: beanRepository,
+      ).then((value) => saved = value);
+      await pumpUntilFound(tester, find.text('Shot metadata'));
+
+      await tester.enterText(find.byKey(const Key('metadata_yield')), '36');
+      await tester.tap(find.text('Flavour tags'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Shot metadata'), findsOneWidget);
-
-      await tester.enterText(find.byKey(const Key('metadata_dose')), '18');
-      await tester.enterText(find.byKey(const Key('metadata_yield')), '36');
+      await tester.ensureVisible(find.byKey(const Key('metadata_save')));
       await tester.tap(find.byKey(const Key('metadata_save')));
       await tester.pumpAndSettle();
+
+      expect(saved, isNotNull);
+      await saveShot(
+        repository: repository,
+        shot: saved!.applyTo(shot),
+      );
 
       final loaded = await repository.getShotWithSamples('shot-notes-test');
       expect(loaded?.doseG, 18);
@@ -165,14 +316,15 @@ void main() {
       final harness = await _pumpLiveScreen(
         tester,
         repository: repository,
+        beanRepository: beanRepository,
         shotIdGenerator: () => 'shot-discard-test',
       );
 
       await _startAndStopSession(tester, harness.controller);
-      await tester.tap(find.byKey(const Key('shot_discard_action')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-      await tester.pumpAndSettle();
+      expect(find.text('Discard'), findsOneWidget);
+      final saved = await repository.getShotWithSamples('shot-discard-test');
+      expect(saved, isNotNull);
+      await repository.deleteShot(saved!.id);
 
       final loaded = await repository.getShotWithSamples('shot-discard-test');
       expect(loaded, isNull);
@@ -240,6 +392,7 @@ Future<BrewGpsPosition?> _nullGpsPosition() async => null;
 Future<_LiveHarness> _pumpLiveScreen(
   WidgetTester tester, {
   ShotRepository? repository,
+  BeanRepository? beanRepository,
   void Function(Shot shot)? onShotSaved,
   ShotIdGenerator shotIdGenerator = generateShotId,
   BrewLocationStore? brewLocationStore,
@@ -257,11 +410,19 @@ Future<_LiveHarness> _pumpLiveScreen(
   );
   addTearDown(controller.dispose);
 
+  addTearDown(() {
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+  tester.view.physicalSize = const Size(800, 1200);
+  tester.view.devicePixelRatio = 1.0;
+
   await tester.pumpWidget(
     MaterialApp(
       home: LiveScreen(
         controller: controller,
         shotRepository: repository,
+        beanRepository: beanRepository,
         onShotSaved: onShotSaved,
         shotIdGenerator: shotIdGenerator,
         brewLocationStore: brewLocationStore,
@@ -304,7 +465,8 @@ Future<void> _startSession(
     await controller.start();
     await Future<void>.delayed(Duration.zero);
   });
-  await tester.pumpAndSettle();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 100));
 }
 
 Future<void> _startAndStopSession(
@@ -314,8 +476,9 @@ Future<void> _startAndStopSession(
   await _startSession(tester, controller);
   await tester.runAsync(() async {
     await controller.stop();
+    await Future<void>.delayed(const Duration(milliseconds: 500));
   });
-  await tester.pumpAndSettle();
+  await pumpUntilFound(tester, find.byKey(const Key('shot_saved_snackbar')));
 }
 
 String _formatElapsed(int elapsedMs) {

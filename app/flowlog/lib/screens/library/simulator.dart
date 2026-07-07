@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
+import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
@@ -832,8 +834,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       return _database!;
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
+    _database = await openFlowlogDatabase();
     _ownsRepositories = true;
     return _database!;
   }
@@ -925,6 +926,40 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     );
   }
 
+  Future<void> _onSetDefaultTargetPressed() async {
+    if (_keyframes.isEmpty || !mounted) {
+      return;
+    }
+
+    final name = await promptSimulatorProfileName(
+      context,
+      initialName: _profile?.name ?? 'Simulator profile',
+    );
+    if (name == null || !mounted) {
+      return;
+    }
+
+    final profile = profileFromKeyframes(
+      _keyframes,
+      name: name,
+      sourceShotId: _profile?.sourceShotId,
+    );
+    final repository = await _ensureProfileRepository();
+    await repository.insertProfile(profile);
+
+    await setDefaultTargetBrew(
+      context: context,
+      profile: profile,
+      profileRepository: repository,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _profile = profile);
+  }
+
   Future<void> _onUseOnLivePressed() async {
     if (_keyframes.isEmpty || !mounted) {
       return;
@@ -967,9 +1002,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
   @override
   void dispose() {
-    if (_ownsRepositories) {
-      _database?.close();
-    }
     super.dispose();
   }
 
@@ -1047,6 +1079,12 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                     onPressed: _onUseOnLivePressed,
                     icon: const Icon(Icons.play_arrow_outlined),
                     label: const Text('Use on Live'),
+                  ),
+                  FilledButton.tonalIcon(
+                    key: const Key('simulator_set_default_target'),
+                    onPressed: _onSetDefaultTargetPressed,
+                    icon: const Icon(Icons.timeline),
+                    label: const Text('Set as target brew'),
                   ),
                 ],
               ),

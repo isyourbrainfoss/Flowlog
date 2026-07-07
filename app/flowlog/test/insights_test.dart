@@ -7,6 +7,8 @@ import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'pump_helpers.dart';
+
 void main() {
   group('computeInsights', () {
     test('aggregates peak pressure by roast, taste by bean, and daily counts', () {
@@ -169,12 +171,12 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(home: LibraryScreen()),
       );
-      await tester.pumpAndSettle();
+      await pumpForAsync(tester);
 
       expect(find.byKey(const Key('library_tab_insights')), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('library_tab_insights')));
-      await tester.pumpAndSettle();
+      await pumpForAsync(tester);
 
       expect(find.byType(InsightsScreen), findsOneWidget);
       expect(tester.takeException(), isNull);

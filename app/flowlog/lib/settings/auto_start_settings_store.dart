@@ -1,20 +1,23 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/live/auto_start.dart';
 
 /// File-backed persistence for pressure-triggered auto-start preferences.
 class AutoStartSettingsStore {
   AutoStartSettingsStore({String? settingsPath})
-      : _settingsPath = settingsPath ?? _defaultSettingsPath;
+      : _settingsPathOverride = settingsPath;
 
-  static String get _defaultSettingsPath =>
-      '${Directory.systemTemp.path}/flowlog_auto_start_settings.json';
+  final String? _settingsPathOverride;
 
-  final String _settingsPath;
+  Future<String> _resolveSettingsPath() async {
+    return _settingsPathOverride ??
+        FlowlogStorage.shared.filePath('flowlog_auto_start_settings.json');
+  }
 
   Future<AutoStartSettings> load() async {
-    final file = File(_settingsPath);
+    final file = File(await _resolveSettingsPath());
     if (!file.existsSync()) {
       return const AutoStartSettings();
     }
@@ -36,7 +39,7 @@ class AutoStartSettingsStore {
   }
 
   Future<void> save(AutoStartSettings settings) async {
-    final file = File(_settingsPath);
+    final file = File(await _resolveSettingsPath());
     await file.parent.create(recursive: true);
     await file.writeAsString(
       const JsonEncoder.withIndent('  ').convert(<String, dynamic>{

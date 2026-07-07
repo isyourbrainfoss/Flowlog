@@ -152,9 +152,7 @@ void main() {
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
 
-      final doseField =
-          tester.widget<TextField>(find.byKey(const Key('metadata_dose')));
-      expect(doseField.controller?.text, '18');
+      expect(find.textContaining('Dose: 18.0 g'), findsOneWidget);
     });
 
     testWidgets('live repeat button saves profile from stopped session', (

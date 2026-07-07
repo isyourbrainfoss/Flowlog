@@ -47,3 +47,40 @@ class Tag {
   @override
   String toString() => 'Tag(id: $id, name: $name)';
 }
+
+/// Links a shot to an organizational tag for sync export/import.
+@immutable
+class ShotTagLink {
+  const ShotTagLink({
+    required this.shotId,
+    required this.tagId,
+  });
+
+  final String shotId;
+  final String tagId;
+
+  factory ShotTagLink.fromJson(Map<String, dynamic> json) {
+    return ShotTagLink(
+      shotId: json['shotId'] as String,
+      tagId: json['tagId'] as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'shotId': shotId,
+      'tagId': tagId,
+    };
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ShotTagLink &&
+            shotId == other.shotId &&
+            tagId == other.tagId;
+  }
+
+  @override
+  int get hashCode => Object.hash(shotId, tagId);
+}

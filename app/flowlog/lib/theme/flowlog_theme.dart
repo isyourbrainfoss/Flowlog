@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 /// Warm coffee palette tokens (libadwaita-inspired).
@@ -147,10 +149,14 @@ abstract final class FlowlogTheme {
 
 /// Notifies listeners when the user switches between coffee dark and café light.
 class FlowlogThemeController extends ChangeNotifier {
-  FlowlogThemeController({ThemeMode themeMode = ThemeMode.dark})
-      : _themeMode = themeMode;
+  FlowlogThemeController({
+    ThemeMode themeMode = ThemeMode.dark,
+    Future<void> Function(ThemeMode mode)? onThemeModeChanged,
+  })  : _themeMode = themeMode,
+        _onThemeModeChanged = onThemeModeChanged;
 
   ThemeMode _themeMode;
+  final Future<void> Function(ThemeMode mode)? _onThemeModeChanged;
 
   ThemeMode get themeMode => _themeMode;
 
@@ -162,6 +168,10 @@ class FlowlogThemeController extends ChangeNotifier {
     }
     _themeMode = mode;
     notifyListeners();
+    final persist = _onThemeModeChanged;
+    if (persist != null) {
+      unawaited(persist(mode));
+    }
   }
 }
 

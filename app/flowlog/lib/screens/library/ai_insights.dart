@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -241,7 +242,7 @@ class AiInsightsScreen extends StatefulWidget {
 class _AiInsightsScreenState extends State<AiInsightsScreen> {
   ShotRepository? _shotRepository;
   FlowlogDatabase? _database;
-  bool _ownsRepository = false;
+
   late Future<Shot?> _latestShotFuture;
   final _tasteNotesController = TextEditingController();
   List<TweakSuggestion> _tweakSuggestions = const [];
@@ -268,10 +269,8 @@ class _AiInsightsScreenState extends State<AiInsightsScreen> {
       return _shotRepository!;
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
+    _database = await openFlowlogDatabase();
     _shotRepository = ShotRepository(_database!);
-    _ownsRepository = true;
     return _shotRepository!;
   }
 
@@ -312,9 +311,6 @@ class _AiInsightsScreenState extends State<AiInsightsScreen> {
     _tasteNotesController
       ..removeListener(_onTasteNotesChanged)
       ..dispose();
-    if (_ownsRepository) {
-      _database?.close();
-    }
     super.dispose();
   }
 

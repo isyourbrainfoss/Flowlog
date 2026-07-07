@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 
@@ -154,8 +155,11 @@ class ChartInteractionController extends ChangeNotifier {
   double _baselineScale = 1;
   double _cumulativePanPixels = 0;
   bool _didZoom = false;
+  ShotSample? _probeSample;
 
   ChartViewMode get viewMode => _viewMode;
+
+  ShotSample? get probeSample => _probeSample;
 
   ChartViewport get viewport {
     return _viewport ??
@@ -208,6 +212,23 @@ class ChartInteractionController extends ChangeNotifier {
 
   void resetViewport() {
     _viewport?.reset();
+    notifyListeners();
+  }
+
+  void setProbeFromElapsedMs(int elapsedMs, List<ShotSample> samples) {
+    final nearest = nearestShotSample(samples, elapsedMs);
+    if (_probeSample == nearest) {
+      return;
+    }
+    _probeSample = nearest;
+    notifyListeners();
+  }
+
+  void clearProbe() {
+    if (_probeSample == null) {
+      return;
+    }
+    _probeSample = null;
     notifyListeners();
   }
 
@@ -265,5 +286,22 @@ class ChartInteractionController extends ChangeNotifier {
     _cumulativePanPixels = 0;
     _didZoom = false;
   }
+}
 
+/// Returns the sample whose [ShotSample.elapsedMs] is closest to [elapsedMs].
+ShotSample? nearestShotSample(List<ShotSample> samples, int elapsedMs) {
+  if (samples.isEmpty) {
+    return null;
+  }
+
+  ShotSample? nearest;
+  var bestDistance = 1 << 62;
+  for (final sample in samples) {
+    final distance = (sample.elapsedMs - elapsedMs).abs();
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      nearest = sample;
+    }
+  }
+  return nearest;
 }

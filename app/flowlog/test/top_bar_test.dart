@@ -220,7 +220,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       await tester.pumpWidget(
-        const FlowlogApp(),
+        const FlowlogApp(autoReconnectSensors: false),
       );
       await tester.pump();
 

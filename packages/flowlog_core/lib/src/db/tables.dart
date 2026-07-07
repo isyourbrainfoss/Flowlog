@@ -22,6 +22,8 @@ class Shots extends Table {
   TextColumn get location => text().nullable()();
   RealColumn get latitude => real().nullable()();
   RealColumn get longitude => real().nullable()();
+  IntColumn get coffeejackRewindTurns => integer().nullable()();
+  IntColumn get coffeejackPreinfusionTurns => integer().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -32,6 +34,7 @@ class Shots extends Table {
 class Beans extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
+  TextColumn get brand => text().nullable()();
   TextColumn get origin => text().nullable()();
   TextColumn get roastLevel => text().nullable()();
   TextColumn get roastDate =>

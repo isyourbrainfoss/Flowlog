@@ -71,7 +71,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(const FlowlogApp());
+      await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
       await tester.pumpAndSettle();
 
       for (final destination in appDestinations) {
@@ -94,7 +94,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(const FlowlogApp());
+      await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
       await tester.pumpAndSettle();
 
       for (final destination in appDestinations) {

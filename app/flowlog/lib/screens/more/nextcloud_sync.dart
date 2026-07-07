@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog/sync/nextcloud_settings_store.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -97,8 +98,7 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
       return _database!;
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
+    _database = await openFlowlogDatabase();
     _ownsDatabase = true;
     return _database!;
   }
@@ -277,9 +277,6 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
     _serverController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
-    if (_ownsDatabase) {
-      _database?.close();
-    }
     super.dispose();
   }
 

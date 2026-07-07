@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flowlog/screens/live/metadata_sheet.dart';
+import 'package:flowlog/settings/brew_defaults_store.dart';
+import 'package:flowlog/settings/coffeejack_settings_store.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
@@ -66,6 +68,9 @@ void showShotSavedSnackBar(BuildContext context, {String? message}) {
 Future<ShotMetadata> defaultMetadataFromSamples(
   List<ShotSample> samples, {
   BeanRepository? beanRepository,
+  ShotRepository? shotRepository,
+  BrewDefaultsSettingsStore? brewDefaultsStore,
+  CoffeejackSettingsStore? coffeejackSettingsStore,
   String? activeBeanName,
   String? activeBeanId,
 }) async {
@@ -76,11 +81,84 @@ Future<ShotMetadata> defaultMetadataFromSamples(
           beanId: activeBeanId,
           name: activeBeanName,
         );
+  final defaults = await (brewDefaultsStore ?? BrewDefaultsSettingsStore())
+      .load();
+  final coffeejack =
+      await (coffeejackSettingsStore ?? CoffeejackSettingsStore()).load();
+  final lastGrind = shotRepository == null
+      ? null
+      : await shotRepository.lastGrindSetting();
 
   return ShotMetadata(
+    doseG: defaults.defaultDoseG,
     yieldG: last.weightG,
+    grindSetting: lastGrind ?? defaults.defaultGrindSetting,
     waterTempC: last.tempC,
     beanId: beanId,
+    coffeejackRewindTurns: coffeejack.rewindTurnsBeforeFill,
+    coffeejackPreinfusionTurns: coffeejack.slowPreinfusionTurns,
+  );
+}
+
+ShotMetadata applyShotMetadataDefaults(
+  ShotMetadata metadata, {
+  required double defaultDoseG,
+  required double defaultGrindSetting,
+  double? lastGrindSetting,
+}) {
+  return metadata.copyWith(
+    doseG: metadata.doseG ?? defaultDoseG,
+    grindSetting:
+        metadata.grindSetting ?? lastGrindSetting ?? defaultGrindSetting,
+  );
+}
+
+/// Infers yield from the last weight sample when not stored on the shot.
+double? inferredYieldG(Shot shot) {
+  if (shot.yieldG != null) {
+    return shot.yieldG;
+  }
+  if (shot.samples.isEmpty) {
+    return null;
+  }
+  return shot.samples.last.weightG;
+}
+
+/// Metadata for history display, filling gaps the edit sheet would show.
+Future<ShotMetadata> displayMetadataForShot(
+  Shot shot, {
+  BrewDefaultsSettingsStore? brewDefaultsStore,
+  CoffeejackSettingsStore? coffeejackSettingsStore,
+  ShotRepository? shotRepository,
+}) async {
+  final defaults = await (brewDefaultsStore ?? BrewDefaultsSettingsStore())
+      .load();
+  final coffeejack =
+      await (coffeejackSettingsStore ?? CoffeejackSettingsStore()).load();
+  final lastGrind = shotRepository == null
+      ? null
+      : await shotRepository.lastGrindSetting();
+
+  var metadata = applyShotMetadataDefaults(
+    ShotMetadata.fromShot(shot),
+    defaultDoseG: defaults.defaultDoseG,
+    defaultGrindSetting: defaults.defaultGrindSetting,
+    lastGrindSetting: lastGrind,
+  );
+
+  if (shot.samples.isNotEmpty) {
+    final last = shot.samples.last;
+    metadata = metadata.copyWith(
+      yieldG: metadata.yieldG ?? last.weightG,
+      waterTempC: metadata.waterTempC ?? last.tempC,
+    );
+  }
+
+  return metadata.copyWith(
+    coffeejackRewindTurns: metadata.coffeejackRewindTurns ??
+        coffeejack.rewindTurnsBeforeFill,
+    coffeejackPreinfusionTurns: metadata.coffeejackPreinfusionTurns ??
+        coffeejack.slowPreinfusionTurns,
   );
 }
 
@@ -93,6 +171,8 @@ Future<Shot?> runAutoSaveFlow({
   DateTime? endedAt,
   ShotMetadata? initialMetadata,
   BeanRepository? beanRepository,
+  ShotRepository? shotRepository,
+  BrewDefaultsSettingsStore? brewDefaultsStore,
   String? activeBeanName,
   String? activeBeanId,
   List<ShotAnnotation> annotations = const [],
@@ -108,9 +188,20 @@ Future<Shot?> runAutoSaveFlow({
     return null;
   }
 
+  final defaultsStore = brewDefaultsStore ?? BrewDefaultsSettingsStore();
+  final defaults = await defaultsStore.load();
+  final lastGrind = shotRepository == null
+      ? null
+      : await shotRepository.lastGrindSetting();
+
   ShotMetadata metadata;
   if (initialMetadata != null) {
-    metadata = initialMetadata;
+    metadata = applyShotMetadataDefaults(
+      initialMetadata,
+      defaultDoseG: defaults.defaultDoseG,
+      defaultGrindSetting: defaults.defaultGrindSetting,
+      lastGrindSetting: lastGrind,
+    );
     if (metadata.beanId == null && beanRepository != null) {
       final resolvedId = await beanRepository.resolveActiveBeanId(
         beanId: activeBeanId,
@@ -124,6 +215,8 @@ Future<Shot?> runAutoSaveFlow({
     metadata = await defaultMetadataFromSamples(
       samples,
       beanRepository: beanRepository,
+      shotRepository: shotRepository,
+      brewDefaultsStore: defaultsStore,
       activeBeanName: activeBeanName,
       activeBeanId: activeBeanId,
     );

@@ -50,6 +50,9 @@ jobs:
 
             **Obtainium:** add `https://github.com/${{ github.repository }}` as a GitHub source.
             APK filter: `flowlog-release.apk`
+
+            **Linux Flatpak:** see the [README Linux section](https://github.com/${{ github.repository }}#linux-flatpak)
+            or wait for the Flatpak workflow to attach `.flatpak` bundles to this release.
           files: flowlog-release.apk
           draft: false
           prerelease: false

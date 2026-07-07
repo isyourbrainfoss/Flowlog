@@ -72,13 +72,35 @@ class BleScanAssignResult {
   }
 }
 
-/// Returns true when [advName] matches a Flowlog-supported sensor of [kind].
+/// Returns true when [name] matches a Flowlog-supported sensor of [kind].
 @visibleForTesting
-bool matchesSensorKind(String advName, SensorKind kind) {
+bool matchesSensorKind(String name, SensorKind kind) {
   return switch (kind) {
-    SensorKind.pressensor => isPressensorDeviceName(advName),
-    SensorKind.scale => advName == DecentScaleConstants.deviceName,
+    SensorKind.pressensor => isPressensorDeviceName(name),
+    SensorKind.scale => name == DecentScaleConstants.deviceName,
   };
+}
+
+/// Resolves the best available BLE device name for sensor matching.
+///
+/// Linux reports names via [platformName] only; [advName] is empty there
+/// (flutter_blue_plus limitation).
+@visibleForTesting
+String resolveBleDeviceName({
+  required String advName,
+  required String platformName,
+}) {
+  if (advName.isNotEmpty) {
+    return advName;
+  }
+  return platformName;
+}
+
+String _bleScanResultName(ScanResult result) {
+  return resolveBleDeviceName(
+    advName: result.advertisementData.advName,
+    platformName: result.device.platformName,
+  );
 }
 
 /// High-level BLE operations used by [SensorHub].
@@ -185,7 +207,7 @@ class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
     final subscription = FlutterBluePlus.onScanResults.listen(
       (results) {
         for (final result in results) {
-          final name = result.advertisementData.advName;
+          final name = _bleScanResultName(result);
           if (!matchesSensorKind(name, kind)) {
             continue;
           }
@@ -219,9 +241,39 @@ class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
       await subscription.cancel();
     }
 
+    if (Platform.isLinux) {
+      await _mergeLinuxCachedDevices(kind: kind, found: found);
+    }
+
     final devices = found.values.toList()
       ..sort((a, b) => b.rssi.compareTo(a.rssi));
     return devices;
+  }
+
+  Future<void> _mergeLinuxCachedDevices({
+    required SensorKind kind,
+    required Map<String, BleDiscoveredDevice> found,
+  }) async {
+    try {
+      final systemDevices = await FlutterBluePlus.systemDevices(const []);
+      for (final device in systemDevices) {
+        final name = device.platformName;
+        if (!matchesSensorKind(name, kind)) {
+          continue;
+        }
+        found.putIfAbsent(
+          device.remoteId.str,
+          () => BleDiscoveredDevice(
+            remoteId: device.remoteId.str,
+            name: name,
+            kind: kind,
+            rssi: -128,
+          ),
+        );
+      }
+    } on Object {
+      // Discovery results are still usable when the system device list fails.
+    }
   }
 
   @override

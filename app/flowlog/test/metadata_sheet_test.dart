@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flowlog/screens/live/metadata_sheet.dart';
+import 'package:flowlog/settings/brew_defaults_store.dart';
+import 'package:flowlog/settings/coffeejack_settings_store.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -103,10 +105,16 @@ void main() {
       await pumpSheet(tester);
 
       expect(find.text('Shot metadata'), findsOneWidget);
-      expect(find.text('Dose (g)'), findsOneWidget);
+      expect(find.textContaining('Dose:'), findsOneWidget);
       expect(find.text('Yield (g)'), findsOneWidget);
-      expect(find.text('Grind'), findsOneWidget);
+      expect(find.textContaining('Grind:'), findsOneWidget);
       expect(find.text('Temp (°C)'), findsOneWidget);
+      expect(find.byKey(const Key('metadata_dose_slider')), findsOneWidget);
+      expect(find.byKey(const Key('metadata_grind_slider')), findsOneWidget);
+      expect(
+        find.byKey(const Key('metadata_coffeejack_rewind_slider')),
+        findsOneWidget,
+      );
       expect(find.text('Bean'), findsOneWidget);
       expect(find.text('Notes'), findsOneWidget);
       expect(find.text('Taste'), findsOneWidget);
@@ -129,18 +137,12 @@ void main() {
 
       await pumpSheet(tester, initial: initial);
 
-      expect(
-        tester.widget<TextField>(find.byKey(const Key('metadata_dose'))).controller?.text,
-        '18',
-      );
+      expect(find.textContaining('Dose: 18.0 g'), findsOneWidget);
       expect(
         tester.widget<TextField>(find.byKey(const Key('metadata_yield'))).controller?.text,
         '36',
       );
-      expect(
-        tester.widget<TextField>(find.byKey(const Key('metadata_grind'))).controller?.text,
-        '14',
-      );
+      expect(find.textContaining('Grind: 14.0'), findsOneWidget);
       expect(
         tester.widget<TextField>(find.byKey(const Key('metadata_temp'))).controller?.text,
         '93',
@@ -229,9 +231,16 @@ void main() {
         onResult: (value) => saved = value,
       );
 
-      await tester.enterText(find.byKey(const Key('metadata_dose')), '18.5');
+      await tester.drag(
+        find.byKey(const Key('metadata_dose_slider')),
+        const Offset(40, 0),
+      );
+      await tester.drag(
+        find.byKey(const Key('metadata_grind_slider')),
+        const Offset(120, 0),
+      );
+      await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const Key('metadata_yield')), '37');
-      await tester.enterText(find.byKey(const Key('metadata_grind')), '14.5');
       await tester.enterText(find.byKey(const Key('metadata_temp')), '92');
       await tester.enterText(find.byKey(const Key('metadata_bean')), 'bean-house-blend');
       await tester.enterText(
@@ -248,9 +257,9 @@ void main() {
 
       expect(saved, isNotNull);
       final metadata = saved!;
-      expect(metadata.doseG, 18.5);
+      expect(metadata.doseG, greaterThan(kDefaultBrewDoseG));
       expect(metadata.yieldG, 37);
-      expect(metadata.grindSetting, 14.5);
+      expect(metadata.grindSetting, greaterThan(kDefaultBrewGrindSetting));
       expect(metadata.beanId, 'bean-house-blend');
       expect(metadata.waterTempC, 92);
       expect(metadata.notes, 'Minimal fixture shot for tests and mock replay.');
@@ -271,8 +280,18 @@ void main() {
 
       await tapVisible(tester, find.byKey(const Key('metadata_save')));
 
-      expect(saved, initial);
-      expect(saved!.applyTo(shot), shot);
+      final expected = initial.copyWith(
+        coffeejackRewindTurns: kDefaultCoffeejackRewindTurns,
+        coffeejackPreinfusionTurns: kDefaultCoffeejackPreinfusionTurns,
+      );
+      expect(saved, expected);
+      expect(
+        saved!.applyTo(shot),
+        shot.copyWith(
+          coffeejackRewindTurns: kDefaultCoffeejackRewindTurns,
+          coffeejackPreinfusionTurns: kDefaultCoffeejackPreinfusionTurns,
+        ),
+      );
     });
   });
 }

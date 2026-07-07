@@ -4,22 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-void main() {
-  Future<void> selectHistoryTab(WidgetTester tester) async {
-    final historyTooltip = find.byTooltip('Shot history');
-    if (historyTooltip.evaluate().isNotEmpty) {
-      await tester.tap(historyTooltip);
-    } else {
-      await tester.tap(
-        find.descendant(
-          of: find.byType(NavigationRail),
-          matching: find.byIcon(Icons.history),
-        ),
-      );
-    }
-    await tester.pumpAndSettle();
-  }
+import 'pump_helpers.dart';
+import 'shell_test_helpers.dart';
 
+void main() {
   Future<void> sendShortcut(
     WidgetTester tester, {
     required LogicalKeyboardKey key,
@@ -36,60 +24,50 @@ void main() {
   }
 
   testWidgets('Space on Live tab toggles start and stop', (tester) async {
-    await tester.pumpWidget(const FlowlogApp());
-    await tester.pumpAndSettle();
+    await pumpFlowlogApp(tester);
 
     expect(find.text('Session: idle'), findsOneWidget);
 
-    await tester.runAsync(() async {
-      await sendShortcut(tester, key: LogicalKeyboardKey.space);
-      await tester.pumpAndSettle();
-    });
+    await sendShortcut(tester, key: LogicalKeyboardKey.space);
+    await pumpForAsync(tester);
 
     expect(find.text('Stop brew'), findsOneWidget);
 
-    await tester.runAsync(() async {
-      await sendShortcut(tester, key: LogicalKeyboardKey.space);
-      await tester.pumpAndSettle();
-    });
+    await sendShortcut(tester, key: LogicalKeyboardKey.space);
+    await pumpForAsync(tester);
 
     expect(find.text('Session: stopped'), findsOneWidget);
     expect(find.text('Start brew'), findsOneWidget);
   });
 
   testWidgets('Space on non-Live tab does not start a shot', (tester) async {
-    await tester.pumpWidget(const FlowlogApp());
-    await tester.pumpAndSettle();
+    await pumpFlowlogApp(tester);
 
     await selectHistoryTab(tester);
 
-    await tester.runAsync(() async {
-      await sendShortcut(tester, key: LogicalKeyboardKey.space);
-      await tester.pumpAndSettle();
-    });
+    await sendShortcut(tester, key: LogicalKeyboardKey.space);
+    await pumpForAsync(tester);
 
     expect(find.text('Session: idle'), findsNothing);
     expect(find.byKey(const Key('history_filter_bean')), findsOneWidget);
   });
 
   testWidgets('Ctrl+E opens export screen from Live tab', (tester) async {
-    await tester.pumpWidget(const FlowlogApp());
-    await tester.pumpAndSettle();
+    await pumpFlowlogApp(tester);
 
     await sendShortcut(
       tester,
       key: LogicalKeyboardKey.keyE,
       control: true,
     );
-    await tester.pumpAndSettle();
+    await pumpForAsync(tester, frames: 5);
 
     expect(find.widgetWithText(AppBar, 'Export shots'), findsOneWidget);
     expect(find.byType(ExportScreen), findsOneWidget);
   });
 
   testWidgets('Ctrl+E opens export screen from History tab', (tester) async {
-    await tester.pumpWidget(const FlowlogApp());
-    await tester.pumpAndSettle();
+    await pumpFlowlogApp(tester);
 
     await selectHistoryTab(tester);
 
@@ -98,7 +76,7 @@ void main() {
       key: LogicalKeyboardKey.keyE,
       control: true,
     );
-    await tester.pumpAndSettle();
+    await pumpForAsync(tester, frames: 5);
 
     expect(find.widgetWithText(AppBar, 'Export shots'), findsOneWidget);
     expect(find.byType(ExportScreen), findsOneWidget);

@@ -3,7 +3,9 @@ import 'dart:io';
 
 import 'package:flowlog/screens/history/filters.dart';
 import 'package:flowlog/screens/history/history_shot_card.dart';
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/history/shot_detail.dart';
+import 'package:flowlog/shell/shot_events.dart';
 import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -34,9 +36,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
   ShotRepository? _shotRepository;
   TagRepository? _tagRepository;
   FlowlogDatabase? _database;
-  bool _ownsRepository = false;
+
   late ShotListFilters _filters;
   late Future<_HistoryData> _historyFuture;
+  ShotEventsNotifier? _shotEventsNotifier;
+  Timer? _deleteSnackBarTimer;
+  int _pendingDeleteSnackBarCount = 0;
 
   @override
   void initState() {
@@ -45,14 +50,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _historyFuture = _loadHistory();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final events = ShotEventsScope.maybeOf(context);
+    if (events == _shotEventsNotifier) {
+      return;
+    }
+    _shotEventsNotifier?.removeListener(_onShotsChanged);
+    _shotEventsNotifier = events;
+    _shotEventsNotifier?.addListener(_onShotsChanged);
+  }
+
+  void _onShotsChanged() {
+    if (!mounted) {
+      return;
+    }
+    unawaited(_refresh());
+  }
+
   Future<FlowlogDatabase> _ensureDatabase() async {
     if (_database != null) {
       return _database!;
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
-    _ownsRepository = true;
+    _database = await openFlowlogDatabase();
     return _database!;
   }
 
@@ -180,13 +202,32 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
 
     await _refresh();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        key: Key('history_deleted_snackbar_${shot.id}'),
-        content: const Text('Brew deleted'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    _scheduleDeleteSnackBar();
+  }
+
+  void _scheduleDeleteSnackBar() {
+    _pendingDeleteSnackBarCount += 1;
+    _deleteSnackBarTimer?.cancel();
+    _deleteSnackBarTimer = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) {
+        return;
+      }
+
+      final count = _pendingDeleteSnackBarCount;
+      _pendingDeleteSnackBarCount = 0;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
+        SnackBar(
+          key: const Key('history_deleted_snackbar'),
+          content: Text(
+            count == 1 ? 'Brew deleted' : '$count brews deleted',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    });
   }
 
   static String _formatStartedAt(DateTime startedAt) {
@@ -201,9 +242,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   void dispose() {
-    if (_ownsRepository) {
-      _database?.close();
-    }
+    _deleteSnackBarTimer?.cancel();
+    _shotEventsNotifier?.removeListener(_onShotsChanged);
     super.dispose();
   }
 

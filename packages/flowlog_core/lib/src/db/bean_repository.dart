@@ -79,6 +79,7 @@ class BeanRepository {
   /// Creates a new bean entry (duplicate names are allowed).
   Future<models.Bean> createBean({
     required String name,
+    String? brand,
     DateTime? roastDate,
     String? origin,
     String? roastLevel,
@@ -95,6 +96,7 @@ class BeanRepository {
     final bean = models.Bean(
       id: 'bean-${DateTime.now().toUtc().millisecondsSinceEpoch}',
       name: trimmed,
+      brand: brand,
       roastDate: roastDate,
       origin: origin,
       roastLevel: roastLevel,
@@ -206,6 +208,7 @@ class BeanRepository {
     return BeansCompanion.insert(
       id: bean.id,
       name: bean.name,
+      brand: Value(bean.brand),
       origin: Value(bean.origin),
       roastLevel: Value(bean.roastLevel),
       roastDate: Value(bean.roastDate),
@@ -220,6 +223,7 @@ class BeanRepository {
     return models.Bean(
       id: row.id,
       name: row.name,
+      brand: row.brand,
       origin: row.origin,
       roastLevel: row.roastLevel,
       roastDate: row.roastDate,

@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:flowlog/screens/live/brew_metadata_sliders.dart';
+import 'package:flowlog/settings/brew_defaults_store.dart';
+import 'package:flowlog/settings/coffeejack_settings_store.dart';
 import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +21,8 @@ class ShotMetadata {
     this.location,
     this.tasteScore,
     this.flavourTags = const [],
+    this.coffeejackRewindTurns,
+    this.coffeejackPreinfusionTurns,
   }) : assert(
           tasteScore == null || (tasteScore >= 0 && tasteScore <= 10),
           'tasteScore must be between 0 and 10',
@@ -32,6 +37,8 @@ class ShotMetadata {
   final String? location;
   final int? tasteScore;
   final List<String> flavourTags;
+  final int? coffeejackRewindTurns;
+  final int? coffeejackPreinfusionTurns;
 
   factory ShotMetadata.fromShot(Shot shot) {
     return ShotMetadata(
@@ -44,6 +51,8 @@ class ShotMetadata {
       location: shot.location,
       tasteScore: shot.tasteScore,
       flavourTags: List<String>.from(shot.flavourTags),
+      coffeejackRewindTurns: shot.coffeejackRewindTurns,
+      coffeejackPreinfusionTurns: shot.coffeejackPreinfusionTurns,
     );
   }
 
@@ -58,6 +67,8 @@ class ShotMetadata {
       location: location,
       tasteScore: tasteScore,
       flavourTags: flavourTags,
+      coffeejackRewindTurns: coffeejackRewindTurns,
+      coffeejackPreinfusionTurns: coffeejackPreinfusionTurns,
     );
   }
 
@@ -71,6 +82,8 @@ class ShotMetadata {
     String? location,
     int? tasteScore,
     List<String>? flavourTags,
+    int? coffeejackRewindTurns,
+    int? coffeejackPreinfusionTurns,
   }) {
     return ShotMetadata(
       doseG: doseG ?? this.doseG,
@@ -82,6 +95,10 @@ class ShotMetadata {
       location: location ?? this.location,
       tasteScore: tasteScore ?? this.tasteScore,
       flavourTags: flavourTags ?? this.flavourTags,
+      coffeejackRewindTurns:
+          coffeejackRewindTurns ?? this.coffeejackRewindTurns,
+      coffeejackPreinfusionTurns:
+          coffeejackPreinfusionTurns ?? this.coffeejackPreinfusionTurns,
     );
   }
 
@@ -97,6 +114,8 @@ class ShotMetadata {
             notes == other.notes &&
             location == other.location &&
             tasteScore == other.tasteScore &&
+            coffeejackRewindTurns == other.coffeejackRewindTurns &&
+            coffeejackPreinfusionTurns == other.coffeejackPreinfusionTurns &&
             _listEquals(flavourTags, other.flavourTags);
   }
 
@@ -110,6 +129,8 @@ class ShotMetadata {
         notes,
         location,
         tasteScore,
+        coffeejackRewindTurns,
+        coffeejackPreinfusionTurns,
         Object.hashAll(flavourTags),
       );
 }
@@ -156,6 +177,7 @@ Future<ShotMetadata?> showMetadataSheet(
 }) {
   return showModalBottomSheet<ShotMetadata>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     showDragHandle: true,
     builder: (context) {
@@ -191,32 +213,35 @@ class MetadataSheet extends StatefulWidget {
 }
 
 class _MetadataSheetState extends State<MetadataSheet> {
-  late final TextEditingController _doseController;
   late final TextEditingController _yieldController;
-  late final TextEditingController _grindController;
   late final TextEditingController _beanController;
   late final TextEditingController _tempController;
   late final TextEditingController _notesController;
   late final TextEditingController _locationController;
+  late double _doseG;
+  late double _grindSetting;
+  late CoffeejackSettings _coffeejackSettings;
   late double _tasteScore;
   late Set<String> _selectedFlavourTags;
   final _customTagController = TextEditingController();
+  final BrewDefaultsSettingsStore _brewDefaultsStore =
+      BrewDefaultsSettingsStore();
+  final CoffeejackSettingsStore _coffeejackSettingsStore =
+      CoffeejackSettingsStore();
   List<Bean> _beans = const [];
   bool _beansReady = false;
+  bool _defaultsReady = false;
   String? _selectedBeanId;
 
   @override
   void initState() {
     super.initState();
     final initial = widget.initial;
-    _doseController = TextEditingController(
-      text: _formatDouble(initial?.doseG),
-    );
+    _doseG = initial?.doseG ?? kDefaultBrewDoseG;
+    _grindSetting = initial?.grindSetting ?? kDefaultBrewGrindSetting;
+    _coffeejackSettings = const CoffeejackSettings();
     _yieldController = TextEditingController(
       text: _formatDouble(initial?.yieldG),
-    );
-    _grindController = TextEditingController(
-      text: _formatDouble(initial?.grindSetting),
     );
     _beanController = TextEditingController(
       text: _initialBeanLabel(initial?.beanId),
@@ -228,7 +253,38 @@ class _MetadataSheetState extends State<MetadataSheet> {
     _locationController = TextEditingController(text: initial?.location ?? '');
     _tasteScore = (initial?.tasteScore ?? 5).toDouble();
     _selectedFlavourTags = Set<String>.from(initial?.flavourTags ?? const []);
+    unawaited(_loadDefaults());
     unawaited(_loadBeans());
+  }
+
+  Future<void> _loadDefaults() async {
+    final results = await Future.wait([
+      _brewDefaultsStore.load(),
+      _coffeejackSettingsStore.load(),
+    ]);
+    if (!mounted) {
+      return;
+    }
+
+    final brewDefaults = results[0] as BrewDefaultsSettings;
+    final coffeejack = results[1] as CoffeejackSettings;
+    final initial = widget.initial;
+
+    setState(() {
+      if (initial?.doseG == null) {
+        _doseG = brewDefaults.defaultDoseG;
+      }
+      if (initial?.grindSetting == null) {
+        _grindSetting = brewDefaults.defaultGrindSetting;
+      }
+      _coffeejackSettings = CoffeejackSettings(
+        rewindTurnsBeforeFill: initial?.coffeejackRewindTurns ??
+            coffeejack.rewindTurnsBeforeFill,
+        slowPreinfusionTurns: initial?.coffeejackPreinfusionTurns ??
+            coffeejack.slowPreinfusionTurns,
+      );
+      _defaultsReady = true;
+    });
   }
 
   String _initialBeanLabel(String? beanId) {
@@ -290,11 +346,14 @@ class _MetadataSheetState extends State<MetadataSheet> {
     });
   }
 
+  Future<void> _updateCoffeejack(CoffeejackSettings settings) async {
+    setState(() => _coffeejackSettings = settings);
+    await _coffeejackSettingsStore.save(settings);
+  }
+
   @override
   void dispose() {
-    _doseController.dispose();
     _yieldController.dispose();
-    _grindController.dispose();
     _beanController.dispose();
     _tempController.dispose();
     _notesController.dispose();
@@ -385,22 +444,24 @@ class _MetadataSheetState extends State<MetadataSheet> {
     }
 
     return ShotMetadata(
-      doseG: _parseDouble(_doseController.text),
+      doseG: _doseG,
       yieldG: _parseDouble(_yieldController.text),
-      grindSetting: _parseDouble(_grindController.text),
+      grindSetting: _grindSetting,
       beanId: beanId,
       waterTempC: _parseDouble(_tempController.text),
       notes: _parseString(_notesController.text),
       location: _parseString(_locationController.text),
       tasteScore: _tasteScore.round(),
       flavourTags: _selectedFlavourTags.toList()..sort(),
+      coffeejackRewindTurns: _coffeejackSettings.rewindTurnsBeforeFill,
+      coffeejackPreinfusionTurns: _coffeejackSettings.slowPreinfusionTurns,
     );
   }
 
   Future<void> _save() async {
     final metadata = await _buildMetadata();
     if (mounted) {
-      Navigator.of(context).pop(metadata);
+      Navigator.of(context, rootNavigator: true).pop(metadata);
     }
   }
 
@@ -425,69 +486,54 @@ class _MetadataSheetState extends State<MetadataSheet> {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: const Key('metadata_dose'),
-                      controller: _doseController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
+                    if (!_defaultsReady)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else
+                      BrewMetadataSliders(
+                        doseG: _doseG,
+                        grindSetting: _grindSetting,
+                        coffeejackSettings: _coffeejackSettings,
+                        onDoseChanged: (value) => setState(() => _doseG = value),
+                        onGrindChanged: (value) =>
+                            setState(() => _grindSetting = value),
+                        onCoffeejackChanged: (settings) =>
+                            unawaited(_updateCoffeejack(settings)),
                       ),
-                      decoration: const InputDecoration(
-                        labelText: 'Dose (g)',
-                        border: OutlineInputBorder(),
-                      ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            key: const Key('metadata_yield'),
+                            controller: _yieldController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Yield (g)',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            key: const Key('metadata_temp'),
+                            controller: _tempController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Temp (°C)',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      key: const Key('metadata_yield'),
-                      controller: _yieldController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Yield (g)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: const Key('metadata_grind'),
-                      controller: _grindController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Grind',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      key: const Key('metadata_temp'),
-                      controller: _tempController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Temp (°C)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 12),
               Autocomplete<Bean>(
                 initialValue: TextEditingValue(text: _beanController.text),

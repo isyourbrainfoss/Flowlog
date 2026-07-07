@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -61,7 +62,7 @@ class BeansScreen extends StatefulWidget {
 class _BeansScreenState extends State<BeansScreen> {
   BeanRepository? _beanRepository;
   FlowlogDatabase? _database;
-  bool _ownsRepository = false;
+
   late Future<List<BeanWithShotCount>> _beansFuture;
 
   @override
@@ -78,10 +79,8 @@ class _BeansScreenState extends State<BeansScreen> {
       return _beanRepository!;
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
+    _database = await openFlowlogDatabase();
     _beanRepository = BeanRepository(_database!);
-    _ownsRepository = true;
     return _beanRepository!;
   }
 
@@ -157,9 +156,6 @@ class _BeansScreenState extends State<BeansScreen> {
 
   @override
   void dispose() {
-    if (_ownsRepository) {
-      _database?.close();
-    }
     super.dispose();
   }
 
@@ -239,6 +235,10 @@ class BeanCard extends StatelessWidget {
     final bean = entry.bean;
     final title = formatBeanDisplayLabel(bean, allBeans: allBeans);
     final subtitle = [
+      if (bean.brand != null &&
+          bean.brand!.isNotEmpty &&
+          !title.contains(bean.brand!))
+        bean.brand,
       if (bean.origin != null && bean.origin!.isNotEmpty) bean.origin,
       if (bean.variety != null && bean.variety!.isNotEmpty) bean.variety,
       if (bean.process != null && bean.process!.isNotEmpty) bean.process,
@@ -440,6 +440,7 @@ class _BeanEditorDialog extends StatefulWidget {
 class _BeanEditorDialogState extends State<_BeanEditorDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
+  late final TextEditingController _brandController;
   late final TextEditingController _originController;
   late final TextEditingController _varietyController;
   late final TextEditingController _stockController;
@@ -454,6 +455,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
     super.initState();
     final bean = widget.bean;
     _nameController = TextEditingController(text: bean?.name ?? '');
+    _brandController = TextEditingController(text: bean?.brand ?? '');
     _originController = TextEditingController(text: bean?.origin ?? '');
     _varietyController = TextEditingController(text: bean?.variety ?? '');
     _stockController = TextEditingController(
@@ -492,6 +494,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
   @override
   void dispose() {
     _nameController.dispose();
+    _brandController.dispose();
     _originController.dispose();
     _varietyController.dispose();
     _stockController.dispose();
@@ -519,6 +522,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
     final bean = widget.bean;
     if (bean == null) {
       return _nameController.text.trim().isNotEmpty ||
+          _brandController.text.trim().isNotEmpty ||
           _originController.text.trim().isNotEmpty ||
           _varietyController.text.trim().isNotEmpty ||
           _stockController.text.trim().isNotEmpty ||
@@ -530,6 +534,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
 
     final stock = _optionalStock(_stockController.text);
     return _nameController.text.trim() != bean.name ||
+        _optionalText(_brandController.text) != bean.brand ||
         _optionalText(_originController.text) != bean.origin ||
         _optionalText(_varietyController.text) != bean.variety ||
         _sliderToRoastLevel(_roastSliderValue) != bean.roastLevel ||
@@ -585,6 +590,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
       Bean(
         id: widget.bean?.id ?? widget.beanIdGenerator(),
         name: _nameController.text.trim(),
+        brand: _optionalText(_brandController.text),
         origin: _optionalText(_originController.text),
         variety: _optionalText(_varietyController.text),
         roastLevel: _sliderToRoastLevel(_roastSliderValue),
@@ -647,6 +653,15 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
                   }
                   return null;
                 },
+              ),
+              TextFormField(
+                key: const Key('bean_editor_brand'),
+                controller: _brandController,
+                decoration: const InputDecoration(
+                  labelText: 'Brand',
+                  hintText: 'e.g. Onyx, Square Mile',
+                ),
+                textCapitalization: TextCapitalization.words,
               ),
               TextFormField(
                 controller: _originController,

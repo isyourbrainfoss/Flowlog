@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/sync/nextcloud_settings_store.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/foundation.dart';
@@ -91,7 +90,6 @@ class FlowlogSyncCoordinator {
     _lastSyncAttempt = DateTime.now();
 
     final resolvedDatabase = database ?? await _openDefaultDatabase();
-    final ownsDatabase = database == null;
 
     try {
       final result = await _syncRunner(
@@ -118,15 +116,10 @@ class FlowlogSyncCoordinator {
       await _settingsStore.saveSettings(updated);
 
       return NextcloudSyncResult(success: false, message: message);
-    } finally {
-      if (ownsDatabase) {
-        await resolvedDatabase.close();
-      }
     }
   }
 
   static Future<FlowlogDatabase> _openDefaultDatabase() async {
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    return FlowlogDatabase.openFile(dbPath);
+    return openFlowlogDatabase();
   }
 }

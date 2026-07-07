@@ -1,0 +1,44 @@
+app-id: com.flowlog.flowlog
+runtime: org.gnome.Platform
+runtime-version: '48'
+sdk: org.gnome.Sdk
+command: flowlog
+separate-locales: false
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --socket=pulseaudio
+  - --filesystem=xdg-documents
+  - --filesystem=xdg-download
+  - --talk-name=org.freedesktop.Notifications
+  # BlueZ / BLE sensors (Pressensor, scales)
+  - --socket=system-bus
+  - --talk-name=org.bluez
+  - --talk-name=org.bluez.Adapter1
+  - --talk-name=org.bluez.Device1
+  - --talk-name=org.bluez.GattManager1
+  - --talk-name=org.bluez.LEAdvertisingManager1
+modules:
+  - name: flowlog
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 bundle/flowlog /app/bin/flowlog
+      - cp -ra bundle/data /app/
+      - cp -ra bundle/lib /app/
+      - install -Dm644 com.flowlog.flowlog.png /app/share/icons/hicolor/128x128/apps/com.flowlog.flowlog.png
+      - install -Dm644 com.flowlog.flowlog.png /app/share/icons/hicolor/64x64/apps/com.flowlog.flowlog.png
+      - install -Dm644 com.flowlog.flowlog.desktop /app/share/applications/com.flowlog.flowlog.desktop
+      - install -Dm644 com.flowlog.flowlog.metainfo.xml /app/share/metainfo/com.flowlog.flowlog.metainfo.xml
+    sources:
+      - type: archive
+        path: flowlog-linux-bundle.tar.gz
+        dest: bundle
+      - type: file
+        path: com.flowlog.flowlog.png
+      - type: file
+        path: com.flowlog.flowlog.desktop
+      - type: file
+        path: com.flowlog.flowlog.metainfo.xml

@@ -21,6 +21,8 @@ class Shot {
     this.longitude,
     this.tasteScore,
     this.flavourTags = const [],
+    this.coffeejackRewindTurns,
+    this.coffeejackPreinfusionTurns,
     this.samples = const [],
     this.annotations = const [],
   }) : assert(
@@ -42,6 +44,8 @@ class Shot {
   final double? longitude;
   final int? tasteScore;
   final List<String> flavourTags;
+  final int? coffeejackRewindTurns;
+  final int? coffeejackPreinfusionTurns;
   final List<ShotSample> samples;
   final List<ShotAnnotation> annotations;
 
@@ -62,6 +66,9 @@ class Shot {
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       tasteScore: json['tasteScore'] as int?,
+      coffeejackRewindTurns: (json['coffeejackRewindTurns'] as num?)?.toInt(),
+      coffeejackPreinfusionTurns:
+          (json['coffeejackPreinfusionTurns'] as num?)?.toInt(),
       flavourTags: (json['flavourTags'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
@@ -92,6 +99,10 @@ class Shot {
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
       if (tasteScore != null) 'tasteScore': tasteScore,
+      if (coffeejackRewindTurns != null)
+        'coffeejackRewindTurns': coffeejackRewindTurns,
+      if (coffeejackPreinfusionTurns != null)
+        'coffeejackPreinfusionTurns': coffeejackPreinfusionTurns,
       if (flavourTags.isNotEmpty) 'flavourTags': flavourTags,
       if (samples.isNotEmpty)
         'samples': samples.map((s) => s.toJson()).toList(),
@@ -115,6 +126,8 @@ class Shot {
     double? longitude,
     int? tasteScore,
     List<String>? flavourTags,
+    int? coffeejackRewindTurns,
+    int? coffeejackPreinfusionTurns,
     List<ShotSample>? samples,
     List<ShotAnnotation>? annotations,
   }) {
@@ -133,6 +146,10 @@ class Shot {
       longitude: longitude ?? this.longitude,
       tasteScore: tasteScore ?? this.tasteScore,
       flavourTags: flavourTags ?? this.flavourTags,
+      coffeejackRewindTurns:
+          coffeejackRewindTurns ?? this.coffeejackRewindTurns,
+      coffeejackPreinfusionTurns:
+          coffeejackPreinfusionTurns ?? this.coffeejackPreinfusionTurns,
       samples: samples ?? this.samples,
       annotations: annotations ?? this.annotations,
     );
@@ -155,6 +172,8 @@ class Shot {
             latitude == other.latitude &&
             longitude == other.longitude &&
             tasteScore == other.tasteScore &&
+            coffeejackRewindTurns == other.coffeejackRewindTurns &&
+            coffeejackPreinfusionTurns == other.coffeejackPreinfusionTurns &&
             _listEquals(flavourTags, other.flavourTags) &&
             _listEquals(samples, other.samples) &&
             _listEquals(annotations, other.annotations);
@@ -175,6 +194,8 @@ class Shot {
         latitude,
         longitude,
         tasteScore,
+        coffeejackRewindTurns,
+        coffeejackPreinfusionTurns,
         Object.hashAll(flavourTags),
         Object.hashAll(samples),
         Object.hashAll(annotations),

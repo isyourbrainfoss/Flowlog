@@ -1,0 +1,165 @@
+name: Linux Flatpak Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: flatpak-pages
+  cancel-in-progress: true
+
+jobs:
+  build-x86_64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config libgtk-3-dev \
+            libblkid-dev liblzma-dev libsecret-1-dev \
+            flatpak flatpak-builder
+
+      - name: Install GNOME SDK
+        run: |
+          flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install -y --user flathub org.gnome.Platform//48 org.gnome.Sdk//48
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build Flatpak (x86_64)
+        env:
+          REPO_DIR: ${{ github.workspace }}/flatpak-pages-repo
+        run: |
+          mkdir -p "$REPO_DIR"
+          ./flatpak/build-flatpak.sh x86_64
+
+      - name: Upload x86_64 repo
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-repo-x86_64
+          path: flatpak-pages-repo
+
+      - name: Upload x86_64 bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-bundle-x86_64
+          path: flatpak/com.flowlog.flowlog-x86_64.flatpak
+
+  build-aarch64:
+    needs: build-x86_64
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config libgtk-3-dev \
+            libblkid-dev liblzma-dev libsecret-1-dev \
+            flatpak flatpak-builder
+
+      - name: Install GNOME SDK
+        run: |
+          flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install -y --user flathub org.gnome.Platform//48 org.gnome.Sdk//48
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Download x86_64 repo
+        uses: actions/download-artifact@v4
+        with:
+          name: flatpak-repo-x86_64
+          path: flatpak-pages-repo
+
+      - name: Build Flatpak (aarch64)
+        env:
+          REPO_DIR: ${{ github.workspace }}/flatpak-pages-repo
+        run: ./flatpak/build-flatpak.sh aarch64
+
+      - name: Upload combined repo
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-repo
+          path: flatpak-pages-repo
+
+      - name: Upload aarch64 bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-bundle-aarch64
+          path: flatpak/com.flowlog.flowlog-aarch64.flatpak
+
+  publish:
+    needs: build-aarch64
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download combined Flatpak repo
+        uses: actions/download-artifact@v4
+        with:
+          name: flatpak-repo
+          path: site
+
+      - name: Add flatpakrepo file
+        run: cp flatpak/flowlog.flatpakrepo site/flowlog.flatpakrepo
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Download Flatpak bundles
+        uses: actions/download-artifact@v4
+        with:
+          pattern: flatpak-bundle-*
+          path: bundles
+          merge-multiple: true
+
+      - name: Upload Flatpak bundles to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          append_body: true
+          body: |
+            **Linux Flatpak remote:**
+            ```bash
+            flatpak remote-add --if-not-exists --user flowlog \
+              https://isyourbrainfoss.github.io/Flowlog/flowlog.flatpakrepo
+            flatpak install --user flowlog com.flowlog.flowlog
+            ```
+          files: |
+            bundles/com.flowlog.flowlog-x86_64.flatpak
+            bundles/com.flowlog.flowlog-aarch64.flatpak
+          fail_on_unmatched_files: false

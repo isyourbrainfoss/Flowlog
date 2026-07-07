@@ -1,6 +1,9 @@
 import 'dart:async';
 
+import 'package:flowlog/screens/more/brew_defaults_screen.dart';
 import 'package:flowlog/screens/more/brew_location_screen.dart';
+import 'package:flowlog/screens/more/target_brew_screen.dart';
+
 import 'package:flowlog/screens/more/diagnostics.dart';
 import 'package:flowlog/screens/more/sensors_screen.dart';
 import 'package:flowlog/settings/brew_location_store.dart';
@@ -63,6 +66,38 @@ class _MoreScreenState extends State<MoreScreen> {
           ),
         ),
         ListTile(
+          key: const Key('more_brew_defaults_tile'),
+          leading: const Icon(Icons.tune),
+          title: const Text('Brew defaults'),
+          subtitle: const Text(
+            'Dose, grind, Coffeejack rewind & pre-infusion turns',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => const BrewDefaultsScreen(),
+              ),
+            );
+          },
+        ),
+        ListTile(
+          key: const Key('more_target_brew_tile'),
+          leading: const Icon(Icons.timeline),
+          title: const Text('Target brew'),
+          subtitle: const Text(
+            'Dotted pressure line always shown on Live',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => const TargetBrewScreen(),
+              ),
+            );
+          },
+        ),
+        ListTile(
           key: const Key('more_brew_location_tile'),
           leading: const Icon(Icons.place_outlined),
           title: const Text('Brew location'),
@@ -96,6 +131,7 @@ class _MoreScreenState extends State<MoreScreen> {
           onTap: () => openExportScreen(context),
         ),
         ListTile(
+          key: const Key('more_sensors_tile'),
           leading: const Icon(Icons.sensors),
           title: const Text('Sensors'),
           subtitle: const Text('Pair Pressensor and scale'),

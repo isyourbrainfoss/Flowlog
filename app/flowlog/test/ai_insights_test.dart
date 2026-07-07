@@ -7,6 +7,8 @@ import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'pump_helpers.dart';
+
 void main() {
   group('suggestTweaksFromTasteNotes', () {
     test('returns empty list for blank notes', () {
@@ -199,7 +201,7 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(home: LibraryScreen()),
       );
-      await tester.pumpAndSettle();
+      await pumpForAsync(tester);
 
       expect(find.byKey(const Key('library_tab_ai_coach')), findsNothing);
       expect(find.text('Simulator'), findsOneWidget);

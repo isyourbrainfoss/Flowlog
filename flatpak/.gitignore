@@ -1,0 +1,5 @@
+repo/
+build-*/
+flowlog-linux-bundle.tar.gz
+com.flowlog.flowlog.png
+com.flowlog.flowlog-*.flatpak

@@ -5,11 +5,12 @@ import 'package:meta/meta.dart';
 import '../models/bean.dart';
 import '../models/saved_profile.dart';
 import '../models/shot.dart';
+import '../models/tag.dart';
 import 'encrypted_sync_blob.dart';
 import 'sync_config.dart';
 
 /// Current [SyncPayload] schema version (embedded in exported backups).
-const syncPayloadVersion = 2;
+const syncPayloadVersion = 3;
 
 /// Oldest [SyncPayload.version] this app can import.
 const minSyncPayloadVersion = 1;
@@ -27,6 +28,8 @@ class SyncPayload {
     required this.shots,
     required this.profiles,
     this.beans = const [],
+    this.tags = const [],
+    this.shotTagLinks = const [],
   });
 
   final int version;
@@ -35,6 +38,8 @@ class SyncPayload {
   final List<Shot> shots;
   final List<SavedProfile> profiles;
   final List<Bean> beans;
+  final List<Tag> tags;
+  final List<ShotTagLink> shotTagLinks;
 
   factory SyncPayload.fromJson(Map<String, dynamic> json) {
     final version = json['version'] as int;
@@ -64,6 +69,21 @@ class SyncPayload {
                   .toList() ??
               const []
           : const [],
+      tags: version >= 3
+          ? (json['tags'] as List<dynamic>?)
+                  ?.map((entry) => Tag.fromJson(entry as Map<String, dynamic>))
+                  .toList() ??
+              const []
+          : const [],
+      shotTagLinks: version >= 3
+          ? (json['shotTagLinks'] as List<dynamic>?)
+                  ?.map(
+                    (entry) =>
+                        ShotTagLink.fromJson(entry as Map<String, dynamic>),
+                  )
+                  .toList() ??
+              const []
+          : const [],
     );
   }
 
@@ -76,6 +96,10 @@ class SyncPayload {
       'profiles': profiles.map((profile) => profile.toJson()).toList(),
       if (version >= 2)
         'beans': beans.map((bean) => bean.toJson()).toList(),
+      if (version >= 3) ...{
+        'tags': tags.map((tag) => tag.toJson()).toList(),
+        'shotTagLinks': shotTagLinks.map((link) => link.toJson()).toList(),
+      },
     };
   }
 
@@ -88,7 +112,9 @@ class SyncPayload {
             config == other.config &&
             _listEquals(shots, other.shots) &&
             _listEquals(profiles, other.profiles) &&
-            _listEquals(beans, other.beans);
+            _listEquals(beans, other.beans) &&
+            _listEquals(tags, other.tags) &&
+            _listEquals(shotTagLinks, other.shotTagLinks);
   }
 
   @override
@@ -99,6 +125,8 @@ class SyncPayload {
         Object.hashAll(shots),
         Object.hashAll(profiles),
         Object.hashAll(beans),
+        Object.hashAll(tags),
+        Object.hashAll(shotTagLinks),
       );
 }
 
@@ -121,6 +149,8 @@ EncryptedSyncBlob exportSyncBlob({
     shots: shots,
     profiles: profiles,
     beans: beans,
+    tags: const [],
+    shotTagLinks: const [],
   );
   return encryptSyncPayload(jsonEncode(payload.toJson()));
 }

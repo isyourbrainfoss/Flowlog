@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.flowlog.flowlog</id>
+  <name>Flowlog</name>
+  <summary>Personal coffee intelligence hub</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      Flowlog records espresso shots with live pressure, weight, and flow curves,
+      keeps brew history, and helps you compare beans and dial in your setup.
+    </p>
+    <p>
+      Pair a Pressensor pressure gauge and compatible scale over Bluetooth on
+      Linux desktop and mobile devices.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.flowlog.flowlog.desktop</launchable>
+  <url type="homepage">https://github.com/isyourbrainfoss/Flowlog</url>
+  <url type="bugtracker">https://github.com/isyourbrainfoss/Flowlog/issues</url>
+  <provides>
+    <binary>flowlog</binary>
+  </provides>
+  <content_rating type="oars-1.1"/>
+</component>

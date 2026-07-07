@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flutter/foundation.dart';
 
 /// User-visible Nextcloud sync preferences (password stored separately).
@@ -74,20 +75,24 @@ class NextcloudSettingsStore {
   NextcloudSettingsStore({
     String? settingsPath,
     String? credentialsPath,
-  })  : _settingsPath = settingsPath ?? _defaultSettingsPath,
-        _credentialsPath = credentialsPath ?? _defaultCredentialsPath;
+  })  : _settingsPathOverride = settingsPath,
+        _credentialsPathOverride = credentialsPath;
 
-  static String get _defaultSettingsPath =>
-      '${Directory.systemTemp.path}/flowlog_nextcloud_settings.json';
+  final String? _settingsPathOverride;
+  final String? _credentialsPathOverride;
 
-  static String get _defaultCredentialsPath =>
-      '${Directory.systemTemp.path}/flowlog_nextcloud_credentials.json';
+  Future<String> _resolveSettingsPath() async {
+    return _settingsPathOverride ??
+        FlowlogStorage.shared.filePath('flowlog_nextcloud_settings.json');
+  }
 
-  final String _settingsPath;
-  final String _credentialsPath;
+  Future<String> _resolveCredentialsPath() async {
+    return _credentialsPathOverride ??
+        FlowlogStorage.shared.filePath('flowlog_nextcloud_credentials.json');
+  }
 
   Future<NextcloudSettings> loadSettings() async {
-    final file = File(_settingsPath);
+    final file = File(await _resolveSettingsPath());
     if (!file.existsSync()) {
       return const NextcloudSettings();
     }
@@ -104,7 +109,7 @@ class NextcloudSettingsStore {
   }
 
   Future<void> saveSettings(NextcloudSettings settings) async {
-    final file = File(_settingsPath);
+    final file = File(await _resolveSettingsPath());
     await file.parent.create(recursive: true);
     await file.writeAsString(
       const JsonEncoder.withIndent('  ').convert(settings.toJson()),
@@ -112,7 +117,7 @@ class NextcloudSettingsStore {
   }
 
   Future<String?> loadPassword() async {
-    final file = File(_credentialsPath);
+    final file = File(await _resolveCredentialsPath());
     if (!file.existsSync()) {
       return null;
     }
@@ -133,7 +138,7 @@ class NextcloudSettingsStore {
   }
 
   Future<void> savePassword(String password) async {
-    final file = File(_credentialsPath);
+    final file = File(await _resolveCredentialsPath());
     await file.parent.create(recursive: true);
     await file.writeAsString(
       const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
@@ -143,12 +148,12 @@ class NextcloudSettingsStore {
   }
 
   Future<void> clearAll() async {
-    final settingsFile = File(_settingsPath);
+    final settingsFile = File(await _resolveSettingsPath());
     if (settingsFile.existsSync()) {
       await settingsFile.delete();
     }
 
-    final credentialsFile = File(_credentialsPath);
+    final credentialsFile = File(await _resolveCredentialsPath());
     if (credentialsFile.existsSync()) {
       await credentialsFile.delete();
     }

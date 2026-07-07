@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -252,8 +253,7 @@ class _BackupScreenState extends State<BackupScreen> {
       return _database!;
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
+    _database = await openFlowlogDatabase();
     _ownsDatabase = true;
     return _database!;
   }
@@ -372,9 +372,6 @@ class _BackupScreenState extends State<BackupScreen> {
 
   @override
   void dispose() {
-    if (_ownsDatabase) {
-      _database?.close();
-    }
     super.dispose();
   }
 

@@ -1,4 +1,5 @@
 import 'package:flowlog/screens/history/shot_detail.dart';
+import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -74,7 +75,7 @@ class HistoryShotCard extends StatelessWidget {
                 Expanded(
                   child: _MetricCell(
                     label: 'Yield',
-                    value: _formatYield(shot.yieldG),
+                    value: _formatYield(inferredYieldG(shot)),
                     labelStyle: labelStyle,
                     valueStyle: valueStyle,
                   ),

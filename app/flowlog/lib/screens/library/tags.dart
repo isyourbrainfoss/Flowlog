@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
@@ -32,7 +33,7 @@ class TagsScreen extends StatefulWidget {
 class _TagsScreenState extends State<TagsScreen> {
   TagRepository? _tagRepository;
   FlowlogDatabase? _database;
-  bool _ownsRepository = false;
+
   late Future<List<TagWithShotCount>> _tagsFuture;
 
   @override
@@ -49,10 +50,8 @@ class _TagsScreenState extends State<TagsScreen> {
       return _tagRepository!;
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
+    _database = await openFlowlogDatabase();
     _tagRepository = TagRepository(_database!);
-    _ownsRepository = true;
     return _tagRepository!;
   }
 
@@ -125,9 +124,6 @@ class _TagsScreenState extends State<TagsScreen> {
 
   @override
   void dispose() {
-    if (_ownsRepository) {
-      _database?.close();
-    }
     super.dispose();
   }
 

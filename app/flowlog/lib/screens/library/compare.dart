@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/history/history_shot_card.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -39,7 +40,7 @@ class CompareScreen extends StatefulWidget {
 class _CompareScreenState extends State<CompareScreen> {
   ShotRepository? _shotRepository;
   FlowlogDatabase? _database;
-  bool _ownsRepository = false;
+
   late Future<List<Shot>> _shotsFuture;
   final List<String> _selectedShotIds = [];
   bool _showDeltaHighlight = false;
@@ -58,10 +59,8 @@ class _CompareScreenState extends State<CompareScreen> {
       return _shotRepository!;
     }
 
-    final dbPath = '${Directory.systemTemp.path}/flowlog.db';
-    _database = FlowlogDatabase.openFile(dbPath);
+    _database = await openFlowlogDatabase();
     _shotRepository = ShotRepository(_database!);
-    _ownsRepository = true;
     return _shotRepository!;
   }
 
@@ -99,9 +98,6 @@ class _CompareScreenState extends State<CompareScreen> {
 
   @override
   void dispose() {
-    if (_ownsRepository) {
-      _database?.close();
-    }
     super.dispose();
   }
 

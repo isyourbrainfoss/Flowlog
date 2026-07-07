@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Flowlog
+Comment=Personal coffee intelligence hub
+Exec=flowlog
+Icon=com.flowlog.flowlog
+Terminal=false
+Type=Application
+Categories=Food;Utility;
+StartupWMClass=flowlog

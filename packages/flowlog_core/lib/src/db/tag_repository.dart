@@ -95,6 +95,15 @@ class TagRepository {
     return rows.map((row) => _tagFromRow(row.readTable(_db.tags))).toList();
   }
 
+  /// Returns every shot-tag association in the database.
+  Future<List<models.ShotTagLink>> listAllShotTagLinks() async {
+    final rows = await _db.select(_db.shotTags).get();
+    return [
+      for (final row in rows)
+        models.ShotTagLink(shotId: row.shotId, tagId: row.tagId),
+    ];
+  }
+
   /// Replaces all tags linked to [shotId].
   Future<void> setTagsForShot(String shotId, List<String> tagIds) async {
     await _db.transaction(() async {

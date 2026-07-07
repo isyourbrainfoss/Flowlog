@@ -70,12 +70,29 @@ void main() {
   group('matchesSensorKind', () {
     test('detects Pressensor PRS advertisements', () {
       expect(matchesSensorKind('PRS-CJ2', SensorKind.pressensor), isTrue);
+      expect(matchesSensorKind('PRS39739', SensorKind.pressensor), isTrue);
       expect(matchesSensorKind('Decent Scale', SensorKind.pressensor), isFalse);
     });
 
     test('detects Decent Scale advertisements', () {
       expect(matchesSensorKind('Decent Scale', SensorKind.scale), isTrue);
       expect(matchesSensorKind('PRS-1', SensorKind.scale), isFalse);
+    });
+  });
+
+  group('resolveBleDeviceName', () {
+    test('prefers advertisement name when present', () {
+      expect(
+        resolveBleDeviceName(advName: 'PRS-CJ2', platformName: ''),
+        'PRS-CJ2',
+      );
+    });
+
+    test('falls back to platform name for Linux-style scan results', () {
+      expect(
+        resolveBleDeviceName(advName: '', platformName: 'PRS39739'),
+        'PRS39739',
+      );
     });
   });
 

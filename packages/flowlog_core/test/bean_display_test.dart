@@ -19,6 +19,15 @@ void main() {
       expect(formatBeanDisplayLabel(solo), 'Ethiopia');
     });
 
+    test('includes brand before bean name', () {
+      const bean = Bean(
+        id: 'bean-branded',
+        name: 'Geometry',
+        brand: 'Onyx',
+      );
+      expect(formatBeanDisplayLabel(bean), 'Onyx · Geometry');
+    });
+
     test('disambiguates duplicate names with roast dates', () {
       final all = [houseMarchWithDate, houseApril];
       expect(

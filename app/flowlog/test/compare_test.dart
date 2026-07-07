@@ -7,6 +7,8 @@ import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'pump_helpers.dart';
+
 void main() {
   group('CompareScreen', () {
     late FlowlogDatabase db;
@@ -149,12 +151,12 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(home: LibraryScreen()),
       );
-      await tester.pumpAndSettle();
+      await pumpForAsync(tester, frames: 8);
 
       expect(find.byKey(const Key('library_tab_compare')), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('library_tab_compare')));
-      await tester.pumpAndSettle();
+      await pumpForAsync(tester, frames: 8);
 
       expect(find.byType(CompareScreen), findsOneWidget);
       expect(tester.takeException(), isNull);

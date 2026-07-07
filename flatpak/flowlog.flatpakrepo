@@ -1,0 +1,11 @@
+[Flatpak Repo]
+Version=0
+Url=https://isyourbrainfoss.github.io/Flowlog/
+Homepage=https://github.com/isyourbrainfoss/Flowlog
+Title=Flowlog
+Description=Personal coffee intelligence hub
+IsRuntime=false
+
+[Application com.flowlog.flowlog]
+arch=aarch64;x86_64
+branch=stable
