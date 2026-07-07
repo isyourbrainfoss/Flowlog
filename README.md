@@ -62,6 +62,36 @@ Obtainium will notify you when a new GitHub Release is published.
 > download `flowlog-release.apk` from [Releases](https://github.com/isyourbrainfoss/Flowlog/releases)
 > in your browser and install manually.
 
+#### Install blocked / can't find old USB build
+
+USB debug installs use a **different signing key** than GitHub release APKs. Android will reject
+the release APK while the old package is still registered — even if the app icon is gone.
+
+1. **Find the hidden app:** Settings → Apps → **All apps** → search **`flowlog`** (all lowercase,
+   not “Flowlog”). Also check a **work profile** tab if you use one.
+2. **Use Build 23+** only ([latest release](https://github.com/isyourbrainfoss/Flowlog/releases/latest)).
+   Older builds used rotating signatures.
+3. **Clear bad downloads:** In Obtainium, remove Flowlog and re-add; or delete any partial
+   `flowlog-release.apk` from Downloads and fetch again on Wi‑Fi.
+4. **Force-remove via USB** (most reliable). With the phone on USB debugging:
+
+```bash
+./tool/android_install.sh
+```
+
+Or manually:
+
+```bash
+adb shell pm list packages | rg flowlog
+adb uninstall com.flowlog.flowlog
+curl -fL -o /tmp/flowlog.apk \
+  https://github.com/isyourbrainfoss/Flowlog/releases/download/build-23/flowlog-release.apk
+adb install /tmp/flowlog.apk
+```
+
+If `adb install` still fails, paste the exact error line — it distinguishes signature conflict
+(`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) from a corrupted download.
+
 ## Linux (Flatpak)
 
 Flowlog is published as a Flatpak for **x86_64** desktops and **aarch64** Linux phones
