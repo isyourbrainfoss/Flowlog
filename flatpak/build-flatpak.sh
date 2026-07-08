@@ -69,7 +69,8 @@ flatpak-builder \
 
 BUNDLE_OUT="$FLATPAK_DIR/com.flowlog.flowlog-${FLATPAK_ARCH}.flatpak"
 flatpak build-bundle "$REPO_DIR" "$BUNDLE_OUT" com.flowlog.flowlog \
-  --arch="$FLATPAK_ARCH"
+  --arch="$FLATPAK_ARCH" \
+  --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
 
 echo "==> Built:"
 echo "    Repo:   $REPO_DIR"

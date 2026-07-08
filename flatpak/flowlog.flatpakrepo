@@ -1,11 +1,8 @@
 [Flatpak Repo]
-Version=0
-Url=https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/
-Homepage=https://github.com/isyourbrainfoss/Flowlog
 Title=Flowlog
-Description=Personal coffee intelligence hub
-IsRuntime=false
-
-[Application com.flowlog.flowlog]
-arch=aarch64;x86_64
-branch=stable
+Url=https://isyourbrainfoss.github.io/Flowlog/
+Homepage=https://github.com/isyourbrainfoss/Flowlog
+Comment=Community Flatpak builds of Flowlog
+Description=Personal coffee intelligence hub — live shot curves, history, and sensor tooling
+Icon=https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/main/flatpak/com.flowlog.flowlog.png
+RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo

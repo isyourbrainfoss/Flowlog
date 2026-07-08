@@ -105,7 +105,7 @@ One-time setup:
 
 ```bash
 flatpak remote-add --if-not-exists --user flowlog \
-  https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/flowlog.flatpakrepo
+  https://isyourbrainfoss.github.io/Flowlog/flowlog.flatpakrepo
 flatpak install --user flowlog com.flowlog.flowlog
 ```
 
@@ -137,8 +137,9 @@ flatpak install --user --bundle com.flowlog.flowlog-aarch64.flatpak
 ./flatpak/build-flatpak.sh x86_64   # or aarch64
 ```
 
-> **Note:** GitHub Pages must be enabled for the repository (Settings → Pages →
-> "GitHub Actions" source) so the Flatpak remote URL stays online.
+> **Note:** GitHub Pages must be enabled once (Settings → Pages → deploy from the
+> `gh-pages` branch, `/` root) so `isyourbrainfoss.github.io/Flowlog/` serves the
+> Flatpak OSTree repo. Until then, use a [release bundle](#install-from-a-release-bundle-offline) below.
 
 ## Development
 
