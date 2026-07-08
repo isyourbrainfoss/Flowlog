@@ -85,6 +85,7 @@ jobs:
           FLUTTER_ROOT="${RUNNER_TOOL_CACHE}/flutter"
           git clone https://github.com/flutter/flutter.git -b stable --depth 1 "$FLUTTER_ROOT"
           echo "${FLUTTER_ROOT}/bin" >> "$GITHUB_PATH"
+          export PATH="${FLUTTER_ROOT}/bin:$PATH"
           flutter config --no-analytics
           flutter precache --linux
           flutter --version
