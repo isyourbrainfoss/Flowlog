@@ -25,9 +25,11 @@ modules:
   - name: flowlog
     buildsystem: simple
     build-commands:
+      # Flutter resolves libapp.so and flutter_assets relative to the binary
+      # (see fl_dart_project.cc: $executable_dir/lib and $executable_dir/data).
       - install -Dm755 bundle/flowlog /app/bin/flowlog
-      - cp -ra bundle/data /app/
-      - cp -ra bundle/lib /app/
+      - cp -ra bundle/lib /app/bin/
+      - cp -ra bundle/data /app/bin/
       - install -Dm644 com.flowlog.flowlog.png /app/share/icons/hicolor/128x128/apps/com.flowlog.flowlog.png
       - install -Dm644 com.flowlog.flowlog.png /app/share/icons/hicolor/64x64/apps/com.flowlog.flowlog.png
       - install -Dm644 com.flowlog.flowlog.desktop /app/share/applications/com.flowlog.flowlog.desktop
