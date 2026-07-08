@@ -72,6 +72,35 @@ void main() {
     });
   });
 
+  group('simulator timeline helpers', () {
+    test('simulatorKeyframeTimesForDuration scales with timeline', () {
+      final times = simulatorKeyframeTimesForDuration(60000);
+
+      expect(times.first, 0);
+      expect(times.last, closeTo(55800, 1000));
+      expect(times, hasLength(5));
+    });
+
+    test('suggestSimulatorTimelineDuration picks next preset', () {
+      expect(suggestSimulatorTimelineDuration(28000), 30000);
+      expect(suggestSimulatorTimelineDuration(31000), 45000);
+      expect(suggestSimulatorTimelineDuration(130000), 135000);
+    });
+
+    test('clampKeyframesToTimeline keeps points inside duration', () {
+      const keyframes = [
+        PressureKeyframe(elapsedMs: 0, pressureBar: 0),
+        PressureKeyframe(elapsedMs: 50000, pressureBar: 6),
+        PressureKeyframe(elapsedMs: 90000, pressureBar: 9),
+      ];
+
+      final clamped = clampKeyframesToTimeline(keyframes, 60000);
+
+      expect(clamped.first.elapsedMs, 0);
+      expect(clamped.last.elapsedMs, lessThanOrEqualTo(60000));
+    });
+  });
+
   group('profileFromKeyframes', () {
     test('expands keyframes into a saved profile', () {
       const keyframes = [
@@ -195,7 +224,7 @@ void main() {
             body: Center(
               child: SizedBox(
                 width: 400,
-                height: 280,
+                height: 400,
                 child: _ProfileEditorHarness(
                   initialKeyframes: const [
                     PressureKeyframe(elapsedMs: 0, pressureBar: 0),
@@ -218,10 +247,10 @@ void main() {
 
       final editorRect =
           tester.getRect(find.byKey(const Key('simulator_profile_editor')));
-      const leftPad = 40.0;
+      const leftPad = 48.0;
       const rightPad = 16.0;
       const topPad = 12.0;
-      const bottomPad = 24.0;
+      const bottomPad = 28.0;
       final plotWidth = editorRect.width - leftPad - rightPad;
       final plotHeight = editorRect.height - topPad - bottomPad;
 
@@ -236,6 +265,7 @@ void main() {
 
       expect(find.byKey(const Key('simulator_remove_point')), findsOneWidget);
 
+      await tester.ensureVisible(find.byKey(const Key('simulator_remove_point')));
       await tester.tap(find.byKey(const Key('simulator_remove_point')));
       await tester.pumpAndSettle();
 
@@ -278,10 +308,10 @@ void main() {
 
       final editorRect =
           tester.getRect(find.byKey(const Key('simulator_profile_editor')));
-      const leftPad = 40.0;
+      const leftPad = 48.0;
       const rightPad = 16.0;
       const topPad = 12.0;
-      const bottomPad = 24.0;
+      const bottomPad = 28.0;
       final plotWidth = editorRect.width - leftPad - rightPad;
       final plotHeight = editorRect.height - topPad - bottomPad;
 
@@ -331,6 +361,90 @@ void main() {
 
       expect(find.text(shot.id), findsOneWidget);
       expect(find.byKey(const Key('simulator_profile_editor')), findsOneWidget);
+    });
+
+    testWidgets('timeline duration dropdown changes editor window', (
+      tester,
+    ) async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      await profileRepository.insertProfile(
+        SavedProfile.fromShot(
+          shot,
+          id: 'demo-profile',
+          name: 'Starter profile',
+          createdAt: DateTime.utc(2026, 6, 29),
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SimulatorScreen(profileRepository: profileRepository),
+        ),
+      );
+      await settleSimulator(tester);
+
+      await tester.tap(find.byKey(const Key('simulator_timeline_duration')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('1:30').last);
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('selected keyframe accepts exact pressure value', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 400,
+                height: 400,
+                child: _ProfileEditorHarness(
+                  initialKeyframes: const [
+                    PressureKeyframe(elapsedMs: 0, pressureBar: 0),
+                    PressureKeyframe(elapsedMs: 6000, pressureBar: 4),
+                    PressureKeyframe(elapsedMs: 12000, pressureBar: 6),
+                    PressureKeyframe(elapsedMs: 18000, pressureBar: 8),
+                    PressureKeyframe(elapsedMs: 28000, pressureBar: 9),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final harness =
+          tester.state<_ProfileEditorHarnessState>(find.byType(_ProfileEditorHarness));
+      final editorRect =
+          tester.getRect(find.byKey(const Key('simulator_profile_editor')));
+      const leftPad = 48.0;
+      const rightPad = 16.0;
+      const topPad = 12.0;
+      const bottomPad = 28.0;
+      final plotWidth = editorRect.width - leftPad - rightPad;
+      final plotHeight = editorRect.height - topPad - bottomPad;
+
+      final lastPoint = Offset(
+        editorRect.left + leftPad + plotWidth,
+        editorRect.top + topPad + plotHeight - (9 / 12) * plotHeight,
+      );
+
+      final gesture = await tester.startGesture(lastPoint);
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('simulator_keyframe_pressure')),
+        '11.5',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(harness.keyframes.last.pressureBar, closeTo(11.5, 0.01));
     });
 
     testWidgets('export profile persists keyframes to repository', (

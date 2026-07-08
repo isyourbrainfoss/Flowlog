@@ -13,14 +13,88 @@ import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Default elapsed times for editable pressure keyframes (ms).
-const List<int> defaultSimulatorKeyframeTimes = [
-  0,
-  6000,
-  12000,
-  18000,
-  28000,
+/// Default simulator timeline length.
+const int kSimulatorDefaultDurationMs = 30000;
+
+/// Preset timeline lengths for the pressure profile editor.
+const List<int> kSimulatorDurationPresetsMs = [
+  30000,
+  45000,
+  60000,
+  90000,
+  120000,
 ];
+
+/// Minimum spacing between editable keyframes (ms).
+const int kSimulatorMinKeyframeSpacingMs = 1500;
+
+/// Suggests a timeline duration that fits [contentMs] (last keyframe or shot end).
+int suggestSimulatorTimelineDuration(int contentMs) {
+  if (contentMs <= 0) {
+    return kSimulatorDefaultDurationMs;
+  }
+
+  for (final preset in kSimulatorDurationPresetsMs) {
+    if (contentMs <= preset) {
+      return preset;
+    }
+  }
+
+  final rounded = ((contentMs + 14999) ~/ 15000) * 15000;
+  return rounded.clamp(
+    kSimulatorDurationPresetsMs.last,
+    180000,
+  );
+}
+
+/// Default keyframe times spread across [durationMs].
+List<int> simulatorKeyframeTimesForDuration(int durationMs) {
+  final end = durationMs.clamp(1000, 600000);
+  return [
+    0,
+    (end * 0.2).round(),
+    (end * 0.4).round(),
+    (end * 0.6).round(),
+    (end * 0.93).round().clamp(0, end),
+  ];
+}
+
+/// Keeps keyframes inside [durationMs] while preserving minimum spacing.
+List<PressureKeyframe> clampKeyframesToTimeline(
+  List<PressureKeyframe> keyframes,
+  int durationMs,
+) {
+  if (keyframes.isEmpty) {
+    return keyframes;
+  }
+
+  final sorted = List<PressureKeyframe>.from(keyframes)
+    ..sort((a, b) => a.elapsedMs.compareTo(b.elapsedMs));
+  final result = <PressureKeyframe>[];
+
+  for (var i = 0; i < sorted.length; i++) {
+    var elapsedMs = sorted[i].elapsedMs.clamp(0, durationMs);
+    if (i == 0) {
+      elapsedMs = 0;
+    } else if (elapsedMs < result.last.elapsedMs + kSimulatorMinKeyframeSpacingMs) {
+      elapsedMs = (result.last.elapsedMs + kSimulatorMinKeyframeSpacingMs)
+          .clamp(0, durationMs);
+    }
+    result.add(sorted[i].copyWith(elapsedMs: elapsedMs));
+  }
+
+  return result;
+}
+
+String formatSimulatorDurationLabel(int durationMs) {
+  final totalSeconds = (durationMs / 1000).round();
+  final minutes = totalSeconds ~/ 60;
+  final seconds = totalSeconds % 60;
+  if (minutes == 0) {
+    return '${seconds}s';
+  }
+  return '$minutes:${seconds.toString().padLeft(2, '0')}';
+}
 
 /// One editable pressure point on the what-if profile.
 @immutable
@@ -153,10 +227,12 @@ double? pressureAtElapsedMs(int elapsedMs, List<ShotSample> samples) {
 /// Builds editable keyframes from a saved profile or shot samples.
 List<PressureKeyframe> keyframesFromPressureSamples(
   List<ShotSample> samples, {
-  List<int> keyframeTimes = defaultSimulatorKeyframeTimes,
+  int durationMs = kSimulatorDefaultDurationMs,
+  List<int>? keyframeTimes,
 }) {
+  final times = keyframeTimes ?? simulatorKeyframeTimesForDuration(durationMs);
   return [
-    for (final elapsedMs in keyframeTimes)
+    for (final elapsedMs in times)
       PressureKeyframe(
         elapsedMs: elapsedMs,
         pressureBar: (pressureAtElapsedMs(elapsedMs, samples) ?? 0)
@@ -260,7 +336,7 @@ class PressureProfileEditor extends StatefulWidget {
 
 class _PressureProfileEditorState extends State<PressureProfileEditor> {
   static const _handleHitRadius = 36.0;
-  static const _minKeyframeSpacingMs = 1500;
+  static const _minKeyframeSpacingMs = kSimulatorMinKeyframeSpacingMs;
   static const _longPressDuration = Duration(milliseconds: 450);
   static const _axisLockThreshold = 8.0;
   static const _dragStartThreshold = 10.0;
@@ -287,6 +363,39 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
     updated[index] = updated[index].copyWith(
       pressureBar: pressureBar.clamp(0, widget.pressureMax).toDouble(),
     );
+    widget.onKeyframesChanged(updated);
+  }
+
+  void _updateKeyframeExact(int index, {int? elapsedMs, double? pressureBar}) {
+    final keyframes = widget.keyframes;
+    if (index < 0 || index >= keyframes.length) {
+      return;
+    }
+
+    var next = keyframes[index];
+    if (pressureBar != null) {
+      next = next.copyWith(
+        pressureBar: pressureBar.clamp(0, widget.pressureMax).toDouble(),
+      );
+    }
+
+    if (elapsedMs != null) {
+      if (index == 0) {
+        next = next.copyWith(elapsedMs: 0);
+      } else if (index == keyframes.length - 1) {
+        next = next.copyWith(
+          elapsedMs: elapsedMs.clamp(0, widget.durationMs),
+        );
+      } else {
+        final minMs = keyframes[index - 1].elapsedMs + _minKeyframeSpacingMs;
+        final maxMs = keyframes[index + 1].elapsedMs - _minKeyframeSpacingMs;
+        next = next.copyWith(elapsedMs: elapsedMs.clamp(minMs, maxMs));
+      }
+    }
+
+    final updated = List<PressureKeyframe>.from(keyframes);
+    updated[index] = next;
+    updated.sort((a, b) => a.elapsedMs.compareTo(b.elapsedMs));
     widget.onKeyframesChanged(updated);
   }
 
@@ -482,22 +591,14 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
     super.dispose();
   }
 
-  String _formatSelectedKeyframeLabel() {
-    final index = _selectedIndex;
-    if (index == null || index >= widget.keyframes.length) {
-      return '';
-    }
-
-    final keyframe = widget.keyframes[index];
-    final seconds = (keyframe.elapsedMs / 1000).round();
-    return '${seconds}s · ${keyframe.pressureBar.toStringAsFixed(1)} bar';
-  }
-
   @override
   Widget build(BuildContext context) {
     final selectedIndex = _selectedIndex;
     final canRemoveSelected =
         selectedIndex != null && _canDeleteKeyframe(selectedIndex);
+    final surfaceStyle = ChartSurfaceStyle.fromColorScheme(
+      Theme.of(context).colorScheme,
+    );
 
     return Semantics(
       label: 'Target pressure profile editor',
@@ -524,6 +625,7 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
                       keyframes: widget.keyframes,
                       durationMs: widget.durationMs,
                       pressureMax: widget.pressureMax,
+                      surfaceStyle: surfaceStyle,
                       activeIndex: _activeIndex,
                       selectedIndex: _selectedIndex,
                     ),
@@ -534,26 +636,179 @@ class _PressureProfileEditorState extends State<PressureProfileEditor> {
           ),
           if (selectedIndex != null) ...[
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Selected: ${_formatSelectedKeyframeLabel()}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-                if (canRemoveSelected)
-                  TextButton.icon(
-                    key: const Key('simulator_remove_point'),
-                    onPressed: () => _deleteKeyframe(selectedIndex),
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('Remove point'),
-                  ),
-              ],
+            _SelectedKeyframeEditor(
+              key: ValueKey('simulator_keyframe_editor_$selectedIndex'),
+              keyframe: widget.keyframes[selectedIndex],
+              index: selectedIndex,
+              durationMs: widget.durationMs,
+              pressureMax: widget.pressureMax,
+              isFirst: selectedIndex == 0,
+              isLast: selectedIndex == widget.keyframes.length - 1,
+              canRemove: canRemoveSelected,
+              onChanged: (elapsedMs, pressureBar) => _updateKeyframeExact(
+                selectedIndex,
+                elapsedMs: elapsedMs,
+                pressureBar: pressureBar,
+              ),
+              onRemove: () => _deleteKeyframe(selectedIndex),
             ),
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Exact time/pressure fields for the selected profile keyframe.
+class _SelectedKeyframeEditor extends StatefulWidget {
+  const _SelectedKeyframeEditor({
+    required this.keyframe,
+    required this.index,
+    required this.durationMs,
+    required this.pressureMax,
+    required this.isFirst,
+    required this.isLast,
+    required this.canRemove,
+    required this.onChanged,
+    required this.onRemove,
+    super.key,
+  });
+
+  final PressureKeyframe keyframe;
+  final int index;
+  final int durationMs;
+  final double pressureMax;
+  final bool isFirst;
+  final bool isLast;
+  final bool canRemove;
+  final void Function(int? elapsedMs, double? pressureBar) onChanged;
+  final VoidCallback onRemove;
+
+  @override
+  State<_SelectedKeyframeEditor> createState() => _SelectedKeyframeEditorState();
+}
+
+class _SelectedKeyframeEditorState extends State<_SelectedKeyframeEditor> {
+  late final TextEditingController _timeController;
+  late final TextEditingController _pressureController;
+
+  @override
+  void initState() {
+    super.initState();
+    _timeController = TextEditingController(text: _formatTime(widget.keyframe));
+    _pressureController =
+        TextEditingController(text: _formatPressure(widget.keyframe));
+  }
+
+  @override
+  void didUpdateWidget(covariant _SelectedKeyframeEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.keyframe != widget.keyframe) {
+      _timeController.text = _formatTime(widget.keyframe);
+      _pressureController.text = _formatPressure(widget.keyframe);
+    }
+  }
+
+  @override
+  void dispose() {
+    _timeController.dispose();
+    _pressureController.dispose();
+    super.dispose();
+  }
+
+  String _formatTime(PressureKeyframe keyframe) {
+    return (keyframe.elapsedMs / 1000).toStringAsFixed(1);
+  }
+
+  String _formatPressure(PressureKeyframe keyframe) {
+    return keyframe.pressureBar.toStringAsFixed(1);
+  }
+
+  void _applyTime() {
+    if (widget.isFirst) {
+      return;
+    }
+    final seconds = double.tryParse(_timeController.text.trim());
+    if (seconds == null) {
+      return;
+    }
+    widget.onChanged((seconds * 1000).round(), null);
+  }
+
+  void _applyPressure() {
+    final pressure = double.tryParse(_pressureController.text.trim());
+    if (pressure == null) {
+      return;
+    }
+    widget.onChanged(null, pressure);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                key: const Key('simulator_keyframe_time'),
+                controller: _timeController,
+                readOnly: widget.isFirst,
+                decoration: const InputDecoration(
+                  labelText: 'Time (s)',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                onSubmitted: (_) => _applyTime(),
+                onEditingComplete: _applyTime,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                key: const Key('simulator_keyframe_pressure'),
+                controller: _pressureController,
+                decoration: InputDecoration(
+                  labelText: 'Pressure (bar)',
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                  helperText: '0–${widget.pressureMax.toStringAsFixed(0)}',
+                ),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                onSubmitted: (_) => _applyPressure(),
+                onEditingComplete: _applyPressure,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                widget.isFirst
+                    ? 'Start point is fixed at 0 s'
+                    : widget.isLast
+                        ? 'End point can move up to '
+                            '${formatSimulatorDurationLabel(widget.durationMs)}'
+                        : 'Drag horizontally to move in time, vertically for pressure',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            if (widget.canRemove)
+              TextButton.icon(
+                key: const Key('simulator_remove_point'),
+                onPressed: widget.onRemove,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Remove point'),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -563,6 +818,7 @@ class _PressureProfileEditorPainter extends CustomPainter {
     required this.keyframes,
     required this.durationMs,
     required this.pressureMax,
+    required this.surfaceStyle,
     this.activeIndex,
     this.selectedIndex,
   });
@@ -570,13 +826,14 @@ class _PressureProfileEditorPainter extends CustomPainter {
   final List<PressureKeyframe> keyframes;
   final int durationMs;
   final double pressureMax;
+  final ChartSurfaceStyle surfaceStyle;
   final int? activeIndex;
   final int? selectedIndex;
 
-  static const leftPad = 40.0;
+  static const leftPad = 48.0;
   static const rightPad = 16.0;
   static const topPad = 12.0;
-  static const bottomPad = 24.0;
+  static const bottomPad = 28.0;
 
   static Rect plotRect(Size size) {
     return Rect.fromLTWH(
@@ -608,7 +865,7 @@ class _PressureProfileEditorPainter extends CustomPainter {
 
     canvas.drawRect(
       Offset.zero & size,
-      Paint()..color = FlowlogChartColors.background,
+      Paint()..color = surfaceStyle.background,
     );
 
     _drawGrid(canvas, plot);
@@ -619,7 +876,7 @@ class _PressureProfileEditorPainter extends CustomPainter {
 
   void _drawGrid(Canvas canvas, Rect plot) {
     final gridPaint = Paint()
-      ..color = FlowlogChartColors.grid.withValues(alpha: 0.25)
+      ..color = surfaceStyle.grid.withValues(alpha: 0.25)
       ..strokeWidth = 1;
 
     for (var i = 0; i <= 4; i++) {
@@ -634,17 +891,44 @@ class _PressureProfileEditorPainter extends CustomPainter {
   }
 
   void _drawAxes(Canvas canvas, Rect plot) {
-    const textStyle = TextStyle(
-      color: FlowlogChartColors.axisLabel,
+    final textStyle = TextStyle(
+      color: surfaceStyle.axisLabel,
       fontSize: 10,
     );
-    _paintText(canvas, 'bar', const Offset(4, topPad), textStyle);
-    _paintText(
-      canvas,
-      _formatDuration(durationMs),
-      Offset(plot.right - 28, plot.bottom + 6),
-      textStyle,
-    );
+
+    for (var i = 0; i <= 4; i++) {
+      final pressure = pressureMax * (4 - i) / 4;
+      final y = plot.top + (plot.height / 4) * i;
+      _paintText(
+        canvas,
+        pressure == pressure.roundToDouble()
+            ? '${pressure.toInt()}'
+            : pressure.toStringAsFixed(1),
+        Offset(4, y - 6),
+        textStyle,
+      );
+    }
+
+    for (var i = 0; i <= 5; i++) {
+      final elapsedMs = (durationMs * i / 5).round();
+      final x = plot.left + (plot.width / 5) * i;
+      _paintText(
+        canvas,
+        _formatAxisTime(elapsedMs),
+        Offset(x - 8, plot.bottom + 4),
+        textStyle,
+      );
+    }
+
+    _paintText(canvas, 'bar', Offset(4, topPad - 2), textStyle);
+  }
+
+  String _formatAxisTime(int elapsedMs) {
+    final seconds = elapsedMs / 1000;
+    if (seconds == seconds.roundToDouble()) {
+      return '${seconds.toInt()}s';
+    }
+    return '${seconds.toStringAsFixed(1)}s';
   }
 
   void _drawProfile(Canvas canvas, Rect plot, Size size) {
@@ -674,7 +958,7 @@ class _PressureProfileEditorPainter extends CustomPainter {
     }
 
     final linePaint = Paint()
-      ..color = FlowlogChartColors.targetPressureLine
+      ..color = surfaceStyle.targetPressureLine
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.round;
@@ -696,10 +980,10 @@ class _PressureProfileEditorPainter extends CustomPainter {
         ..color = isActive
             ? FlowlogChartColors.pressureHigh
             : isSelected
-                ? FlowlogChartColors.targetPressureLine
+                ? surfaceStyle.targetPressureLine
                 : FlowlogChartColors.pressureLine;
       final strokePaint = Paint()
-        ..color = FlowlogChartColors.axisLabel
+        ..color = surfaceStyle.axisLabel
         ..style = PaintingStyle.stroke
         ..strokeWidth = isSelected ? 2.5 : 2;
 
@@ -710,7 +994,7 @@ class _PressureProfileEditorPainter extends CustomPainter {
           point,
           radius + 4,
           Paint()
-            ..color = FlowlogChartColors.targetPressureLine.withValues(alpha: 0.35)
+            ..color = surfaceStyle.targetPressureLine.withValues(alpha: 0.35)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
         );
@@ -731,21 +1015,12 @@ class _PressureProfileEditorPainter extends CustomPainter {
     painter.paint(canvas, offset);
   }
 
-  String _formatDuration(int elapsedMs) {
-    final seconds = (elapsedMs / 1000).round();
-    final minutes = seconds ~/ 60;
-    final remainingSeconds = seconds % 60;
-    if (minutes == 0) {
-      return '${remainingSeconds}s';
-    }
-    return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
-  }
-
   @override
   bool shouldRepaint(covariant _PressureProfileEditorPainter oldDelegate) {
     return oldDelegate.keyframes != keyframes ||
         oldDelegate.durationMs != durationMs ||
         oldDelegate.pressureMax != pressureMax ||
+        oldDelegate.surfaceStyle != surfaceStyle ||
         oldDelegate.activeIndex != activeIndex ||
         oldDelegate.selectedIndex != selectedIndex;
   }
@@ -793,6 +1068,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   late Future<_SimulatorState> _stateFuture;
 
   List<PressureKeyframe> _keyframes = const [];
+  int _timelineDurationMs = kSimulatorDefaultDurationMs;
   SavedProfile? _profile;
   bool _initialized = false;
   bool _profileEditorActive = false;
@@ -845,8 +1121,19 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     final profile = profiles.isNotEmpty
         ? profiles.first
         : await _demoProfileFromFixture();
-    final keyframes = keyframesFromPressureSamples(profile.pressureSamples);
-    return _SimulatorState(profile: profile, keyframes: keyframes);
+    final contentMs = profile.pressureSamples.isEmpty
+        ? kSimulatorDefaultDurationMs
+        : profile.pressureSamples.last.elapsedMs;
+    final timelineDurationMs = suggestSimulatorTimelineDuration(contentMs);
+    final keyframes = keyframesFromPressureSamples(
+      profile.pressureSamples,
+      durationMs: timelineDurationMs,
+    );
+    return _SimulatorState(
+      profile: profile,
+      keyframes: keyframes,
+      timelineDurationMs: timelineDurationMs,
+    );
   }
 
   Future<void> _refresh() async {
@@ -863,11 +1150,38 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     }
     _profile = state.profile;
     _keyframes = state.keyframes;
+    _timelineDurationMs = state.timelineDurationMs;
     _initialized = true;
   }
 
   void _onKeyframesChanged(List<PressureKeyframe> keyframes) {
     setState(() => _keyframes = keyframes);
+  }
+
+  void _setTimelineDuration(int durationMs) {
+    setState(() {
+      _timelineDurationMs = durationMs;
+      _keyframes = clampKeyframesToTimeline(_keyframes, durationMs);
+    });
+  }
+
+  Future<void> _onTimelineDurationSelected(int? durationMs) async {
+    if (durationMs == null) {
+      return;
+    }
+
+    if (durationMs < 0) {
+      final custom = await promptSimulatorDurationMs(
+        context,
+        initialMs: _timelineDurationMs,
+      );
+      if (custom != null && mounted) {
+        _setTimelineDuration(custom);
+      }
+      return;
+    }
+
+    _setTimelineDuration(durationMs);
   }
 
   Future<void> _onImportShotPressed() async {
@@ -881,13 +1195,23 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       return;
     }
 
+    final contentMs = math.max(
+      BrewSummary.fromShot(shot).durationMs,
+      shot.samples.isEmpty ? 0 : shot.samples.last.elapsedMs,
+    );
+    final timelineDurationMs = suggestSimulatorTimelineDuration(contentMs);
+
     setState(() {
       _profile = SavedProfile.fromShot(
         shot,
         id: _profile?.id ?? 'simulator-draft',
         name: shot.id,
       );
-      _keyframes = keyframesFromPressureSamples(shot.samples);
+      _timelineDurationMs = timelineDurationMs;
+      _keyframes = keyframesFromPressureSamples(
+        shot.samples,
+        durationMs: timelineDurationMs,
+      );
     });
   }
 
@@ -1026,9 +1350,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         final pressureProfile = expandKeyframesToProfile(_keyframes);
         final predictedSamples = buildPredictedFlowSamples(pressureProfile);
         final summary = summarizePredictedFlow(predictedSamples);
-        final durationMs = _keyframes.isEmpty
-            ? 30000
-            : _keyframes.map((k) => k.elapsedMs).reduce(math.max);
+        final durationMs = _timelineDurationMs;
 
         return Scaffold(
           body: RefreshIndicator(
@@ -1089,14 +1411,43 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Text(
-                'Target pressure',
-                style: Theme.of(context).textTheme.titleSmall,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Target pressure',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ),
+                  DropdownButton<int>(
+                    key: const Key('simulator_timeline_duration'),
+                    value: kSimulatorDurationPresetsMs.contains(durationMs)
+                        ? durationMs
+                        : -1,
+                    items: [
+                      for (final preset in kSimulatorDurationPresetsMs)
+                        DropdownMenuItem(
+                          value: preset,
+                          child: Text(
+                            formatSimulatorDurationLabel(preset),
+                          ),
+                        ),
+                      DropdownMenuItem(
+                        value: -1,
+                        child: Text(
+                          'Custom (${formatSimulatorDurationLabel(durationMs)})',
+                        ),
+                      ),
+                    ],
+                    onChanged: _onTimelineDurationSelected,
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               PressureProfileEditor(
                 keyframes: _keyframes,
                 durationMs: durationMs,
+                height: 220,
                 onKeyframesChanged: _onKeyframesChanged,
                 onGestureActiveChanged: (active) {
                   setState(() => _profileEditorActive = active);
@@ -1205,10 +1556,12 @@ class _SimulatorState {
   const _SimulatorState({
     required this.profile,
     required this.keyframes,
+    required this.timelineDurationMs,
   });
 
   final SavedProfile profile;
   final List<PressureKeyframe> keyframes;
+  final int timelineDurationMs;
 }
 
 Future<SavedProfile> _demoProfileFromFixture() async {
@@ -1318,6 +1671,83 @@ class _SimulatorProfileNameDialogState extends State<_SimulatorProfileNameDialog
           key: const Key('simulator_profile_name_save'),
           onPressed: _submit,
           child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Prompts for a custom timeline length in seconds.
+Future<int?> promptSimulatorDurationMs(
+  BuildContext context, {
+  required int initialMs,
+}) {
+  return showDialog<int>(
+    context: context,
+    builder: (dialogContext) => _SimulatorDurationDialog(initialMs: initialMs),
+  );
+}
+
+class _SimulatorDurationDialog extends StatefulWidget {
+  const _SimulatorDurationDialog({required this.initialMs});
+
+  final int initialMs;
+
+  @override
+  State<_SimulatorDurationDialog> createState() => _SimulatorDurationDialogState();
+}
+
+class _SimulatorDurationDialogState extends State<_SimulatorDurationDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: (widget.initialMs / 1000).toStringAsFixed(0),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final seconds = int.tryParse(_controller.text.trim());
+    if (seconds == null) {
+      return;
+    }
+    final ms = (seconds * 1000).clamp(5000, 180000);
+    Navigator.of(context).pop(ms);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      key: const Key('simulator_duration_dialog'),
+      title: const Text('Timeline length'),
+      content: TextField(
+        key: const Key('simulator_duration_field'),
+        controller: _controller,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(
+          labelText: 'Duration (seconds)',
+          helperText: 'Between 5 s and 180 s',
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('simulator_duration_save'),
+          onPressed: _submit,
+          child: const Text('Apply'),
         ),
       ],
     );
