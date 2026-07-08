@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: android-pages
+  cancel-in-progress: false
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -37,8 +41,20 @@ jobs:
         working-directory: app/flowlog
         run: flutter build apk --release --split-per-abi --target-platform android-arm64 --build-number=${{ github.run_number }}
 
-      - name: Prepare release asset
-        run: cp app/flowlog/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk flowlog-release.apk
+      - name: Prepare release assets
+        run: |
+          APK=app/flowlog/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          BUILD=build-${{ github.run_number }}
+          cp "$APK" flowlog-release.apk
+          cp "$APK" flowlog-arm64-v8a.apk
+          echo "VERSION=$BUILD" >> "$GITHUB_ENV"
+          ls -lh flowlog-*.apk
+
+      - name: Read version code from APK
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq aapt >/dev/null
+          VC=$(aapt dump badging flowlog-arm64-v8a.apk | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
+          echo "VERSION_CODE=$VC" >> "$GITHUB_ENV"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -48,11 +64,27 @@ jobs:
           body: |
             Automated Android build for commit ${{ github.sha }}.
 
-            **Obtainium:** add `https://github.com/${{ github.repository }}` as a GitHub source.
-            APK filter: `flowlog-release.apk`
+            **Obtainium (recommended):** Direct APK Link → Standard JSON:
+            ```
+            https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/version.json
+            ```
 
             **Linux Flatpak:** see the [README Linux section](https://github.com/${{ github.repository }}#linux-flatpak)
             or wait for the Flatpak workflow to attach `.flatpak` bundles to this release.
-          files: flowlog-release.apk
+          files: |
+            flowlog-release.apk
+            flowlog-arm64-v8a.apk
           draft: false
           prerelease: false
+
+      - name: Prepare Obtainium mirror (GitHub Pages branch)
+        run: bash tool/prepare_pages_site.sh flowlog-arm64-v8a.apk "$VERSION" "$VERSION_CODE" site
+
+      - name: Deploy APK mirror to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: site
+          publish_branch: gh-pages
+          force_orphan: true
+          enable_jekyll: false

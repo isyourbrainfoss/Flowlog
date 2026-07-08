@@ -41,56 +41,56 @@ Wireless ADB works too, but USB is simpler for first-time setup and is more reli
 
 ### Obtainium (best for installing latest builds)
 
-This repo publishes a release APK on every push to `main`. Install and update with [Obtainium](https://github.com/ImranR98/Obtainium):
+[Obtainium](https://github.com/ImranR98/Obtainium) installs APKs directly from a release source and
+can notify you when updates are available. A new arm64 APK is published on every push to `main`.
 
-1. Install Obtainium on your phone.
-2. Add app → **GitHub**.
-3. Source URL: `https://github.com/isyourbrainfoss/Flowlog`
-4. Release filter: latest release (default).
-5. APK filter / regex: `flowlog-release\.apk`
-6. Save and install.
+#### Recommended: Standard JSON (stable mirror)
 
-Obtainium will notify you when a new GitHub Release is published.
+GitHub Release asset URLs (`release-assets.githubusercontent.com`) often fail on phones with
+*Connection closed while receiving data*. Use the `gh-pages` mirror instead (same approach as
+[gator-flutter](https://github.com/isyourbrainfoss/gator-flutter)).
 
-> **Note:** If you previously installed Flowlog via USB (`flutter run`), uninstall it first —
-> debug builds are signed with a different key than the GitHub release APKs. A leftover install
-> shows as **Conflict** in Obtainium. Release APKs from CI share one consistent upload key so
-> Obtainium updates work across builds.
->
-> **Download errors:** CI ships an arm64-only APK (~22 MB) for faster, more reliable installs on
-> modern phones. If Obtainium reports `Connection closed while receiving data`, retry on Wi‑Fi or
-> download `flowlog-release.apk` from [Releases](https://github.com/isyourbrainfoss/Flowlog/releases)
-> in your browser and install manually.
+1. Install Obtainium from F-Droid, IzzyOnDroid, or its [GitHub releases](https://github.com/ImranR98/Obtainium/releases).
+2. **Add app** → source type **Direct APK Link** (Obtainium auto-detects JSON).
+3. Paste this URL:
 
-#### Install blocked / can't find old USB build
+   ```
+   https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/version.json
+   ```
 
-USB debug installs use a **different signing key** than GitHub release APKs. Android will reject
-the release APK while the old package is still registered — even if the app icon is gone.
+4. Tap **Get updates** / install.
 
-1. **Find the hidden app:** Settings → Apps → **All apps** → search **`flowlog`** (all lowercase,
-   not “Flowlog”). Also check a **work profile** tab if you use one.
-2. **Use Build 23+** only ([latest release](https://github.com/isyourbrainfoss/Flowlog/releases/latest)).
-   Older builds used rotating signatures.
-3. **Clear bad downloads:** In Obtainium, remove Flowlog and re-add; or delete any partial
-   `flowlog-release.apk` from Downloads and fetch again on Wi‑Fi.
-4. **Force-remove via USB** (most reliable). With the phone on USB debugging:
+`version.json` includes `versionCode`, `sha256sum`, and the APK URL. CI refreshes it on each build.
 
-```bash
-./tool/android_install.sh
+**One-tap add (Obtainium installed):**
+
+```
+https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/version.json
 ```
 
-Or manually:
+#### Troubleshooting Obtainium
 
-```bash
-adb shell pm list packages | rg flowlog
-adb uninstall com.flowlog.flowlog
-curl -fL -o /tmp/flowlog.apk \
-  https://github.com/isyourbrainfoss/Flowlog/releases/download/build-23/flowlog-release.apk
-adb install /tmp/flowlog.apk
+| Symptom | Fix |
+|---------|-----|
+| **“App not installed” / “Conflict” / signature error** | A USB debug build or pre-build-22 release may still be registered. **Uninstall** `flowlog` (Settings → Apps → All apps → search lowercase `flowlog`), or use `./tool/android_install.sh` over USB. Then install fresh from `version.json` above. |
+| **“Connection closed while receiving data”** | Do not use GitHub Release download URLs on mobile. Remove the app in Obtainium and re-add using `version.json`, not `github.com/.../releases/download/...`. |
+| **Still on an old Obtainium entry** | Remove Flowlog in Obtainium, re-add with the `version.json` URL. |
+
+#### Alternative: Direct APK Link
+
+If JSON does not work in your Obtainium version:
+
+```
+https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/flowlog-arm64-v8a.apk
 ```
 
-If `adb install` still fails, paste the exact error line — it distinguishes signature conflict
-(`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) from a corrupted download.
+#### Alternative: GitHub Releases
+
+```
+https://github.com/isyourbrainfoss/Flowlog
+```
+
+APK filter: `flowlog-arm64-v8a\.apk` or `flowlog-release\.apk`
 
 ## Linux (Flatpak)
 

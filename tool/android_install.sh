@@ -3,7 +3,7 @@
 set -euo pipefail
 
 PACKAGE=com.flowlog.flowlog
-RELEASE_URL="${FLOWLOG_APK_URL:-https://github.com/isyourbrainfoss/Flowlog/releases/download/build-23/flowlog-release.apk}"
+RELEASE_URL="${FLOWLOG_APK_URL:-https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/flowlog-arm64-v8a.apk}"
 APK_PATH="${FLOWLOG_APK_PATH:-/tmp/flowlog-release.apk}"
 
 if ! command -v adb >/dev/null 2>&1; then
