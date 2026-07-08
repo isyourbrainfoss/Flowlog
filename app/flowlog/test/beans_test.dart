@@ -1,9 +1,12 @@
 import 'package:flowlog/screens/library/beans.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('BeansScreen', () {
     late FlowlogDatabase db;
     late BeanRepository beanRepository;
@@ -198,6 +201,164 @@ void main() {
 
       expect(find.byKey(const Key('bean_editor_add')), findsNothing);
       expect(find.text('No beans yet'), findsOneWidget);
+    });
+
+    testWidgets('copies AI prompt from bean editor', (tester) async {
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async {
+          if (methodCall.method == 'Clipboard.setData') {
+            clipboardText =
+                (methodCall.arguments as Map<Object?, Object?>)['text']
+                    as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+
+      await _pumpBeansScreen(tester, beanRepository: beanRepository);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('beans_add_fab')));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byKey(const Key('bean_ai_copy_prompt')));
+      await tester.tap(find.byKey(const Key('bean_ai_copy_prompt')));
+      await tester.pumpAndSettle();
+
+      expect(clipboardText, buildBeanAiPrompt());
+      expect(
+        find.byKey(const Key('bean_ai_prompt_copied_snackbar')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('imports AI response from clipboard into bean editor',
+        (tester) async {
+      const clipboardJson = '''
+```json
+{
+  "name": "Guji Natural",
+  "brand": "Square Mile",
+  "origin": "Ethiopia",
+  "variety": "Heirloom",
+  "process": "Natural",
+  "roastLevel": "Light",
+  "roastDate": "2026-02-10",
+  "stockG": 250,
+  "notes": "Blueberry"
+}
+```
+''';
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async {
+          if (methodCall.method == 'Clipboard.getData') {
+            return {'text': clipboardJson};
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+
+      await _pumpBeansScreen(
+        tester,
+        beanRepository: beanRepository,
+        beanIdGenerator: () => 'bean-ai-import',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('beans_add_fab')));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.byKey(const Key('bean_ai_import_clipboard')),
+      );
+      await tester.tap(find.byKey(const Key('bean_ai_import_clipboard')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('bean_ai_import_dialog')), findsNothing);
+      expect(
+        find.byKey(const Key('bean_ai_imported_snackbar')),
+        findsOneWidget,
+      );
+      expect(
+        find.widgetWithText(TextFormField, 'Name'),
+        findsOneWidget,
+      );
+      expect(
+        find
+            .widgetWithText(TextFormField, 'Name')
+            .evaluate()
+            .single
+            .widget,
+        isA<TextFormField>().having(
+          (field) => field.controller?.text,
+          'controller text',
+          'Guji Natural',
+        ),
+      );
+      expect(
+        find.byKey(const Key('bean_editor_brand')).evaluate().single.widget,
+        isA<TextFormField>().having(
+          (field) => field.controller?.text,
+          'controller text',
+          'Square Mile',
+        ),
+      );
+      expect(find.text('Roast: Light'), findsOneWidget);
+      expect(find.text('2026-02-10'), findsOneWidget);
+
+      await tester.ensureVisible(find.byKey(const Key('bean_editor_save')));
+      await tester.tap(find.byKey(const Key('bean_editor_save')));
+      await tester.pumpAndSettle();
+
+      final saved = await beanRepository.getBeanById('bean-ai-import');
+      expect(saved?.name, 'Guji Natural');
+      expect(saved?.brand, 'Square Mile');
+      expect(saved?.process, 'Natural');
+      expect(saved?.roastLevel, 'Light');
+      expect(saved?.stockG, 250);
+      expect(saved?.notes, 'Blueberry');
+    });
+
+    testWidgets('opens import dialog when clipboard JSON is invalid',
+        (tester) async {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async {
+          if (methodCall.method == 'Clipboard.getData') {
+            return {'text': 'not valid json'};
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+
+      await _pumpBeansScreen(tester, beanRepository: beanRepository);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('beans_add_fab')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('bean_ai_import_clipboard')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('bean_ai_import_dialog')), findsOneWidget);
+      expect(
+        find.byKey(const Key('bean_ai_import_field')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('deletes bean from card action', (tester) async {

@@ -1,6 +1,7 @@
 library flowlog_core;
 
 export 'src/db/db.dart';
+export 'src/export/bean_ai_import.dart';
 export 'src/export/csv.dart';
 export 'src/export/csv_import.dart';
 export 'src/export/pdf.dart';

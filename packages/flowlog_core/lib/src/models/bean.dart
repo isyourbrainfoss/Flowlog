@@ -7,6 +7,15 @@ const List<String> kBeanProcessMethods = [
   'Anaerobic natural',
 ];
 
+/// Roast labels from light to dark for bean inventory.
+const List<String> kBeanRoastLevels = [
+  'Light',
+  'Medium-Light',
+  'Medium',
+  'Medium-Dark',
+  'Dark',
+];
+
 /// Coffee bean inventory entry.
 @immutable
 class Bean {

@@ -4,14 +4,6 @@ import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-/// Roast labels from light to dark for the bean editor slider.
-const List<String> kBeanRoastLevels = [
-  'Light',
-  'Medium-Light',
-  'Medium',
-  'Medium-Dark',
-  'Dark',
-];
 
 /// Common retail bag sizes in grams (250g EU specialty, 500g half-kilo, 1kg).
 const List<int> kBeanStockPresetsG = [200, 250, 500, 1000];
@@ -602,6 +594,94 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
     );
   }
 
+  Future<void> _copyAiPrompt() async {
+    await Clipboard.setData(ClipboardData(text: buildBeanAiPrompt()));
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        key: Key('bean_ai_prompt_copied_snackbar'),
+        content: Text('AI prompt copied — paste it into your AI with a bag photo'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _importFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim();
+
+    if (!mounted) {
+      return;
+    }
+
+    if (text == null || text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          key: Key('bean_ai_clipboard_empty_snackbar'),
+          content: Text('Clipboard is empty — copy the AI code block first'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final draft = parseBeanAiResponse(text);
+      _applyBeanAiDraft(draft);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          key: Key('bean_ai_imported_snackbar'),
+          content: Text('Bean details imported from clipboard'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on FormatException {
+      final draft = await showBeanAiImportDialog(
+        context,
+        initialText: text,
+      );
+      if (!mounted || draft == null) {
+        return;
+      }
+      _applyBeanAiDraft(draft);
+    }
+  }
+
+  void _applyBeanAiDraft(BeanAiDraft draft) {
+    setState(() {
+      _nameController.text = draft.name;
+      if (draft.brand != null) {
+        _brandController.text = draft.brand!;
+      }
+      if (draft.origin != null) {
+        _originController.text = draft.origin!;
+      }
+      if (draft.variety != null) {
+        _varietyController.text = draft.variety!;
+      }
+      if (draft.notes != null) {
+        _notesController.text = draft.notes!;
+      }
+      if (draft.roastLevel != null) {
+        _roastSliderValue = _roastLevelToSlider(draft.roastLevel);
+      }
+      if (draft.roastDate != null) {
+        _roastDate = draft.roastDate!.toLocal();
+      }
+      if (draft.process != null) {
+        _selectedProcess = draft.process;
+      }
+      if (draft.stockG != null) {
+        _stockController.text = draft.stockG!.truncateToDouble() == draft.stockG
+            ? draft.stockG!.toStringAsFixed(0)
+            : draft.stockG.toString();
+        _selectedStockPreset = _matchingStockPreset(draft.stockG);
+      }
+    });
+  }
+
   Future<void> _pickRoastDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -643,6 +723,55 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Card(
+                margin: EdgeInsets.zero,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Auto-fill from bag photo',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Copy the prompt into any AI with a photo of the bag, '
+                        'copy the AI\'s code block, then import from clipboard.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color:
+                                  Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              key: const Key('bean_ai_copy_prompt'),
+                              onPressed: _copyAiPrompt,
+                              icon: const Icon(Icons.copy_outlined, size: 18),
+                              label: const Text('Copy prompt'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              key: const Key('bean_ai_import_clipboard'),
+                              onPressed: _importFromClipboard,
+                              icon: const Icon(Icons.content_paste_go_outlined,
+                                  size: 18),
+                              label: const Text('Import'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: 'Name'),
@@ -827,6 +956,132 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
         ),
       ],
     ),
+    );
+  }
+}
+
+/// Dialog for pasting an AI response and parsing bean fields.
+Future<BeanAiDraft?> showBeanAiImportDialog(
+  BuildContext context, {
+  String initialText = '',
+}) {
+  return showDialog<BeanAiDraft>(
+    context: context,
+    builder: (dialogContext) => _BeanAiImportDialog(initialText: initialText),
+  );
+}
+
+class _BeanAiImportDialog extends StatefulWidget {
+  const _BeanAiImportDialog({this.initialText = ''});
+
+  final String initialText;
+
+  @override
+  State<_BeanAiImportDialog> createState() => _BeanAiImportDialogState();
+}
+
+class _BeanAiImportDialogState extends State<_BeanAiImportDialog> {
+  late final TextEditingController _controller;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _readClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text;
+    if (text == null || text.trim().isEmpty) {
+      setState(() => _error = 'Clipboard is empty');
+      return;
+    }
+    setState(() {
+      _controller.text = text;
+      _error = null;
+    });
+  }
+
+  void _import() {
+    try {
+      final draft = parseBeanAiResponse(_controller.text);
+      Navigator.pop(context, draft);
+    } on FormatException catch (error) {
+      setState(() => _error = error.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      key: const Key('bean_ai_import_dialog'),
+      title: const Text('Import from AI'),
+      content: SizedBox(
+        width: 480,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Paste the JSON code block your AI returned, or read it from '
+                'the clipboard.',
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const Key('bean_ai_import_read_clipboard'),
+                  onPressed: _readClipboard,
+                  icon: const Icon(Icons.content_paste_outlined, size: 18),
+                  label: const Text('Read clipboard'),
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextField(
+                key: const Key('bean_ai_import_field'),
+                controller: _controller,
+                maxLines: 8,
+                decoration: const InputDecoration(
+                  hintText: '{ "name": "...", ... }',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (_) {
+                  if (_error != null) {
+                    setState(() => _error = null);
+                  }
+                },
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('bean_ai_import_cancel'),
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('bean_ai_import_apply'),
+          onPressed: _import,
+          child: const Text('Apply'),
+        ),
+      ],
     );
   }
 }
