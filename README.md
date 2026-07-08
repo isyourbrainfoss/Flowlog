@@ -105,7 +105,7 @@ One-time setup:
 
 ```bash
 flatpak remote-add --if-not-exists --user flowlog \
-  https://isyourbrainfoss.github.io/Flowlog/flowlog.flatpakrepo
+  https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/flowlog.flatpakrepo
 flatpak install --user flowlog com.flowlog.flowlog
 ```
 
