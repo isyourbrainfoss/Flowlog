@@ -7,6 +7,7 @@ import 'package:flowlog/settings/coffeejack_settings_store.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -64,7 +65,7 @@ void main() {
       );
       expect(find.text('chocolate'), findsOneWidget);
       expect(find.text('nutty'), findsOneWidget);
-      expect(find.byType(TextField), findsNothing);
+      expect(find.byKey(const Key('shot_ai_flavor_goal')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -142,6 +143,63 @@ void main() {
 
       expect(find.text('11 turns'), findsOneWidget);
       expect(find.text('7 slow turns'), findsOneWidget);
+    });
+
+    testWidgets('copies shot data for AI feedback', (tester) async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      final beanRepository = BeanRepository(db);
+      await beanRepository.upsertBean(
+        const Bean(
+          id: 'bean-house-blend',
+          name: 'House Blend',
+          origin: 'Brazil',
+        ),
+      );
+
+      String? clipboardText;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async {
+          if (methodCall.method == 'Clipboard.setData') {
+            clipboardText =
+                (methodCall.arguments as Map<Object?, Object?>)['text']
+                    as String?;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ShotDetailScreen(
+            shot: shot,
+            shotRepository: repository,
+            beanRepository: beanRepository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('shot_ai_flavor_goal')),
+        'more sweetness',
+      );
+      await tester.tap(find.byKey(const Key('shot_copy_ai_feedback_button')));
+      await tester.pumpAndSettle();
+
+      expect(clipboardText, isNotNull);
+      expect(clipboardText, contains('flowlog-shot-ai-feedback-v1'));
+      expect(clipboardText, contains('more sweetness'));
+      expect(clipboardText, contains('House Blend'));
+      expect(
+        find.byKey(const Key('shot_ai_feedback_copied_snackbar')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('delete brew removes shot and closes detail', (tester) async {

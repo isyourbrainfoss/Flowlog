@@ -12,6 +12,7 @@ import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Read-only detail view for a saved shot: full chart and metadata.
 class ShotDetailScreen extends StatefulWidget {
@@ -55,8 +56,10 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
   bool _editing = false;
   bool _deleting = false;
   RepeatShotController? _repeatShotController;
+  Bean? _bean;
   String? _beanLabel;
   ShotMetadata? _displayMetadata;
+  final TextEditingController _aiFlavorGoalController = TextEditingController();
 
   @override
   void initState() {
@@ -102,12 +105,34 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
     }
 
     setState(() {
+      _bean = bean;
       if (bean != null) {
         _beanLabel = formatBeanDisplayLabel(bean);
       } else {
         _beanLabel = beanId;
       }
     });
+  }
+
+  Future<void> _copyForAiFeedback() async {
+    final text = buildShotAiFeedbackClipboardText(
+      shot: _currentShot,
+      beanContext: (_bean != null || _beanLabel != null)
+          ? ShotAiBeanContext(label: _beanLabel, bean: _bean)
+          : null,
+      desiredFlavorGoal: _aiFlavorGoalController.text,
+    );
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        key: Key('shot_ai_feedback_copied_snackbar'),
+        content: Text('Shot data copied — paste into your AI chat'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -119,6 +144,7 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
 
   @override
   void dispose() {
+    _aiFlavorGoalController.dispose();
     super.dispose();
   }
 
@@ -313,6 +339,12 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
           ),
           ShareProfileButton.fromShot(shot),
           IconButton(
+            key: const Key('shot_copy_ai_feedback'),
+            tooltip: 'Copy for AI feedback',
+            onPressed: _copyForAiFeedback,
+            icon: const Icon(Icons.psychology_outlined),
+          ),
+          IconButton(
             key: const Key('shot_delete'),
             tooltip: 'Delete brew',
             onPressed: _deleting ? null : _onDeletePressed,
@@ -334,6 +366,49 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
               samples: shot.samples,
               annotations: shot.annotations,
               maxDurationMs: _chartDurationMs(shot),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              color: theme.colorScheme.surfaceContainerHighest,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Get AI dial-in feedback',
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Copy brew metadata and curve data for any AI. '
+                      'Optionally describe the flavour you want below.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      key: const Key('shot_ai_flavor_goal'),
+                      controller: _aiFlavorGoalController,
+                      decoration: const InputDecoration(
+                        labelText: 'Desired flavour (optional)',
+                        hintText: 'e.g. brighter acidity, more sweetness',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      key: const Key('shot_copy_ai_feedback_button'),
+                      onPressed: _copyForAiFeedback,
+                      icon: const Icon(Icons.copy_outlined, size: 18),
+                      label: const Text('Copy for AI'),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             Card(
