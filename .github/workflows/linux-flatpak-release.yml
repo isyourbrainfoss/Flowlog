@@ -79,11 +79,15 @@ jobs:
           flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
           flatpak install -y --user flathub org.gnome.Platform//48 org.gnome.Sdk//48
 
+      # flutter-action cannot install ARM64 SDKs (no prebuilt archive); clone instead.
       - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
+        run: |
+          FLUTTER_ROOT="${RUNNER_TOOL_CACHE}/flutter"
+          git clone https://github.com/flutter/flutter.git -b stable --depth 1 "$FLUTTER_ROOT"
+          echo "${FLUTTER_ROOT}/bin" >> "$GITHUB_PATH"
+          flutter config --no-analytics
+          flutter precache --linux
+          flutter --version
 
       - name: Download x86_64 repo
         uses: actions/download-artifact@v4
