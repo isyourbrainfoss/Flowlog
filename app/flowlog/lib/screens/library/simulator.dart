@@ -750,6 +750,7 @@ class _SelectedKeyframeEditorState extends State<_SelectedKeyframeEditor> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: TextField(
