@@ -39,7 +39,11 @@ jobs:
 
       - name: Build release APK (arm64 only)
         working-directory: app/flowlog
-        run: flutter build apk --release --split-per-abi --target-platform android-arm64 --build-number=${{ github.run_number }}
+        run: |
+          BUILD=build-${{ github.run_number }}
+          flutter build apk --release --split-per-abi --target-platform android-arm64 \
+            --build-number=${{ github.run_number }} \
+            --build-name="$BUILD"
 
       - name: Prepare release assets
         run: |
@@ -53,7 +57,7 @@ jobs:
       - name: Read version code from APK
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq aapt >/dev/null
-          VC=$(aapt dump badging flowlog-arm64-v8a.apk | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
+          VC=$(aapt dump badging flowlog-arm64-v8a.apk | grep -oP "package: name='[^']+' versionCode='\K[^']+")
           echo "VERSION_CODE=$VC" >> "$GITHUB_ENV"
 
       - name: Publish GitHub Release

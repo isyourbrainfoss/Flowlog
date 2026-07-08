@@ -72,7 +72,8 @@ https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://raw.gi
 
 | Symptom | Fix |
 |---------|-----|
-| **“App not installed” / “Conflict” / signature error** | A USB debug build or pre-build-22 release may still be registered. **Uninstall** `flowlog` (Settings → Apps → All apps → search lowercase `flowlog`), or use `./tool/android_install.sh` over USB. Then install fresh from `version.json` above. |
+| **`error [App]` or `Conflict [App]`** | `[App]` is Obtainium’s placeholder name before the first successful install — not the problem. Open **Settings → Logs** in Obtainium for the real message. `Conflict` = an old USB/debug build is still installed with a different signing key; uninstall `flowlog` first (Settings → Apps, or `adb uninstall com.flowlog.flowlog`). |
+| **“App not installed” / signature error** | Same as `Conflict` above: remove the old build, then install fresh from `version.json`. |
 | **“Connection closed while receiving data”** | Do not use GitHub Release download URLs on mobile. Remove the app in Obtainium and re-add using `version.json`, not `github.com/.../releases/download/...`. |
 | **Still on an old Obtainium entry** | Remove Flowlog in Obtainium, re-add with the `version.json` URL. |
 
