@@ -1,6 +1,6 @@
 [Flatpak Repo]
 Version=0
-Url=https://isyourbrainfoss.github.io/Flowlog/
+Url=https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/
 Homepage=https://github.com/isyourbrainfoss/Flowlog
 Title=Flowlog
 Description=Personal coffee intelligence hub
