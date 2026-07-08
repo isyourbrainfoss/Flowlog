@@ -1,4 +1,5 @@
 import 'package:flowlog/screens/live/controls.dart';
+import 'package:flowlog/widgets/fullscreen_plot.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -123,14 +124,9 @@ class LiveFullscreenChartButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: IconButton(
-        key: const Key('live_fullscreen_open'),
-        tooltip: 'Fullscreen chart',
-        onPressed: onPressed,
-        icon: const Icon(Icons.fullscreen),
-      ),
+    return FullscreenPlotButton(
+      onPressed: onPressed,
+      buttonKey: const Key('live_fullscreen_open'),
     );
   }
 }

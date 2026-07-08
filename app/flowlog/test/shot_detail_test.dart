@@ -58,13 +58,16 @@ void main() {
       expect(find.text('93.0 °C'), findsOneWidget);
       expect(find.text('House Blend'), findsOneWidget);
       expect(find.text('bean-house-blend'), findsNothing);
+      expect(find.byKey(const Key('flavour_profile_section')), findsOneWidget);
+      expect(find.byKey(const Key('flavour_profile_taste_value')), findsOneWidget);
       expect(find.text('7/10'), findsOneWidget);
+      expect(find.byKey(const Key('flavour_profile_tags')), findsOneWidget);
+      expect(find.byKey(const Key('flavour_profile_tag_chocolate')), findsOneWidget);
+      expect(find.byKey(const Key('flavour_profile_tag_nutty')), findsOneWidget);
       expect(
         find.text('Minimal fixture shot for tests and mock replay.'),
         findsOneWidget,
       );
-      expect(find.text('chocolate'), findsOneWidget);
-      expect(find.text('nutty'), findsOneWidget);
       expect(find.byKey(const Key('shot_ai_flavor_goal')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });

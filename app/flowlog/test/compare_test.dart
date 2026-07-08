@@ -45,6 +45,10 @@ void main() {
     testWidgets('overlays two selected shots with distinct legend labels', (
       tester,
     ) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final baseline = _loadFixtureShot('shots/minimal_shot.json');
       final comparison = baseline.copyWith(
         id: 'shot-minimal-002',
@@ -72,10 +76,52 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('compare_overlay_chart')), findsOneWidget);
-      expect(find.textContaining('Shot 1'), findsOneWidget);
-      expect(find.textContaining('Shot 2'), findsOneWidget);
+      expect(find.byKey(const Key('compare_metadata_table')), findsOneWidget);
+      expect(find.byKey(const Key('compare_fullscreen_open')), findsOneWidget);
+      expect(find.textContaining('Shot 1 ('), findsOneWidget);
+      expect(find.textContaining('Shot 2 ('), findsOneWidget);
+      expect(find.text('chocolate, nutty'), findsNWidgets(2));
       expect(find.text('Pressure'), findsOneWidget);
       expect(find.text('Overlay'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('opens compare chart fullscreen', (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final baseline = _loadFixtureShot('shots/minimal_shot.json');
+      final comparison = baseline.copyWith(
+        id: 'shot-minimal-002',
+        startedAt: DateTime.utc(2026, 6, 29, 11),
+      );
+
+      await repository.insertShot(baseline);
+      await repository.insertShot(comparison);
+
+      await _pumpCompareScreen(tester, repository: repository);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('compare_select_shot-minimal-001')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('compare_select_shot-minimal-002')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('compare_fullscreen_open')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('compare_fullscreen_chart')), findsOneWidget);
+      expect(
+        find.byKey(const Key('compare_fullscreen_overlay_chart')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('compare_fullscreen_close')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('compare_fullscreen_chart')), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -107,6 +153,11 @@ void main() {
     });
 
     testWidgets('delta highlight toggle updates chart state', (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       final baseline = _loadFixtureShot('shots/minimal_shot.json');
       final comparison = baseline.copyWith(
         id: 'shot-minimal-002',
@@ -137,6 +188,11 @@ void main() {
       var chart = tester.widget<CompareOverlayChart>(chartFinder);
       expect(chart.showDeltaHighlight, isFalse);
 
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('compare_delta_toggle')),
+        80,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.byKey(const Key('compare_delta_toggle')));
       await tester.pumpAndSettle();
 

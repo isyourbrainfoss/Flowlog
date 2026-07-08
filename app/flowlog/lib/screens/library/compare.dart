@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/history/history_shot_card.dart';
+import 'package:flowlog/screens/live/save_shot.dart';
+import 'package:flowlog/widgets/fullscreen_plot.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -121,104 +124,122 @@ class _CompareScreenState extends State<CompareScreen> {
 
         return Scaffold(
           body: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (selectedShots.length >= 2) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: CompareOverlayChart(
-                  key: const Key('compare_overlay_chart'),
-                  shots: selectedShots,
-                  showDeltaHighlight: _showDeltaHighlight,
-                ),
-              ),
-              SwitchListTile(
-                key: const Key('compare_delta_toggle'),
-                title: const Text('Delta highlight'),
-                subtitle: const Text(
-                  'Shade pressure difference between first two selections',
-                ),
-                value: _showDeltaHighlight,
-                onChanged: (value) {
-                  setState(() => _showDeltaHighlight = value);
-                },
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _CompareLegend(shots: selectedShots),
-              ),
-              const Divider(height: 1),
-            ] else
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  shots.length < 2
-                      ? 'Save at least two shots to compare'
-                      : 'Select 2 or more shots to compare',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-            if (_selectedShotIds.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Row(
-                  children: [
-                    Text(
-                      '${_selectedShotIds.length} selected',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const Spacer(),
-                    TextButton(
-                      key: const Key('compare_clear_all'),
-                      onPressed: () {
-                        setState(() {
-                          _selectedShotIds.clear();
-                          _showDeltaHighlight = false;
-                        });
-                      },
-                      child: const Text('Clear all'),
-                    ),
-                  ],
-                ),
-              ),
-            Expanded(
-              child: shots.isEmpty
-                  ? const Center(child: Text('No saved shots yet'))
-                  : RefreshIndicator(
-                      onRefresh: _refresh,
-                      child: ListView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        itemCount: shots.length,
-                        itemBuilder: (context, index) {
-                          final shot = shots[index];
-                          final isSelected =
-                              _selectedShotIds.contains(shot.id);
-                          return CheckboxListTile(
-                            key: Key('compare_select_${shot.id}'),
-                            value: isSelected,
-                            onChanged: (value) {
-                              if (value == null) {
-                                return;
-                              }
-                              _toggleShotSelection(shot, value);
-                            },
-                            title: Text(_formatStartedAt(shot.startedAt)),
-                            subtitle: Text(
-                              [
-                                _formatPeakPressure(shot.samples),
-                                _formatYield(shot.yieldG),
-                                _formatTasteScore(shot.tasteScore),
-                              ].join(' · '),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (selectedShots.length >= 2)
+                Expanded(
+                  flex: 3,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        FullscreenPlotButton(
+                          buttonKey: const Key('compare_fullscreen_open'),
+                          onPressed: () => unawaited(
+                            openCompareFullscreenChart(
+                              context,
+                              shots: selectedShots,
+                              showDeltaHighlight: _showDeltaHighlight,
                             ),
-                            secondary: const Icon(Icons.show_chart),
-                            controlAffinity: ListTileControlAffinity.leading,
-                          );
-                        },
-                      ),
+                          ),
+                        ),
+                        CompareOverlayChart(
+                          key: const Key('compare_overlay_chart'),
+                          shots: selectedShots,
+                          showDeltaHighlight: _showDeltaHighlight,
+                        ),
+                        SwitchListTile(
+                          key: const Key('compare_delta_toggle'),
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Delta highlight'),
+                          subtitle: const Text(
+                            'Shade pressure difference between first two selections',
+                          ),
+                          value: _showDeltaHighlight,
+                          onChanged: (value) {
+                            setState(() => _showDeltaHighlight = value);
+                          },
+                        ),
+                        _CompareLegend(shots: selectedShots),
+                        const SizedBox(height: 12),
+                        _CompareMetadataTable(shots: selectedShots),
+                      ],
                     ),
-            ),
-          ],
-        ),
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    shots.length < 2
+                        ? 'Save at least two shots to compare'
+                        : 'Select 2 or more shots to compare',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              if (_selectedShotIds.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        '${_selectedShotIds.length} selected',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        key: const Key('compare_clear_all'),
+                        onPressed: () {
+                          setState(() {
+                            _selectedShotIds.clear();
+                            _showDeltaHighlight = false;
+                          });
+                        },
+                        child: const Text('Clear all'),
+                      ),
+                    ],
+                  ),
+                ),
+              Expanded(
+                flex: selectedShots.length >= 2 ? 4 : 1,
+                child: shots.isEmpty
+                    ? const Center(child: Text('No saved shots yet'))
+                    : RefreshIndicator(
+                        onRefresh: _refresh,
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: shots.length,
+                          itemBuilder: (context, index) {
+                            final shot = shots[index];
+                            final isSelected =
+                                _selectedShotIds.contains(shot.id);
+                            return CheckboxListTile(
+                              key: Key('compare_select_${shot.id}'),
+                              value: isSelected,
+                              onChanged: (value) {
+                                if (value == null) {
+                                  return;
+                                }
+                                _toggleShotSelection(shot, value);
+                              },
+                              title: Text(_formatStartedAt(shot.startedAt)),
+                              subtitle: Text(
+                                [
+                                  _formatPeakPressure(shot.samples),
+                                  _formatYield(shot.yieldG),
+                                  _formatTasteScore(shot.tasteScore),
+                                ].join(' · '),
+                              ),
+                              secondary: const Icon(Icons.show_chart),
+                              controlAffinity: ListTileControlAffinity.leading,
+                            );
+                          },
+                        ),
+                      ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -254,6 +275,176 @@ class _CompareScreenState extends State<CompareScreen> {
       return 'Taste —';
     }
     return 'Taste $tasteScore/10';
+  }
+}
+
+/// Opens a fullscreen compare overlay chart.
+Future<void> openCompareFullscreenChart(
+  BuildContext context, {
+  required List<Shot> shots,
+  required bool showDeltaHighlight,
+}) {
+  return openFullscreenPlot(
+    context,
+    scaffoldKey: const Key('compare_fullscreen_chart'),
+    closeButtonKey: const Key('compare_fullscreen_close'),
+    builder: (context) => LayoutBuilder(
+      builder: (context, constraints) {
+        const footerReserve = 36.0;
+        return SizedBox(
+          height: constraints.maxHeight,
+          child: CompareOverlayChart(
+            key: const Key('compare_fullscreen_overlay_chart'),
+            shots: shots,
+            showDeltaHighlight: showDeltaHighlight,
+            height: math.max(1, constraints.maxHeight - footerReserve),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+class _CompareMetadataTable extends StatelessWidget {
+  const _CompareMetadataTable({required this.shots});
+
+  final List<Shot> shots;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      key: const Key('compare_metadata_table'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Metadata', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                columnSpacing: 20,
+                headingRowHeight: 40,
+                dataRowMinHeight: 36,
+                dataRowMaxHeight: 72,
+                columns: [
+                  const DataColumn(label: Text('')),
+                  for (var i = 0; i < shots.length; i++)
+                    DataColumn(
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: compareShotColor(i),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text('Shot ${i + 1}'),
+                        ],
+                      ),
+                    ),
+                ],
+                rows: [
+                  _metadataRow('Dose', shots.map(_formatDose)),
+                  _metadataRow('Yield', shots.map(_formatYieldCell)),
+                  _metadataRow('Ratio', shots.map(_formatRatio)),
+                  _metadataRow('Grind', shots.map(_formatGrind)),
+                  _metadataRow('Water temp', shots.map(_formatWaterTemp)),
+                  _metadataRow('Taste', shots.map(_formatTasteCell)),
+                  _metadataRow('Flavour tags', shots.map(_formatFlavourTags)),
+                  _metadataRow('Notes', shots.map(_formatNotes)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  DataRow _metadataRow(String label, Iterable<String> values) {
+    return DataRow(
+      cells: [
+        DataCell(Text(label)),
+        for (final value in values) DataCell(Text(value)),
+      ],
+    );
+  }
+
+  static String _formatDose(Shot shot) {
+    final dose = shot.doseG;
+    if (dose == null) {
+      return '—';
+    }
+    return '${dose.toStringAsFixed(1)} g';
+  }
+
+  static String _formatYieldCell(Shot shot) {
+    final yield = inferredYieldG(shot);
+    if (yield == null) {
+      return '—';
+    }
+    return '${yield.toStringAsFixed(1)} g';
+  }
+
+  static String _formatRatio(Shot shot) {
+    final dose = shot.doseG;
+    final yield = inferredYieldG(shot);
+    if (dose == null || yield == null || dose <= 0) {
+      return '—';
+    }
+    return '1:${(yield / dose).toStringAsFixed(1)}';
+  }
+
+  static String _formatGrind(Shot shot) {
+    final grind = shot.grindSetting;
+    if (grind == null) {
+      return '—';
+    }
+    if (grind == grind.roundToDouble()) {
+      return grind.toInt().toString();
+    }
+    return grind.toString();
+  }
+
+  static String _formatWaterTemp(Shot shot) {
+    final temp = shot.waterTempC ??
+        (shot.samples.isNotEmpty ? shot.samples.last.tempC : null);
+    if (temp == null) {
+      return '—';
+    }
+    return '${temp.toStringAsFixed(1)} °C';
+  }
+
+  static String _formatTasteCell(Shot shot) {
+    final taste = shot.tasteScore;
+    if (taste == null) {
+      return '—';
+    }
+    return '$taste/10';
+  }
+
+  static String _formatFlavourTags(Shot shot) {
+    if (shot.flavourTags.isEmpty) {
+      return '—';
+    }
+    return shot.flavourTags.join(', ');
+  }
+
+  static String _formatNotes(Shot shot) {
+    final notes = shot.notes;
+    if (notes == null || notes.trim().isEmpty) {
+      return '—';
+    }
+    return notes;
   }
 }
 

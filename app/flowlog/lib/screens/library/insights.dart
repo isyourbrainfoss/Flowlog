@@ -1,6 +1,9 @@
 import 'dart:io';
 
+import 'dart:async';
+
 import 'package:flowlog/persistence/flowlog_storage.dart';
+import 'package:flowlog/widgets/fullscreen_plot.dart';
 import 'package:flowlog/screens/history/history_shot_card.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -316,7 +319,55 @@ class InsightsBarSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(title, style: theme.textTheme.titleMedium),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(title, style: theme.textTheme.titleMedium),
+                ),
+                if (entries.isNotEmpty)
+                  IconButton(
+                    key: Key('insights_fullscreen_${title.toLowerCase().replaceAll(' ', '_')}'),
+                    tooltip: 'Fullscreen chart',
+                    onPressed: () => unawaited(
+                      openFullscreenPlot(
+                        context,
+                        scaffoldKey: Key(
+                          'insights_fullscreen_${title.toLowerCase().replaceAll(' ', '_')}',
+                        ),
+                        builder: (context) => LayoutBuilder(
+                          builder: (context, constraints) {
+                            return SingleChildScrollView(
+                              padding: const EdgeInsets.fromLTRB(48, 48, 16, 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(title, style: theme.textTheme.titleLarge),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    subtitle,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  SimpleBarChart(
+                                    entries: entries,
+                                    valueFormatter: valueFormatter,
+                                    barColor: barColor,
+                                    valueMax: valueMax,
+                                    barHeight: 18,
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    icon: const Icon(Icons.fullscreen),
+                  ),
+              ],
+            ),
             const SizedBox(height: 4),
             Text(
               subtitle,

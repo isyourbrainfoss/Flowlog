@@ -1,3 +1,4 @@
+import 'package:flowlog/widgets/fullscreen_plot.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -47,50 +48,26 @@ class _HistoryFullscreenChartScreenState
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final durationMs = _chartDurationMs(widget.shot);
 
-    return Scaffold(
-      key: const Key('history_fullscreen_chart'),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SizedBox(
-                    height: constraints.maxHeight,
-                    child: DualCurveChart(
-                      key: const Key('history_fullscreen_dual_chart'),
-                      height: constraints.maxHeight,
-                      samples: widget.shot.samples,
-                      annotations: widget.shot.annotations,
-                      maxDurationMs: durationMs,
-                      interactionController: _interactionController,
-                      enableCrosshair: true,
-                    ),
-                  );
-                },
-              ),
+    return FullscreenPlotScaffold(
+      scaffoldKey: const Key('history_fullscreen_chart'),
+      closeButtonKey: const Key('history_fullscreen_close'),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SizedBox(
+            height: constraints.maxHeight,
+            child: DualCurveChart(
+              key: const Key('history_fullscreen_dual_chart'),
+              height: constraints.maxHeight,
+              samples: widget.shot.samples,
+              annotations: widget.shot.annotations,
+              maxDurationMs: durationMs,
+              interactionController: _interactionController,
+              enableCrosshair: true,
             ),
-            Positioned(
-              top: 4,
-              left: 4,
-              child: Material(
-                color: scheme.surfaceContainerHighest.withValues(alpha: 0.92),
-                shape: const CircleBorder(),
-                clipBehavior: Clip.antiAlias,
-                child: IconButton(
-                  key: const Key('history_fullscreen_close'),
-                  tooltip: 'Minimize chart',
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.fullscreen_exit),
-                ),
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -117,14 +94,9 @@ class HistoryFullscreenChartButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: IconButton(
-        key: const Key('history_fullscreen_open'),
-        tooltip: 'Fullscreen chart',
-        onPressed: onPressed,
-        icon: const Icon(Icons.fullscreen),
-      ),
+    return FullscreenPlotButton(
+      onPressed: onPressed,
+      buttonKey: const Key('history_fullscreen_open'),
     );
   }
 }

@@ -8,6 +8,7 @@ import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/shell_scope.dart';
+import 'package:flowlog/widgets/fullscreen_plot.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -1444,6 +1445,32 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 ],
               ),
               const SizedBox(height: 8),
+              FullscreenPlotButton(
+                buttonKey: const Key('simulator_profile_fullscreen_open'),
+                onPressed: () => unawaited(
+                  openFullscreenPlot(
+                    context,
+                    scaffoldKey: const Key('simulator_profile_fullscreen_chart'),
+                    closeButtonKey: const Key('simulator_profile_fullscreen_close'),
+                    builder: (context) => LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SizedBox(
+                          height: constraints.maxHeight,
+                          child: PressureProfileEditor(
+                            keyframes: _keyframes,
+                            durationMs: durationMs,
+                            height: constraints.maxHeight,
+                            onKeyframesChanged: _onKeyframesChanged,
+                            onGestureActiveChanged: (active) {
+                              setState(() => _profileEditorActive = active);
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
               PressureProfileEditor(
                 keyframes: _keyframes,
                 durationMs: durationMs,
@@ -1459,6 +1486,34 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 summary: summary,
               ),
               const SizedBox(height: 12),
+              FullscreenPlotButton(
+                buttonKey: const Key('simulator_flow_fullscreen_open'),
+                onPressed: () => unawaited(
+                  openFullscreenPlot(
+                    context,
+                    scaffoldKey: const Key('simulator_flow_fullscreen_chart'),
+                    closeButtonKey: const Key('simulator_flow_fullscreen_close'),
+                    builder: (context) => LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SizedBox(
+                          height: constraints.maxHeight,
+                          child: DualCurveChart(
+                            key: const Key('simulator_flow_fullscreen_dual_chart'),
+                            height: constraints.maxHeight,
+                            samples: predictedSamples,
+                            maxDurationMs: durationMs,
+                            showPressure: true,
+                            showWeight: false,
+                            showFlow: true,
+                            enableInteraction: true,
+                            targetPressureSamples: pressureProfile,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
               DualCurveChart(
                 key: const Key('simulator_flow_chart'),
                 samples: predictedSamples,

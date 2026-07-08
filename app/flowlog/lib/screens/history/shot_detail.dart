@@ -9,6 +9,7 @@ import 'package:flowlog/screens/live/metadata_sheet.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
+import 'package:flowlog/widgets/flavour_profile.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -451,6 +452,11 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
               shot: shot,
               beanLabel: _beanLabel,
             ),
+            const SizedBox(height: 24),
+            FlavourProfileSection(
+              tasteScore: metadata.tasteScore,
+              flavourTags: metadata.flavourTags,
+            ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               key: const Key('shot_edit_metadata_button'),
@@ -463,22 +469,6 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
               Text('Notes', style: theme.textTheme.titleSmall),
               const SizedBox(height: 4),
               Text(metadata.notes!),
-            ],
-            if (metadata.flavourTags.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text('Flavour tags', style: theme.textTheme.titleSmall),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final tag in metadata.flavourTags)
-                    Chip(
-                      label: Text(tag),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                ],
-              ),
             ],
             const SizedBox(height: 24),
             RepeatShotButton(
@@ -634,13 +624,6 @@ class _MetadataGrid extends StatelessWidget {
             valueStyle: valueStyle,
           ),
         ],
-        const SizedBox(height: 12),
-        _MetadataField(
-          label: 'Taste',
-          value: _formatTasteScore(metadata.tasteScore),
-          labelStyle: labelStyle,
-          valueStyle: valueStyle,
-        ),
       ],
     );
   }
@@ -667,13 +650,6 @@ class _MetadataGrid extends StatelessWidget {
       return '—';
     }
     return '${value.toStringAsFixed(1)} °C';
-  }
-
-  static String _formatTasteScore(int? tasteScore) {
-    if (tasteScore == null) {
-      return '—';
-    }
-    return '$tasteScore/10';
   }
 
   static String _formatTurns(int? turns) {
