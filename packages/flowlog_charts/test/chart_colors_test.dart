@@ -54,6 +54,25 @@ void main() {
       expect(style.grid, scheme.outline);
       expect(style.axisLabel, scheme.onSurfaceVariant);
       expect(style.background, isNot(FlowlogChartColors.background));
+      expect(
+        style.targetPressureLine,
+        FlowlogChartColors.coffeeTargetPressureLineLight,
+      );
+      expect(
+        style.targetPressureLine,
+        isNot(FlowlogChartColors.coffeeTargetPressureLine),
+      );
+    });
+
+    test('ChartSurfaceStyle keeps pale target line in dark mode', () {
+      final scheme = ColorScheme.fromSeed(
+        seedColor: const Color(0xFF6F4E37),
+        brightness: Brightness.dark,
+      );
+
+      final style = ChartSurfaceStyle.fromColorScheme(scheme);
+
+      expect(style.targetPressureLine, FlowlogChartColors.coffeeTargetPressureLine);
     });
 
     test('palette switch updates active getters', () {

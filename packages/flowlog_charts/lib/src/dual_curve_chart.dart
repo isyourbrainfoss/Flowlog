@@ -43,7 +43,11 @@ abstract final class FlowlogChartColors {
   static const coffeePressureLine = Color(0xFFD4923A);
   static const coffeeWeightLine = Color(0xFF5B8DB8);
   static const coffeeFlowLine = Color(0xFF4ECDC4);
+  /// Dashed target overlay on dark chart surfaces.
   static const coffeeTargetPressureLine = Color(0xFFE8E0D8);
+
+  /// Dashed target overlay on light chart surfaces (coffee palette).
+  static const coffeeTargetPressureLineLight = Color(0xFF6F4E37);
 
   static const colorblindPressureLow = Color(0xFF56B4E9);
   static const colorblindPressureHigh = Color(0xFFE69F00);
@@ -82,6 +86,16 @@ abstract final class FlowlogChartColors {
         colorblindSafe: colorblindTargetPressureLine,
       );
 
+  /// Target curve color for the active [ColorScheme] brightness.
+  static Color targetPressureLineFor(ColorScheme scheme) {
+    if (scheme.brightness == Brightness.light) {
+      return palette == FlowlogChartPalette.colorblindSafe
+          ? colorblindTargetPressureLine
+          : coffeeTargetPressureLineLight;
+    }
+    return targetPressureLine;
+  }
+
   static const grid = Color(0xFF9A8B7E);
   static const axisLabel = Color(0xFFD4C9BC);
   static const background = Color(0xFF241C16);
@@ -103,19 +117,22 @@ class ChartSurfaceStyle {
     required this.background,
     required this.grid,
     required this.axisLabel,
+    required this.targetPressureLine,
   });
 
   final Color background;
   final Color grid;
   final Color axisLabel;
+  final Color targetPressureLine;
 
   /// Uses coffee-dark constants in dark mode; theme tokens in light mode.
   static ChartSurfaceStyle fromColorScheme(ColorScheme scheme) {
     if (scheme.brightness == Brightness.dark) {
-      return const ChartSurfaceStyle(
+      return ChartSurfaceStyle(
         background: FlowlogChartColors.background,
         grid: FlowlogChartColors.grid,
         axisLabel: FlowlogChartColors.axisLabel,
+        targetPressureLine: FlowlogChartColors.targetPressureLine,
       );
     }
 
@@ -123,6 +140,7 @@ class ChartSurfaceStyle {
       background: scheme.surface,
       grid: scheme.outline,
       axisLabel: scheme.onSurfaceVariant,
+      targetPressureLine: FlowlogChartColors.targetPressureLineFor(scheme),
     );
   }
 
@@ -132,11 +150,13 @@ class ChartSurfaceStyle {
         other is ChartSurfaceStyle &&
             background == other.background &&
             grid == other.grid &&
-            axisLabel == other.axisLabel;
+            axisLabel == other.axisLabel &&
+            targetPressureLine == other.targetPressureLine;
   }
 
   @override
-  int get hashCode => Object.hash(background, grid, axisLabel);
+  int get hashCode =>
+      Object.hash(background, grid, axisLabel, targetPressureLine);
 }
 
 /// Live dual-axis chart for espresso pressure, weight, and flow.
@@ -299,6 +319,7 @@ class _DualCurveChartState extends State<DualCurveChart> {
       background: widget.backgroundColor ?? themeStyle.background,
       grid: themeStyle.grid,
       axisLabel: themeStyle.axisLabel,
+      targetPressureLine: themeStyle.targetPressureLine,
     );
     final prepared = _prepareSamples(rawSamples);
     final totalDurationMs = _resolveTotalDurationMs(prepared);
@@ -429,6 +450,7 @@ class _DualCurveChartState extends State<DualCurveChart> {
               showFlow: visibility.showFlow,
               showTarget: widget.targetPressureSamples.isNotEmpty,
               viewMode: viewMode,
+              surfaceStyle: surfaceStyle,
               interactionController: widget.enableInteraction
                   ? _interactionController
                   : null,
@@ -743,6 +765,7 @@ class _Legend extends StatelessWidget {
     required this.showFlow,
     required this.showTarget,
     required this.viewMode,
+    required this.surfaceStyle,
     this.interactionController,
   });
 
@@ -751,6 +774,7 @@ class _Legend extends StatelessWidget {
   final bool showFlow;
   final bool showTarget;
   final ChartViewMode viewMode;
+  final ChartSurfaceStyle surfaceStyle;
   final ChartInteractionController? interactionController;
 
   @override
@@ -775,7 +799,7 @@ class _Legend extends StatelessWidget {
     if (showTarget) {
       items.add(
         _LegendItem(
-          color: FlowlogChartColors.targetPressureLine,
+          color: surfaceStyle.targetPressureLine,
           label: 'Target',
           dashed: true,
         ),
@@ -957,10 +981,11 @@ class DualCurveChartPainter extends CustomPainter {
     this.denseTimeAxis = false,
     this.devicePixelRatio = 1.0,
   })  : surfaceStyle = surfaceStyle ??
-            const ChartSurfaceStyle(
+            ChartSurfaceStyle(
               background: FlowlogChartColors.background,
               grid: FlowlogChartColors.grid,
               axisLabel: FlowlogChartColors.axisLabel,
+              targetPressureLine: FlowlogChartColors.targetPressureLine,
             ),
         viewport = viewport ??
             ChartViewport(
@@ -1331,8 +1356,8 @@ class DualCurveChartPainter extends CustomPainter {
       samples: targetPressureSamples,
       valueSelector: (sample) => sample.pressureBar,
       maxValue: scales.pressureMax,
-      color: FlowlogChartColors.targetPressureLine.withValues(alpha: 0.85),
-      strokeWidth: 1.75,
+      color: surfaceStyle.targetPressureLine.withValues(alpha: 0.9),
+      strokeWidth: 2,
       dashed: true,
     );
   }
