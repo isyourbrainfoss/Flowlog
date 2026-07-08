@@ -150,16 +150,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG=$(gh release list --repo "${{ github.repository }}" --limit 30 \
-            --json tagName,targetCommitish \
-            --jq '.[] | select(.targetCommitish == "${{ github.sha }}") | .tagName' \
-            | head -1)
+          TAG=""
+          for attempt in $(seq 1 36); do
+            while read -r tag; do
+              commit=$(gh api "repos/${{ github.repository }}/commits/${tag}" -q .sha 2>/dev/null || true)
+              if [ "$commit" = "${{ github.sha }}" ]; then
+                TAG="$tag"
+                break 2
+              fi
+            done < <(gh release list --repo "${{ github.repository }}" --limit 40 --json tagName -q '.[].tagName')
+            echo "Waiting for Android release for ${{ github.sha }} (attempt ${attempt}/36)…" >&2
+            sleep 10
+          done
+
           if [ -z "$TAG" ]; then
-            echo "No release for ${{ github.sha }} yet; skipping bundle upload" >&2
+            echo "No release for ${{ github.sha }} after 6 minutes; skipping bundle upload" >&2
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "tag=$TAG" >> "$GITHUB_OUTPUT"
             echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Matched release tag: $TAG" >&2
           fi
 
       - name: Upload Flatpak bundles to release
