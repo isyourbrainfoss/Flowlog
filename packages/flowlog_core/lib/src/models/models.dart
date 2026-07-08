@@ -3,6 +3,7 @@ export 'bean.dart';
 export 'bean_display.dart';
 export 'device.dart';
 export 'device_type.dart';
+export 'flavour_intensities.dart';
 export 'saved_profile.dart';
 export 'shot.dart';
 export 'shot_annotation.dart';

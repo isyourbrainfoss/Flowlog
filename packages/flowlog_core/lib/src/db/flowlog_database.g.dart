@@ -116,6 +116,18 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     requiredDuringInsert: false,
     defaultValue: const Constant('[]'),
   );
+  static const VerificationMeta _flavourIntensitiesMeta =
+      const VerificationMeta('flavourIntensities');
+  @override
+  late final GeneratedColumn<String> flavourIntensities =
+      GeneratedColumn<String>(
+        'flavour_intensities',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('{}'),
+      );
   static const VerificationMeta _locationMeta = const VerificationMeta(
     'location',
   );
@@ -183,6 +195,7 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     notes,
     tasteScore,
     flavourTags,
+    flavourIntensities,
     location,
     latitude,
     longitude,
@@ -260,6 +273,15 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         flavourTags.isAcceptableOrUnknown(
           data['flavour_tags']!,
           _flavourTagsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('flavour_intensities')) {
+      context.handle(
+        _flavourIntensitiesMeta,
+        flavourIntensities.isAcceptableOrUnknown(
+          data['flavour_intensities']!,
+          _flavourIntensitiesMeta,
         ),
       );
     }
@@ -356,6 +378,10 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         DriftSqlType.string,
         data['${effectivePrefix}flavour_tags'],
       )!,
+      flavourIntensities: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}flavour_intensities'],
+      )!,
       location: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}location'],
@@ -402,6 +428,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
   final String? notes;
   final int? tasteScore;
   final String flavourTags;
+  final String flavourIntensities;
   final String? location;
   final double? latitude;
   final double? longitude;
@@ -419,6 +446,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     this.notes,
     this.tasteScore,
     required this.flavourTags,
+    required this.flavourIntensities,
     this.location,
     this.latitude,
     this.longitude,
@@ -461,6 +489,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       map['taste_score'] = Variable<int>(tasteScore);
     }
     map['flavour_tags'] = Variable<String>(flavourTags);
+    map['flavour_intensities'] = Variable<String>(flavourIntensities);
     if (!nullToAbsent || location != null) {
       map['location'] = Variable<String>(location);
     }
@@ -510,6 +539,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           ? const Value.absent()
           : Value(tasteScore),
       flavourTags: Value(flavourTags),
+      flavourIntensities: Value(flavourIntensities),
       location: location == null && nullToAbsent
           ? const Value.absent()
           : Value(location),
@@ -546,6 +576,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       notes: serializer.fromJson<String?>(json['notes']),
       tasteScore: serializer.fromJson<int?>(json['tasteScore']),
       flavourTags: serializer.fromJson<String>(json['flavourTags']),
+      flavourIntensities: serializer.fromJson<String>(
+        json['flavourIntensities'],
+      ),
       location: serializer.fromJson<String?>(json['location']),
       latitude: serializer.fromJson<double?>(json['latitude']),
       longitude: serializer.fromJson<double?>(json['longitude']),
@@ -572,6 +605,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       'notes': serializer.toJson<String?>(notes),
       'tasteScore': serializer.toJson<int?>(tasteScore),
       'flavourTags': serializer.toJson<String>(flavourTags),
+      'flavourIntensities': serializer.toJson<String>(flavourIntensities),
       'location': serializer.toJson<String?>(location),
       'latitude': serializer.toJson<double?>(latitude),
       'longitude': serializer.toJson<double?>(longitude),
@@ -594,6 +628,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     Value<String?> notes = const Value.absent(),
     Value<int?> tasteScore = const Value.absent(),
     String? flavourTags,
+    String? flavourIntensities,
     Value<String?> location = const Value.absent(),
     Value<double?> latitude = const Value.absent(),
     Value<double?> longitude = const Value.absent(),
@@ -611,6 +646,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     notes: notes.present ? notes.value : this.notes,
     tasteScore: tasteScore.present ? tasteScore.value : this.tasteScore,
     flavourTags: flavourTags ?? this.flavourTags,
+    flavourIntensities: flavourIntensities ?? this.flavourIntensities,
     location: location.present ? location.value : this.location,
     latitude: latitude.present ? latitude.value : this.latitude,
     longitude: longitude.present ? longitude.value : this.longitude,
@@ -642,6 +678,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       flavourTags: data.flavourTags.present
           ? data.flavourTags.value
           : this.flavourTags,
+      flavourIntensities: data.flavourIntensities.present
+          ? data.flavourIntensities.value
+          : this.flavourIntensities,
       location: data.location.present ? data.location.value : this.location,
       latitude: data.latitude.present ? data.latitude.value : this.latitude,
       longitude: data.longitude.present ? data.longitude.value : this.longitude,
@@ -668,6 +707,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           ..write('notes: $notes, ')
           ..write('tasteScore: $tasteScore, ')
           ..write('flavourTags: $flavourTags, ')
+          ..write('flavourIntensities: $flavourIntensities, ')
           ..write('location: $location, ')
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude, ')
@@ -690,6 +730,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     notes,
     tasteScore,
     flavourTags,
+    flavourIntensities,
     location,
     latitude,
     longitude,
@@ -711,6 +752,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           other.notes == this.notes &&
           other.tasteScore == this.tasteScore &&
           other.flavourTags == this.flavourTags &&
+          other.flavourIntensities == this.flavourIntensities &&
           other.location == this.location &&
           other.latitude == this.latitude &&
           other.longitude == this.longitude &&
@@ -730,6 +772,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
   final Value<String?> notes;
   final Value<int?> tasteScore;
   final Value<String> flavourTags;
+  final Value<String> flavourIntensities;
   final Value<String?> location;
   final Value<double?> latitude;
   final Value<double?> longitude;
@@ -748,6 +791,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.notes = const Value.absent(),
     this.tasteScore = const Value.absent(),
     this.flavourTags = const Value.absent(),
+    this.flavourIntensities = const Value.absent(),
     this.location = const Value.absent(),
     this.latitude = const Value.absent(),
     this.longitude = const Value.absent(),
@@ -767,6 +811,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.notes = const Value.absent(),
     this.tasteScore = const Value.absent(),
     this.flavourTags = const Value.absent(),
+    this.flavourIntensities = const Value.absent(),
     this.location = const Value.absent(),
     this.latitude = const Value.absent(),
     this.longitude = const Value.absent(),
@@ -787,6 +832,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Expression<String>? notes,
     Expression<int>? tasteScore,
     Expression<String>? flavourTags,
+    Expression<String>? flavourIntensities,
     Expression<String>? location,
     Expression<double>? latitude,
     Expression<double>? longitude,
@@ -806,6 +852,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
       if (notes != null) 'notes': notes,
       if (tasteScore != null) 'taste_score': tasteScore,
       if (flavourTags != null) 'flavour_tags': flavourTags,
+      if (flavourIntensities != null) 'flavour_intensities': flavourIntensities,
       if (location != null) 'location': location,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
@@ -829,6 +876,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Value<String?>? notes,
     Value<int?>? tasteScore,
     Value<String>? flavourTags,
+    Value<String>? flavourIntensities,
     Value<String?>? location,
     Value<double?>? latitude,
     Value<double?>? longitude,
@@ -848,6 +896,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
       notes: notes ?? this.notes,
       tasteScore: tasteScore ?? this.tasteScore,
       flavourTags: flavourTags ?? this.flavourTags,
+      flavourIntensities: flavourIntensities ?? this.flavourIntensities,
       location: location ?? this.location,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
@@ -899,6 +948,9 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     if (flavourTags.present) {
       map['flavour_tags'] = Variable<String>(flavourTags.value);
     }
+    if (flavourIntensities.present) {
+      map['flavour_intensities'] = Variable<String>(flavourIntensities.value);
+    }
     if (location.present) {
       map['location'] = Variable<String>(location.value);
     }
@@ -938,6 +990,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
           ..write('notes: $notes, ')
           ..write('tasteScore: $tasteScore, ')
           ..write('flavourTags: $flavourTags, ')
+          ..write('flavourIntensities: $flavourIntensities, ')
           ..write('location: $location, ')
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude, ')
@@ -3735,6 +3788,7 @@ typedef $$ShotsTableCreateCompanionBuilder =
       Value<String?> notes,
       Value<int?> tasteScore,
       Value<String> flavourTags,
+      Value<String> flavourIntensities,
       Value<String?> location,
       Value<double?> latitude,
       Value<double?> longitude,
@@ -3755,6 +3809,7 @@ typedef $$ShotsTableUpdateCompanionBuilder =
       Value<String?> notes,
       Value<int?> tasteScore,
       Value<String> flavourTags,
+      Value<String> flavourIntensities,
       Value<String?> location,
       Value<double?> latitude,
       Value<double?> longitude,
@@ -3888,6 +3943,11 @@ class $$ShotsTableFilterComposer
 
   ColumnFilters<String> get flavourTags => $composableBuilder(
     column: $table.flavourTags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get flavourIntensities => $composableBuilder(
+    column: $table.flavourIntensities,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4056,6 +4116,11 @@ class $$ShotsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get flavourIntensities => $composableBuilder(
+    column: $table.flavourIntensities,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get location => $composableBuilder(
     column: $table.location,
     builder: (column) => ColumnOrderings(column),
@@ -4129,6 +4194,11 @@ class $$ShotsTableAnnotationComposer
 
   GeneratedColumn<String> get flavourTags => $composableBuilder(
     column: $table.flavourTags,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get flavourIntensities => $composableBuilder(
+    column: $table.flavourIntensities,
     builder: (column) => column,
   );
 
@@ -4270,6 +4340,7 @@ class $$ShotsTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<int?> tasteScore = const Value.absent(),
                 Value<String> flavourTags = const Value.absent(),
+                Value<String> flavourIntensities = const Value.absent(),
                 Value<String?> location = const Value.absent(),
                 Value<double?> latitude = const Value.absent(),
                 Value<double?> longitude = const Value.absent(),
@@ -4288,6 +4359,7 @@ class $$ShotsTableTableManager
                 notes: notes,
                 tasteScore: tasteScore,
                 flavourTags: flavourTags,
+                flavourIntensities: flavourIntensities,
                 location: location,
                 latitude: latitude,
                 longitude: longitude,
@@ -4308,6 +4380,7 @@ class $$ShotsTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<int?> tasteScore = const Value.absent(),
                 Value<String> flavourTags = const Value.absent(),
+                Value<String> flavourIntensities = const Value.absent(),
                 Value<String?> location = const Value.absent(),
                 Value<double?> latitude = const Value.absent(),
                 Value<double?> longitude = const Value.absent(),
@@ -4326,6 +4399,7 @@ class $$ShotsTableTableManager
                 notes: notes,
                 tasteScore: tasteScore,
                 flavourTags: flavourTags,
+                flavourIntensities: flavourIntensities,
                 location: location,
                 latitude: latitude,
                 longitude: longitude,

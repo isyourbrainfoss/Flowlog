@@ -1,3 +1,4 @@
+import '../models/flavour_intensities.dart';
 import '../models/shot.dart';
 import '../models/shot_sample.dart';
 
@@ -43,6 +44,11 @@ String exportShotToCsv(Shot shot) {
   if (shot.flavourTags.isNotEmpty) {
     buffer.writeln(
       'flavour_tags,${_csvCell(shot.flavourTags.join(';'))}',
+    );
+  }
+  if (shot.flavourIntensities.isNotEmpty) {
+    buffer.writeln(
+      'flavour_intensities,${_csvCell(formatFlavourIntensitiesCsv(shot.flavourIntensities))}',
     );
   }
 

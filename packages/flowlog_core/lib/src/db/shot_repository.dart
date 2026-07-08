@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
+import '../models/flavour_intensities.dart';
 import '../models/shot.dart' as models;
 import '../models/shot_annotation.dart' as models;
 import '../models/shot_sample.dart' as models;
@@ -273,6 +274,7 @@ class ShotRepository {
       longitude: Value(shot.longitude),
       tasteScore: Value(shot.tasteScore),
       flavourTags: Value(jsonEncode(shot.flavourTags)),
+      flavourIntensities: Value(encodeFlavourIntensities(shot.flavourIntensities)),
       coffeejackRewindTurns: Value(shot.coffeejackRewindTurns),
       coffeejackPreinfusionTurns: Value(shot.coffeejackPreinfusionTurns),
     );
@@ -324,6 +326,7 @@ class ShotRepository {
       longitude: row.longitude,
       tasteScore: row.tasteScore,
       flavourTags: _decodeFlavourTags(row.flavourTags),
+      flavourIntensities: decodeFlavourIntensities(row.flavourIntensities),
       coffeejackRewindTurns: row.coffeejackRewindTurns,
       coffeejackPreinfusionTurns: row.coffeejackPreinfusionTurns,
       samples: samples,

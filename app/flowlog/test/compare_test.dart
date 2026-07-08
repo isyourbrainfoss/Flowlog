@@ -80,7 +80,7 @@ void main() {
       expect(find.byKey(const Key('compare_fullscreen_open')), findsOneWidget);
       expect(find.textContaining('Shot 1 ('), findsOneWidget);
       expect(find.textContaining('Shot 2 ('), findsOneWidget);
-      expect(find.text('chocolate, nutty'), findsNWidgets(2));
+      expect(find.text('chocolate 5, nutty 5'), findsNWidgets(2));
       expect(find.text('Pressure'), findsOneWidget);
       expect(find.text('Overlay'), findsOneWidget);
       expect(tester.takeException(), isNull);

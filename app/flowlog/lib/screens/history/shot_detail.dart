@@ -456,6 +456,7 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
             FlavourProfileSection(
               tasteScore: metadata.tasteScore,
               flavourTags: metadata.flavourTags,
+              flavourIntensities: metadata.flavourIntensities,
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(

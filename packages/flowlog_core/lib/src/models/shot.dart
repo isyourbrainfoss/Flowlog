@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 
+import 'flavour_intensities.dart';
 import 'shot_annotation.dart';
 import 'shot_sample.dart';
 
@@ -21,6 +22,7 @@ class Shot {
     this.longitude,
     this.tasteScore,
     this.flavourTags = const [],
+    this.flavourIntensities = const {},
     this.coffeejackRewindTurns,
     this.coffeejackPreinfusionTurns,
     this.samples = const [],
@@ -44,6 +46,7 @@ class Shot {
   final double? longitude;
   final int? tasteScore;
   final List<String> flavourTags;
+  final Map<String, int> flavourIntensities;
   final int? coffeejackRewindTurns;
   final int? coffeejackPreinfusionTurns;
   final List<ShotSample> samples;
@@ -73,6 +76,7 @@ class Shot {
               ?.map((e) => e as String)
               .toList() ??
           const [],
+      flavourIntensities: _flavourIntensitiesFromJson(json['flavourIntensities']),
       samples: (json['samples'] as List<dynamic>?)
               ?.map((e) => ShotSample.fromJson(e as Map<String, dynamic>))
               .toList() ??
@@ -104,6 +108,8 @@ class Shot {
       if (coffeejackPreinfusionTurns != null)
         'coffeejackPreinfusionTurns': coffeejackPreinfusionTurns,
       if (flavourTags.isNotEmpty) 'flavourTags': flavourTags,
+      if (flavourIntensities.isNotEmpty)
+        'flavourIntensities': flavourIntensities,
       if (samples.isNotEmpty)
         'samples': samples.map((s) => s.toJson()).toList(),
       if (annotations.isNotEmpty)
@@ -126,6 +132,7 @@ class Shot {
     double? longitude,
     int? tasteScore,
     List<String>? flavourTags,
+    Map<String, int>? flavourIntensities,
     int? coffeejackRewindTurns,
     int? coffeejackPreinfusionTurns,
     List<ShotSample>? samples,
@@ -146,6 +153,7 @@ class Shot {
       longitude: longitude ?? this.longitude,
       tasteScore: tasteScore ?? this.tasteScore,
       flavourTags: flavourTags ?? this.flavourTags,
+      flavourIntensities: flavourIntensities ?? this.flavourIntensities,
       coffeejackRewindTurns:
           coffeejackRewindTurns ?? this.coffeejackRewindTurns,
       coffeejackPreinfusionTurns:
@@ -175,6 +183,7 @@ class Shot {
             coffeejackRewindTurns == other.coffeejackRewindTurns &&
             coffeejackPreinfusionTurns == other.coffeejackPreinfusionTurns &&
             _listEquals(flavourTags, other.flavourTags) &&
+            _mapEquals(flavourIntensities, other.flavourIntensities) &&
             _listEquals(samples, other.samples) &&
             _listEquals(annotations, other.annotations);
   }
@@ -197,6 +206,7 @@ class Shot {
         coffeejackRewindTurns,
         coffeejackPreinfusionTurns,
         Object.hashAll(flavourTags),
+        Object.hashAll(flavourIntensities.entries),
         Object.hashAll(samples),
         Object.hashAll(annotations),
       );
@@ -207,11 +217,38 @@ class Shot {
       'doseG: $doseG, yieldG: $yieldG, samples: ${samples.length})';
 }
 
+Map<String, int> _flavourIntensitiesFromJson(Object? raw) {
+  if (raw is! Map) {
+    return const {};
+  }
+  final result = <String, int>{};
+  for (final entry in raw.entries) {
+    final tag = entry.key;
+    final value = entry.value;
+    if (tag is! String || value is! num) {
+      continue;
+    }
+    result[tag] = clampFlavourIntensity(value.round());
+  }
+  return result;
+}
+
 bool _listEquals<T>(List<T> a, List<T> b) {
   if (identical(a, b)) return true;
   if (a.length != b.length) return false;
   for (var i = 0; i < a.length; i++) {
     if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
+bool _mapEquals(Map<String, int> a, Map<String, int> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (final entry in a.entries) {
+    if (b[entry.key] != entry.value) {
+      return false;
+    }
   }
   return true;
 }

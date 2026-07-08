@@ -239,6 +239,9 @@ Shot mergeShotRecords({
     flavourTags: primary.flavourTags.isNotEmpty
         ? primary.flavourTags
         : secondary.flavourTags,
+    flavourIntensities: primary.flavourIntensities.isNotEmpty
+        ? primary.flavourIntensities
+        : secondary.flavourIntensities,
     samples: primary.samples.length >= secondary.samples.length
         ? primary.samples
         : secondary.samples,
@@ -278,6 +281,9 @@ int _shotCompleteness(Shot shot) {
     score += 2;
   }
   if (shot.flavourTags.isNotEmpty) {
+    score++;
+  }
+  if (shot.flavourIntensities.isNotEmpty) {
     score++;
   }
   if (shot.location?.trim().isNotEmpty ?? false) {

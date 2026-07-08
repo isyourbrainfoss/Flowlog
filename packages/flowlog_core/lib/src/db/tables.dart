@@ -19,6 +19,8 @@ class Shots extends Table {
   IntColumn get tasteScore => integer().nullable()();
   TextColumn get flavourTags =>
       text().withDefault(const Constant('[]'))();
+  TextColumn get flavourIntensities =>
+      text().withDefault(const Constant('{}'))();
   TextColumn get location => text().nullable()();
   RealColumn get latitude => real().nullable()();
   RealColumn get longitude => real().nullable()();

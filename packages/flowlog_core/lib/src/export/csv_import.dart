@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../models/flavour_intensities.dart';
 import '../models/shot.dart';
 import '../models/shot_sample.dart';
 
@@ -115,6 +116,9 @@ Shot importShotFromCsv(String csv) {
     notes: _nullableString(metadata['notes']),
     tasteScore: _parseNullableInt(metadata['taste_score']),
     flavourTags: _parseFlavourTags(metadata['flavour_tags']),
+    flavourIntensities: parseFlavourIntensitiesCsv(
+      metadata['flavour_intensities'],
+    ),
     samples: samples,
   );
 }
@@ -134,6 +138,7 @@ const _knownMetadataKeys = {
   'notes',
   'taste_score',
   'flavour_tags',
+  'flavour_intensities',
 };
 
 bool _isSamplesHeader(List<String> fields) {

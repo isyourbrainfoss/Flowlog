@@ -26,7 +26,7 @@ class FlowlogDatabase extends _$FlowlogDatabase {
   FlowlogDatabase(super.executor);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -116,6 +116,18 @@ class FlowlogDatabase extends _$FlowlogDatabase {
             }
             if (!shotColumns.contains('coffeejack_preinfusion_turns')) {
               await m.addColumn(shots, shots.coffeejackPreinfusionTurns);
+            }
+          }
+          if (from < 13) {
+            final shotColumns = await m.database
+                .customSelect(
+                  'PRAGMA table_info(shots)',
+                  readsFrom: {shots},
+                )
+                .map((row) => row.read<String>('name'))
+                .get();
+            if (!shotColumns.contains('flavour_intensities')) {
+              await m.addColumn(shots, shots.flavourIntensities);
             }
           }
         },

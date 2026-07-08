@@ -32,7 +32,7 @@ void main() {
       expect(lines, contains('Dose: 18.0 g'));
       expect(lines, contains('Yield: 36.0 g'));
       expect(lines, contains('Bean: bean-house-blend'));
-      expect(lines, contains('Flavour tags: chocolate, nutty'));
+      expect(lines, contains('Flavour profile: chocolate 5, nutty 5'));
       expect(lines, contains('Duration: 28.5 s'));
       expect(lines, contains('Peak pressure: 9.0 bar'));
       expect(lines, contains('Max flow: 1.2 g/s'));

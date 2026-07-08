@@ -21,6 +21,7 @@ class ShotMetadata {
     this.location,
     this.tasteScore,
     this.flavourTags = const [],
+    this.flavourIntensities = const {},
     this.coffeejackRewindTurns,
     this.coffeejackPreinfusionTurns,
   }) : assert(
@@ -37,6 +38,7 @@ class ShotMetadata {
   final String? location;
   final int? tasteScore;
   final List<String> flavourTags;
+  final Map<String, int> flavourIntensities;
   final int? coffeejackRewindTurns;
   final int? coffeejackPreinfusionTurns;
 
@@ -51,6 +53,7 @@ class ShotMetadata {
       location: shot.location,
       tasteScore: shot.tasteScore,
       flavourTags: List<String>.from(shot.flavourTags),
+      flavourIntensities: Map<String, int>.from(shot.flavourIntensities),
       coffeejackRewindTurns: shot.coffeejackRewindTurns,
       coffeejackPreinfusionTurns: shot.coffeejackPreinfusionTurns,
     );
@@ -67,6 +70,7 @@ class ShotMetadata {
       location: location,
       tasteScore: tasteScore,
       flavourTags: flavourTags,
+      flavourIntensities: flavourIntensities,
       coffeejackRewindTurns: coffeejackRewindTurns,
       coffeejackPreinfusionTurns: coffeejackPreinfusionTurns,
     );
@@ -82,6 +86,7 @@ class ShotMetadata {
     String? location,
     int? tasteScore,
     List<String>? flavourTags,
+    Map<String, int>? flavourIntensities,
     int? coffeejackRewindTurns,
     int? coffeejackPreinfusionTurns,
   }) {
@@ -95,6 +100,7 @@ class ShotMetadata {
       location: location ?? this.location,
       tasteScore: tasteScore ?? this.tasteScore,
       flavourTags: flavourTags ?? this.flavourTags,
+      flavourIntensities: flavourIntensities ?? this.flavourIntensities,
       coffeejackRewindTurns:
           coffeejackRewindTurns ?? this.coffeejackRewindTurns,
       coffeejackPreinfusionTurns:
@@ -116,7 +122,8 @@ class ShotMetadata {
             tasteScore == other.tasteScore &&
             coffeejackRewindTurns == other.coffeejackRewindTurns &&
             coffeejackPreinfusionTurns == other.coffeejackPreinfusionTurns &&
-            _listEquals(flavourTags, other.flavourTags);
+            _listEquals(flavourTags, other.flavourTags) &&
+            _mapEquals(flavourIntensities, other.flavourIntensities);
   }
 
   @override
@@ -132,7 +139,19 @@ class ShotMetadata {
         coffeejackRewindTurns,
         coffeejackPreinfusionTurns,
         Object.hashAll(flavourTags),
+        Object.hashAll(flavourIntensities.entries),
       );
+}
+
+bool _mapEquals(Map<String, int> a, Map<String, int> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (final entry in a.entries) {
+    if (b[entry.key] != entry.value) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool _listEquals<T>(List<T> a, List<T> b) {
@@ -223,6 +242,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
   late CoffeejackSettings _coffeejackSettings;
   late double _tasteScore;
   late Set<String> _selectedFlavourTags;
+  late Map<String, int> _flavourIntensities;
   final _customTagController = TextEditingController();
   final BrewDefaultsSettingsStore _brewDefaultsStore =
       BrewDefaultsSettingsStore();
@@ -253,6 +273,9 @@ class _MetadataSheetState extends State<MetadataSheet> {
     _locationController = TextEditingController(text: initial?.location ?? '');
     _tasteScore = (initial?.tasteScore ?? 5).toDouble();
     _selectedFlavourTags = Set<String>.from(initial?.flavourTags ?? const []);
+    _flavourIntensities = Map<String, int>.from(
+      initial?.flavourIntensities ?? const {},
+    );
     unawaited(_loadDefaults());
     unawaited(_loadBeans());
   }
@@ -370,6 +393,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
 
     setState(() {
       _selectedFlavourTags.add(tag);
+      _flavourIntensities.putIfAbsent(tag, () => kDefaultFlavourIntensity);
       _customTagController.clear();
     });
   }
@@ -443,6 +467,11 @@ class _MetadataSheetState extends State<MetadataSheet> {
       }
     }
 
+    final flavourIntensities = normalizeFlavourIntensities(
+      selectedTags: _selectedFlavourTags,
+      intensities: _flavourIntensities,
+    );
+
     return ShotMetadata(
       doseG: _doseG,
       yieldG: _parseDouble(_yieldController.text),
@@ -452,7 +481,8 @@ class _MetadataSheetState extends State<MetadataSheet> {
       notes: _parseString(_notesController.text),
       location: _parseString(_locationController.text),
       tasteScore: _tasteScore.round(),
-      flavourTags: _selectedFlavourTags.toList()..sort(),
+      flavourTags: sortedFlavourTags(_selectedFlavourTags),
+      flavourIntensities: flavourIntensities,
       coffeejackRewindTurns: _coffeejackSettings.rewindTurnsBeforeFill,
       coffeejackPreinfusionTurns: _coffeejackSettings.slowPreinfusionTurns,
     );
@@ -662,14 +692,45 @@ class _MetadataSheetState extends State<MetadataSheet> {
                         setState(() {
                           if (selected) {
                             _selectedFlavourTags.add(tag);
+                            _flavourIntensities.putIfAbsent(
+                              tag,
+                              () => kDefaultFlavourIntensity,
+                            );
                           } else {
                             _selectedFlavourTags.remove(tag);
+                            _flavourIntensities.remove(tag);
                           }
                         });
                       },
                     ),
                 ],
               ),
+              if (_selectedFlavourTags.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Flavour intensity',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Rate how much of each note you taste (1–10).',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                for (final tag in sortedFlavourTags(_selectedFlavourTags))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _FlavourIntensityRow(
+                      tag: tag,
+                      value: _flavourIntensities[tag] ?? kDefaultFlavourIntensity,
+                      onChanged: (value) {
+                        setState(() => _flavourIntensities[tag] = value);
+                      },
+                    ),
+                  ),
+              ],
               const SizedBox(height: 12),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -711,6 +772,56 @@ class _MetadataSheetState extends State<MetadataSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _FlavourIntensityRow extends StatelessWidget {
+  const _FlavourIntensityRow({
+    required this.tag,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String tag;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 72,
+          child: Text(
+            tag,
+            style: Theme.of(context).textTheme.bodySmall,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Expanded(
+          child: Slider(
+            key: Key('metadata_flavour_intensity_$tag'),
+            value: value.toDouble(),
+            min: kMinFlavourIntensity.toDouble(),
+            max: kMaxFlavourIntensity.toDouble(),
+            divisions: kMaxFlavourIntensity - kMinFlavourIntensity,
+            label: value.toString(),
+            onChanged: (next) => onChanged(next.round()),
+          ),
+        ),
+        SizedBox(
+          width: 32,
+          child: Text(
+            key: Key('metadata_flavour_intensity_value_$tag'),
+            value.toString(),
+            textAlign: TextAlign.end,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+          ),
+        ),
+      ],
     );
   }
 }

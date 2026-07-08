@@ -21,13 +21,16 @@ void main() {
       expect(find.textContaining('No flavour notes recorded yet'), findsOneWidget);
     });
 
-    testWidgets('shows taste score and flavour tags', (tester) async {
+    testWidgets('shows scaled intensity bars for each flavour tag', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
             body: FlavourProfileSection(
               tasteScore: 8,
               flavourTags: ['chocolate', 'nutty'],
+              flavourIntensities: {'chocolate': 7, 'nutty': 4},
             ),
           ),
         ),
@@ -39,6 +42,10 @@ void main() {
       expect(find.byKey(const Key('flavour_profile_tag_chocolate')), findsOneWidget);
       expect(find.byKey(const Key('flavour_profile_tag_nutty')), findsOneWidget);
       expect(find.byKey(const Key('flavour_profile_bars')), findsOneWidget);
+      expect(find.byKey(const Key('flavour_profile_bar_chocolate')), findsOneWidget);
+      expect(find.byKey(const Key('flavour_profile_intensity_chocolate')), findsOneWidget);
+      expect(find.text('7/10'), findsOneWidget);
+      expect(find.text('4/10'), findsOneWidget);
     });
   });
 }

@@ -265,6 +265,25 @@ void main() {
       expect(metadata.notes, 'Minimal fixture shot for tests and mock replay.');
       expect(metadata.tasteScore, 5);
       expect(metadata.flavourTags, ['chocolate', 'nutty']);
+      expect(metadata.flavourIntensities, {'chocolate': 5, 'nutty': 5});
+    });
+
+    testWidgets('shows intensity sliders for selected flavour tags', (
+      tester,
+    ) async {
+      await pumpSheet(tester);
+
+      await tapVisible(tester, find.byKey(const Key('metadata_flavour_chocolate')));
+      await tapVisible(tester, find.byKey(const Key('metadata_flavour_nutty')));
+
+      expect(
+        find.byKey(const Key('metadata_flavour_intensity_chocolate')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('metadata_flavour_intensity_nutty')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('fixture metadata round-trips through sheet', (tester) async {
@@ -281,6 +300,7 @@ void main() {
       await tapVisible(tester, find.byKey(const Key('metadata_save')));
 
       final expected = initial.copyWith(
+        flavourIntensities: const {'chocolate': 5, 'nutty': 5},
         coffeejackRewindTurns: kDefaultCoffeejackRewindTurns,
         coffeejackPreinfusionTurns: kDefaultCoffeejackPreinfusionTurns,
       );
@@ -288,6 +308,7 @@ void main() {
       expect(
         saved!.applyTo(shot),
         shot.copyWith(
+          flavourIntensities: const {'chocolate': 5, 'nutty': 5},
           coffeejackRewindTurns: kDefaultCoffeejackRewindTurns,
           coffeejackPreinfusionTurns: kDefaultCoffeejackPreinfusionTurns,
         ),

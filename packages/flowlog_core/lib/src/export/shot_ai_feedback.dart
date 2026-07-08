@@ -123,6 +123,8 @@ Map<String, dynamic> _metadataMap(Shot shot) {
     if (shot.beanId != null) 'beanId': shot.beanId,
     if (shot.tasteScore != null) 'tasteScore': shot.tasteScore,
     if (shot.flavourTags.isNotEmpty) 'flavourTags': shot.flavourTags,
+    if (shot.flavourIntensities.isNotEmpty)
+      'flavourIntensities': shot.flavourIntensities,
     if (shot.notes != null && shot.notes!.trim().isNotEmpty) 'notes': shot.notes,
     if (shot.location != null) 'location': shot.location,
     if (shot.coffeejackRewindTurns != null)

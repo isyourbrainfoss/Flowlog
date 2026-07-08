@@ -433,10 +433,10 @@ class _CompareMetadataTable extends StatelessWidget {
   }
 
   static String _formatFlavourTags(Shot shot) {
-    if (shot.flavourTags.isEmpty) {
-      return '—';
-    }
-    return shot.flavourTags.join(', ');
+    return formatFlavourProfileSummary(
+      tags: shot.flavourTags,
+      intensities: shot.flavourIntensities,
+    );
   }
 
   static String _formatNotes(Shot shot) {

@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../flowlog_version.dart';
+import '../models/flavour_intensities.dart';
 import '../models/shot.dart';
 import '../models/shot_sample.dart';
 
@@ -107,7 +108,9 @@ List<String> shotPdfReportLines(Shot shot) {
     lines.add('Taste score: ${shot.tasteScore}/10');
   }
   if (shot.flavourTags.isNotEmpty) {
-    lines.add('Flavour tags: ${shot.flavourTags.join(', ')}');
+    lines.add(
+      'Flavour profile: ${formatFlavourProfileSummary(tags: shot.flavourTags, intensities: shot.flavourIntensities)}',
+    );
   }
 
   lines
