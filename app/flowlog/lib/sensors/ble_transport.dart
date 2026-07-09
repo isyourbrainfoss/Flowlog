@@ -310,6 +310,7 @@ class FlutterBluePressensorTransport implements PressensorBleTransport {
   BluetoothDevice? _device;
   BluetoothCharacteristic? _pressureCharacteristic;
   BluetoothCharacteristic? _zeroCharacteristic;
+  BluetoothCharacteristic? _batteryCharacteristic;
   StreamSubscription<List<int>>? _pressureSubscription;
   final _pressureController = StreamController<List<int>>.broadcast();
 
@@ -347,7 +348,18 @@ class FlutterBluePressensorTransport implements PressensorBleTransport {
     BluetoothCharacteristic? pressure;
     BluetoothCharacteristic? zero;
 
+    BluetoothCharacteristic? battery;
+
     for (final service in services) {
+      if (service.uuid == Guid(pressensorBatteryServiceUuid)) {
+        for (final characteristic in service.characteristics) {
+          if (characteristic.uuid ==
+              Guid(pressensorBatteryLevelCharacteristicUuid)) {
+            battery = characteristic;
+          }
+        }
+        continue;
+      }
       if (service.uuid != Guid(pressensorPressureServiceUuid)) {
         continue;
       }
@@ -367,6 +379,7 @@ class FlutterBluePressensorTransport implements PressensorBleTransport {
 
     _pressureCharacteristic = pressure;
     _zeroCharacteristic = zero;
+    _batteryCharacteristic = battery;
   }
 
   @override
@@ -385,6 +398,16 @@ class FlutterBluePressensorTransport implements PressensorBleTransport {
     device.cancelWhenDisconnected(_pressureSubscription!);
     unawaited(characteristic.setNotifyValue(true));
     return _pressureController.stream;
+  }
+
+  @override
+  Future<int?> readBatteryPercent() async {
+    final characteristic = _batteryCharacteristic;
+    if (characteristic == null) {
+      return null;
+    }
+    final value = await characteristic.read();
+    return parsePressensorBatteryLevel(value);
   }
 
   @override
@@ -407,6 +430,7 @@ class FlutterBluePressensorTransport implements PressensorBleTransport {
     _device = null;
     _pressureCharacteristic = null;
     _zeroCharacteristic = null;
+    _batteryCharacteristic = null;
     if (device != null) {
       await device.disconnect();
     }

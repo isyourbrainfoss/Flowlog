@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:flowlog/sensors/sensor_hub.dart';
+import 'package:flowlog/sensors/sensor_kind.dart';
+import 'package:flowlog_sensors/flowlog_sensors.dart'
+    show ConnectionState, isPressensorLowBattery;
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide ConnectionState;
 
 /// Sensor diagnostics: RSSI placeholder, reconnect log, and last error.
 class SensorDiagnosticsScreen extends StatelessWidget {
@@ -48,6 +51,27 @@ class SensorDiagnosticsScreen extends StatelessWidget {
             _RssiCard(
               deviceName: device.name,
               rssi: hub.rssiFor(device.id),
+            ),
+            const SizedBox(height: 8),
+          ],
+        const SizedBox(height: 8),
+        Text(
+          'Battery',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        if (devices.where((device) => device.kind == SensorKind.pressensor).isEmpty)
+          const _EmptyDiagnosticsHint(
+            message: 'Pair a Pressensor to see battery level.',
+          )
+        else
+          for (final device in devices.where(
+            (entry) => entry.kind == SensorKind.pressensor,
+          )) ...[
+            _BatteryCard(
+              deviceName: device.name,
+              percent: hub.batteryPercentFor(device.id),
+              isConnected: device.state == ConnectionState.connected,
             ),
             const SizedBox(height: 8),
           ],
@@ -174,6 +198,51 @@ class _LastErrorCard extends StatelessWidget {
                   ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BatteryCard extends StatelessWidget {
+  const _BatteryCard({
+    required this.deviceName,
+    required this.percent,
+    required this.isConnected,
+  });
+
+  final String deviceName;
+  final int? percent;
+  final bool isConnected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isLow = isPressensorLowBattery(percent);
+    final display = percent == null
+        ? (isConnected ? '— % (unavailable)' : 'Connect to read')
+        : '$percent%';
+
+    return Card(
+      elevation: FlowlogColors.cardElevation,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(FlowlogColors.cardRadius),
+        side: isLow
+            ? BorderSide(color: scheme.error.withValues(alpha: 0.6))
+            : BorderSide.none,
+      ),
+      child: ListTile(
+        leading: Icon(
+          isLow ? Icons.battery_alert : Icons.battery_std,
+          color: isLow ? scheme.error : null,
+        ),
+        title: Text(deviceName),
+        subtitle: Text(
+          isLow ? '$display · Low battery' : 'Battery: $display',
+          key: Key('battery_${deviceName}_value'),
+          style: isLow
+              ? TextStyle(color: scheme.error)
+              : null,
         ),
       ),
     );

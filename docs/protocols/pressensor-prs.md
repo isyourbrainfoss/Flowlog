@@ -47,6 +47,7 @@ Flowlog maps mbar to bar for shot charts (`mbar / 1000`).
 ## Integration notes
 
 - **Tare:** write any value to Zero Pressure (`873ae82c-…`).
-- **Battery:** optional read on standard Battery Level characteristic.
-- **Log:** diagnostic strings only; not required for live pressure streaming.
+- **Battery:** optional read on standard Battery Level characteristic (`0…100` %). Flowlog reads this on connect and warns at ≤20%.
+- **Temperature:** bundled on every 16th pressure notify (see above). Flowlog records it on shot samples and shows it on the Live metrics row.
+- **Log:** optional notify on Log characteristic — null-terminated diagnostic strings (not used by Flowlog yet).
 - **Clock:** merge samples on **host receive time** (see `docs/AGENT_GUIDE.md`).

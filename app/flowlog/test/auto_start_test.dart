@@ -43,6 +43,9 @@ class _MockPressensorBleTransport implements PressensorBleTransport {
     List<int> payload = pressensorZeroPressureCommand,
   ]) async {}
 
+  @override
+  Future<int?> readBatteryPercent() async => null;
+
   Future<void> close() => _pressureController.close();
 }
 

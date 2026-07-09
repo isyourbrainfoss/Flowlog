@@ -22,6 +22,10 @@ class PressensorBleAdapter implements SensorAdapter {
   final _stopwatch = Stopwatch();
 
   StreamSubscription<List<int>>? _pressureSub;
+  int? _batteryPercent;
+
+  /// Last battery reading from [readBatteryPercent], if available.
+  int? get batteryPercent => _batteryPercent;
 
   @override
   Stream<ConnectionState> get state => _stateController.stream;
@@ -53,10 +57,20 @@ class PressensorBleAdapter implements SensorAdapter {
           _stateController.add(ConnectionState.error);
         },
       );
+      await refreshBatteryPercent();
       _stateController.add(ConnectionState.connected);
     } catch (_) {
       _stateController.add(ConnectionState.error);
       rethrow;
+    }
+  }
+
+  /// Re-reads battery level from the device (BLE read, not streamed).
+  Future<void> refreshBatteryPercent() async {
+    try {
+      _batteryPercent = await _transport.readBatteryPercent();
+    } on Object {
+      _batteryPercent = null;
     }
   }
 

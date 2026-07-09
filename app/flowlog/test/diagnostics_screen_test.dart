@@ -42,6 +42,17 @@ void main() {
       );
     });
 
+    testWidgets('shows pressensor battery and low warning', (tester) async {
+      final hub = SensorHub()..addDevice(SensorKind.pressensor, name: 'PRS');
+      addTearDown(hub.dispose);
+
+      hub.updateBatteryPercent(hub.devices.first.id, 15);
+
+      await pumpDiagnosticsScreen(tester, hub: hub);
+
+      expect(find.textContaining('15% · Low battery'), findsOneWidget);
+    });
+
     testWidgets('shows RSSI placeholder and live value', (tester) async {
       final hub = SensorHub()..addDevice(SensorKind.pressensor, name: 'PRS');
       addTearDown(hub.dispose);

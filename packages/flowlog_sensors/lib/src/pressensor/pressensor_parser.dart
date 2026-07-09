@@ -50,3 +50,11 @@ PressensorReading parsePressureNotify(List<int> data) {
 
   return PressensorReading(pressureBar: pressureBar, tempC: tempC);
 }
+
+/// Parses the standard BLE battery level characteristic (single byte, 0–100).
+int? parsePressensorBatteryLevel(List<int> data) {
+  if (data.isEmpty) {
+    return null;
+  }
+  return data.first.clamp(0, 100);
+}

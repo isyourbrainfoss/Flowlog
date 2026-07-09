@@ -172,13 +172,20 @@ class _LiveScreenState extends State<LiveScreen> {
         previous != ConnectionState.connected &&
         current == ConnectionState.connected &&
         mounted) {
+      final threshold =
+          _resolvedAutoStartController.settings.startThresholdBar;
+      final batteryWarning =
+          pressensorLowBatteryWarning(hub.pressensorBatteryPercent);
+      final message = StringBuffer(
+        'Pressensor connected — auto-start at ${threshold.toStringAsFixed(1)} bar',
+      );
+      if (batteryWarning != null) {
+        message.write('. $batteryWarning');
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           key: const Key('pressensor_connected_snackbar'),
-          content: Text(
-            'Pressensor connected — auto-start at '
-            '${_resolvedAutoStartController.settings.startThresholdBar.toStringAsFixed(1)} bar',
-          ),
+          content: Text(message.toString()),
           behavior: SnackBarBehavior.floating,
         ),
       );

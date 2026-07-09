@@ -39,6 +39,22 @@ const String pressensorLogCharacteristicUuid =
 /// The PRS protocol accepts any value; current pressure is treated as zero.
 const List<int> pressensorZeroPressureCommand = [0x00];
 
+/// Battery percent at or below which Flowlog shows a low-battery warning.
+const int kPressensorLowBatteryPercent = 20;
+
+/// Returns true when [percent] should trigger a low-battery warning.
+bool isPressensorLowBattery(int? percent) {
+  return percent != null && percent <= kPressensorLowBatteryPercent;
+}
+
+/// User-facing low-battery warning, or null when [percent] is acceptable.
+String? pressensorLowBatteryWarning(int? percent) {
+  if (!isPressensorLowBattery(percent)) {
+    return null;
+  }
+  return 'Pressensor battery low ($percent%). Charge before your next session.';
+}
+
 /// Returns true when [deviceName] matches a Pressensor PRS advertisement.
 bool isPressensorDeviceName(String deviceName) {
   return deviceName.startsWith(pressensorNamePrefix);

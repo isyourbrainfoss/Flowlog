@@ -23,4 +23,7 @@ abstract class PressensorBleTransport {
   Future<void> writeZeroPressure([
     List<int> payload = pressensorZeroPressureCommand,
   ]);
+
+  /// Reads battery percent (0–100) when the device exposes the BLE service.
+  Future<int?> readBatteryPercent();
 }

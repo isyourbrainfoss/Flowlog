@@ -5,7 +5,8 @@ import 'package:flowlog/settings/auto_start_settings_store.dart';
 import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
-import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
+import 'package:flowlog_sensors/flowlog_sensors.dart'
+    show ConnectionState, isPressensorLowBattery, pressensorLowBatteryWarning;
 import 'package:flutter/material.dart' hide ConnectionState;
 
 /// Sensors pairing and connection management.
@@ -43,6 +44,7 @@ class SensorsScreen extends StatelessWidget {
           const SizedBox(height: 12),
           for (final device in devices) ...[
             _PairedDeviceCard(
+              hub: hub,
               device: device,
               onConnect: () => _connect(context, hub, device.id),
               onDisconnect: () => _disconnect(context, hub, device.id),
@@ -114,7 +116,7 @@ Future<String> _connectMessage({
 }) async {
   return switch (device.state) {
     ConnectionState.connected => device.kind == SensorKind.pressensor
-        ? _pressensorConnectedMessage(device.name)
+        ? _pressensorConnectedMessage(device.name, hub)
         : 'Connected to ${device.name}.',
     ConnectionState.connecting => 'Connecting to ${device.name}…',
     _ => hub.lastError ??
@@ -122,10 +124,20 @@ Future<String> _connectMessage({
   };
 }
 
-Future<String> _pressensorConnectedMessage(String deviceName) async {
+Future<String> _pressensorConnectedMessage(
+  String deviceName,
+  SensorHub hub,
+) async {
   final settings = await AutoStartSettingsStore().load();
-  return 'Connected to $deviceName. Auto-start at '
-      '${settings.startThresholdBar.toStringAsFixed(1)} bar.';
+  final buffer = StringBuffer(
+    'Connected to $deviceName. Auto-start at '
+    '${settings.startThresholdBar.toStringAsFixed(1)} bar.',
+  );
+  final batteryWarning = pressensorLowBatteryWarning(hub.pressensorBatteryPercent);
+  if (batteryWarning != null) {
+    buffer.write(' $batteryWarning');
+  }
+  return buffer.toString();
 }
 
 class _EmptySensorsState extends StatelessWidget {
@@ -422,6 +434,7 @@ class _AddSensorDialogState extends State<_AddSensorDialog> {
 
 class _PairedDeviceCard extends StatelessWidget {
   const _PairedDeviceCard({
+    required this.hub,
     required this.device,
     required this.onConnect,
     required this.onDisconnect,
@@ -429,6 +442,7 @@ class _PairedDeviceCard extends StatelessWidget {
     required this.onRemove,
   });
 
+  final SensorHub hub;
   final PairedSensorEntry device;
   final VoidCallback onConnect;
   final VoidCallback onDisconnect;
@@ -440,6 +454,10 @@ class _PairedDeviceCard extends StatelessWidget {
     final canConnect = device.state == ConnectionState.disconnected ||
         device.state == ConnectionState.error;
     final canDisconnect = device.state == ConnectionState.connected;
+    final batteryPercent = device.kind == SensorKind.pressensor
+        ? hub.batteryPercentFor(device.id)
+        : null;
+    final batteryIsLow = isPressensorLowBattery(batteryPercent);
 
     return Card(
       elevation: FlowlogColors.cardElevation,
@@ -486,6 +504,21 @@ class _PairedDeviceCard extends StatelessWidget {
                 'BLE id: ${device.bleRemoteId}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            if (batteryPercent != null &&
+                device.state == ConnectionState.connected) ...[
+              Text(
+                batteryIsLow
+                    ? 'Battery: $batteryPercent% · Low — charge soon'
+                    : 'Battery: $batteryPercent%',
+                key: Key('paired_battery_${device.id}'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: batteryIsLow
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
               ),
               const SizedBox(height: 8),

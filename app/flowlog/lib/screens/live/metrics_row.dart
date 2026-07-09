@@ -15,10 +15,12 @@ class LiveMetrics {
   const LiveMetrics({
     this.pressureBar,
     this.flowGs,
+    this.tempC,
     required this.elapsedMs,
     this.projectedYieldG,
     this.pressureTrend = MetricTrend.neutral,
     this.flowTrend = MetricTrend.neutral,
+    this.tempTrend = MetricTrend.neutral,
     this.elapsedTrend = MetricTrend.neutral,
     this.projectedYieldTrend = MetricTrend.neutral,
   });
@@ -27,10 +29,12 @@ class LiveMetrics {
 
   final double? pressureBar;
   final double? flowGs;
+  final double? tempC;
   final int elapsedMs;
   final double? projectedYieldG;
   final MetricTrend pressureTrend;
   final MetricTrend flowTrend;
+  final MetricTrend tempTrend;
   final MetricTrend elapsedTrend;
   final MetricTrend projectedYieldTrend;
 
@@ -67,10 +71,12 @@ class LiveMetrics {
     return LiveMetrics(
       pressureBar: current.pressureBar,
       flowGs: current.flowGs,
+      tempC: current.tempC,
       elapsedMs: current.elapsedMs,
       projectedYieldG: projectedYieldG,
       pressureTrend: _trend(current.pressureBar, prior?.pressureBar),
       flowTrend: _trend(current.flowGs, prior?.flowGs),
+      tempTrend: _trend(current.tempC, prior?.tempC),
       elapsedTrend: _trend(
         current.elapsedMs.toDouble(),
         prior?.elapsedMs.toDouble(),
@@ -199,6 +205,15 @@ class LiveMetricsRow extends StatelessWidget {
         labelStyle: labelStyle,
         valueStyle: valueStyle,
       ),
+      if (resolved.tempC != null)
+        _MetricTile(
+          key: const Key('live_metric_temp'),
+          label: 'Temp',
+          value: _formatTemp(resolved.tempC),
+          trend: resolved.tempTrend,
+          labelStyle: labelStyle,
+          valueStyle: valueStyle,
+        ),
     ];
 
     return Card(
@@ -209,25 +224,28 @@ class LiveMetricsRow extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             if (constraints.maxWidth < compactLayoutBreakpoint) {
+              final rows = <Widget>[];
+              for (var i = 0; i < tiles.length; i += 2) {
+                if (i > 0) {
+                  rows.add(const SizedBox(height: 10));
+                }
+                final pair = tiles.sublist(i, (i + 2).clamp(0, tiles.length));
+                rows.add(
+                  Row(
+                    children: [
+                      Expanded(child: pair[0]),
+                      if (pair.length > 1) ...[
+                        const SizedBox(width: 8),
+                        Expanded(child: pair[1]),
+                      ] else
+                        const Spacer(),
+                    ],
+                  ),
+                );
+              }
               return Column(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: tiles[0]),
-                      const SizedBox(width: 8),
-                      Expanded(child: tiles[1]),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(child: tiles[2]),
-                      const SizedBox(width: 8),
-                      Expanded(child: tiles[3]),
-                    ],
-                  ),
-                ],
+                children: rows,
               );
             }
 
@@ -272,10 +290,18 @@ class LiveMetricsRow extends StatelessWidget {
     }
     return '${grams.toStringAsFixed(1)} g';
   }
+
+  static String _formatTemp(double? tempC) {
+    if (tempC == null) {
+      return '—';
+    }
+    return '${tempC.toStringAsFixed(1)} °C';
+  }
 }
 
 class _MetricTile extends StatelessWidget {
   const _MetricTile({
+    super.key,
     required this.label,
     required this.value,
     required this.trend,

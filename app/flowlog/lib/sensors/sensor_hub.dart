@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_kind.dart';
 import 'package:flowlog/settings/paired_sensors_store.dart';
-import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState, SensorAdapter;
+import 'package:flowlog_sensors/flowlog_sensors.dart'
+    show ConnectionState, PressensorBleAdapter, SensorAdapter;
 import 'package:flutter/material.dart' hide ConnectionState;
 
 export 'package:flowlog/sensors/sensor_kind.dart';
@@ -81,6 +82,7 @@ class SensorHub extends ChangeNotifier {
   final PairedSensorsStore? _pairedSensorsStore;
   final List<SensorReconnectEvent> _reconnectLog = [];
   final Map<String, int?> _rssiByDevice = {};
+  final Map<String, int?> _batteryByDevice = {};
   final Map<String, SensorAdapter> _activeAdapters = {};
   final Map<String, StreamSubscription<ConnectionState>> _adapterStateSubs = {};
   final BleConnectionBackend _bleBackend;
@@ -97,6 +99,20 @@ class SensorHub extends ChangeNotifier {
 
   /// RSSI in dBm from the most recent scan, when available.
   int? rssiFor(String deviceId) => _rssiByDevice[deviceId];
+
+  /// Battery percent (0–100) after the last successful pressensor connect.
+  int? batteryPercentFor(String deviceId) => _batteryByDevice[deviceId];
+
+  /// Battery percent for the connected pressensor, if known.
+  int? get pressensorBatteryPercent {
+    for (final device in _devices) {
+      if (device.kind == SensorKind.pressensor &&
+          device.state == ConnectionState.connected) {
+        return _batteryByDevice[device.id];
+      }
+    }
+    return null;
+  }
 
   bool hasKind(SensorKind kind) =>
       _devices.any((device) => device.kind == kind);
@@ -212,6 +228,7 @@ class SensorHub extends ChangeNotifier {
     _devices.removeWhere((device) => device.id == id);
     if (_devices.length != before) {
       _rssiByDevice.remove(id);
+      _batteryByDevice.remove(id);
       unawaited(_persistDevices());
       notifyListeners();
     }
@@ -312,6 +329,12 @@ class SensorHub extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Updates cached battery percent for [deviceId].
+  void updateBatteryPercent(String deviceId, int? percent) {
+    _batteryByDevice[deviceId] = percent;
+    notifyListeners();
+  }
+
   /// Attempt BLE connect using flutter_blue_plus when the platform supports it.
   Future<void> connect(String id) async {
     final index = _devices.indexWhere((device) => device.id == id);
@@ -322,6 +345,7 @@ class SensorHub extends ChangeNotifier {
     final device = _devices[index];
     _devices[index] = device.copyWith(state: ConnectionState.connecting);
     _rssiByDevice[id] = null;
+    _batteryByDevice[id] = null;
     recordReconnect(
       deviceId: id,
       deviceName: device.name,
@@ -359,6 +383,10 @@ class SensorHub extends ChangeNotifier {
       });
 
       await adapter.connect();
+      if (device.kind == SensorKind.pressensor &&
+          adapter is PressensorBleAdapter) {
+        _batteryByDevice[id] = adapter.batteryPercent;
+      }
 
       final currentIndex = _devices.indexWhere((entry) => entry.id == id);
       if (currentIndex < 0) {
@@ -405,6 +433,14 @@ class SensorHub extends ChangeNotifier {
     }
 
     _devices[index] = _devices[index].copyWith(state: state);
+    if (state == ConnectionState.connected) {
+      final adapter = _activeAdapters[id];
+      if (adapter is PressensorBleAdapter) {
+        _batteryByDevice[id] = adapter.batteryPercent;
+      }
+    } else if (state == ConnectionState.disconnected) {
+      _batteryByDevice.remove(id);
+    }
     if (state == ConnectionState.error) {
       setLastError('Sensor link error ($id).');
     }
@@ -424,6 +460,7 @@ class SensorHub extends ChangeNotifier {
     }
     _devices[index] =
         _devices[index].copyWith(state: ConnectionState.disconnected);
+    _batteryByDevice.remove(id);
     notifyListeners();
   }
 

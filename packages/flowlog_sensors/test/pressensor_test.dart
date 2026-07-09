@@ -48,6 +48,11 @@ class _MockPressensorBleTransport implements PressensorBleTransport {
     writtenZeroCommands.add(List<int>.from(payload));
   }
 
+  int? batteryPercent = 85;
+
+  @override
+  Future<int?> readBatteryPercent() async => batteryPercent;
+
   Future<void> close() => _pressureController.close();
 }
 
@@ -117,6 +122,24 @@ void main() {
     });
   });
 
+  group('parsePressensorBatteryLevel', () {
+    test('parses single-byte BLE battery characteristic', () {
+      expect(parsePressensorBatteryLevel([72]), 72);
+      expect(parsePressensorBatteryLevel([150]), 100);
+      expect(parsePressensorBatteryLevel(const []), isNull);
+    });
+
+    test('low-battery helpers use configured threshold', () {
+      expect(isPressensorLowBattery(20), isTrue);
+      expect(isPressensorLowBattery(21), isFalse);
+      expect(
+        pressensorLowBatteryWarning(15),
+        'Pressensor battery low (15%). Charge before your next session.',
+      );
+      expect(pressensorLowBatteryWarning(80), isNull);
+    });
+  });
+
   group('PressensorBleAdapter', () {
     late _MockPressensorBleTransport transport;
     late PressensorBleAdapter adapter;
@@ -142,6 +165,14 @@ void main() {
       expect(transport.writtenZeroCommands, [
         pressensorZeroPressureCommand,
       ]);
+    });
+
+    test('connect reads battery percent from transport', () async {
+      transport.batteryPercent = 18;
+
+      await adapter.connect();
+
+      expect(adapter.batteryPercent, 18);
     });
 
     test('connect emits lifecycle states and parsed samples', () async {

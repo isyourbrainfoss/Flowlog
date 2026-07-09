@@ -431,6 +431,7 @@ class _ShellContent extends StatelessWidget {
                     onActiveBeanChanged: onActiveBeanChanged,
                     pressensorState: hub.pressensorState,
                     scaleState: hub.scaleState,
+                    pressensorBatteryPercent: hub.pressensorBatteryPercent,
                   );
                 },
               ),

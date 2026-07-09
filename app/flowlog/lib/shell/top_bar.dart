@@ -3,7 +3,8 @@ import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_core/flowlog_core.dart';
-import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
+import 'package:flowlog_sensors/flowlog_sensors.dart'
+    show ConnectionState, isPressensorLowBattery;
 import 'package:flutter/material.dart' hide ConnectionState;
 
 /// Default active bean label shown in the top bar.
@@ -21,6 +22,7 @@ class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
     this.onActiveBeanChanged,
     this.pressensorState = ConnectionState.disconnected,
     this.scaleState = ConnectionState.disconnected,
+    this.pressensorBatteryPercent,
   });
 
   final String beanName;
@@ -28,6 +30,7 @@ class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
   final void Function(String name, {String? beanId})? onActiveBeanChanged;
   final ConnectionState pressensorState;
   final ConnectionState scaleState;
+  final int? pressensorBatteryPercent;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -91,8 +94,11 @@ class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
                 SensorConnectionIcon(
                   key: const Key('top_bar_prs_status'),
                   label: 'Pressensor PRS',
-                  icon: Icons.speed,
+                  icon: isPressensorLowBattery(pressensorBatteryPercent)
+                      ? Icons.battery_alert
+                      : Icons.speed,
                   state: pressensorState,
+                  batteryPercent: pressensorBatteryPercent,
                   onTap: () => _openSensorsScreen(context),
                 ),
                 const SizedBox(width: 4),
@@ -296,12 +302,14 @@ class SensorConnectionIcon extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.state,
+    this.batteryPercent,
     this.onTap,
   });
 
   final String label;
   final IconData icon;
   final ConnectionState state;
+  final int? batteryPercent;
   final VoidCallback? onTap;
 
   @override
@@ -319,10 +327,17 @@ class SensorConnectionIcon extends StatelessWidget {
       child: Icon(icon, size: 20, color: color),
     );
 
+    final battery = batteryPercent;
+    final batterySuffix = battery == null
+        ? ''
+        : isPressensorLowBattery(battery)
+            ? ' — Battery $battery% (low)'
+            : ' — Battery $battery%';
+
     return Tooltip(
       message: onTap != null
-          ? '$label: $tooltip — tap to open Sensors'
-          : '$label: $tooltip',
+          ? '$label: $tooltip$batterySuffix — tap to open Sensors'
+          : '$label: $tooltip$batterySuffix',
       child: onTap == null
           ? child
           : InkWell(
