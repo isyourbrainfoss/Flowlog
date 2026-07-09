@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import 'package:flowlog/sensors/sensor_hub.dart';
+import 'package:flowlog/shell/app_destinations.dart';
+import 'package:flowlog/shell/shell_scope.dart';
+import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flutter/material.dart';
 
@@ -70,9 +75,46 @@ class SensorDiagnosticsScreen extends StatelessWidget {
           )
         else
           _ReconnectLogCard(events: hub.reconnectLog),
+        const SizedBox(height: 24),
+        Text(
+          'Developer',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        Card(
+          elevation: FlowlogColors.cardElevation,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(FlowlogColors.cardRadius),
+          ),
+          child: ListTile(
+            key: const Key('settings_try_demo'),
+            leading: const Icon(Icons.science_outlined),
+            title: const Text('Try demo shot'),
+            subtitle: const Text(
+              'Replay bundled sample data on the Live tab',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => unawaited(startDemoShotFromSettings(context)),
+          ),
+        ),
       ],
     );
   }
+}
+
+/// Switches to Live and starts bundled demo replay (More → Sensor diagnostics).
+Future<void> startDemoShotFromSettings(BuildContext context) async {
+  final shortcuts = FlowlogShortcutsScope.maybeOf(context);
+  final switchTab = FlowlogShellScope.maybeOf(context)?.switchTab;
+  final startDemo = shortcuts?.registry.startDemoShot;
+  if (switchTab == null || startDemo == null) {
+    return;
+  }
+
+  Navigator.of(context).pop();
+  switchTab(AppTab.live);
+  await Future<void>.delayed(Duration.zero);
+  await startDemo();
 }
 
 /// Opens [SensorDiagnosticsScreen] from Sensors or More.

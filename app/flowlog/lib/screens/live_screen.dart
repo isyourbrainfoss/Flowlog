@@ -263,6 +263,7 @@ class _LiveScreenState extends State<LiveScreen> {
     if (scope != null) {
       _shortcutRegistry = scope.registry;
       _shortcutRegistry!.setToggleLiveShot(_onToggleShotShortcut);
+      _shortcutRegistry!.setStartDemoShot(_onTryDemoShot);
     }
     _repeatShotController =
         widget.repeatShotController ?? RepeatShotScope.maybeOf(context);
@@ -284,6 +285,7 @@ class _LiveScreenState extends State<LiveScreen> {
   void dispose() {
     _sensorHub?.removeListener(_onSensorHubChanged);
     _shortcutRegistry?.setToggleLiveShot(null);
+    _shortcutRegistry?.setStartDemoShot(null);
     _confettiController.dispose();
     _chartInteractionController.dispose();
     _activeBrewNotifier?.setBrewing(false);
@@ -663,9 +665,6 @@ class _LiveScreenState extends State<LiveScreen> {
         final state = controller.sessionState;
         final samples = controller.samples;
         final demoModeActive = _sensorSource?.isDemoMode ?? false;
-        final showTryDemoButton = !demoModeActive &&
-            state != ShotSessionState.recording &&
-            state != ShotSessionState.paused;
         final latestSample = samples.isEmpty ? null : samples.last;
         final previousSample =
             samples.length < 2 ? null : samples[samples.length - 2];
@@ -807,17 +806,6 @@ class _LiveScreenState extends State<LiveScreen> {
                           ),
                           const SizedBox(height: 8),
                         ],
-                        if (showTryDemoButton)
-                          Align(
-                            alignment: Alignment.center,
-                            child: OutlinedButton.icon(
-                              key: const Key('live_try_demo'),
-                              onPressed: _onTryDemoShot,
-                              icon: const Icon(Icons.science_outlined),
-                              label: const Text('Try demo shot'),
-                            ),
-                          ),
-                        if (showTryDemoButton) const SizedBox(height: 16),
                         if (controller.canSaveShot)
                           Align(
                             alignment: Alignment.center,

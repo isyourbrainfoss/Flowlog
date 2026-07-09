@@ -6,6 +6,8 @@ import 'package:flowlog/screens/live_screen.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog/sensors/live_sensor_source.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
+import 'package:flowlog/shell/app_destinations.dart';
+import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
 import 'package:flowlog_sensors/src/decent_scale/decent_scale.dart';
@@ -180,25 +182,31 @@ void main() {
       hub.dispose();
     });
 
-    Future<void> pumpLiveScreen(
+    Future<FlowlogShortcutRegistry> pumpLiveScreen(
       WidgetTester tester, {
       LiveSensorSource? sensorSource,
       PressureAdapterFactory? pressureAdapterFactory,
       WeightAdapterFactory? weightAdapterFactory,
     }) async {
+      final registry = FlowlogShortcutRegistry();
       await tester.pumpWidget(
         SensorHubScope(
           hub: hub,
-          child: MaterialApp(
-            home: LiveScreen(
-              sensorSource: sensorSource,
-              pressureAdapterFactory: pressureAdapterFactory,
-              weightAdapterFactory: weightAdapterFactory,
+          child: FlowlogShortcuts(
+            registry: registry,
+            currentTab: AppTab.live,
+            child: MaterialApp(
+              home: LiveScreen(
+                sensorSource: sensorSource,
+                pressureAdapterFactory: pressureAdapterFactory,
+                weightAdapterFactory: weightAdapterFactory,
+              ),
             ),
           ),
         ),
       );
       await tester.pumpAndSettle();
+      return registry;
     }
 
     testWidgets('shows empty chart when no sensors are connected', (
@@ -230,41 +238,32 @@ void main() {
       expect(find.text('Stop brew'), findsOneWidget);
     });
 
-    testWidgets('shows try demo button only while idle', (tester) async {
+    testWidgets('live tab does not show try demo button', (tester) async {
       await pumpLiveScreen(tester);
 
-      expect(find.byKey(const Key('live_try_demo')), findsOneWidget);
-      expect(find.text('Try demo shot'), findsOneWidget);
+      expect(find.byKey(const Key('live_try_demo')), findsNothing);
+      expect(find.text('Try demo shot'), findsNothing);
     });
 
     testWidgets('try demo shot enables demo banner and recording', (
       tester,
     ) async {
-      await pumpLiveScreen(tester);
-
-      final tryDemoButton = find.byKey(const Key('live_try_demo'));
-      await tester.ensureVisible(tryDemoButton);
-      await tester.pumpAndSettle();
+      final registry = await pumpLiveScreen(tester);
 
       await tester.runAsync(() async {
-        await tester.tap(tryDemoButton);
+        await registry.startDemoShot?.call();
         await tester.pump();
       });
 
       expect(find.text('Demo shot — replayed sample data'), findsOneWidget);
-      expect(find.byKey(const Key('live_try_demo')), findsNothing);
       expect(find.text('Stop brew'), findsOneWidget);
     });
 
     testWidgets('dismissing demo banner exits demo mode', (tester) async {
-      await pumpLiveScreen(tester);
-
-      final tryDemoButton = find.byKey(const Key('live_try_demo'));
-      await tester.ensureVisible(tryDemoButton);
-      await tester.pumpAndSettle();
+      final registry = await pumpLiveScreen(tester);
 
       await tester.runAsync(() async {
-        await tester.tap(tryDemoButton);
+        await registry.startDemoShot?.call();
         await tester.pump();
       });
 

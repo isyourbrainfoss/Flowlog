@@ -2,6 +2,7 @@ import 'package:flowlog/main.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/flowlog_shell.dart';
+import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -159,8 +160,13 @@ void main() {
     await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('live_try_demo')));
-    await tester.pumpAndSettle();
+    final registry = FlowlogShortcutsScope.of(
+      tester.element(find.byKey(const Key('live_brew'))),
+    ).registry;
+    await tester.runAsync(() async {
+      await registry.startDemoShot?.call();
+      await tester.pump();
+    });
     await tester.pump(const Duration(milliseconds: 500));
 
     final samplesFinder = find.textContaining('samples');

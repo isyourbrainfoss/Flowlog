@@ -17,9 +17,14 @@ class OpenExportIntent extends Intent {
 /// Registry for live-tab handlers registered by [LiveScreen].
 class FlowlogShortcutRegistry {
   Future<void> Function()? toggleLiveShot;
+  Future<void> Function()? startDemoShot;
 
   void setToggleLiveShot(Future<void> Function()? handler) {
     toggleLiveShot = handler;
+  }
+
+  void setStartDemoShot(Future<void> Function()? handler) {
+    startDemoShot = handler;
   }
 }
 
