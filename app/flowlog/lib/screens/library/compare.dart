@@ -359,6 +359,7 @@ class _CompareMetadataTable extends StatelessWidget {
                   _metadataRow('Ratio', shots.map(_formatRatio)),
                   _metadataRow('Grind', shots.map(_formatGrind)),
                   _metadataRow('Water temp', shots.map(_formatWaterTemp)),
+                  _metadataRow('Brew temp', shots.map(_formatBrewTemp)),
                   _metadataRow('Taste', shots.map(_formatTasteCell)),
                   _metadataRow('Flavour tags', shots.map(_formatFlavourTags)),
                   _metadataRow('Notes', shots.map(_formatNotes)),
@@ -410,12 +411,15 @@ class _CompareMetadataTable extends StatelessWidget {
   }
 
   static String _formatWaterTemp(Shot shot) {
-    final temp = shot.waterTempC ??
-        (shot.samples.isNotEmpty ? shot.samples.last.tempC : null);
+    final temp = shot.waterTempC;
     if (temp == null) {
       return '—';
     }
     return '${temp.toStringAsFixed(1)} °C';
+  }
+
+  static String _formatBrewTemp(Shot shot) {
+    return brewTempRangeFromSamples(shot.samples).format();
   }
 
   static String _formatTasteCell(Shot shot) {

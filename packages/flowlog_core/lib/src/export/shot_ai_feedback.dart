@@ -4,6 +4,7 @@ import 'package:meta/meta.dart';
 
 import '../models/bean.dart';
 import '../models/brew_summary.dart';
+import '../models/brew_temp.dart';
 import '../models/shot.dart';
 import '../models/shot_annotation.dart';
 import '../models/shot_sample.dart';
@@ -73,6 +74,7 @@ Map<String, dynamic> buildShotAiFeedbackPayload({
   int maxCurvePoints = 40,
 }) {
   final summary = BrewSummary.fromShot(shot);
+  final brewTemp = brewTempRangeFromSamples(shot.samples);
   final sortedSamples = List<ShotSample>.from(shot.samples)
     ..sort((a, b) => a.elapsedMs.compareTo(b.elapsedMs));
 
@@ -85,6 +87,8 @@ Map<String, dynamic> buildShotAiFeedbackPayload({
       'durationMs': summary.durationMs,
       'durationSec': summary.durationMs / 1000,
       'peakPressureBar': summary.peakPressureBar,
+      if (brewTemp.startTempC != null) 'brewStartTempC': brewTemp.startTempC,
+      if (brewTemp.endTempC != null) 'brewEndTempC': brewTemp.endTempC,
       if (shot.doseG != null && shot.yieldG != null && shot.doseG! > 0)
         'brewRatio': shot.yieldG! / shot.doseG!,
     },

@@ -89,11 +89,12 @@ Future<ShotMetadata> defaultMetadataFromSamples(
       ? null
       : await shotRepository.lastGrindSetting();
 
+  final brewTemp = brewTempRangeFromSamples(samples);
   return ShotMetadata(
     doseG: defaults.defaultDoseG,
     yieldG: last.weightG,
     grindSetting: lastGrind ?? defaults.defaultGrindSetting,
-    waterTempC: last.tempC,
+    waterTempC: brewTemp.endTempC ?? last.tempC,
     beanId: beanId,
     coffeejackRewindTurns: coffeejack.rewindTurnsBeforeFill,
     coffeejackPreinfusionTurns: coffeejack.slowPreinfusionTurns,
@@ -148,9 +149,10 @@ Future<ShotMetadata> displayMetadataForShot(
 
   if (shot.samples.isNotEmpty) {
     final last = shot.samples.last;
+    final brewTemp = brewTempRangeFromSamples(shot.samples);
     metadata = metadata.copyWith(
       yieldG: metadata.yieldG ?? last.weightG,
-      waterTempC: metadata.waterTempC ?? last.tempC,
+      waterTempC: metadata.waterTempC ?? brewTemp.endTempC ?? last.tempC,
     );
   }
 

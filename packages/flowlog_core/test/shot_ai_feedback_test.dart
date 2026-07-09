@@ -40,11 +40,29 @@ void main() {
       expect(payload['brewSummary'], isA<Map<String, dynamic>>());
       expect(payload['brewSummary']['peakPressureBar'], isNotNull);
       expect(payload['brewSummary']['brewRatio'], closeTo(2.0, 0.01));
+      expect(payload['brewSummary']['brewStartTempC'], isNotNull);
+      expect(payload['brewSummary']['brewEndTempC'], isNotNull);
 
       final curve = payload['curve'] as List<dynamic>;
       expect(curve, isNotEmpty);
       expect(curve.length, lessThanOrEqualTo(40));
       expect(curve.first, containsPair('elapsedMs', 0));
+    });
+
+    test('includes sensor brew temperatures in brew summary', () {
+      final shotWithTemp = shot.copyWith(
+        samples: [
+          const ShotSample(elapsedMs: 0, pressureBar: 0, tempC: 91.0),
+          const ShotSample(elapsedMs: 1000, pressureBar: 9, tempC: 93.0),
+          const ShotSample(elapsedMs: 2000, pressureBar: 0, tempC: 40.0),
+        ],
+      );
+
+      final payload = buildShotAiFeedbackPayload(shot: shotWithTemp);
+      final summary = payload['brewSummary'] as Map<String, dynamic>;
+
+      expect(summary['brewStartTempC'], 91.0);
+      expect(summary['brewEndTempC'], 93.0);
     });
 
     test('includes bean context and desired flavor goal', () {

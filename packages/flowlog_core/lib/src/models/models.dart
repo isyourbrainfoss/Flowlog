@@ -1,4 +1,5 @@
 export 'brew_summary.dart';
+export 'brew_temp.dart';
 export 'bean.dart';
 export 'bean_display.dart';
 export 'device.dart';

@@ -536,6 +536,8 @@ class _MetadataGrid extends StatelessWidget {
           fontFeatures: const [FontFeature.tabularFigures()],
         );
 
+    final brewTemp = brewTempRangeFromSamples(shot.samples);
+
     return Column(
       children: [
         Row(
@@ -579,6 +581,15 @@ class _MetadataGrid extends StatelessWidget {
             ),
           ],
         ),
+        if (brewTemp.hasAny) ...[
+          const SizedBox(height: 12),
+          _MetadataField(
+            label: 'Brew temp',
+            value: brewTemp.format(),
+            labelStyle: labelStyle,
+            valueStyle: valueStyle,
+          ),
+        ],
         const SizedBox(height: 12),
         Row(
           children: [
