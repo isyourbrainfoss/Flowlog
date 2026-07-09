@@ -503,6 +503,7 @@ class _LiveScreenState extends State<LiveScreen> {
         location: locationSettings.currentLocation,
         latitude: gps?.latitude,
         longitude: gps?.longitude,
+        autoStartPressureBar: controller.autoStartPressureBar,
         idGenerator: widget.shotIdGenerator,
         onSaved: (saved) {
           _lastAutoSavedShotId = saved.id;

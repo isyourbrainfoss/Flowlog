@@ -26,6 +26,7 @@ class Shots extends Table {
   RealColumn get longitude => real().nullable()();
   IntColumn get coffeejackRewindTurns => integer().nullable()();
   IntColumn get coffeejackPreinfusionTurns => integer().nullable()();
+  RealColumn get autoStartPressureBar => real().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

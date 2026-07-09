@@ -58,8 +58,14 @@ class LiveShotController extends ChangeNotifier {
 
   bool get isBrewing => canStop;
 
+  double? _autoStartPressureBar;
+
+  /// The pressure threshold (in bar) that was used to auto-start this brew, if any.
+  /// Null if started manually.
+  double? get autoStartPressureBar => _autoStartPressureBar;
+
   /// Tares the scale, connects [sampleAdapter], and begins [ShotSession].
-  Future<void> start() async {
+  Future<void> start({double? autoStartPressureBar}) async {
     if (!canStart) {
       return;
     }
@@ -67,6 +73,8 @@ class LiveShotController extends ChangeNotifier {
     if (sessionState == ShotSessionState.stopped) {
       await _replaceSession();
     }
+
+    _autoStartPressureBar = autoStartPressureBar;
 
     await _onTare();
     _sessionStartedAt = DateTime.now().toUtc();

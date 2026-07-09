@@ -47,6 +47,20 @@ class BrewCompleteBanner extends StatelessWidget {
                       color: theme.colorScheme.onPrimaryContainer,
                     ),
                   ),
+                  if (summary.preInfusionMs != null || summary.highPressureMs != null)
+                    Text(
+                      'Pre-inf ${summary.formatPreInfusion()} · High-press ${summary.formatHighPressure()}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  if (summary.autoStartPressureBar != null)
+                    Text(
+                      'Auto-started at ${summary.formatAutoStartPressure()}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
+                      ),
+                    ),
                 ],
               ),
             ),

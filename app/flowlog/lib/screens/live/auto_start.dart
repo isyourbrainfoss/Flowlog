@@ -301,7 +301,9 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
 
     _starting = true;
     try {
-      await widget.controller.start();
+      await widget.controller.start(
+        autoStartPressureBar: widget.settings.startThresholdBar,
+      );
     } finally {
       _starting = false;
     }

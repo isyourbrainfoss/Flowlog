@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/history/history_fullscreen_chart.dart';
@@ -51,8 +50,6 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
   BeanRepository? _beanRepository;
   ProfileRepository? _profileRepository;
   FlowlogDatabase? _database;
-  bool _ownsShotRepository = false;
-  bool _ownsProfileRepository = false;
   bool _repeating = false;
   bool _settingTarget = false;
   bool _editing = false;
@@ -169,7 +166,6 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
     }
 
     _database = await openFlowlogDatabase();
-    _ownsShotRepository = true;
     return _database!;
   }
 
@@ -183,7 +179,6 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
 
     final database = await _ensureDatabase();
     _shotRepository = ShotRepository(database);
-    _ownsShotRepository = true;
     return _shotRepository!;
   }
 
@@ -195,11 +190,8 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
       return _profileRepository!;
     }
 
-    if (_database == null) {
-      _database = await openFlowlogDatabase();
-    }
+    _database ??= await openFlowlogDatabase();
     _profileRepository = ProfileRepository(_database!);
-    _ownsProfileRepository = true;
     return _profileRepository!;
   }
 
@@ -210,10 +202,18 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
 
     setState(() => _editing = true);
     try {
+      final shotRepository = await _ensureShotRepository();
+      if (!mounted) {
+        return;
+      }
+      final beanRepository = await _ensureBeanRepository();
+      if (!mounted) {
+        return;
+      }
       final updated = await runAddNotesFlow(
         context: context,
-        repository: await _ensureShotRepository(),
-        beanRepository: await _ensureBeanRepository(),
+        repository: shotRepository,
+        beanRepository: beanRepository,
         shot: _currentShot,
       );
       if (updated != null && mounted) {
@@ -285,10 +285,14 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
 
     setState(() => _repeating = true);
     try {
+      final profileRepository = await _ensureProfileRepository();
+      if (!mounted) {
+        return;
+      }
       await startRepeatShotFromShot(
         context: context,
         shot: _currentShot,
-        profileRepository: await _ensureProfileRepository(),
+        profileRepository: profileRepository,
         repeatController: _repeatShotController,
       );
       if (mounted) {
@@ -308,11 +312,16 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
 
     setState(() => _settingTarget = true);
     try {
+      final profileRepository = await _ensureProfileRepository();
+      if (!mounted) {
+        return;
+      }
+      final targetBrewController = TargetBrewScope.maybeOf(context);
       await setDefaultTargetBrewFromShot(
         context: context,
         shot: _currentShot,
-        profileRepository: await _ensureProfileRepository(),
-        targetBrewController: TargetBrewScope.maybeOf(context),
+        profileRepository: profileRepository,
+        targetBrewController: targetBrewController,
       );
     } finally {
       if (mounted) {
@@ -416,28 +425,67 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: _MetadataField(
-                        label: 'Brew time',
-                        value: brewSummary.formatDuration(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _MetadataField(
+                            label: 'Brew time',
+                            value: brewSummary.formatDuration(),
+                            labelStyle: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            valueStyle: theme.textTheme.titleMedium,
+                          ),
+                        ),
+                        Expanded(
+                          child: _MetadataField(
+                            label: 'Peak pressure',
+                            value: brewSummary.formatPeakPressure(),
+                            labelStyle: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            valueStyle: theme.textTheme.titleMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (brewSummary.preInfusionMs != null || brewSummary.highPressureMs != null)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _MetadataField(
+                              label: 'Pre-infusion',
+                              value: brewSummary.formatPreInfusion(),
+                              labelStyle: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              valueStyle: theme.textTheme.titleMedium,
+                            ),
+                          ),
+                          Expanded(
+                            child: _MetadataField(
+                              label: 'High pressure',
+                              value: brewSummary.formatHighPressure(),
+                              labelStyle: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              valueStyle: theme.textTheme.titleMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (brewSummary.autoStartPressureBar != null)
+                      _MetadataField(
+                        label: 'Auto-started at',
+                        value: brewSummary.formatAutoStartPressure(),
                         labelStyle: theme.textTheme.labelSmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                         valueStyle: theme.textTheme.titleMedium,
                       ),
-                    ),
-                    Expanded(
-                      child: _MetadataField(
-                        label: 'Peak pressure',
-                        value: brewSummary.formatPeakPressure(),
-                        labelStyle: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        valueStyle: theme.textTheme.titleMedium,
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -646,16 +694,6 @@ class _MetadataGrid extends StatelessWidget {
       return '—';
     }
     return '${value.toStringAsFixed(1)} g';
-  }
-
-  static String _formatNumber(double? value) {
-    if (value == null) {
-      return '—';
-    }
-    if (value == value.roundToDouble()) {
-      return value.toInt().toString();
-    }
-    return value.toString();
   }
 
   static String _formatTemp(double? value) {

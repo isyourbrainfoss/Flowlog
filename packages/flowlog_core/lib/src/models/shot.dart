@@ -29,6 +29,7 @@ class Shot {
     this.flavourIntensities = const {},
     this.coffeejackRewindTurns,
     this.coffeejackPreinfusionTurns,
+    this.autoStartPressureBar,
     this.samples = const [],
     this.annotations = const [],
   }) : assert(
@@ -53,6 +54,7 @@ class Shot {
   final Map<String, int> flavourIntensities;
   final int? coffeejackRewindTurns;
   final int? coffeejackPreinfusionTurns;
+  final double? autoStartPressureBar;
   final List<ShotSample> samples;
   final List<ShotAnnotation> annotations;
 
@@ -76,6 +78,7 @@ class Shot {
       coffeejackRewindTurns: (json['coffeejackRewindTurns'] as num?)?.toInt(),
       coffeejackPreinfusionTurns:
           (json['coffeejackPreinfusionTurns'] as num?)?.toInt(),
+      autoStartPressureBar: (json['autoStartPressureBar'] as num?)?.toDouble(),
       flavourTags: (json['flavourTags'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
@@ -111,6 +114,8 @@ class Shot {
         'coffeejackRewindTurns': coffeejackRewindTurns,
       if (coffeejackPreinfusionTurns != null)
         'coffeejackPreinfusionTurns': coffeejackPreinfusionTurns,
+      if (autoStartPressureBar != null)
+        'autoStartPressureBar': autoStartPressureBar,
       if (flavourTags.isNotEmpty) 'flavourTags': flavourTags,
       if (flavourIntensities.isNotEmpty)
         'flavourIntensities': flavourIntensities,
@@ -139,6 +144,7 @@ class Shot {
     Map<String, int>? flavourIntensities,
     int? coffeejackRewindTurns,
     int? coffeejackPreinfusionTurns,
+    double? autoStartPressureBar,
     List<ShotSample>? samples,
     List<ShotAnnotation>? annotations,
   }) {
@@ -162,6 +168,7 @@ class Shot {
           coffeejackRewindTurns ?? this.coffeejackRewindTurns,
       coffeejackPreinfusionTurns:
           coffeejackPreinfusionTurns ?? this.coffeejackPreinfusionTurns,
+      autoStartPressureBar: autoStartPressureBar ?? this.autoStartPressureBar,
       samples: samples ?? this.samples,
       annotations: annotations ?? this.annotations,
     );
@@ -186,6 +193,7 @@ class Shot {
             tasteScore == other.tasteScore &&
             coffeejackRewindTurns == other.coffeejackRewindTurns &&
             coffeejackPreinfusionTurns == other.coffeejackPreinfusionTurns &&
+            autoStartPressureBar == other.autoStartPressureBar &&
             _listEquals(flavourTags, other.flavourTags) &&
             _mapEquals(flavourIntensities, other.flavourIntensities) &&
             _listEquals(samples, other.samples) &&
@@ -200,6 +208,7 @@ class Shot {
         doseG,
         yieldG,
         grindSetting,
+        autoStartPressureBar,
         beanId,
         waterTempC,
         notes,

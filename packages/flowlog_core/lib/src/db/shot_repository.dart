@@ -278,6 +278,7 @@ class ShotRepository {
       flavourIntensities: Value(encodeFlavourIntensities(shot.flavourIntensities)),
       coffeejackRewindTurns: Value(shot.coffeejackRewindTurns),
       coffeejackPreinfusionTurns: Value(shot.coffeejackPreinfusionTurns),
+      autoStartPressureBar: Value(shot.autoStartPressureBar),
     );
   }
 
@@ -330,6 +331,7 @@ class ShotRepository {
       flavourIntensities: decodeFlavourIntensities(row.flavourIntensities),
       coffeejackRewindTurns: row.coffeejackRewindTurns,
       coffeejackPreinfusionTurns: row.coffeejackPreinfusionTurns,
+      autoStartPressureBar: row.autoStartPressureBar,
       samples: samples,
       annotations: annotations,
     );

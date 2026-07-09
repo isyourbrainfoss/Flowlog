@@ -25,6 +25,7 @@ Shot buildShotFromSession({
   String? location,
   double? latitude,
   double? longitude,
+  double? autoStartPressureBar,
   ShotIdGenerator idGenerator = generateShotId,
 }) {
   var shot = Shot(
@@ -34,6 +35,7 @@ Shot buildShotFromSession({
     location: location,
     latitude: latitude,
     longitude: longitude,
+    autoStartPressureBar: autoStartPressureBar,
     samples: List<ShotSample>.from(samples),
     annotations: List<ShotAnnotation>.from(annotations),
   );
@@ -181,6 +183,7 @@ Future<Shot?> runAutoSaveFlow({
   String? location,
   double? latitude,
   double? longitude,
+  double? autoStartPressureBar,
   ShotIdGenerator idGenerator = generateShotId,
   void Function(Shot shot)? onSaved,
   Future<void> Function(Shot shot)? onAddNotes,
@@ -233,6 +236,7 @@ Future<Shot?> runAutoSaveFlow({
     location: location,
     latitude: latitude,
     longitude: longitude,
+    autoStartPressureBar: autoStartPressureBar,
     idGenerator: idGenerator,
   );
 
@@ -338,10 +342,19 @@ Future<Shot?> runStarShotSaveFlow({
     return null;
   }
 
+  final ShotMetadata? initial;
+  if (initialMetadata != null) {
+    initial = initialMetadata;
+  } else {
+    initial = await defaultMetadataFromSamples(samples);
+    if (!context.mounted) {
+      return null;
+    }
+  }
+
   final metadata = await showMetadataSheet(
     context,
-    initial: initialMetadata ??
-        await defaultMetadataFromSamples(samples),
+    initial: initial,
   );
   if (metadata == null || !context.mounted) {
     return null;
