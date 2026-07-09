@@ -9,6 +9,7 @@ import 'package:flowlog/screens/live/metadata_sheet.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
+import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog/widgets/flavour_profile.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -563,7 +564,7 @@ class _MetadataGrid extends StatelessWidget {
             Expanded(
               child: _MetadataField(
                 label: 'Grind',
-                value: _formatNumber(metadata.grindSetting),
+                value: formatGrindSetting(metadata.grindSetting),
                 labelStyle: labelStyle,
                 valueStyle: valueStyle,
               ),

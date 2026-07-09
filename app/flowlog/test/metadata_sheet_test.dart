@@ -111,6 +111,8 @@ void main() {
       expect(find.text('Temp (°C)'), findsOneWidget);
       expect(find.byKey(const Key('metadata_dose_slider')), findsOneWidget);
       expect(find.byKey(const Key('metadata_grind_slider')), findsOneWidget);
+      expect(find.byKey(const Key('metadata_grind_decrement')), findsOneWidget);
+      expect(find.byKey(const Key('metadata_grind_increment')), findsOneWidget);
       expect(
         find.byKey(const Key('metadata_coffeejack_rewind_slider')),
         findsOneWidget,
@@ -121,6 +123,22 @@ void main() {
       expect(find.text('Flavour tags'), findsOneWidget);
       expect(find.byKey(const Key('metadata_taste_slider')), findsOneWidget);
       expect(find.byKey(const Key('metadata_save')), findsOneWidget);
+    });
+
+    testWidgets('grind steppers adjust in 0.1 steps', (tester) async {
+      await pumpSheet(tester);
+
+      final starting = snapGrindSetting(kDefaultBrewGrindSetting);
+      expect(find.text('Grind: ${formatGrindSetting(starting)}'), findsOneWidget);
+
+      await tapVisible(tester, find.byKey(const Key('metadata_grind_increment')));
+      expect(
+        find.text('Grind: ${formatGrindSetting(starting + kBrewGrindStep)}'),
+        findsOneWidget,
+      );
+
+      await tapVisible(tester, find.byKey(const Key('metadata_grind_decrement')));
+      expect(find.text('Grind: ${formatGrindSetting(starting)}'), findsOneWidget);
     });
 
     testWidgets('shows selectable flavour tag chips', (tester) async {

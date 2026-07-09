@@ -54,7 +54,7 @@ void main() {
       expect(find.text('Metadata'), findsOneWidget);
       expect(find.text('18.0 g'), findsOneWidget);
       expect(find.text('36.0 g'), findsOneWidget);
-      expect(find.text('14'), findsOneWidget);
+      expect(find.text('14.0'), findsOneWidget);
       expect(find.text('93.0 °C'), findsOneWidget);
       expect(find.text('House Blend'), findsOneWidget);
       expect(find.text('bean-house-blend'), findsNothing);
@@ -103,7 +103,7 @@ void main() {
       expect(find.text('${kDefaultBrewDoseG.toStringAsFixed(1)} g'), findsOneWidget);
       expect(find.text('36.2 g'), findsOneWidget);
       expect(find.text('93.5 °C'), findsOneWidget);
-      expect(find.text(kDefaultBrewGrindSetting.toString()), findsOneWidget);
+      expect(find.text(formatGrindSetting(kDefaultBrewGrindSetting)), findsOneWidget);
       expect(
         find.text('${kDefaultCoffeejackRewindTurns} turns'),
         findsOneWidget,

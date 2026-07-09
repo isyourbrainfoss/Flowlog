@@ -26,6 +26,9 @@ class BrewMetadataSliders extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final snappedGrind = snapGrindSetting(grindSetting);
+    final canDecrementGrind = snappedGrind > kBrewGrindMin;
+    final canIncrementGrind = snappedGrind < kBrewGrindMax;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -45,17 +48,45 @@ class BrewMetadataSliders extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Grind: ${grindSetting.toStringAsFixed(1)}',
+          'Grind: ${formatGrindSetting(snappedGrind)}',
           style: theme.textTheme.titleSmall,
         ),
-        Slider(
-          key: const Key('metadata_grind_slider'),
-          value: grindSetting.clamp(kBrewGrindMin, kBrewGrindMax),
-          min: kBrewGrindMin,
-          max: kBrewGrindMax,
-          divisions: ((kBrewGrindMax - kBrewGrindMin) * 10).round(),
-          label: grindSetting.toStringAsFixed(1),
-          onChanged: onGrindChanged,
+        Row(
+          children: [
+            IconButton(
+              key: const Key('metadata_grind_decrement'),
+              tooltip: 'Finer (−0.1)',
+              onPressed: canDecrementGrind
+                  ? () => onGrindChanged(
+                        snapGrindSetting(snappedGrind - kBrewGrindStep),
+                      )
+                  : null,
+              icon: const Icon(Icons.remove),
+              visualDensity: VisualDensity.compact,
+            ),
+            Expanded(
+              child: Slider(
+                key: const Key('metadata_grind_slider'),
+                value: snappedGrind,
+                min: kBrewGrindMin,
+                max: kBrewGrindMax,
+                divisions: ((kBrewGrindMax - kBrewGrindMin) * 10).round(),
+                label: formatGrindSetting(snappedGrind),
+                onChanged: (value) => onGrindChanged(snapGrindSetting(value)),
+              ),
+            ),
+            IconButton(
+              key: const Key('metadata_grind_increment'),
+              tooltip: 'Coarser (+0.1)',
+              onPressed: canIncrementGrind
+                  ? () => onGrindChanged(
+                        snapGrindSetting(snappedGrind + kBrewGrindStep),
+                      )
+                  : null,
+              icon: const Icon(Icons.add),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
         ),
         if (showCoffeejack) ...[
           const SizedBox(height: 16),

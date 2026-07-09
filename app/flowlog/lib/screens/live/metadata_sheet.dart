@@ -258,7 +258,9 @@ class _MetadataSheetState extends State<MetadataSheet> {
     super.initState();
     final initial = widget.initial;
     _doseG = initial?.doseG ?? kDefaultBrewDoseG;
-    _grindSetting = initial?.grindSetting ?? kDefaultBrewGrindSetting;
+    _grindSetting = snapGrindSetting(
+      initial?.grindSetting ?? kDefaultBrewGrindSetting,
+    );
     _coffeejackSettings = const CoffeejackSettings();
     _yieldController = TextEditingController(
       text: _formatDouble(initial?.yieldG),
@@ -298,7 +300,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
         _doseG = brewDefaults.defaultDoseG;
       }
       if (initial?.grindSetting == null) {
-        _grindSetting = brewDefaults.defaultGrindSetting;
+        _grindSetting = snapGrindSetting(brewDefaults.defaultGrindSetting);
       }
       _coffeejackSettings = CoffeejackSettings(
         rewindTurnsBeforeFill: initial?.coffeejackRewindTurns ??
@@ -475,7 +477,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
     return ShotMetadata(
       doseG: _doseG,
       yieldG: _parseDouble(_yieldController.text),
-      grindSetting: _grindSetting,
+      grindSetting: snapGrindSetting(_grindSetting),
       beanId: beanId,
       waterTempC: _parseDouble(_tempController.text),
       notes: _parseString(_notesController.text),
@@ -527,8 +529,9 @@ class _MetadataSheetState extends State<MetadataSheet> {
                         grindSetting: _grindSetting,
                         coffeejackSettings: _coffeejackSettings,
                         onDoseChanged: (value) => setState(() => _doseG = value),
-                        onGrindChanged: (value) =>
-                            setState(() => _grindSetting = value),
+                        onGrindChanged: (value) => setState(
+                          () => _grindSetting = snapGrindSetting(value),
+                        ),
                         onCoffeejackChanged: (settings) =>
                             unawaited(_updateCoffeejack(settings)),
                       ),

@@ -17,6 +17,23 @@ const double kBrewDoseMaxG = 24.0;
 const double kBrewGrindMin = 0.0;
 const double kBrewGrindMax = 20.0;
 
+/// Step size for grind adjustments in the metadata sheet.
+const double kBrewGrindStep = 0.1;
+
+/// Snaps [value] to one decimal place within grind bounds.
+double snapGrindSetting(double value) {
+  final snapped = (value * 10).round() / 10.0;
+  return snapped.clamp(kBrewGrindMin, kBrewGrindMax);
+}
+
+/// Formats grind for display without floating-point noise.
+String formatGrindSetting(double? value) {
+  if (value == null) {
+    return '—';
+  }
+  return snapGrindSetting(value).toStringAsFixed(1);
+}
+
 /// User preferences for metadata defaults on new brews.
 class BrewDefaultsSettings {
   const BrewDefaultsSettings({

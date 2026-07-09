@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/history/history_shot_card.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
+import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog/widgets/fullscreen_plot.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -405,14 +406,7 @@ class _CompareMetadataTable extends StatelessWidget {
   }
 
   static String _formatGrind(Shot shot) {
-    final grind = shot.grindSetting;
-    if (grind == null) {
-      return '—';
-    }
-    if (grind == grind.roundToDouble()) {
-      return grind.toInt().toString();
-    }
-    return grind.toString();
+    return formatGrindSetting(shot.grindSetting);
   }
 
   static String _formatWaterTemp(Shot shot) {
