@@ -6,7 +6,6 @@ import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/live/annotations.dart';
 import 'package:flowlog/screens/live/auto_start.dart';
 import 'package:flowlog/screens/live/brew_complete_banner.dart';
-import 'package:flowlog/screens/live/coffeejack_turns_panel.dart';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/delight.dart';
 import 'package:flowlog/screens/live/feedback.dart';
@@ -14,12 +13,8 @@ import 'package:flowlog/screens/live/fullscreen_chart.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
-import 'package:flowlog/screens/more/target_brew_screen.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
-import 'package:flowlog/screens/more/brew_defaults_screen.dart';
-import 'package:flowlog/settings/auto_start_settings_store.dart';
 import 'package:flowlog/settings/brew_location_store.dart';
-import 'package:flowlog/settings/coffeejack_settings_store.dart';
 import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog/sensors/live_sensor_source.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
@@ -51,6 +46,7 @@ class LiveScreen extends StatefulWidget {
     this.weightAdapterFactory,
     this.brewLocationStore,
     this.brewGpsCapture,
+    this.autoStartController,
   });
 
   /// Optional override for tests or dependency injection.
@@ -92,6 +88,9 @@ class LiveScreen extends StatefulWidget {
   /// Optional GPS capture override for tests.
   final BrewGpsCapture? brewGpsCapture;
 
+  /// Optional auto-start controller override for tests.
+  final AutoStartSettingsController? autoStartController;
+
   @override
   State<LiveScreen> createState() => _LiveScreenState();
 }
@@ -118,19 +117,15 @@ class _LiveScreenState extends State<LiveScreen> {
   TargetBrewController? _targetBrewController;
   final ConfettiController _confettiController = ConfettiController();
   late final ChartInteractionController _chartInteractionController;
-  final AutoStartSettingsStore _autoStartSettingsStore = AutoStartSettingsStore();
+  late final AutoStartSettingsController _ownedAutoStartController;
+  AutoStartSettingsController? _autoStartController;
   late final BrewLocationStore _brewLocationStore;
   late final BrewGpsCapture _brewGpsCapture;
-  AutoStartSettings _autoStartSettings = const AutoStartSettings();
-  CoffeejackSettings _coffeejackSettings = const CoffeejackSettings();
-  final CoffeejackSettingsStore _coffeejackSettingsStore =
-      CoffeejackSettingsStore();
   BrewSummary? _lastBrewSummary;
   SensorHub? _sensorHub;
   ConnectionState? _lastPressensorState;
   ActiveBrewNotifier? _activeBrewNotifier;
   ShotEventsNotifier? _shotEventsNotifier;
-  late final ValueNotifier<double?> _livePressureBarNotifier;
 
   @override
   void initState() {
@@ -146,7 +141,8 @@ class _LiveScreenState extends State<LiveScreen> {
     );
     _annotationController.addListener(_syncAnnotations);
     _chartInteractionController = ChartInteractionController();
-    _livePressureBarNotifier = ValueNotifier<double?>(null);
+    _ownedAutoStartController = AutoStartSettingsController();
+    unawaited(_ownedAutoStartController.load());
 
     if (widget.controller != null) {
       _sensorSource = widget.sensorSource;
@@ -154,43 +150,12 @@ class _LiveScreenState extends State<LiveScreen> {
       _controllerReady = true;
     }
 
-    unawaited(_loadAutoStartSettings());
-    unawaited(_loadCoffeejackSettings());
   }
 
-  Future<void> _loadAutoStartSettings() async {
-    final settings = await _autoStartSettingsStore.load();
-    if (mounted) {
-      setState(() => _autoStartSettings = settings);
-    }
-  }
-
-  Future<void> _loadCoffeejackSettings() async {
-    final settings = await _coffeejackSettingsStore.load();
-    if (mounted) {
-      setState(() => _coffeejackSettings = settings);
-    }
-  }
-
-  Future<void> _openCoffeejackSettings() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => BrewDefaultsScreen(
-          coffeejackSettingsStore: _coffeejackSettingsStore,
-        ),
-      ),
-    );
-    await _loadCoffeejackSettings();
-  }
-
-  Future<void> _onAutoStartThresholdChanged(double value) async {
-    final updated = AutoStartSettings(
-      enabled: _autoStartSettings.enabled,
-      startThresholdBar: value,
-      releaseFraction: _autoStartSettings.releaseFraction,
-    );
-    setState(() => _autoStartSettings = updated);
-    await _autoStartSettingsStore.save(updated);
+  AutoStartSettingsController get _resolvedAutoStartController {
+    return _autoStartController ??
+        widget.autoStartController ??
+        _ownedAutoStartController;
   }
 
   void _onSensorHubChanged() {
@@ -212,7 +177,7 @@ class _LiveScreenState extends State<LiveScreen> {
           key: const Key('pressensor_connected_snackbar'),
           content: Text(
             'Pressensor connected — auto-start at '
-            '${_autoStartSettings.startThresholdBar.toStringAsFixed(1)} bar',
+            '${_resolvedAutoStartController.settings.startThresholdBar.toStringAsFixed(1)} bar',
           ),
           behavior: SnackBarBehavior.floating,
         ),
@@ -268,6 +233,8 @@ class _LiveScreenState extends State<LiveScreen> {
     _repeatShotController =
         widget.repeatShotController ?? RepeatShotScope.maybeOf(context);
     _targetBrewController = TargetBrewScope.maybeOf(context);
+    _autoStartController = widget.autoStartController ??
+        AutoStartSettingsScope.maybeOf(context);
 
     _activeBrewNotifier = ActiveBrewScope.maybeOf(context);
     _shotEventsNotifier = ShotEventsScope.maybeOf(context);
@@ -294,7 +261,7 @@ class _LiveScreenState extends State<LiveScreen> {
     _annotationController.removeListener(_syncAnnotations);
     _annotationController.dispose();
     _annotationsNotifier.dispose();
-    _livePressureBarNotifier.dispose();
+    _ownedAutoStartController.dispose();
     _samplesNotifier.dispose();
     if (_ownsController) {
       _controller?.dispose();
@@ -594,27 +561,6 @@ class _LiveScreenState extends State<LiveScreen> {
     );
   }
 
-  bool _showAutoStartBanner({
-    required bool demoModeActive,
-    required bool canStart,
-  }) {
-    if (demoModeActive || !canStart) {
-      return false;
-    }
-
-    final hub = SensorHubScope.maybeOf(context);
-    final source = _sensorSource;
-    if (hub?.activeAdapterFor(SensorKind.pressensor) != null) {
-      return true;
-    }
-
-    if (source == null || !source.hasConnectedSensors) {
-      return false;
-    }
-
-    return source.resolveSampleAdapter() is! IdleSensorAdapter;
-  }
-
   Future<void> _onRepeatShotPressed() async {
     final controller = _controller;
     if (controller == null || !controller.canSaveShot) {
@@ -658,6 +604,7 @@ class _LiveScreenState extends State<LiveScreen> {
     if (_targetBrewController != null) {
       listenables.add(_targetBrewController!);
     }
+    listenables.add(_resolvedAutoStartController);
 
     return ListenableBuilder(
       listenable: Listenable.merge(listenables),
@@ -671,16 +618,8 @@ class _LiveScreenState extends State<LiveScreen> {
         final canAnnotate =
             state != ShotSessionState.idle && samples.isNotEmpty;
         final repeatPrefill = _repeatShotController?.prefill;
-        final targetBrew = _targetBrewController;
         final chartTargetSamples = _chartTargetPressureSamples();
-        final showDefaultTargetBanner = repeatPrefill == null &&
-            targetBrew != null &&
-            targetBrew.hasTarget;
-
-        final showAutoStart = _showAutoStartBanner(
-          demoModeActive: demoModeActive,
-          canStart: controller.canStart,
-        );
+        final autoStartSettings = _resolvedAutoStartController.settings;
 
         final shell = ConfettiOverlay(
           controller: _confettiController,
@@ -710,32 +649,6 @@ class _LiveScreenState extends State<LiveScreen> {
                             onDismiss: _repeatShotController!.clear,
                           ),
                         if (repeatPrefill != null) const SizedBox(height: 8),
-                        if (showDefaultTargetBanner)
-                          TargetBrewBanner(
-                            profileName: targetBrew.profileName ?? 'Target',
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (context) => TargetBrewScreen(
-                                    targetBrewController: targetBrew,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        if (showDefaultTargetBanner) const SizedBox(height: 8),
-                        if (showAutoStart)
-                          AutoStartArmedBanner(
-                            thresholdBar: _autoStartSettings.startThresholdBar,
-                            pressureBarNotifier: _livePressureBarNotifier,
-                          ),
-                        if (showAutoStart)
-                          AutoStartThresholdPanel(
-                            thresholdBar: _autoStartSettings.startThresholdBar,
-                            onThresholdChanged: (value) =>
-                                unawaited(_onAutoStartThresholdChanged(value)),
-                          ),
-                        if (showAutoStart) const SizedBox(height: 8),
                         if (_lastBrewSummary != null && !controller.isBrewing) ...[
                           BrewCompleteBanner(
                             summary: _lastBrewSummary!,
@@ -799,12 +712,6 @@ class _LiveScreenState extends State<LiveScreen> {
                             style: Theme.of(context).textTheme.titleMedium,
                             textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 8),
-                          CoffeejackTurnsPanel(
-                            settings: _coffeejackSettings,
-                            onTap: () => unawaited(_openCoffeejackSettings()),
-                          ),
-                          const SizedBox(height: 8),
                         ],
                         if (controller.canSaveShot)
                           Align(
@@ -883,9 +790,8 @@ class _LiveScreenState extends State<LiveScreen> {
           controller: controller,
           hub: hub,
           sensorSource: _sensorSource,
-          settings: _autoStartSettings,
+          settings: autoStartSettings,
           isDemoMode: demoModeActive,
-          pressureBarNotifier: _livePressureBarNotifier,
           child: shell,
         );
       },

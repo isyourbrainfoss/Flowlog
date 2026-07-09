@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flowlog/persistence/flowlog_storage.dart';
+import 'package:flowlog/screens/live/auto_start.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
@@ -22,6 +23,7 @@ class FlowlogShell extends StatefulWidget {
     this.initialTab = AppTab.live,
     this.repeatShotController,
     this.targetBrewController,
+    this.autoStartController,
   });
 
   final AppTab initialTab;
@@ -31,6 +33,9 @@ class FlowlogShell extends StatefulWidget {
 
   /// Optional target-brew controller for tests.
   final TargetBrewController? targetBrewController;
+
+  /// Optional auto-start controller for tests.
+  final AutoStartSettingsController? autoStartController;
 
   @override
   State<FlowlogShell> createState() => _FlowlogShellState();
@@ -47,6 +52,8 @@ class _FlowlogShellState extends State<FlowlogShell> {
   late final bool _ownsRepeatShotController;
   late final TargetBrewController _targetBrewController;
   late final bool _ownsTargetBrewController;
+  late final AutoStartSettingsController _autoStartController;
+  late final bool _ownsAutoStartController;
   late final ActiveBrewNotifier _activeBrewNotifier;
   late final ShotEventsNotifier _shotEventsNotifier;
 
@@ -59,6 +66,9 @@ class _FlowlogShellState extends State<FlowlogShell> {
     _ownsTargetBrewController = widget.targetBrewController == null;
     _targetBrewController =
         widget.targetBrewController ?? TargetBrewController();
+    _ownsAutoStartController = widget.autoStartController == null;
+    _autoStartController =
+        widget.autoStartController ?? AutoStartSettingsController();
     _activeBrewNotifier = ActiveBrewNotifier();
     _shotEventsNotifier = ShotEventsNotifier();
     _selectedIndex = appDestinations
@@ -68,6 +78,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
     }
     unawaited(_loadActiveBeanAndSync());
     unawaited(_loadTargetBrew());
+    unawaited(_autoStartController.load());
   }
 
   Future<void> _loadActiveBeanAndSync() async {
@@ -114,6 +125,9 @@ class _FlowlogShellState extends State<FlowlogShell> {
     }
     if (_ownsTargetBrewController) {
       _targetBrewController.dispose();
+    }
+    if (_ownsAutoStartController) {
+      _autoStartController.dispose();
     }
     super.dispose();
   }
@@ -301,16 +315,19 @@ class _FlowlogShellState extends State<FlowlogShell> {
           notifier: _shotEventsNotifier,
           child: ActiveBrewScope(
             notifier: _activeBrewNotifier,
-            child: TargetBrewScope(
-              controller: _targetBrewController,
-              child: RepeatShotScope(
-                controller: _repeatShotController,
-                child: FlowlogShellScope(
-                  switchTab: _switchTab,
-                  child: FlowlogShortcuts(
-                    registry: _shortcutRegistry,
-                    currentTab: destination.tab,
-                    child: shell,
+            child: AutoStartSettingsScope(
+              controller: _autoStartController,
+              child: TargetBrewScope(
+                controller: _targetBrewController,
+                child: RepeatShotScope(
+                  controller: _repeatShotController,
+                  child: FlowlogShellScope(
+                    switchTab: _switchTab,
+                    child: FlowlogShortcuts(
+                      registry: _shortcutRegistry,
+                      currentTab: destination.tab,
+                      child: shell,
+                    ),
                   ),
                 ),
               ),

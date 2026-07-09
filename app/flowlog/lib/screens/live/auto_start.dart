@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/sensors/live_sensor_source.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
+import 'package:flowlog/settings/auto_start_settings_store.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 
@@ -25,6 +26,65 @@ class AutoStartSettings {
   final double releaseFraction;
 
   double get releaseThresholdBar => startThresholdBar * releaseFraction;
+
+  AutoStartSettings copyWith({
+    bool? enabled,
+    double? startThresholdBar,
+    double? releaseFraction,
+  }) {
+    return AutoStartSettings(
+      enabled: enabled ?? this.enabled,
+      startThresholdBar: startThresholdBar ?? this.startThresholdBar,
+      releaseFraction: releaseFraction ?? this.releaseFraction,
+    );
+  }
+}
+
+/// File-backed auto-start preferences shared by Live and Brew defaults.
+class AutoStartSettingsController extends ChangeNotifier {
+  AutoStartSettingsController({
+    AutoStartSettingsStore? settingsStore,
+  }) : _settingsStore = settingsStore ?? AutoStartSettingsStore();
+
+  final AutoStartSettingsStore _settingsStore;
+  AutoStartSettings _settings = const AutoStartSettings();
+
+  AutoStartSettings get settings => _settings;
+
+  Future<void> load() async {
+    _settings = await _settingsStore.load();
+    notifyListeners();
+  }
+
+  Future<void> updateSettings(AutoStartSettings settings) async {
+    _settings = settings;
+    notifyListeners();
+    await _settingsStore.save(settings);
+  }
+
+  Future<void> setEnabled(bool enabled) {
+    return updateSettings(_settings.copyWith(enabled: enabled));
+  }
+
+  Future<void> setThresholdBar(double thresholdBar) {
+    return updateSettings(_settings.copyWith(startThresholdBar: thresholdBar));
+  }
+}
+
+/// Provides [AutoStartSettingsController] to the widget tree.
+class AutoStartSettingsScope
+    extends InheritedNotifier<AutoStartSettingsController> {
+  const AutoStartSettingsScope({
+    required AutoStartSettingsController controller,
+    required super.child,
+    super.key,
+  }) : super(notifier: controller);
+
+  static AutoStartSettingsController? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<AutoStartSettingsScope>()
+        ?.notifier;
+  }
 }
 
 /// Tracks hysteresis so auto-start only fires once per pressure rise.

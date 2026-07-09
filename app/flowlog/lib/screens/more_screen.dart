@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flowlog/screens/live/auto_start.dart';
 import 'package:flowlog/screens/more/brew_defaults_screen.dart';
 import 'package:flowlog/screens/more/brew_location_screen.dart';
 import 'package:flowlog/screens/more/target_brew_screen.dart';
@@ -70,13 +71,16 @@ class _MoreScreenState extends State<MoreScreen> {
           leading: const Icon(Icons.tune),
           title: const Text('Brew defaults'),
           subtitle: const Text(
-            'Dose, grind, Coffeejack rewind & pre-infusion turns',
+            'Dose, grind, Coffeejack turns & auto-start threshold',
           ),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (context) => const BrewDefaultsScreen(),
+                builder: (context) => BrewDefaultsScreen(
+                  autoStartController:
+                      AutoStartSettingsScope.maybeOf(context),
+                ),
               ),
             );
           },

@@ -129,6 +129,27 @@ void main() {
       expect(find.text('Colombia Huila'), findsNothing);
     });
 
+    testWidgets('bean field clear button empties the text field', (tester) async {
+      await pumpTopBar(tester);
+
+      await tester.tap(find.byKey(const Key('top_bar_bean_name')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('top_bar_bean_clear')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('top_bar_bean_clear')));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('top_bar_bean_edit_field')))
+            .controller
+            ?.text,
+        isEmpty,
+      );
+      expect(find.byKey(const Key('top_bar_bean_clear')), findsNothing);
+    });
+
     testWidgets('returns bean id when selecting autocomplete option',
         (tester) async {
       const beans = [

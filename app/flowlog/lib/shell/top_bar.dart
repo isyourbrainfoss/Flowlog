@@ -220,9 +220,11 @@ class _BeanNameEditDialogState extends State<_BeanNameEditDialog> {
               });
             },
             onSelected: (bean) {
-              _selectedBeanId = bean.id;
-              _beanController.text =
-                  formatBeanDisplayLabel(bean, allBeans: _beans);
+              setState(() {
+                _selectedBeanId = bean.id;
+                _beanController.text =
+                    formatBeanDisplayLabel(bean, allBeans: _beans);
+              });
             },
             fieldViewBuilder: (
               context,
@@ -240,15 +242,31 @@ class _BeanNameEditDialogState extends State<_BeanNameEditDialog> {
                 autofocus: true,
                 enabled: _beansReady,
                 textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Bean',
                   hintText: 'e.g. House Blend',
                   helperText:
                       'Pick a saved bag or type a new name to create one',
+                  suffixIcon: controller.text.isEmpty
+                      ? null
+                      : IconButton(
+                          key: const Key('top_bar_bean_clear'),
+                          tooltip: 'Clear',
+                          onPressed: () {
+                            controller.clear();
+                            setState(() {
+                              _beanController.clear();
+                              _selectedBeanId = null;
+                            });
+                          },
+                          icon: const Icon(Icons.close),
+                        ),
                 ),
                 onChanged: (value) {
-                  _beanController.text = value;
-                  _selectedBeanId = null;
+                  setState(() {
+                    _beanController.text = value;
+                    _selectedBeanId = null;
+                  });
                 },
                 onSubmitted: (_) => onFieldSubmitted(),
               );

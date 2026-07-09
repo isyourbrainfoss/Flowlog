@@ -167,7 +167,7 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('shows armed banner when pressensor is connected', (
+    testWidgets('does not show auto-start controls on live tab', (
       tester,
     ) async {
       hub.addDevice(SensorKind.pressensor);
@@ -175,7 +175,8 @@ void main() {
 
       await pumpHarness(tester);
 
-      expect(find.textContaining('Auto-start armed'), findsOneWidget);
+      expect(find.textContaining('Auto-start armed'), findsNothing);
+      expect(find.byKey(const Key('auto_start_threshold_slider')), findsNothing);
     });
 
     testWidgets('starts brew when pressure crosses threshold', (
