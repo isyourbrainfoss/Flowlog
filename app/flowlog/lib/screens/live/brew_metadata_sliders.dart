@@ -33,9 +33,36 @@ class BrewMetadataSliders extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Dose: ${doseG.toStringAsFixed(1)} g',
-          style: theme.textTheme.titleSmall,
+        Row(
+          children: [
+            Text(
+              'Dose: ${doseG.toStringAsFixed(1)} g',
+              style: theme.textTheme.titleSmall,
+            ),
+            const Spacer(),
+            IconButton(
+              key: const Key('metadata_dose_decrement'),
+              tooltip: '−0.5 g',
+              onPressed: doseG > kBrewDoseMinG
+                  ? () => onDoseChanged(
+                        (doseG - 0.5).clamp(kBrewDoseMinG, kBrewDoseMaxG),
+                      )
+                  : null,
+              icon: const Icon(Icons.remove),
+              visualDensity: VisualDensity.compact,
+            ),
+            IconButton(
+              key: const Key('metadata_dose_increment'),
+              tooltip: '+0.5 g',
+              onPressed: doseG < kBrewDoseMaxG
+                  ? () => onDoseChanged(
+                        (doseG + 0.5).clamp(kBrewDoseMinG, kBrewDoseMaxG),
+                      )
+                  : null,
+              icon: const Icon(Icons.add),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
         ),
         Slider(
           key: const Key('metadata_dose_slider'),

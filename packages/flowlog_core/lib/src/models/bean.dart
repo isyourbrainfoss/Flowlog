@@ -1,4 +1,53 @@
+import 'dart:convert';
+
 import 'package:meta/meta.dart';
+
+/// Repairs common UTF-8 mojibake in user-entered text (e.g. from AI/clipboard).
+/// Handles repeated patterns like "ÃÂ..." from mis-encoded Norwegian/special chars.
+String? repairMojibake(String? text) {
+  if (text == null || text.isEmpty) return text;
+  if (!text.contains('\u00c3') && !text.contains('\u00c2')) {
+    return text; // fast path for clean text
+  }
+  String current = text;
+
+  // Direct pattern fix for repeated mojibake sequences (e.g. "ÃÂ" runs)
+  current = current.replaceAll(RegExp(r'(\u00c3\u00c2)+'), '\u00f8');
+
+  // Context specific for the exact reported "kaffebønner" corruption
+  if (current.contains('kaffeb') && current.contains('nner')) {
+    current = current.replaceAllMapped(
+      RegExp(r'kaffeb[\u00c3\u00c2\u00f8\u00e6\u00e5ÃÂ]+nner'),
+      (_) => 'kaffeb\u00f8nner',
+    );
+  }
+
+  // Common mojibake patterns using escapes only
+  current = current
+      .replaceAll('\u00c3\u00f8', '\u00f8')
+      .replaceAll('\u00c3\u00c2\u00b8', '\u00f8')
+      .replaceAll('\u00c3\u00e6', '\u00e6')
+      .replaceAll('\u00c3\u00e5', '\u00e5')
+      .replaceAll('\u00c3', '\u00f8')
+      .replaceAll('\u00c2\u00b8', '\u00f8');
+
+  // Fallback roundtrips
+  for (var i = 0; i < 3; i++) {
+    try {
+      final bytes = latin1.encode(current);
+      final repaired = utf8.decode(bytes, allowMalformed: true);
+      if (repaired == current) break;
+      if (!repaired.contains('\u00c3') || repaired.runes.where((r) => r > 127).length > current.runes.where((r) => r > 127).length) {
+        current = repaired;
+        break;
+      }
+      current = repaired;
+    } catch (_) {
+      break;
+    }
+  }
+  return current;
+}
 
 /// Coffee processing methods for bean inventory.
 const List<String> kBeanProcessMethods = [
@@ -56,7 +105,7 @@ class Bean {
       process: json['process'] as String?,
       variety: json['variety'] as String?,
       stockG: (json['stockG'] as num?)?.toDouble(),
-      notes: json['notes'] as String?,
+      notes: repairMojibake(json['notes'] as String?),
     );
   }
 

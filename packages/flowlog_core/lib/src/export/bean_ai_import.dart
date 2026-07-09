@@ -156,7 +156,7 @@ String? _optionalString(Object? value) {
   if (trimmed.isEmpty || trimmed.toLowerCase() == 'null') {
     return null;
   }
-  return trimmed;
+  return repairMojibake(trimmed);
 }
 
 String? _normalizeRoastLevel(String? value) {

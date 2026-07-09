@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:test/test.dart';
 
@@ -91,6 +93,27 @@ Here is the bean info:
         () => parseBeanAiResponse('{"name": "Test", "roastDate": "March 2026"}'),
         throwsA(isA<FormatException>()),
       );
+    });
+  });
+
+  group('repairMojibake', () {
+    test('fixes the reported kaffebønner mojibake pattern', () {
+      // Construct using bytes to simulate exact stored mojibake regardless of source encoding
+      final mojibakeSeq = [0xC3, 0xC2]; // bytes for ÃÂ in latin1 view
+      final badBytes = utf8.encode('En blanding av sesongens beste kaffeb') +
+          List<int>.generate(30 * 2, (i) => mojibakeSeq[i % 2]) +
+          utf8.encode('nner brent til espresso. Floral og fruktig.');
+      final bad = utf8.decode(badBytes, allowMalformed: true);
+      final fixed = repairMojibake(bad);
+      expect(fixed, contains('kaffeb\u00f8nner'));
+      expect(fixed, isNot(contains('\u00c3')));
+    });
+
+    test('is idempotent on clean text', () {
+      const clean = 'kaffeb\u00f8nner with special chars';
+      final fixed = repairMojibake(clean);
+      expect(fixed, clean);
+      expect(fixed, isNot(contains('\u00c3')));
     });
   });
 }

@@ -112,6 +112,7 @@ class _LiveScreenState extends State<LiveScreen> {
   String? _lastAutoSavedShotId;
   ShotSessionState _lastSessionState = ShotSessionState.idle;
   bool _wasBrewing = false;
+  Timer? _autoStopTimer;
   FlowlogShortcutRegistry? _shortcutRegistry;
   RepeatShotController? _repeatShotController;
   TargetBrewController? _targetBrewController;
@@ -270,6 +271,7 @@ class _LiveScreenState extends State<LiveScreen> {
     _annotationsNotifier.dispose();
     _ownedAutoStartController.dispose();
     _samplesNotifier.dispose();
+    _autoStopTimer?.cancel();
     if (_ownsController) {
       _controller?.dispose();
     }
@@ -289,6 +291,40 @@ class _LiveScreenState extends State<LiveScreen> {
     }
     _lastSessionState = state;
     _samplesNotifier.value = List<ShotSample>.from(controller.samples);
+
+    _checkAutoStop(controller);
+  }
+
+  void _checkAutoStop(LiveShotController controller) {
+    if (controller.sessionState != ShotSessionState.recording) {
+      _autoStopTimer?.cancel();
+      _autoStopTimer = null;
+      return;
+    }
+
+    final samples = controller.samples;
+    if (samples.length < 8) return; // need some history (~0.8s at 100ms)
+
+    // Look at last ~8 samples (~800ms). If pressure has been near zero,
+    // auto-stop so forgotten brews don't save huge zero tails.
+    final recent = samples.sublist(samples.length - 8);
+    final allLow = recent.every((s) => (s.pressureBar ?? 100) < 0.4);
+
+    if (allLow) {
+      if (_autoStopTimer == null) {
+        _autoStopTimer = Timer(const Duration(milliseconds: 1500), () {
+          if (mounted &&
+              _controller != null &&
+              _controller!.sessionState == ShotSessionState.recording) {
+            _controller!.stop();
+          }
+          _autoStopTimer = null;
+        });
+      }
+    } else {
+      _autoStopTimer?.cancel();
+      _autoStopTimer = null;
+    }
   }
 
   void _syncAnnotations() {
@@ -447,6 +483,11 @@ class _LiveScreenState extends State<LiveScreen> {
       if (locationSettings.autoGpsEnabled) {
         gps = await _brewGpsCapture.captureCurrentPosition();
       }
+      final beanRepository = await _ensureBeanRepository();
+      if (!mounted) {
+        return;
+      }
+
       final shot = await runAutoSaveFlow(
         context: context,
         repository: repository,
@@ -455,7 +496,7 @@ class _LiveScreenState extends State<LiveScreen> {
         startedAt: startedAt,
         endedAt: controller.sessionEndedAt,
         initialMetadata: _repeatShotController?.prefill?.metadata,
-        beanRepository: await _ensureBeanRepository(),
+        beanRepository: beanRepository,
         activeBeanName: activeBean?.name,
         activeBeanId: activeBean?.beanId,
         annotations: _annotationController.annotations,
@@ -500,10 +541,15 @@ class _LiveScreenState extends State<LiveScreen> {
       return;
     }
 
+    final beanRepository = await _ensureBeanRepository();
+    if (!mounted) {
+      return;
+    }
+
     final updated = await runAddNotesFlow(
       context: context,
       repository: repository,
-      beanRepository: await _ensureBeanRepository(),
+      beanRepository: beanRepository,
       shot: shot,
       onSaved: widget.onShotSaved,
     );
@@ -520,6 +566,9 @@ class _LiveScreenState extends State<LiveScreen> {
 
   Future<void> _onDiscardSavedShot(Shot shot) async {
     final repository = await _ensureShotRepository();
+    if (!mounted) {
+      return;
+    }
     await repository.deleteShot(shot.id);
     if (_lastAutoSavedShotId == shot.id) {
       _lastAutoSavedShotId = null;
@@ -585,10 +634,15 @@ class _LiveScreenState extends State<LiveScreen> {
       endedAt: controller.sessionEndedAt,
     );
 
+    final profileRepository = await _ensureProfileRepository();
+    if (!mounted) {
+      return;
+    }
+
     await startRepeatShotFromShot(
       context: context,
       shot: shot,
-      profileRepository: await _ensureProfileRepository(),
+      profileRepository: profileRepository,
       repeatController:
           _repeatShotController ?? widget.repeatShotController,
     );

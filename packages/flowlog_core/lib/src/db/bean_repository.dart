@@ -2,6 +2,8 @@ import 'package:drift/drift.dart';
 import 'package:meta/meta.dart';
 
 import '../models/bean.dart' as models;
+import '../models/bean.dart' show repairMojibake;
+import '../models/bean.dart' show repairMojibake;
 import 'flowlog_database.dart';
 
 /// Bean with the number of shots linked via [models.Bean.id].
@@ -230,7 +232,7 @@ class BeanRepository {
       process: row.process,
       variety: row.variety,
       stockG: row.stockG,
-      notes: row.notes,
+      notes: repairMojibake(row.notes),
     );
   }
 }

@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:meta/meta.dart';
+
+import 'bean.dart' show repairMojibake;
 
 import 'flavour_intensities.dart';
 import 'shot_annotation.dart';
@@ -64,7 +68,7 @@ class Shot {
       grindSetting: (json['grindSetting'] as num?)?.toDouble(),
       beanId: json['beanId'] as String?,
       waterTempC: (json['waterTempC'] as num?)?.toDouble(),
-      notes: json['notes'] as String?,
+      notes: repairMojibake(json['notes'] as String?),
       location: json['location'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),

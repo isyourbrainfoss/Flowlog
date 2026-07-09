@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 
 import '../models/flavour_intensities.dart';
 import '../models/shot.dart' as models;
+import '../models/bean.dart' show repairMojibake;
 import '../models/shot_annotation.dart' as models;
 import '../models/shot_sample.dart' as models;
 import 'flowlog_database.dart';
@@ -320,7 +321,7 @@ class ShotRepository {
       grindSetting: row.grindSetting,
       beanId: row.beanId,
       waterTempC: row.waterTempC,
-      notes: row.notes,
+      notes: repairMojibake(row.notes),
       location: row.location,
       latitude: row.latitude,
       longitude: row.longitude,

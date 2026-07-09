@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -170,7 +168,24 @@ class _BeansScreenState extends State<BeansScreen> {
 
         return Scaffold(
           body: beans.isEmpty
-              ? const Center(child: Text('No beans yet'))
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.inventory_2_outlined, size: 48),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No beans yet',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Add your first bag using the + button or import from AI.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: _refresh,
                   child: ListView.builder(

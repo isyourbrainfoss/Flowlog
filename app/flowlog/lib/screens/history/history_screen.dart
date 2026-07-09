@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flowlog/screens/history/filters.dart';
 import 'package:flowlog/screens/history/history_shot_card.dart';
@@ -323,9 +322,35 @@ class _HistoryShotList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (shots.isEmpty) {
+      final theme = Theme.of(context);
       return Center(
-        child: Text(
-          filters.isActive ? 'No shots match filters' : 'No saved shots yet',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              filters.isActive ? Icons.filter_alt_off : Icons.coffee_outlined,
+              size: 48,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              filters.isActive
+                  ? 'No shots match your filters'
+                  : 'No saved shots yet',
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              filters.isActive
+                  ? 'Try clearing some filters to see more results.'
+                  : 'Start a brew on the Live tab to record your first shot.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       );
     }

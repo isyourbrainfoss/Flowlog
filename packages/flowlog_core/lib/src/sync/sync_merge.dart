@@ -1,5 +1,6 @@
 import 'package:meta/meta.dart';
 
+import '../models/bean.dart' show repairMojibake;
 import '../models/shot.dart';
 import '../models/tag.dart';
 import '../db/bean_repository.dart';
@@ -106,7 +107,9 @@ Future<SyncMergeResult> mergeSyncPayloadFromRemote({
         remoteExportedAt.isAfter(
           local.roastDate ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
         )) {
-      await beanRepository.upsertBean(bean);
+      // Merge notes intelligently to protect local fixes from remote mojibake
+      final mergedNotes = _mergeBeanNotes(local?.notes, bean.notes);
+      await beanRepository.upsertBean(bean.copyWith(notes: mergedNotes));
       beansMerged++;
     }
   }
@@ -303,6 +306,25 @@ String? _mergeText(String? primary, String? secondary) {
     return b;
   }
   return null;
+}
+
+/// For bean notes, prefer the version that is non-empty and does not contain
+/// mojibake markers (Ã or replacement chars). This prevents corrupted remote
+/// versions from overwriting local manual fixes.
+String? _mergeBeanNotes(String? local, String? remote) {
+  final l = repairMojibake(local?.trim());
+  final r = repairMojibake(remote?.trim());
+  if (l != null && l.isNotEmpty) {
+    final lHasBad = l.contains('Ã') || l.contains('\uFFFD');
+    final rHasBad = (r ?? '').contains('Ã') || (r ?? '').contains('\uFFFD');
+    if (lHasBad && !rHasBad && (r?.isNotEmpty ?? false)) {
+      return r;
+    }
+    if (!lHasBad) {
+      return l;
+    }
+  }
+  return r?.isNotEmpty == true ? r : l;
 }
 
 Map<String, List<String>> _groupShotTagLinks(List<ShotTagLink> links) {
