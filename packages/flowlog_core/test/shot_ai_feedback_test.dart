@@ -99,8 +99,9 @@ void main() {
       expect(text, contains('My taste goal: more sweetness'));
       expect(text, contains('flowlog-shot-ai-feedback-v1'));
       expect(text, contains('```json'));
-      expect(text, contains('suggestedTweaks'));
-      expect(text, contains('one markdown code block'));
+      expect(text, contains('plain, readable text'));
+      expect(text, contains('Suggested tweaks'));
+      expect(text, isNot(contains('suggestedTweaks')));
     });
   });
 }

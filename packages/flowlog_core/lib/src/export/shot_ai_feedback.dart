@@ -48,23 +48,14 @@ $goalLine
 
 Focus on dial-in advice tied to the data: dose, yield, ratio, grind, temperature, pressure profile shape, flow behavior, and anything suggested by the curve or notes. Be concise and actionable. If important context is missing, say what you would need.
 
-Output format (important):
-Put your entire answer in one markdown code block so it can be copied with a single button. Use a ```json fence. Do not write any text, explanation, or extra code blocks before or after that block.
+Answer format:
+Reply in plain, readable text (short paragraphs and bullet points are fine). Do not wrap your answer in a code block or JSON.
 
-```json
-{
-  "summary": "short overview of how the shot likely tasted and extracted",
-  "observations": ["curve or metadata observation"],
-  "suggestedTweaks": [
-    {
-      "parameter": "grind | dose | yield | temp | pressure | preinfusion | ...",
-      "direction": "finer | coarser | increase | decrease | longer | shorter | ...",
-      "reason": "why this helps the stated taste goal"
-    }
-  ],
-  "questions": ["optional clarifying question if data is insufficient"]
-}
-```
+Structure your reply roughly as:
+1. Summary — how the shot likely tasted and extracted
+2. Observations — what the curve or metadata suggests
+3. Suggested tweaks — specific changes (grind, dose, yield, temp, pressure, pre-infusion, etc.) and why each helps my taste goal
+4. Questions — only if you need more context
 
 Shot data (from Flowlog):
 
