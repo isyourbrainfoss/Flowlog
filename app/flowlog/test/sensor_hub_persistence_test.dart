@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flowlog/sensors/sensor_hub.dart';
-import 'package:flowlog/sensors/sensor_kind.dart';
 import 'package:flowlog/settings/paired_sensors_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 

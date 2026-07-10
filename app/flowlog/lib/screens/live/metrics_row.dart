@@ -45,7 +45,7 @@ class LiveMetrics {
     int targetDurationMs = defaultTargetDurationMs,
   }) {
     final history = <ShotSample>[
-      if (previous != null) previous,
+      ...? (previous != null ? [previous] : null),
       sample,
     ];
     final computed = computeFlowRates(history);
@@ -205,15 +205,16 @@ class LiveMetricsRow extends StatelessWidget {
         labelStyle: labelStyle,
         valueStyle: valueStyle,
       ),
-      if (resolved.tempC != null)
-        _MetricTile(
-          key: const Key('live_metric_temp'),
-          label: 'Temp',
-          value: _formatTemp(resolved.tempC),
-          trend: resolved.tempTrend,
-          labelStyle: labelStyle,
-          valueStyle: valueStyle,
-        ),
+      ? (resolved.tempC != null
+          ? _MetricTile(
+              key: const Key('live_metric_temp'),
+              label: 'Temp',
+              value: _formatTemp(resolved.tempC),
+              trend: resolved.tempTrend,
+              labelStyle: labelStyle,
+              valueStyle: valueStyle,
+            )
+          : null),
     ];
 
     return Card(

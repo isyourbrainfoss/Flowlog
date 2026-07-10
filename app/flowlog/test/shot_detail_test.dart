@@ -106,11 +106,11 @@ void main() {
       expect(find.text('92.0 °C → 93.5 °C'), findsOneWidget);
       expect(find.text(formatGrindSetting(kDefaultBrewGrindSetting)), findsOneWidget);
       expect(
-        find.text('${kDefaultCoffeejackRewindTurns} turns'),
+        find.text('$kDefaultCoffeejackRewindTurns turns'),
         findsOneWidget,
       );
       expect(
-        find.text('${kDefaultCoffeejackPreinfusionTurns} slow turns'),
+        find.text('$kDefaultCoffeejackPreinfusionTurns slow turns'),
         findsOneWidget,
       );
     });

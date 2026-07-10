@@ -197,26 +197,19 @@ class LiveControls extends StatelessWidget {
           buttonChild = Stack(
             alignment: Alignment.center,
             children: [
-              // Coffee-like liquid at the bottom of the button, gently floating/waving
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: 26,
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
-                  child: _AnimatedCoffeeLiquid(),
-                ),
+              // Coffee-like liquid filling lower portion of the button area, with gentle floating wave across full width
+              Positioned.fill(
+                child: _AnimatedCoffeeLiquid(),
               ),
-              // Text on top, with slight shadow for readability over liquid
+              // Text on top, with shadow for legibility over the liquid
               Text(
                 'Start brew',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       shadows: [
                         Shadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 2,
+                          color: Colors.black.withValues(alpha: 0.35),
+                          blurRadius: 3,
                         ),
                       ],
                     ),
@@ -261,7 +254,7 @@ class LiveControls extends StatelessWidget {
 /// Animated coffee-like liquid that gently "floats" with a moving wave surface.
 /// Used as a visual affordance inside the prominent idle "Start brew" button.
 class _AnimatedCoffeeLiquid extends StatefulWidget {
-  const _AnimatedCoffeeLiquid({super.key});
+  const _AnimatedCoffeeLiquid({super.key}); // ignore: unused_element_parameter
 
   @override
   State<_AnimatedCoffeeLiquid> createState() => _AnimatedCoffeeLiquidState();
@@ -276,7 +269,7 @@ class _AnimatedCoffeeLiquidState extends State<_AnimatedCoffeeLiquid>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
+      duration: const Duration(milliseconds: 2800),
     )..repeat();
   }
 
@@ -289,9 +282,9 @@ class _AnimatedCoffeeLiquidState extends State<_AnimatedCoffeeLiquid>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Coffee liquid color (darker espresso-like), foam on top
-    final liquidColor = theme.colorScheme.secondaryContainer.withValues(alpha: 0.85);
-    final foamColor = theme.colorScheme.primary.withValues(alpha: 0.35);
+    // Darker coffee liquid, lighter crema foam. Slightly transparent so it blends with button bg.
+    final liquidColor = theme.colorScheme.secondaryContainer.withValues(alpha: 0.92);
+    final foamColor = theme.colorScheme.primary.withValues(alpha: 0.28);
 
     return AnimatedBuilder(
       animation: _controller,
@@ -323,18 +316,25 @@ class _CoffeeLiquidPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = liquidColor;
 
+    // Liquid fills the lower ~60% of the button content area for a fuller "in the button" look
+    final liquidFillRatio = 0.60;
+    final surfaceBase = size.height * (1.0 - liquidFillRatio);
+
+    // Gentle vertical bob for "floating" liquid feel (slow, continuous)
+    final bob = math.sin(progress * 2 * math.pi) * 2.5;
+    final surfaceY = surfaceBase + bob;
+
     final path = Path();
-    final waveHeight = 6.0;
-    final baseY = size.height * 0.65; // liquid fills lower ~65%
-
     path.moveTo(0, size.height);
-    path.lineTo(0, baseY);
+    path.lineTo(0, surfaceY);
 
-    // Gentle sine wave surface that moves (floating liquid effect)
-    for (double x = 0; x <= size.width; x += 2) {
-      final wave1 = math.sin((x / 28) + (progress * 2 * math.pi)) * waveHeight;
-      final wave2 = math.sin((x / 13) + (progress * 3 * math.pi)) * (waveHeight * 0.4);
-      final y = baseY + wave1 + wave2;
+    final waveHeight = 7.0;
+
+    // Two overlaid sine waves for natural liquid surface, full width
+    for (double x = 0; x <= size.width; x += 1.5) {
+      final wave1 = math.sin((x / 32) + (progress * 2 * math.pi)) * waveHeight;
+      final wave2 = math.sin((x / 11) + (progress * 3.5 * math.pi)) * (waveHeight * 0.35);
+      final y = surfaceY + wave1 + wave2;
       path.lineTo(x, y);
     }
 
@@ -343,20 +343,20 @@ class _CoffeeLiquidPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // Lighter foam "head" on top of the wave for coffee look
+    // Subtle lighter foam band along the surface for coffee crema look
     final foamPaint = Paint()..color = foamColor;
     final foamPath = Path();
-    foamPath.moveTo(0, baseY);
+    foamPath.moveTo(0, surfaceY - 2);
 
-    for (double x = 0; x <= size.width; x += 2) {
-      final wave1 = math.sin((x / 28) + (progress * 2 * math.pi)) * waveHeight;
-      final wave2 = math.sin((x / 13) + (progress * 3 * math.pi)) * (waveHeight * 0.4);
-      final y = baseY + wave1 + wave2 - 3;
+    for (double x = 0; x <= size.width; x += 1.5) {
+      final wave1 = math.sin((x / 32) + (progress * 2 * math.pi)) * waveHeight;
+      final wave2 = math.sin((x / 11) + (progress * 3.5 * math.pi)) * (waveHeight * 0.35);
+      final y = surfaceY + wave1 + wave2 - 4;
       foamPath.lineTo(x, y);
     }
 
-    foamPath.lineTo(size.width, baseY + 8);
-    foamPath.lineTo(0, baseY + 8);
+    foamPath.lineTo(size.width, surfaceY + 6);
+    foamPath.lineTo(0, surfaceY + 6);
     foamPath.close();
 
     canvas.drawPath(foamPath, foamPaint);

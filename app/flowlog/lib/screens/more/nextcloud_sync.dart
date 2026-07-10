@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
@@ -50,7 +49,6 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
   late final TextEditingController _passwordController;
 
   FlowlogDatabase? _database;
-  bool _ownsDatabase = false;
   bool _loading = true;
   bool _isBusy = false;
   bool _loginCancelled = false;
@@ -99,7 +97,6 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
     }
 
     _database = await openFlowlogDatabase();
-    _ownsDatabase = true;
     return _database!;
   }
 
@@ -311,6 +308,15 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
           'over WebDAV. Sign in with your browser (recommended) or paste '
           'an app password manually.',
           style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Note: Transfer uses your WebDAV credentials. On-device encryption is '
+          'currently a basic placeholder and will be improved before relying on '
+          'it for sensitive data.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+              ),
         ),
         const SizedBox(height: 16),
         TextField(

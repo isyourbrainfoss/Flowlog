@@ -150,25 +150,22 @@ abstract final class FlowlogTheme {
 /// Notifies listeners when the user switches between coffee dark and café light.
 class FlowlogThemeController extends ChangeNotifier {
   FlowlogThemeController({
-    ThemeMode themeMode = ThemeMode.dark,
-    Future<void> Function(ThemeMode mode)? onThemeModeChanged,
-  })  : _themeMode = themeMode,
-        _onThemeModeChanged = onThemeModeChanged;
+    this.themeMode = ThemeMode.dark,
+    this.onThemeModeChanged,
+  });
 
-  ThemeMode _themeMode;
-  final Future<void> Function(ThemeMode mode)? _onThemeModeChanged;
+  ThemeMode themeMode;
+  final Future<void> Function(ThemeMode mode)? onThemeModeChanged;
 
-  ThemeMode get themeMode => _themeMode;
-
-  bool get isDark => _themeMode == ThemeMode.dark;
+  bool get isDark => themeMode == ThemeMode.dark;
 
   void setThemeMode(ThemeMode mode) {
-    if (_themeMode == mode) {
+    if (themeMode == mode) {
       return;
     }
-    _themeMode = mode;
+    themeMode = mode;
     notifyListeners();
-    final persist = _onThemeModeChanged;
+    final persist = onThemeModeChanged;
     if (persist != null) {
       unawaited(persist(mode));
     }

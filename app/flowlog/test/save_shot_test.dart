@@ -12,7 +12,6 @@ import 'package:flowlog/settings/brew_location_store.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
-import 'package:flowlog_sensors/src/decent_scale/decent_scale.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -3,10 +3,8 @@ import 'dart:io';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/feedback.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
-
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
-import 'package:flowlog_sensors/src/decent_scale/decent_scale.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

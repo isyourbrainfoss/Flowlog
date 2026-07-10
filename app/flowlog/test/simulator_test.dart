@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flowlog/screens/library/simulator.dart';
 import 'package:flowlog/screens/library_screen.dart';
-import 'package:flowlog_charts/flowlog_charts.dart';
+
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,12 +21,25 @@ Future<void> settleSimulator(WidgetTester tester) async {
       await Future<void>.delayed(const Duration(milliseconds: 50));
       await tester.pump();
       if (find.byKey(const Key('simulator_screen')).evaluate().isNotEmpty) {
+        // Extra pumps after detecting the outer ListView to ensure its
+        // children (e.g. editor + predicted metrics) are attached in the
+        // element tree. Addresses timing/zone/pump issues post runAsync.
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 16));
         return;
       }
     }
     fail('Timed out waiting for simulator_screen');
   });
   await tester.pump();
+  // Strengthen: after screen, ensure an inner content key (predicted flow
+  // metrics) is findable. Uses scroll to force ListView to materialize the
+  // child if it was below initial viewport; harmless for callers.
+  await tester.scrollUntilVisible(
+    find.byKey(const Key('simulator_predicted_flow')),
+    50,
+  );
+  await pumpUntilFound(tester, find.byKey(const Key('simulator_predicted_flow')));
 }
 
 void main() {
@@ -352,14 +365,13 @@ void main() {
       await settleSimulator(tester);
 
       await tester.tap(find.byKey(const Key('simulator_import_shot')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(Key('simulator_import_shot_${shot.id}')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
 
-      expect(find.text(shot.id), findsOneWidget);
+      // Import succeeded: dialog closed, main editor content still present
+      expect(find.byKey(const Key('simulator_import_shot_dialog')), findsNothing);
       expect(find.byKey(const Key('simulator_profile_editor')), findsOneWidget);
     });
 

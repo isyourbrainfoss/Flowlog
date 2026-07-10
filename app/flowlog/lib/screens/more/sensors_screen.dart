@@ -100,6 +100,9 @@ class SensorsScreen extends StatelessWidget {
 
     final device = hub.devices.firstWhere((entry) => entry.id == deviceId);
     final message = await _connectMessage(hub: hub, device: device);
+    if (!context.mounted) {
+      return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -361,7 +364,7 @@ class _PickScannedDeviceDialog extends StatelessWidget {
         child: ListView.separated(
           shrinkWrap: true,
           itemCount: devices.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
+          separatorBuilder: (context, index) => const Divider(height: 1),
           itemBuilder: (context, index) {
             final device = devices[index];
             return ListTile(

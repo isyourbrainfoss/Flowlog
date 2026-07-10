@@ -1,10 +1,15 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
+  // Silence noisy "multiple databases" warnings during the large test suite
+  // (each test often opens its own in-memory DB via repositories).
+  driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+
   late Directory testSupportDir;
 
   setUp(() async {

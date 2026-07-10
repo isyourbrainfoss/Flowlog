@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flowlog/sensors/sensor_hub.dart';
-import 'package:flowlog/sensors/sensor_kind.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart'
     show ConnectionState, isPressensorLowBattery;
 import 'package:flowlog/shell/app_destinations.dart';

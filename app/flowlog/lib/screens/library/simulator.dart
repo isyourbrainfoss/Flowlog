@@ -1066,7 +1066,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   ProfileRepository? _profileRepository;
   ShotRepository? _shotRepository;
   FlowlogDatabase? _database;
-  bool _ownsRepositories = false;
   late Future<_SimulatorState> _stateFuture;
 
   List<PressureKeyframe> _keyframes = const [];
@@ -1113,7 +1112,6 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     }
 
     _database = await openFlowlogDatabase();
-    _ownsRepositories = true;
     return _database!;
   }
 
@@ -1272,6 +1270,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     );
     final repository = await _ensureProfileRepository();
     await repository.insertProfile(profile);
+    if (!mounted) {
+      return;
+    }
 
     await setDefaultTargetBrew(
       context: context,
@@ -1306,6 +1307,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     );
     final repository = await _ensureProfileRepository();
     await repository.insertProfile(profile);
+    if (!mounted) {
+      return;
+    }
 
     final repeatController = RepeatShotScope.maybeOf(context);
     repeatController?.setPrefill(RepeatShotPrefill.fromProfile(profile));

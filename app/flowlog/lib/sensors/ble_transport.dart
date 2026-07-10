@@ -3,9 +3,6 @@ import 'dart:io';
 
 import 'package:flowlog/sensors/sensor_kind.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
-// Decent scale BLE types live in a sub-library to keep flowlog_sensors pure Dart.
-// ignore: implementation_imports
-import 'package:flowlog_sensors/src/decent_scale/decent_scale.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 

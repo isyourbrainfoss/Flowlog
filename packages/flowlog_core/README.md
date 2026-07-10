@@ -1,39 +1,59 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# flowlog_core
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
+Core models, persistence (Drift), shot session logic, CSV/PDF export, and sync for the Flowlog coffee shot tracker.
 
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/tools/pub/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
-
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+Intended for the Flowlog app and Dart code handling espresso shot models and storage.
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+- Data models (`Shot`, `ShotSample`, `Bean`, `SavedProfile`, annotations, tags, etc.).
+- `ShotSession` state machine to record from `Stream<ShotSample>` or manually (start/pause/resume/stop).
+- Drift-backed `FlowlogDatabase` and `*Repository` classes for persistence.
+- `FlowRateCalculator` and `ShotDetector` for derived metrics and auto-detection.
+- CSV export/import and PDF export for shots.
+- Sync helpers (blobs, Nextcloud).
 
 ## Getting started
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+Add to your `pubspec.yaml` (in this workspace it resolves automatically):
+
+```yaml
+dependencies:
+  flowlog_core:
+```
+
+The package requires a Dart SDK ^3.12.2 and pulls in `drift` for DB.
 
 ## Usage
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
-
 ```dart
-const like = 'sample';
+import 'package:flowlog_core/flowlog_core.dart';
+
+// Shot session (live recording)
+final session = ShotSession();
+session.start(sensorStream);  // Stream<ShotSample>
+session.pause();
+session.resume();
+await session.stop();
+await session.dispose();
+
+// Database + repo
+final db = FlowlogDatabase.inMemory(); // or .openFile(path)
+final repo = ShotRepository(db);
+await repo.insertShot(shot);
+final history = await repo.listShots(includeSamples: true);
+
+// Processing
+final withFlow = computeFlowRates(samples);
+final detection = detectShotStart(samples);
 ```
+
+See `example/flowlog_core_example.dart` and tests for more. Production usage is in `app/flowlog/`.
+
 
 ## Additional information
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+See the root project [README](../../README.md) for installation, development, and architecture notes.
+
+Report issues and contribute in the main Flowlog repository. This package is not published to pub.dev.
+

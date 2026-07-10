@@ -172,7 +172,7 @@ class LinuxExportActions implements ExportActions {
   }
 }
 
-/// Android share sheet via [Share].
+/// Android share sheet via [SharePlus].
 class AndroidExportActions implements ExportActions {
   @override
   Future<ExportOutcome> saveTextFile({
@@ -182,9 +182,11 @@ class AndroidExportActions implements ExportActions {
     final tempDir = Directory.systemTemp.createTempSync('flowlog-export');
     final file = File('${tempDir.path}/$suggestedName');
     await file.writeAsString(content);
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      subject: 'Flowlog export',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path)],
+        subject: 'Flowlog export',
+      ),
     );
     return ExportOutcome.shared([suggestedName]);
   }
@@ -200,9 +202,11 @@ class AndroidExportActions implements ExportActions {
       xFiles.add(XFile(file.path, name: entry.filename));
     }
 
-    await Share.shareXFiles(
-      xFiles,
-      subject: 'Flowlog export',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: xFiles,
+        subject: 'Flowlog export',
+      ),
     );
     return ExportOutcome.shared(files.map((file) => file.filename).toList());
   }

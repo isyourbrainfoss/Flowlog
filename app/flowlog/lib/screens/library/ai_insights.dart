@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -356,7 +354,9 @@ class _AiInsightsScreenState extends State<AiInsightsScreen> {
               AiInsightsAnomaliesCard(
                 key: const Key('ai_insights_anomalies'),
                 hints: _anomalyHints,
-                shotLabel: hasShot ? _shotLabel(latestShot!) : null,
+                shotLabel: (latestShot != null && latestShot.samples.isNotEmpty)
+                    ? _shotLabel(latestShot)
+                    : null,
                 emptyMessage: hasShot
                     ? 'No curve anomalies detected in the latest shot'
                     : 'Save a shot with samples to analyze the curve',

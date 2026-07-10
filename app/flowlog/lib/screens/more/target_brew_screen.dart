@@ -92,6 +92,9 @@ class _TargetBrewScreenState extends State<TargetBrewScreen> {
 
   Future<void> _pickProfile() async {
     final repository = await _ensureProfileRepository();
+    if (!mounted) {
+      return;
+    }
     final profile = await showProfilePickerDialog(
       context: context,
       profileRepository: repository,
@@ -101,6 +104,9 @@ class _TargetBrewScreenState extends State<TargetBrewScreen> {
       return;
     }
 
+    if (!mounted) {
+      return;
+    }
     await _effectiveController(context).setProfile(
       profile,
       profileRepository: repository,
@@ -108,6 +114,9 @@ class _TargetBrewScreenState extends State<TargetBrewScreen> {
   }
 
   Future<void> _clearTarget() async {
+    if (!mounted) {
+      return;
+    }
     await _effectiveController(context).clear();
   }
 

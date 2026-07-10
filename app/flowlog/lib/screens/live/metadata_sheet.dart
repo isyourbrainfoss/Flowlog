@@ -6,7 +6,7 @@ import 'package:flowlog/settings/coffeejack_settings_store.dart';
 import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
-import 'package:meta/meta.dart';
+
 
 /// Metadata fields captured after a shot, aligned with [Shot] properties.
 @immutable
@@ -458,11 +458,12 @@ class _MetadataSheetState extends State<MetadataSheet> {
   }
 
   Future<ShotMetadata> _buildMetadata() async {
+    final activeBeanScope = ActiveBeanScope.maybeOf(context);
     final beanId = await _resolveBeanId();
     if (beanId != null && widget.beanRepository != null) {
       final bean = await widget.beanRepository!.getBeanById(beanId);
       if (bean != null) {
-        ActiveBeanScope.maybeOf(context)?.onActiveBeanChanged(
+        activeBeanScope?.onActiveBeanChanged(
           bean.name,
           beanId: bean.id,
         );

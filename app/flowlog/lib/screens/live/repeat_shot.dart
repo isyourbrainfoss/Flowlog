@@ -89,6 +89,9 @@ Future<void> startRepeatShotFromShot({
     id: generateProfileId(),
   );
   await profileRepository.insertProfile(profile);
+  if (!context.mounted) {
+    return;
+  }
 
   final controller =
       repeatController ?? RepeatShotScope.maybeOf(context);

@@ -3,15 +3,12 @@ import 'dart:io';
 import 'package:flowlog/location/brew_gps.dart';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/delight.dart';
-import 'package:flowlog/screens/live/metadata_sheet.dart';
-import 'package:flowlog/screens/live/save_shot.dart';
+
 import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog/screens/live_screen.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
-import 'package:flowlog_sensors/src/decent_scale/decent_scale.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'pump_helpers.dart';

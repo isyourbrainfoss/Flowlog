@@ -182,6 +182,17 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         type: DriftSqlType.int,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _autoStartPressureBarMeta =
+      const VerificationMeta('autoStartPressureBar');
+  @override
+  late final GeneratedColumn<double> autoStartPressureBar =
+      GeneratedColumn<double>(
+        'auto_start_pressure_bar',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -201,6 +212,7 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     longitude,
     coffeejackRewindTurns,
     coffeejackPreinfusionTurns,
+    autoStartPressureBar,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -321,6 +333,15 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         ),
       );
     }
+    if (data.containsKey('auto_start_pressure_bar')) {
+      context.handle(
+        _autoStartPressureBarMeta,
+        autoStartPressureBar.isAcceptableOrUnknown(
+          data['auto_start_pressure_bar']!,
+          _autoStartPressureBarMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -402,6 +423,10 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         DriftSqlType.int,
         data['${effectivePrefix}coffeejack_preinfusion_turns'],
       ),
+      autoStartPressureBar: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}auto_start_pressure_bar'],
+      ),
     );
   }
 
@@ -434,6 +459,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
   final double? longitude;
   final int? coffeejackRewindTurns;
   final int? coffeejackPreinfusionTurns;
+  final double? autoStartPressureBar;
   const ShotRow({
     required this.id,
     required this.startedAt,
@@ -452,6 +478,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     this.longitude,
     this.coffeejackRewindTurns,
     this.coffeejackPreinfusionTurns,
+    this.autoStartPressureBar,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -507,6 +534,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
         coffeejackPreinfusionTurns,
       );
     }
+    if (!nullToAbsent || autoStartPressureBar != null) {
+      map['auto_start_pressure_bar'] = Variable<double>(autoStartPressureBar);
+    }
     return map;
   }
 
@@ -556,6 +586,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           coffeejackPreinfusionTurns == null && nullToAbsent
           ? const Value.absent()
           : Value(coffeejackPreinfusionTurns),
+      autoStartPressureBar: autoStartPressureBar == null && nullToAbsent
+          ? const Value.absent()
+          : Value(autoStartPressureBar),
     );
   }
 
@@ -588,6 +621,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       coffeejackPreinfusionTurns: serializer.fromJson<int?>(
         json['coffeejackPreinfusionTurns'],
       ),
+      autoStartPressureBar: serializer.fromJson<double?>(
+        json['autoStartPressureBar'],
+      ),
     );
   }
   @override
@@ -613,6 +649,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       'coffeejackPreinfusionTurns': serializer.toJson<int?>(
         coffeejackPreinfusionTurns,
       ),
+      'autoStartPressureBar': serializer.toJson<double?>(autoStartPressureBar),
     };
   }
 
@@ -634,6 +671,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     Value<double?> longitude = const Value.absent(),
     Value<int?> coffeejackRewindTurns = const Value.absent(),
     Value<int?> coffeejackPreinfusionTurns = const Value.absent(),
+    Value<double?> autoStartPressureBar = const Value.absent(),
   }) => ShotRow(
     id: id ?? this.id,
     startedAt: startedAt ?? this.startedAt,
@@ -656,6 +694,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     coffeejackPreinfusionTurns: coffeejackPreinfusionTurns.present
         ? coffeejackPreinfusionTurns.value
         : this.coffeejackPreinfusionTurns,
+    autoStartPressureBar: autoStartPressureBar.present
+        ? autoStartPressureBar.value
+        : this.autoStartPressureBar,
   );
   ShotRow copyWithCompanion(ShotsCompanion data) {
     return ShotRow(
@@ -690,6 +731,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       coffeejackPreinfusionTurns: data.coffeejackPreinfusionTurns.present
           ? data.coffeejackPreinfusionTurns.value
           : this.coffeejackPreinfusionTurns,
+      autoStartPressureBar: data.autoStartPressureBar.present
+          ? data.autoStartPressureBar.value
+          : this.autoStartPressureBar,
     );
   }
 
@@ -712,7 +756,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude, ')
           ..write('coffeejackRewindTurns: $coffeejackRewindTurns, ')
-          ..write('coffeejackPreinfusionTurns: $coffeejackPreinfusionTurns')
+          ..write('coffeejackPreinfusionTurns: $coffeejackPreinfusionTurns, ')
+          ..write('autoStartPressureBar: $autoStartPressureBar')
           ..write(')'))
         .toString();
   }
@@ -736,6 +781,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     longitude,
     coffeejackRewindTurns,
     coffeejackPreinfusionTurns,
+    autoStartPressureBar,
   );
   @override
   bool operator ==(Object other) =>
@@ -757,7 +803,8 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           other.latitude == this.latitude &&
           other.longitude == this.longitude &&
           other.coffeejackRewindTurns == this.coffeejackRewindTurns &&
-          other.coffeejackPreinfusionTurns == this.coffeejackPreinfusionTurns);
+          other.coffeejackPreinfusionTurns == this.coffeejackPreinfusionTurns &&
+          other.autoStartPressureBar == this.autoStartPressureBar);
 }
 
 class ShotsCompanion extends UpdateCompanion<ShotRow> {
@@ -778,6 +825,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
   final Value<double?> longitude;
   final Value<int?> coffeejackRewindTurns;
   final Value<int?> coffeejackPreinfusionTurns;
+  final Value<double?> autoStartPressureBar;
   final Value<int> rowid;
   const ShotsCompanion({
     this.id = const Value.absent(),
@@ -797,6 +845,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.longitude = const Value.absent(),
     this.coffeejackRewindTurns = const Value.absent(),
     this.coffeejackPreinfusionTurns = const Value.absent(),
+    this.autoStartPressureBar = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ShotsCompanion.insert({
@@ -817,6 +866,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.longitude = const Value.absent(),
     this.coffeejackRewindTurns = const Value.absent(),
     this.coffeejackPreinfusionTurns = const Value.absent(),
+    this.autoStartPressureBar = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        startedAt = Value(startedAt);
@@ -838,6 +888,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Expression<double>? longitude,
     Expression<int>? coffeejackRewindTurns,
     Expression<int>? coffeejackPreinfusionTurns,
+    Expression<double>? autoStartPressureBar,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -860,6 +911,8 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
         'coffeejack_rewind_turns': coffeejackRewindTurns,
       if (coffeejackPreinfusionTurns != null)
         'coffeejack_preinfusion_turns': coffeejackPreinfusionTurns,
+      if (autoStartPressureBar != null)
+        'auto_start_pressure_bar': autoStartPressureBar,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -882,6 +935,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Value<double?>? longitude,
     Value<int?>? coffeejackRewindTurns,
     Value<int?>? coffeejackPreinfusionTurns,
+    Value<double?>? autoStartPressureBar,
     Value<int>? rowid,
   }) {
     return ShotsCompanion(
@@ -904,6 +958,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
           coffeejackRewindTurns ?? this.coffeejackRewindTurns,
       coffeejackPreinfusionTurns:
           coffeejackPreinfusionTurns ?? this.coffeejackPreinfusionTurns,
+      autoStartPressureBar: autoStartPressureBar ?? this.autoStartPressureBar,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -970,6 +1025,11 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
         coffeejackPreinfusionTurns.value,
       );
     }
+    if (autoStartPressureBar.present) {
+      map['auto_start_pressure_bar'] = Variable<double>(
+        autoStartPressureBar.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -996,6 +1056,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
           ..write('longitude: $longitude, ')
           ..write('coffeejackRewindTurns: $coffeejackRewindTurns, ')
           ..write('coffeejackPreinfusionTurns: $coffeejackPreinfusionTurns, ')
+          ..write('autoStartPressureBar: $autoStartPressureBar, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3794,6 +3855,7 @@ typedef $$ShotsTableCreateCompanionBuilder =
       Value<double?> longitude,
       Value<int?> coffeejackRewindTurns,
       Value<int?> coffeejackPreinfusionTurns,
+      Value<double?> autoStartPressureBar,
       Value<int> rowid,
     });
 typedef $$ShotsTableUpdateCompanionBuilder =
@@ -3815,6 +3877,7 @@ typedef $$ShotsTableUpdateCompanionBuilder =
       Value<double?> longitude,
       Value<int?> coffeejackRewindTurns,
       Value<int?> coffeejackPreinfusionTurns,
+      Value<double?> autoStartPressureBar,
       Value<int> rowid,
     });
 
@@ -3973,6 +4036,11 @@ class $$ShotsTableFilterComposer
 
   ColumnFilters<int> get coffeejackPreinfusionTurns => $composableBuilder(
     column: $table.coffeejackPreinfusionTurns,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get autoStartPressureBar => $composableBuilder(
+    column: $table.autoStartPressureBar,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4145,6 +4213,11 @@ class $$ShotsTableOrderingComposer
     column: $table.coffeejackPreinfusionTurns,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<double> get autoStartPressureBar => $composableBuilder(
+    column: $table.autoStartPressureBar,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ShotsTableAnnotationComposer
@@ -4218,6 +4291,11 @@ class $$ShotsTableAnnotationComposer
 
   GeneratedColumn<int> get coffeejackPreinfusionTurns => $composableBuilder(
     column: $table.coffeejackPreinfusionTurns,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get autoStartPressureBar => $composableBuilder(
+    column: $table.autoStartPressureBar,
     builder: (column) => column,
   );
 
@@ -4346,6 +4424,7 @@ class $$ShotsTableTableManager
                 Value<double?> longitude = const Value.absent(),
                 Value<int?> coffeejackRewindTurns = const Value.absent(),
                 Value<int?> coffeejackPreinfusionTurns = const Value.absent(),
+                Value<double?> autoStartPressureBar = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShotsCompanion(
                 id: id,
@@ -4365,6 +4444,7 @@ class $$ShotsTableTableManager
                 longitude: longitude,
                 coffeejackRewindTurns: coffeejackRewindTurns,
                 coffeejackPreinfusionTurns: coffeejackPreinfusionTurns,
+                autoStartPressureBar: autoStartPressureBar,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4386,6 +4466,7 @@ class $$ShotsTableTableManager
                 Value<double?> longitude = const Value.absent(),
                 Value<int?> coffeejackRewindTurns = const Value.absent(),
                 Value<int?> coffeejackPreinfusionTurns = const Value.absent(),
+                Value<double?> autoStartPressureBar = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShotsCompanion.insert(
                 id: id,
@@ -4405,6 +4486,7 @@ class $$ShotsTableTableManager
                 longitude: longitude,
                 coffeejackRewindTurns: coffeejackRewindTurns,
                 coffeejackPreinfusionTurns: coffeejackPreinfusionTurns,
+                autoStartPressureBar: autoStartPressureBar,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

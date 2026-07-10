@@ -157,6 +157,7 @@ class LinuxBackupActions implements BackupActions {
   }
 }
 
+/// Android share sheet via [SharePlus].
 class AndroidBackupActions implements BackupActions {
   @override
   Future<BackupSaveOutcome> saveBackup({
@@ -166,9 +167,11 @@ class AndroidBackupActions implements BackupActions {
     final tempDir = Directory.systemTemp.createTempSync('flowlog-backup');
     final file = File('${tempDir.path}/$suggestedName');
     await file.writeAsString(content);
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      subject: 'Flowlog backup',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path)],
+        subject: 'Flowlog backup',
+      ),
     );
     return BackupSaveOutcome.saved(
       file.path,
@@ -232,7 +235,6 @@ class BackupScreen extends StatefulWidget {
 
 class _BackupScreenState extends State<BackupScreen> {
   FlowlogDatabase? _database;
-  bool _ownsDatabase = false;
   late final BackupActions _actions;
   bool _isBusy = false;
   String? _statusMessage;
@@ -254,7 +256,6 @@ class _BackupScreenState extends State<BackupScreen> {
     }
 
     _database = await openFlowlogDatabase();
-    _ownsDatabase = true;
     return _database!;
   }
 

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'dart:async';
 
 import 'package:flowlog/persistence/flowlog_storage.dart';
@@ -172,7 +170,6 @@ class _InsightsScreenState extends State<InsightsScreen> {
   ShotRepository? _shotRepository;
   BeanRepository? _beanRepository;
   FlowlogDatabase? _database;
-  bool _ownsRepositories = false;
   late Future<InsightsSnapshot> _insightsFuture;
 
   @override
@@ -192,7 +189,6 @@ class _InsightsScreenState extends State<InsightsScreen> {
     _database = await openFlowlogDatabase();
     _shotRepository = ShotRepository(_database!);
     _beanRepository = BeanRepository(_database!);
-    _ownsRepositories = true;
     return (shots: _shotRepository!, beans: _beanRepository!);
   }
 

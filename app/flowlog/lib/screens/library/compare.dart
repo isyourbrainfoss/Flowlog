@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flowlog/persistence/flowlog_storage.dart';
@@ -569,7 +568,7 @@ class _CompareOverlayChartState extends State<CompareOverlayChart> {
         builder: (context, constraints) {
           final plotWidth = _plotWidth(constraints.maxWidth);
           final body = CustomPaint(
-            painter: CompareOverlayPainter(
+            painter: _CompareOverlayPainter(
               shots: preparedShots,
               viewport: viewport,
               showDeltaHighlight: widget.showDeltaHighlight,
@@ -653,7 +652,7 @@ class _CompareOverlayChartState extends State<CompareOverlayChart> {
   static double _plotWidth(double width) {
     return math.max(
       1,
-      width - CompareOverlayPainter.leftPad - CompareOverlayPainter.rightPad,
+      width - _CompareOverlayPainter.leftPad - _CompareOverlayPainter.rightPad,
     );
   }
 }
@@ -669,13 +668,12 @@ class _PreparedCompareShot {
 }
 
 /// Paints multiple shot pressure curves and an optional delta band.
-class CompareOverlayPainter extends CustomPainter {
-  CompareOverlayPainter({
+class _CompareOverlayPainter extends CustomPainter {
+  _CompareOverlayPainter({
     required this.shots,
     required this.viewport,
     this.showDeltaHighlight = false,
-    this.backgroundColor = FlowlogChartColors.background,
-  });
+  }) : backgroundColor = FlowlogChartColors.background;
 
   final List<_PreparedCompareShot> shots;
   final ChartViewport viewport;
@@ -975,7 +973,7 @@ class CompareOverlayPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CompareOverlayPainter oldDelegate) {
+  bool shouldRepaint(covariant _CompareOverlayPainter oldDelegate) {
     return oldDelegate.shots != shots ||
         oldDelegate.viewport != viewport ||
         oldDelegate.showDeltaHighlight != showDeltaHighlight ||

@@ -141,7 +141,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
                 Expanded(
                   child: DropdownButtonFormField<int?>(
                     key: const Key('history_filter_taste_min'),
-                    value: widget.filters.minTasteScore,
+                    initialValue: widget.filters.minTasteScore,
                     decoration: const InputDecoration(
                       labelText: 'Min taste',
                       isDense: true,

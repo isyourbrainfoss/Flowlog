@@ -1,8 +1,9 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
-import 'package:flowlog_sensors/src/decent_scale/decent_scale.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 
 /// Builds a [PressensorBleAdapter] for a paired pressensor device.
@@ -112,24 +113,20 @@ class SessionSensorAdapter implements SensorAdapter {
 /// Chooses the Live tab sample source from [SensorHub] state and demo mode.
 class LiveSensorSource {
   LiveSensorSource({
-    required SensorHub hub,
-    String? demoFixturePath,
-    Future<List<SensorSample>> Function()? demoFixtureLoader,
+    required this.hub,
+    this.demoFixturePath,
+    this.demoFixtureLoader,
     this.pressureAdapterFactory,
     this.weightAdapterFactory,
-  })  : _hub = hub,
-        _demoFixturePath = demoFixturePath,
-        _demoFixtureLoader = demoFixtureLoader;
+  });
 
-  final SensorHub _hub;
-  final String? _demoFixturePath;
-  final Future<List<SensorSample>> Function()? _demoFixtureLoader;
+  final SensorHub hub;
+  final String? demoFixturePath;
+  final Future<List<SensorSample>> Function()? demoFixtureLoader;
   final PressureAdapterFactory? pressureAdapterFactory;
   final WeightAdapterFactory? weightAdapterFactory;
 
   bool _demoMode = false;
-
-  SensorHub get hub => _hub;
 
   bool get isDemoMode => _demoMode;
 
@@ -142,7 +139,7 @@ class LiveSensorSource {
   }
 
   /// Whether any paired sensor is currently connected.
-  bool get hasConnectedSensors => _hub.devices.any(
+  bool get hasConnectedSensors => hub.devices.any(
         (device) => device.state == ConnectionState.connected,
       );
 
@@ -150,8 +147,8 @@ class LiveSensorSource {
   SensorAdapter resolveSampleAdapter() {
     if (_demoMode) {
       return MockReplayAdapter(
-        fixturePath: _demoFixturePath,
-        fixtureLoader: _demoFixtureLoader,
+        fixturePath: demoFixturePath,
+        fixtureLoader: demoFixtureLoader,
         speed: 1.0,
       );
     }
@@ -164,8 +161,8 @@ class LiveSensorSource {
     }
 
     final usesHubAdapters =
-        _hub.activeAdapterFor(SensorKind.pressensor) != null ||
-        _hub.activeAdapterFor(SensorKind.scale) != null;
+        hub.activeAdapterFor(SensorKind.pressensor) != null ||
+        hub.activeAdapterFor(SensorKind.scale) != null;
 
     return MergedSampleStreamAdapter(
       merged: MergedSampleStream(
@@ -182,7 +179,7 @@ class LiveSensorSource {
       return;
     }
 
-    final hubScale = _hub.activeAdapterFor(SensorKind.scale);
+    final hubScale = hub.activeAdapterFor(SensorKind.scale);
     if (hubScale is DecentScaleBleAdapter) {
       await hubScale.tare();
       return;
@@ -202,7 +199,7 @@ class LiveSensorSource {
   }
 
   SensorAdapter? _resolvePressureAdapter() {
-    final hubAdapter = _hub.activeAdapterFor(SensorKind.pressensor);
+    final hubAdapter = hub.activeAdapterFor(SensorKind.pressensor);
     if (hubAdapter != null) {
       return hubAdapter;
     }
@@ -221,7 +218,7 @@ class LiveSensorSource {
   }
 
   SensorAdapter? _resolveScaleAdapter() {
-    final hubAdapter = _hub.activeAdapterFor(SensorKind.scale);
+    final hubAdapter = hub.activeAdapterFor(SensorKind.scale);
     if (hubAdapter != null) {
       return hubAdapter;
     }
@@ -240,7 +237,7 @@ class LiveSensorSource {
   }
 
   PairedSensorEntry? _connectedDevice(SensorKind kind) {
-    for (final device in _hub.devices) {
+    for (final device in hub.devices) {
       if (device.kind == kind && device.state == ConnectionState.connected) {
         return device;
       }

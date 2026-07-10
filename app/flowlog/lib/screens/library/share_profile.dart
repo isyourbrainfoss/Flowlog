@@ -30,6 +30,7 @@ Future<void> copyShareLink(
   ScaffoldMessengerState? messenger,
 }) async {
   await Clipboard.setData(ClipboardData(text: link));
+  if (!context.mounted) return;
   final snackbarMessenger = messenger ?? ScaffoldMessenger.of(context);
   snackbarMessenger.showSnackBar(
     SnackBar(
@@ -98,7 +99,12 @@ Future<void> showShareProfileDialog(
           TextButton.icon(
             key: const Key('share_profile_system_share'),
             onPressed: () async {
-              await Share.share(link, subject: profile.name);
+              await SharePlus.instance.share(
+                ShareParams(
+                  text: link,
+                  subject: profile.name,
+                ),
+              );
             },
             icon: const Icon(Icons.share),
             label: const Text('Share'),

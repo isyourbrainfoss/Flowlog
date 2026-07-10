@@ -1,39 +1,65 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# flowlog_charts
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
+Flutter chart widgets (CustomPainter) for live and historical espresso shot curves in Flowlog.
 
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
-
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+`DualCurveChart` renders pressure, weight, and flow with interaction, annotations, and target overlays. Includes `SparklineChart` for compact previews. Depends on `flowlog_core` `ShotSample`.
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+- `DualCurveChart`: live/static rendering of shot curves (overlay, split, flow-only), ValueNotifier support, pinch/pan/zoom, annotations, target pressure curve, crosshair.
+- `SparklineChart`: compact pressure history sparkline.
+- Theming via `FlowlogChartColors` (coffee palette + colorblind-safe option).
+- `ChartInteractionController`, `ChartViewport`, `ChartViewMode` for external control and state.
+- Annotation painting helpers.
 
 ## Getting started
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+```yaml
+dependencies:
+  flowlog_charts:
+    # (or via workspace)
+```
+
+This is a Flutter package (requires Flutter SDK). Depends on `flowlog_core` for `ShotSample` / `ShotAnnotation`.
+
 
 ## Usage
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
-
 ```dart
-const like = 'sample';
+import 'package:flowlog_charts/flowlog_charts.dart';
+import 'package:flowlog_core/flowlog_core.dart';
+import 'package:flutter/material.dart';
+
+final samplesNotifier = ValueNotifier<List<ShotSample>>([]);
+
+// Live chart wired to a session
+DualCurveChart(
+  samplesNotifier: samplesNotifier,
+  annotationsNotifier: annotationsNotifier,
+  interactionController: _controller,
+  height: 220,
+  denseTimeAxis: true,
+  onAnnotateAtElapsedMs: onAnnotate,
+  targetPressureSamples: targetSamples,
+);
+
+// Static history view
+DualCurveChart(
+  samples: shot.samples,
+  annotations: shot.annotations,
+  enableInteraction: false,
+);
+
+// Compact
+SparklineChart(samples: shot.samples, height: 48);
 ```
+
+See `app/flowlog/lib/screens/live_screen.dart`, `shot_detail.dart`, and `packages/flowlog_charts/test/` for more patterns.
+
+Use `samples` for static data or `samplesNotifier` for live updates from `ShotSession.sampleBatches`.
+
 
 ## Additional information
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+See the root project [README](../../README.md) for context. The charts are used throughout the live view and history screens.
+

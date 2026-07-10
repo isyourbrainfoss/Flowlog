@@ -71,10 +71,9 @@ class SensorHub extends ChangeNotifier {
   SensorHub({
     List<PairedSensorEntry>? initialDevices,
     BleConnectionBackend? bleBackend,
-    PairedSensorsStore? pairedSensorsStore,
+    this._pairedSensorsStore,
   })  : _devices = List.of(initialDevices ?? []),
-        _bleBackend = bleBackend ?? const UnsupportedBleConnectionBackend(),
-        _pairedSensorsStore = pairedSensorsStore {
+        _bleBackend = bleBackend ?? const UnsupportedBleConnectionBackend() {
     _syncIdCounterFromDevices();
   }
 
@@ -105,7 +104,7 @@ class SensorHub extends ChangeNotifier {
 
   /// Battery percent for the connected pressensor, if known.
   int? get pressensorBatteryPercent {
-    for (final device in _devices) {
+    for (final device in devices) {
       if (device.kind == SensorKind.pressensor &&
           device.state == ConnectionState.connected) {
         return _batteryByDevice[device.id];
@@ -131,7 +130,7 @@ class SensorHub extends ChangeNotifier {
 
   /// Active adapter for a connected device of [kind], when [connect] succeeded.
   SensorAdapter? activeAdapterFor(SensorKind kind) {
-    for (final device in _devices) {
+    for (final device in devices) {
       if (device.kind == kind && device.state == ConnectionState.connected) {
         return _activeAdapters[device.id];
       }
@@ -179,8 +178,8 @@ class SensorHub extends ChangeNotifier {
       return false;
     }
 
-    final device = _devices[index];
-    _devices[index] = device.copyWith(
+    final device = devices[index];
+    devices[index] = device.copyWith(
       bleRemoteId: bleRemoteId,
       name: name?.trim().isNotEmpty ?? false ? name!.trim() : device.name,
     );
@@ -236,7 +235,7 @@ class SensorHub extends ChangeNotifier {
 
   /// Reconnects paired sensors that already have a saved BLE id.
   Future<void> reconnectPairedDevices() async {
-    for (final device in List<PairedSensorEntry>.from(_devices)) {
+    for (final device in List<PairedSensorEntry>.from(devices)) {
       final bleRemoteId = device.bleRemoteId;
       if (bleRemoteId == null ||
           bleRemoteId.isEmpty ||
@@ -249,7 +248,7 @@ class SensorHub extends ChangeNotifier {
   }
 
   void _syncIdCounterFromDevices() {
-    for (final device in _devices) {
+    for (final device in devices) {
       final match = RegExp(r'^sensor-(\d+)$').firstMatch(device.id);
       if (match == null) {
         continue;
@@ -268,7 +267,7 @@ class SensorHub extends ChangeNotifier {
     }
 
     await store.save([
-      for (final device in _devices)
+      for (final device in devices)
         PairedSensorRecord(
           id: device.id,
           name: device.name,
@@ -342,8 +341,8 @@ class SensorHub extends ChangeNotifier {
       return;
     }
 
-    final device = _devices[index];
-    _devices[index] = device.copyWith(state: ConnectionState.connecting);
+    final device = devices[index];
+    devices[index] = device.copyWith(state: ConnectionState.connecting);
     _rssiByDevice[id] = null;
     _batteryByDevice[id] = null;
     recordReconnect(
@@ -393,8 +392,8 @@ class SensorHub extends ChangeNotifier {
         return;
       }
 
-      _devices[currentIndex] =
-          _devices[currentIndex].copyWith(state: ConnectionState.connected);
+      devices[currentIndex] =
+          devices[currentIndex].copyWith(state: ConnectionState.connected);
       setLastError(null);
       recordReconnect(
         deviceId: id,
@@ -415,7 +414,7 @@ class SensorHub extends ChangeNotifier {
     PairedSensorEntry device,
     String message,
   ) async {
-    _devices[index] = device.copyWith(state: ConnectionState.disconnected);
+    devices[index] = device.copyWith(state: ConnectionState.disconnected);
     setLastError(message);
     recordReconnect(
       deviceId: device.id,
@@ -432,7 +431,7 @@ class SensorHub extends ChangeNotifier {
       return;
     }
 
-    _devices[index] = _devices[index].copyWith(state: state);
+    devices[index] = devices[index].copyWith(state: state);
     if (state == ConnectionState.connected) {
       final adapter = _activeAdapters[id];
       if (adapter is PressensorBleAdapter) {
@@ -458,8 +457,8 @@ class SensorHub extends ChangeNotifier {
     if (index < 0) {
       return;
     }
-    _devices[index] =
-        _devices[index].copyWith(state: ConnectionState.disconnected);
+    devices[index] =
+        devices[index].copyWith(state: ConnectionState.disconnected);
     _batteryByDevice.remove(id);
     notifyListeners();
   }

@@ -134,6 +134,9 @@ Future<void> setDefaultTargetBrewFromShot({
     id: generateProfileId(),
   );
   await profileRepository.insertProfile(profile);
+  if (!context.mounted) {
+    return;
+  }
   await setDefaultTargetBrew(
     context: context,
     profile: profile,

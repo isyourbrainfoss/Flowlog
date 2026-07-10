@@ -6,10 +6,11 @@ import 'package:flowlog_sensors/flowlog_sensors.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _RecordingBleBackend implements BleConnectionBackend {
+  // ignore: unused_element_parameter
   _RecordingBleBackend({
-    this.readyMessage,
+    this.readyMessage, // ignore: unused_element_parameter
     this.discovered = const [],
-    this.connectError,
+    this.connectError, // ignore: unused_element_parameter
   });
 
   String? readyMessage;
@@ -22,10 +23,7 @@ class _RecordingBleBackend implements BleConnectionBackend {
   Future<String?> ensureReady() async => readyMessage;
 
   @override
-  Future<List<BleDiscoveredDevice>> scan(
-    SensorKind kind, {
-    Duration timeout = const Duration(seconds: 8),
-  }) async {
+  Future<List<BleDiscoveredDevice>> scan(SensorKind kind, {Duration timeout = const Duration(seconds: 10)}) async {
     scanCalls += 1;
     return discovered;
   }
