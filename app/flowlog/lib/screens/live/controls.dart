@@ -194,10 +194,10 @@ class LiveControls extends StatelessWidget {
         late final Widget button;
 
         if (isIdleProminent) {
-          // Custom full-bleed button showing *only* the coffee (vertical stripes).
-          // No cup/rim. Subtle animated stripes using two coffee colors.
+          // Custom full-bleed button showing *only* the coffee as a smooth
+          // animated vertical gradient (light → dark). No cup/rim.
           button = Material(
-            color: const Color(0xFF2C211A), // deep coffee liquid color (no separate cup)
+            color: const Color(0xFF2C211A), // base dark coffee (painter covers it)
             shape: const StadiumBorder(),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
@@ -269,9 +269,10 @@ class LiveControls extends StatelessWidget {
   }
 }
 
-/// Animated vertical stripes filling the entire prominent "Start brew" button
-/// with coffee colors. Very subtle, slow shift so the pattern changes gradually
-/// across the button (not all at once). Only the coffee, no cup visible.
+/// Animated vertical gradient (smooth light-to-dark coffee) filling the entire
+/// prominent "Start brew" button. The transition moves gently so not the whole
+/// button changes color at the same instant. Subtle and tasteful. Only the
+/// coffee, no cup/rim visible.
 class _AnimatedCoffeeLiquid extends StatefulWidget {
   const _AnimatedCoffeeLiquid({super.key}); // ignore: unused_element_parameter
 
@@ -321,10 +322,10 @@ class _AnimatedCoffeeLiquidState extends State<_AnimatedCoffeeLiquid>
   }
 }
 
-/// Simple vertical stripes filling the entire prominent Start brew button with coffee.
-/// Subtle animation using two coffee shades. Stripes shift slowly so the color
-/// change does not affect the whole button uniformly at the same time.
-/// No drips, no complex shapes or heavy gradients.
+/// Animated vertical gradient filling the entire prominent Start brew button
+/// with smooth coffee colors (light to dark). The transition point moves
+/// slowly up and down so the color change does not affect the whole button
+/// uniformly at the same time. Subtle, tasteful, no stripes or drips.
 class _CoffeeLiquidPainter extends CustomPainter {
   _CoffeeLiquidPainter({
     required this.progress,
@@ -338,55 +339,28 @@ class _CoffeeLiquidPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Base coffee color filling the whole button (only coffee, no cup).
-    final basePaint = Paint()..color = liquidColor;
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), basePaint);
+    final rect = Offset.zero & size;
 
-    // Vertical stripes using a second subtle coffee shade.
-    // Animation shifts them slowly so the color change sweeps and does not
-    // affect the entire button at exactly the same moment.
-    final stripePaint = Paint()
-      ..color = cremaTint.withValues(alpha: 0.20);
+    // Two coffee shades: light (top-ish) to dark (bottom-ish)
+    final lightCoffee = cremaTint;                    // e.g. warmer/lighter brown
+    final darkCoffee = liquidColor;                   // deep rich brown
 
-    const double stripeWidth = 4.0;
-    const double period = 9.0; // stripe + gap
+    // Animate the gradient transition so it sweeps vertically.
+    // Using sine makes it gently move up/down without being abrupt.
+    final t = math.sin(progress * 2 * math.pi) * 0.35; // range roughly -0.35 to +0.35
 
-    // Slow continuous drift + small oscillation.
-    final drift = (progress * 12.0) % period;
-    final bob = math.sin(progress * 2 * math.pi) * 1.2;
+    final gradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [lightCoffee, darkCoffee],
+      stops: [
+        0.25 + t,   // transition start moves
+        0.75 + t,   // transition end moves
+      ],
+    ).createShader(rect);
 
-    for (double x = drift + bob - period; x < size.width + period; x += period) {
-      canvas.drawRect(
-        Rect.fromLTWH(x, 0, stripeWidth, size.height),
-        stripePaint,
-      );
-    }
-
-    // Second, narrower set of stripes with different phase/speed for more
-    // organic "not uniform" movement across the height.
-    final stripe2 = Paint()
-      ..color = const Color(0xFF3D2E24).withValues(alpha: 0.10);
-
-    const double period2 = 3.0;
-    final drift2 = (progress * 7.0 + 1.5) % period2;
-    for (double x = drift2 - period2; x < size.width + period2; x += period2 * 2) {
-      canvas.drawRect(
-        Rect.fromLTWH(x, 0, 1.5, size.height),
-        stripe2,
-      );
-    }
-
-    // Very subtle moving vertical band so the color shift does not happen
-    // across the whole button at exactly the same time (top-to-bottom sweep).
-    final sweepT = (progress * 0.8) % 1.0;
-    final sweepY = sweepT * size.height;
-    final sweepH = size.height * 0.25;
-    final sweepPaint = Paint()
-      ..color = cremaTint.withValues(alpha: 0.06);
-    canvas.drawRect(
-      Rect.fromLTWH(0, sweepY - sweepH / 2, size.width, sweepH),
-      sweepPaint,
-    );
+    final paint = Paint()..shader = gradient;
+    canvas.drawRect(rect, paint);
   }
 
   @override
