@@ -802,17 +802,17 @@ class _LiveScreenState extends State<LiveScreen> {
                             previousSample: previousSample,
                           )
                         else if (state == ShotSessionState.idle)
-                          // Live pressure and temperature before brew starts (reassurance sensors connected).
-                          // Pressure and temp shown side by side.
+                          // Live pressure (always) and temperature (when available from Pressensor or scale)
+                          // before starting the shot. Shown side by side to confirm sensors are live.
                           ValueListenableBuilder<double?>(
                             valueListenable: _livePressureNotifier,
                             builder: (context, pressureBar, _) {
+                              if (pressureBar == null) {
+                                return const SizedBox.shrink();
+                              }
                               return ValueListenableBuilder<double?>(
                                 valueListenable: _liveTempNotifier,
                                 builder: (context, tempC, _) {
-                                  if (pressureBar == null && tempC == null) {
-                                    return const SizedBox.shrink();
-                                  }
                                   return Card(
                                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                                     child: Padding(
@@ -820,30 +820,27 @@ class _LiveScreenState extends State<LiveScreen> {
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          if (pressureBar != null)
-                                            LivePressureReadout(pressureBar: pressureBar),
-                                          if (pressureBar != null && tempC != null)
-                                            const SizedBox(width: 16),
-                                          if (tempC != null)
-                                            Column(
-                                              crossAxisAlignment: CrossAxisAlignment.end,
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  tempC.toStringAsFixed(1),
-                                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                                        fontFeatures: const [FontFeature.tabularFigures()],
-                                                        fontWeight: FontWeight.w600,
-                                                      ),
-                                                ),
-                                                Text(
-                                                  '°C',
-                                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
+                                          LivePressureReadout(pressureBar: pressureBar),
+                                          const SizedBox(width: 16),
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                tempC != null ? tempC.toStringAsFixed(1) : '—',
+                                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                              ),
+                                              Text(
+                                                '°C',
+                                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
                                         ],
                                       ),
                                     ),
