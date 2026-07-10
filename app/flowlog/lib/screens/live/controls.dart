@@ -1,7 +1,6 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
@@ -270,10 +269,10 @@ class LiveControls extends StatelessWidget {
   }
 }
 
-/// Animated coffee-like liquid filling the entire prominent Start button.
-/// Uses a subtle surface wave + low-opacity internal ripples at multiple
-/// depths so the gentle floating motion is visible across the *whole* height.
-/// Animation is intentionally slow and low-contrast for subtlety.
+/// Top-down view into an espresso cup for the prominent Start brew button.
+/// Thick dark liquid with a central pour point and gentle expanding ripples
+/// (as if espresso is dripping in). Subtle, tasteful animation using low
+/// opacity and slow timing. The pill shape approximates the cup top view.
 class _AnimatedCoffeeLiquid extends StatefulWidget {
   const _AnimatedCoffeeLiquid({super.key}); // ignore: unused_element_parameter
 
@@ -303,11 +302,10 @@ class _AnimatedCoffeeLiquidState extends State<_AnimatedCoffeeLiquid>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Liquid is a rich dark coffee color filling most of the pill.
-    // Foam is a lighter crema sitting on the animated surface.
-    // These sit on top of the button's cup background color.
+    // Rich dark espresso for the thick liquid body.
+    // A crema-tinted color used for subtle ripples.
     final liquidColor = const Color(0xFF2C211A); // deep coffee
-    final foamColor = theme.colorScheme.primary.withValues(alpha: 0.45);
+    final cremaTint = theme.colorScheme.primary.withValues(alpha: 0.35);
 
     return AnimatedBuilder(
       animation: _controller,
@@ -316,7 +314,7 @@ class _AnimatedCoffeeLiquidState extends State<_AnimatedCoffeeLiquid>
           painter: _CoffeeLiquidPainter(
             progress: _controller.value,
             liquidColor: liquidColor,
-            foamColor: foamColor,
+            cremaTint: cremaTint,
           ),
         );
       },
@@ -328,86 +326,92 @@ class _CoffeeLiquidPainter extends CustomPainter {
   _CoffeeLiquidPainter({
     required this.progress,
     required this.liquidColor,
-    required this.foamColor,
+    required this.cremaTint,
   });
 
   final double progress;
   final Color liquidColor;
-  final Color foamColor;
+  final Color cremaTint;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = liquidColor;
+    final center = Offset(size.width / 2, size.height / 2);
 
-    // Liquid fills nearly the entire button height. Surface sits near the
-    // very top so the liquid body occupies (almost) the whole visual pill.
-    final surfaceBase = size.height * 0.10;
+    // Inset slightly so the outer Material color acts as the cup rim.
+    const inset = 3.0;
+    final liquidRect = Rect.fromLTWH(
+      inset,
+      inset,
+      size.width - inset * 2,
+      size.height - inset * 2,
+    );
+    final liquidRRect = RRect.fromRectAndRadius(
+      liquidRect,
+      const Radius.circular(30),
+    );
 
-    // Gentle vertical bob for "floating" liquid feel (slow, continuous)
-    final bob = math.sin(progress * 2 * math.pi) * 1.8;
-    final surfaceY = surfaceBase + bob;
+    // Base thick dark espresso liquid.
+    final liquidPaint = Paint()..color = liquidColor;
+    canvas.drawRRect(liquidRRect, liquidPaint);
 
-    final path = Path();
-    path.moveTo(0, size.height);
-    path.lineTo(0, surfaceY);
+    // Subtle inner depth layer for "thick" viscous look (slightly darker toward center).
+    final depthPaint = Paint()..color = const Color(0xFF1A120D).withValues(alpha: 0.55);
+    final innerRect = liquidRect.deflate(5);
+    final innerRRect = RRect.fromRectAndRadius(innerRect, const Radius.circular(25));
+    canvas.drawRRect(innerRRect, depthPaint);
 
-    final waveHeight = 5.5;
+    // Central pour / drip impact point (darker, as if espresso stream is hitting).
+    final pourPaint = Paint()..color = const Color(0xFF120B08).withValues(alpha: 0.65);
+    canvas.drawCircle(center, 7, pourPaint);
 
-    // Subtle surface waves
-    for (double x = 0; x <= size.width; x += 1.5) {
-      final wave1 = math.sin((x / 32) + (progress * 2 * math.pi)) * waveHeight;
-      final wave2 = math.sin((x / 13) + (progress * 3.9 * math.pi)) * (waveHeight * 0.35);
-      final y = surfaceY + wave1 + wave2;
-      path.lineTo(x, y);
-    }
-
-    path.lineTo(size.width, size.height);
-    path.close();
-
-    canvas.drawPath(path, paint);
-
-    // Lighter foam "crema" band sitting on the surface (subtle)
-    final foamPaint = Paint()..color = foamColor;
-    final foamPath = Path();
-    foamPath.moveTo(0, surfaceY - 2);
-
-    for (double x = 0; x <= size.width; x += 1.5) {
-      final wave1 = math.sin((x / 32) + (progress * 2 * math.pi)) * waveHeight;
-      final wave2 = math.sin((x / 13) + (progress * 3.9 * math.pi)) * (waveHeight * 0.35);
-      final y = surfaceY + wave1 + wave2 - 3;
-      foamPath.lineTo(x, y);
-    }
-
-    foamPath.lineTo(size.width, surfaceY + 5);
-    foamPath.lineTo(0, surfaceY + 5);
-    foamPath.close();
-
-    canvas.drawPath(foamPath, foamPaint);
-
-    // Subtle internal ripples throughout the *entire* liquid body so the
-    // animation is visible across the whole button height (not just near the top).
+    // Gentle expanding ripples from the center (top-down pour ripples on thick liquid).
+    // Slow, low-opacity, tasteful.
     final ripplePaint = Paint()
-      ..color = foamColor.withValues(alpha: 0.13)
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6;
 
-    final liquidHeight = size.height - surfaceY;
     for (int i = 0; i < 5; i++) {
-      final depth = 0.15 + (i * 0.17); // spread ripples from near surface down toward bottom
-      final yBase = surfaceY + liquidHeight * depth +
-          math.sin((progress + i * 0.17) * 2 * math.pi) * 0.8; // tiny vertical drift
+      // Phase offset per ring for natural overlapping ripples.
+      final t = ((progress * 0.7) + (i * 0.18)) % 1.0;
+      final alpha = (0.18 * (1.0 - t)).clamp(0.0, 0.18);
+      ripplePaint.color = cremaTint.withValues(alpha: alpha);
 
-      final rPath = Path();
-      rPath.moveTo(0, yBase);
+      // Ripple size grows from center out.
+      final rx = (size.width / 2 - inset - 4) * t * 0.88;
+      final ry = (size.height / 2 - inset - 4) * t * 0.88;
 
-      final rAmp = 2.2;
-      final rFreq = 26 + (i % 2) * 5;
+      final rippleRect = Rect.fromCenter(
+        center: center,
+        width: rx * 2,
+        height: ry * 2,
+      );
 
-      for (double x = 0; x <= size.width; x += 2.0) {
-        final wy = math.sin((x / rFreq) + (progress * (1.7 + i * 0.35) * 2 * math.pi)) * rAmp;
-        rPath.lineTo(x, yBase + wy);
-      }
-      canvas.drawPath(rPath, ripplePaint);
+      // Slightly varying roundness as it expands for organic feel.
+      final corner = 28.0 * (0.6 + 0.4 * (1 - t));
+      final rippleRRect = RRect.fromRectAndRadius(rippleRect, Radius.circular(corner));
+
+      // Thinner stroke as ripple expands.
+      ripplePaint.strokeWidth = 1.8 * (1.0 - t * 0.6);
+
+      canvas.drawRRect(rippleRRect, ripplePaint);
+    }
+
+    // Extra very subtle micro-ripples / surface texture for thickness.
+    final microPaint = Paint()
+      ..color = cremaTint.withValues(alpha: 0.07)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.9;
+
+    for (int i = 0; i < 3; i++) {
+      final t = ((progress * 1.1 + i * 0.33) % 1.0);
+      final rx = (size.width / 2 - inset - 8) * (0.25 + t * 0.65);
+      final ry = (size.height / 2 - inset - 8) * (0.25 + t * 0.65);
+
+      final rRect = RRect.fromRectAndRadius(
+        Rect.fromCenter(center: center, width: rx * 2, height: ry * 2),
+        const Radius.circular(20),
+      );
+      canvas.drawRRect(rRect, microPaint);
     }
   }
 
@@ -415,7 +419,7 @@ class _CoffeeLiquidPainter extends CustomPainter {
   bool shouldRepaint(covariant _CoffeeLiquidPainter oldDelegate) {
     return oldDelegate.progress != progress ||
         oldDelegate.liquidColor != liquidColor ||
-        oldDelegate.foamColor != foamColor;
+        oldDelegate.cremaTint != cremaTint;
   }
 }
 
