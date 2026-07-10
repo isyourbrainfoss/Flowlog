@@ -193,10 +193,10 @@ class LiveControls extends StatelessWidget {
         late final Widget button;
 
         if (isIdleProminent) {
-          // Custom full-bleed button. The liquid painter now animates across
-          // the full height of the pill with subtle ripples (not just the top).
+          // Custom full-bleed button showing *only* the coffee liquid (no cup rim visible).
+          // The entire pill is filled with the animated top-down espresso.
           button = Material(
-            color: const Color(0xFF3D2E24), // dark coffee cup color
+            color: const Color(0xFF2C211A), // deep coffee liquid color (no separate cup)
             shape: const StadiumBorder(),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
@@ -209,11 +209,10 @@ class LiveControls extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Liquid now paints the full 64px height of the button.
                     Positioned.fill(
                       child: _AnimatedCoffeeLiquid(),
                     ),
-                    // Text centered over the liquid/foam.
+                    // Text centered over the liquid.
                     Text(
                       'Start brew',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -322,6 +321,9 @@ class _AnimatedCoffeeLiquidState extends State<_AnimatedCoffeeLiquid>
   }
 }
 
+/// Custom painter for top-down view of thick coffee filling the *entire* button.
+/// No cup/rim visible — just the animated espresso liquid across the full pill.
+/// Central drip point + expanding ripples for the "dripping down" effect.
 class _CoffeeLiquidPainter extends CustomPainter {
   _CoffeeLiquidPainter({
     required this.progress,
@@ -337,48 +339,44 @@ class _CoffeeLiquidPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
 
-    // Inset slightly so the outer Material color acts as the cup rim.
-    const inset = 3.0;
-    final liquidRect = Rect.fromLTWH(
-      inset,
-      inset,
-      size.width - inset * 2,
-      size.height - inset * 2,
-    );
-    final liquidRRect = RRect.fromRectAndRadius(
-      liquidRect,
-      const Radius.circular(30),
+    // Fill the *entire* button area with coffee — no cup/rim visible.
+    // Use full size rounded rect matching the stadium pill shape.
+    final fullRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final fullRRect = RRect.fromRectAndRadius(
+      fullRect,
+      const Radius.circular(32),
     );
 
-    // Base thick dark espresso liquid.
+    // Base thick dark espresso liquid — covers the whole button.
     final liquidPaint = Paint()..color = liquidColor;
-    canvas.drawRRect(liquidRRect, liquidPaint);
+    canvas.drawRRect(fullRRect, liquidPaint);
 
-    // Subtle inner depth layer for "thick" viscous look (slightly darker toward center).
+    // Subtle inner depth layer for thick, viscous appearance.
     final depthPaint = Paint()..color = const Color(0xFF1A120D).withValues(alpha: 0.55);
-    final innerRect = liquidRect.deflate(5);
-    final innerRRect = RRect.fromRectAndRadius(innerRect, const Radius.circular(25));
+    final innerRRect = RRect.fromRectAndRadius(
+      fullRect.deflate(6),
+      const Radius.circular(26),
+    );
     canvas.drawRRect(innerRRect, depthPaint);
 
-    // Central pour / drip impact point (darker, as if espresso stream is hitting).
+    // Central pour / drip impact point.
     final pourPaint = Paint()..color = const Color(0xFF120B08).withValues(alpha: 0.65);
-    canvas.drawCircle(center, 7, pourPaint);
+    canvas.drawCircle(center, 8, pourPaint);
 
-    // Gentle expanding ripples from the center (top-down pour ripples on thick liquid).
-    // Slow, low-opacity, tasteful.
+    // Gentle expanding ripples from the center — top-down view of thick coffee
+    // with ripples as the espresso drips in. Full coverage, no inset.
     final ripplePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.6;
 
     for (int i = 0; i < 5; i++) {
-      // Phase offset per ring for natural overlapping ripples.
       final t = ((progress * 0.7) + (i * 0.18)) % 1.0;
       final alpha = (0.18 * (1.0 - t)).clamp(0.0, 0.18);
       ripplePaint.color = cremaTint.withValues(alpha: alpha);
 
-      // Ripple size grows from center out.
-      final rx = (size.width / 2 - inset - 4) * t * 0.88;
-      final ry = (size.height / 2 - inset - 4) * t * 0.88;
+      // Ripple grows to cover almost the full button.
+      final rx = (size.width / 2 - 2) * t * 0.95;
+      final ry = (size.height / 2 - 2) * t * 0.95;
 
       final rippleRect = Rect.fromCenter(
         center: center,
@@ -386,17 +384,14 @@ class _CoffeeLiquidPainter extends CustomPainter {
         height: ry * 2,
       );
 
-      // Slightly varying roundness as it expands for organic feel.
-      final corner = 28.0 * (0.6 + 0.4 * (1 - t));
+      final corner = 30.0 * (0.5 + 0.5 * (1 - t));
       final rippleRRect = RRect.fromRectAndRadius(rippleRect, Radius.circular(corner));
 
-      // Thinner stroke as ripple expands.
-      ripplePaint.strokeWidth = 1.8 * (1.0 - t * 0.6);
-
+      ripplePaint.strokeWidth = 1.9 * (1.0 - t * 0.5);
       canvas.drawRRect(rippleRRect, ripplePaint);
     }
 
-    // Extra very subtle micro-ripples / surface texture for thickness.
+    // Extra subtle micro-ripples / texture across the full area for thickness.
     final microPaint = Paint()
       ..color = cremaTint.withValues(alpha: 0.07)
       ..style = PaintingStyle.stroke
@@ -404,12 +399,12 @@ class _CoffeeLiquidPainter extends CustomPainter {
 
     for (int i = 0; i < 3; i++) {
       final t = ((progress * 1.1 + i * 0.33) % 1.0);
-      final rx = (size.width / 2 - inset - 8) * (0.25 + t * 0.65);
-      final ry = (size.height / 2 - inset - 8) * (0.25 + t * 0.65);
+      final rx = (size.width / 2 - 4) * (0.2 + t * 0.75);
+      final ry = (size.height / 2 - 4) * (0.2 + t * 0.75);
 
       final rRect = RRect.fromRectAndRadius(
         Rect.fromCenter(center: center, width: rx * 2, height: ry * 2),
-        const Radius.circular(20),
+        const Radius.circular(22),
       );
       canvas.drawRRect(rRect, microPaint);
     }
