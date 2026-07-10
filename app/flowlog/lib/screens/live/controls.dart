@@ -269,10 +269,9 @@ class LiveControls extends StatelessWidget {
   }
 }
 
-/// Animated vertical gradient (smooth light-to-dark coffee) filling the entire
-/// prominent "Start brew" button. The transition moves gently so not the whole
-/// button changes color at the same instant. Subtle and tasteful. Only the
-/// coffee, no cup/rim visible.
+/// Soft diffuse vertical gradient (light→dark coffee) filling the entire
+/// prominent "Start brew" button. Gently pulsing and breathing with subtle
+/// wavy modulation for a more organic, non-linear look. Only the coffee.
 class _AnimatedCoffeeLiquid extends StatefulWidget {
   const _AnimatedCoffeeLiquid({super.key}); // ignore: unused_element_parameter
 
@@ -289,7 +288,7 @@ class _AnimatedCoffeeLiquidState extends State<_AnimatedCoffeeLiquid>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 4800),
+      duration: const Duration(milliseconds: 8500),  // slower, more gentle pulse
     )..repeat();
   }
 
@@ -322,10 +321,10 @@ class _AnimatedCoffeeLiquidState extends State<_AnimatedCoffeeLiquid>
   }
 }
 
-/// Animated vertical gradient filling the entire prominent Start brew button
-/// with smooth coffee colors (light to dark). The transition point moves
-/// slowly up and down so the color change does not affect the whole button
-/// uniformly at the same time. Subtle, tasteful, no stripes or drips.
+/// Soft, diffuse vertical gradient (light coffee to dark coffee) filling the
+/// entire prominent Start brew button. Very blended transition that gently
+/// pulses/breathes. Subtle horizontal waves add organic variation so it's not
+/// a hard straight line. Slower, more diffuse feel overall.
 class _CoffeeLiquidPainter extends CustomPainter {
   _CoffeeLiquidPainter({
     required this.progress,
@@ -341,26 +340,50 @@ class _CoffeeLiquidPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
 
-    // Two coffee shades: light (top-ish) to dark (bottom-ish)
-    final lightCoffee = cremaTint;                    // e.g. warmer/lighter brown
-    final darkCoffee = liquidColor;                   // deep rich brown
+    // Soft, diffuse vertical gradient: light coffee → dark coffee.
+    // Wider transition zone and gentle animation for a more blended, pulsing feel.
+    final lightCoffee = cremaTint;
+    final darkCoffee = liquidColor;
 
-    // Animate the gradient transition so it sweeps vertically.
-    // Using sine makes it gently move up/down without being abrupt.
-    final t = math.sin(progress * 2 * math.pi) * 0.35; // range roughly -0.35 to +0.35
+    // Very slow, small movement so the gradient "breathes" rather than sweeps sharply.
+    final t = math.sin(progress * 2 * math.pi) * 0.18;
 
     final gradient = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      colors: [lightCoffee, darkCoffee],
+      colors: [
+        lightCoffee,
+        lightCoffee.withValues(alpha: 0.75),
+        darkCoffee,
+        darkCoffee,
+      ],
       stops: [
-        0.25 + t,   // transition start moves
-        0.75 + t,   // transition end moves
+        0.15 + t * 0.5,
+        0.45 + t,
+        0.55 + t,
+        0.85 - t * 0.5,
       ],
     ).createShader(rect);
 
     final paint = Paint()..shader = gradient;
     canvas.drawRect(rect, paint);
+
+    // Very subtle wavy horizontal modulation across the gradient.
+    // This breaks the "straight line" look and adds a soft, diffuse coffee surface feel.
+    // Tops and bottoms have slight phase interaction.
+    final wavePaint = Paint()..color = lightCoffee.withValues(alpha: 0.07);
+    for (int w = 0; w < 3; w++) {
+      final baseY = size.height * (0.25 + w * 0.22);
+      final path = Path();
+      path.moveTo(0, baseY);
+      for (double x = 0; x <= size.width; x += 3) {
+        // Slight wave; different freq/phase for top vs lower bands (interaction)
+        final wave = math.sin((x * 0.018) + (progress * 1.8 * math.pi) + w) * 2.2 +
+                     math.sin((x * 0.027) + (progress * 2.4 * math.pi) + w * 1.5) * 1.1;
+        path.lineTo(x, baseY + wave);
+      }
+      canvas.drawPath(path, wavePaint);
+    }
   }
 
   @override
