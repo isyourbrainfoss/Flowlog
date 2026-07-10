@@ -110,6 +110,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
   bool _autoSavingShot = false;
   String? _lastAutoSavedShotId;
+  bool _autoSavedCurrent = false;
   ShotSessionState _lastSessionState = ShotSessionState.idle;
   bool _wasBrewing = false;
   Timer? _autoStopTimer;
@@ -200,6 +201,8 @@ class _LiveScreenState extends State<LiveScreen> {
     _controller!.addListener(_syncSamples);
     _controller!.addListener(_onSessionLifecycle);
     _wasBrewing = _controller!.isBrewing;
+    _autoSavedCurrent = false;
+    _lastAutoSavedShotId = null;
     _syncSamples();
   }
 
@@ -311,16 +314,14 @@ class _LiveScreenState extends State<LiveScreen> {
     final allLow = recent.every((s) => (s.pressureBar ?? 100) < 0.4);
 
     if (allLow) {
-      if (_autoStopTimer == null) {
-        _autoStopTimer = Timer(const Duration(milliseconds: 1500), () {
-          if (mounted &&
-              _controller != null &&
-              _controller!.sessionState == ShotSessionState.recording) {
-            _controller!.stop();
-          }
-          _autoStopTimer = null;
-        });
-      }
+      _autoStopTimer ??= Timer(const Duration(milliseconds: 1500), () {
+        if (mounted &&
+            _controller != null &&
+            _controller!.sessionState == ShotSessionState.recording) {
+          _controller!.stop();
+        }
+        _autoStopTimer = null;
+      });
     } else {
       _autoStopTimer?.cancel();
       _autoStopTimer = null;
@@ -453,15 +454,29 @@ class _LiveScreenState extends State<LiveScreen> {
     if (brewing && _lastBrewSummary != null) {
       setState(() => _lastBrewSummary = null);
     }
-    if (_wasBrewing && !brewing && controller.canSaveShot) {
+    // Trigger auto-save on stop transition (covers both manual stop and auto-stop).
+    if (_wasBrewing && !brewing && controller.canSaveShot && !_autoSavedCurrent) {
       unawaited(_autoSaveStoppedSession());
+    }
+    // Also catch stopped state directly (helps auto-stop timer path reliability)
+    if (controller.sessionState == ShotSessionState.stopped &&
+        controller.canSaveShot &&
+        !_autoSavedCurrent) {
+      unawaited(_autoSaveStoppedSession());
+    }
+    if (brewing && !_wasBrewing) {
+      _autoSavedCurrent = false;
+      _lastAutoSavedShotId = null;
     }
     _wasBrewing = brewing;
   }
 
   Future<void> _autoSaveStoppedSession() async {
     final controller = _controller;
-    if (controller == null || !controller.canSaveShot || _autoSavingShot) {
+    if (controller == null ||
+        !controller.canSaveShot ||
+        _autoSavingShot ||
+        _autoSavedCurrent) {
       return;
     }
 
@@ -470,6 +485,7 @@ class _LiveScreenState extends State<LiveScreen> {
       return;
     }
 
+    _autoSavedCurrent = true;
     setState(() => _autoSavingShot = true);
     try {
       final repository = await _ensureShotRepository();
@@ -507,6 +523,7 @@ class _LiveScreenState extends State<LiveScreen> {
         idGenerator: widget.shotIdGenerator,
         onSaved: (saved) {
           _lastAutoSavedShotId = saved.id;
+          _autoSavedCurrent = true;
           widget.onShotSaved?.call(saved);
         },
         onAddNotes: (saved) => _onAddNotesToSavedShot(saved),
@@ -522,6 +539,7 @@ class _LiveScreenState extends State<LiveScreen> {
       if (shot != null) {
         if (mounted) {
           setState(() => _lastBrewSummary = BrewSummary.fromShot(shot));
+          _autoSavedCurrent = true;
         }
         _shotEventsNotifier?.notifyShotsChanged();
         final database = await _ensureDatabase();
@@ -573,6 +591,7 @@ class _LiveScreenState extends State<LiveScreen> {
     await repository.deleteShot(shot.id);
     if (_lastAutoSavedShotId == shot.id) {
       _lastAutoSavedShotId = null;
+      _autoSavedCurrent = false;
     }
     _shotEventsNotifier?.notifyShotsChanged();
 
@@ -585,6 +604,23 @@ class _LiveScreenState extends State<LiveScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _saveCurrentSession() async {
+    final controller = _controller;
+    if (controller == null || !controller.canSaveShot || _autoSavedCurrent) {
+      return;
+    }
+    await _autoSaveStoppedSession();
+  }
+
+  Future<void> _editLastSavedShot() async {
+    if (_lastAutoSavedShotId == null) return;
+    final repository = await _ensureShotRepository();
+    if (!mounted) return;
+    final shot = await repository.getShotWithSamples(_lastAutoSavedShotId!);
+    if (shot == null || !mounted) return;
+    await _onAddNotesToSavedShot(shot);
   }
 
   List<ShotSample> _chartTargetPressureSamples() {
@@ -716,6 +752,9 @@ class _LiveScreenState extends State<LiveScreen> {
                             summary: _lastBrewSummary!,
                             onDismiss: () =>
                                 setState(() => _lastBrewSummary = null),
+                            onEdit: _lastAutoSavedShotId != null
+                                ? () => unawaited(_editLastSavedShot())
+                                : null,
                           ),
                           const SizedBox(height: 8),
                         ],
@@ -775,13 +814,23 @@ class _LiveScreenState extends State<LiveScreen> {
                             textAlign: TextAlign.center,
                           ),
                         ],
-                        if (controller.canSaveShot)
+                        if (controller.canSaveShot) ...[
                           Align(
                             alignment: Alignment.center,
                             child: RepeatShotButton(
                               onPressed: () => unawaited(_onRepeatShotPressed()),
                             ),
                           ),
+                          if (!_autoSavedCurrent) ...[
+                            const SizedBox(height: 8),
+                            FilledButton.icon(
+                              key: const Key('save_current_shot_button'),
+                              onPressed: () => unawaited(_saveCurrentSession()),
+                              icon: const Icon(Icons.save),
+                              label: const Text('Save shot'),
+                            ),
+                          ],
+                        ],
                         if (controller.canSaveShot) const SizedBox(height: 16),
                       ],
                     ),

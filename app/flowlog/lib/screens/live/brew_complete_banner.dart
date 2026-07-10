@@ -7,10 +7,12 @@ class BrewCompleteBanner extends StatelessWidget {
     super.key,
     required this.summary,
     this.onDismiss,
+    this.onEdit,
   });
 
   final BrewSummary summary;
   final VoidCallback? onDismiss;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +66,12 @@ class BrewCompleteBanner extends StatelessWidget {
                 ],
               ),
             ),
+            if (onEdit != null)
+              TextButton(
+                key: const Key('brew_complete_edit'),
+                onPressed: onEdit,
+                child: const Text('Edit'),
+              ),
             if (onDismiss != null)
               IconButton(
                 key: const Key('brew_complete_dismiss'),

@@ -150,10 +150,13 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
                       ),
                       Slider(
                         key: const Key('brew_defaults_auto_start_threshold'),
-                        value: autoStart.startThresholdBar.clamp(0.5, 2.5),
-                        min: 0.5,
-                        max: 2.5,
-                        divisions: 20,
+                        value: autoStart.startThresholdBar.clamp(
+                          kMinAutoStartPressureBar,
+                          kMaxAutoStartPressureBar,
+                        ),
+                        min: kMinAutoStartPressureBar,
+                        max: kMaxAutoStartPressureBar,
+                        divisions: 24,
                         label:
                             '${autoStart.startThresholdBar.toStringAsFixed(1)} bar',
                         onChanged: (value) =>

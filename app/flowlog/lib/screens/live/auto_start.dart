@@ -10,6 +10,12 @@ import 'package:flutter/material.dart' hide ConnectionState;
 /// Default pressure (bar) that triggers an automatic brew start.
 const double kDefaultAutoStartPressureBar = 1.0;
 
+/// Minimum allowed auto-start threshold (bar).
+const double kMinAutoStartPressureBar = 0.1;
+
+/// Maximum allowed auto-start threshold (bar).
+const double kMaxAutoStartPressureBar = 2.5;
+
 /// Pressure must fall below this fraction of [startThresholdBar] to re-arm.
 const double kAutoStartReleaseFraction = 0.5;
 
@@ -339,10 +345,10 @@ class AutoStartThresholdPanel extends StatelessWidget {
         children: [
           Slider(
             key: const Key('auto_start_threshold_slider'),
-            value: thresholdBar.clamp(0.5, 2.5),
-            min: 0.5,
-            max: 2.5,
-            divisions: 20,
+            value: thresholdBar.clamp(kMinAutoStartPressureBar, kMaxAutoStartPressureBar),
+            min: kMinAutoStartPressureBar,
+            max: kMaxAutoStartPressureBar,
+            divisions: 24,
             label: '${thresholdBar.toStringAsFixed(1)} bar',
             onChanged: onThresholdChanged,
           ),
