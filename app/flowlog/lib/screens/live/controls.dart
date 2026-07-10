@@ -194,9 +194,8 @@ class LiveControls extends StatelessWidget {
         late final Widget button;
 
         if (isIdleProminent) {
-          // Custom full-bleed button so the coffee liquid fills the *entire*
-          // visual pill (no internal padding inset, no small rectangular box
-          // around the text).
+          // Custom full-bleed button. The liquid painter now animates across
+          // the full height of the pill with subtle ripples (not just the top).
           button = Material(
             color: const Color(0xFF3D2E24), // dark coffee cup color
             shape: const StadiumBorder(),
@@ -271,9 +270,10 @@ class LiveControls extends StatelessWidget {
   }
 }
 
-/// Animated coffee-like liquid that gently "floats" with a moving wave surface.
-/// When used inside the custom full-size prominent Start button, it fills
-/// essentially the whole visual pill area.
+/// Animated coffee-like liquid filling the entire prominent Start button.
+/// Uses a subtle surface wave + low-opacity internal ripples at multiple
+/// depths so the gentle floating motion is visible across the *whole* height.
+/// Animation is intentionally slow and low-contrast for subtlety.
 class _AnimatedCoffeeLiquid extends StatefulWidget {
   const _AnimatedCoffeeLiquid({super.key}); // ignore: unused_element_parameter
 
@@ -290,7 +290,7 @@ class _AnimatedCoffeeLiquidState extends State<_AnimatedCoffeeLiquid>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2800),
+      duration: const Duration(milliseconds: 4800),
     )..repeat();
   }
 
@@ -339,25 +339,24 @@ class _CoffeeLiquidPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = liquidColor;
 
-    // Fill the vast majority of the button so the liquid looks like it fills
-    // the *entire* pill (only a thin band of "cup" + foam at the very top).
-    final liquidFillRatio = 0.88;
-    final surfaceBase = size.height * (1.0 - liquidFillRatio);
+    // Liquid fills nearly the entire button height. Surface sits near the
+    // very top so the liquid body occupies (almost) the whole visual pill.
+    final surfaceBase = size.height * 0.10;
 
     // Gentle vertical bob for "floating" liquid feel (slow, continuous)
-    final bob = math.sin(progress * 2 * math.pi) * 3.0;
+    final bob = math.sin(progress * 2 * math.pi) * 1.8;
     final surfaceY = surfaceBase + bob;
 
     final path = Path();
     path.moveTo(0, size.height);
     path.lineTo(0, surfaceY);
 
-    final waveHeight = 8.0;
+    final waveHeight = 5.5;
 
-    // Two overlaid sine waves for natural liquid surface, full width of content area
+    // Subtle surface waves
     for (double x = 0; x <= size.width; x += 1.5) {
-      final wave1 = math.sin((x / 30) + (progress * 2 * math.pi)) * waveHeight;
-      final wave2 = math.sin((x / 12) + (progress * 3.7 * math.pi)) * (waveHeight * 0.4);
+      final wave1 = math.sin((x / 32) + (progress * 2 * math.pi)) * waveHeight;
+      final wave2 = math.sin((x / 13) + (progress * 3.9 * math.pi)) * (waveHeight * 0.35);
       final y = surfaceY + wave1 + wave2;
       path.lineTo(x, y);
     }
@@ -367,23 +366,49 @@ class _CoffeeLiquidPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // Lighter foam "crema" band sitting on the surface
+    // Lighter foam "crema" band sitting on the surface (subtle)
     final foamPaint = Paint()..color = foamColor;
     final foamPath = Path();
-    foamPath.moveTo(0, surfaceY - 3);
+    foamPath.moveTo(0, surfaceY - 2);
 
     for (double x = 0; x <= size.width; x += 1.5) {
-      final wave1 = math.sin((x / 30) + (progress * 2 * math.pi)) * waveHeight;
-      final wave2 = math.sin((x / 12) + (progress * 3.7 * math.pi)) * (waveHeight * 0.4);
-      final y = surfaceY + wave1 + wave2 - 5;
+      final wave1 = math.sin((x / 32) + (progress * 2 * math.pi)) * waveHeight;
+      final wave2 = math.sin((x / 13) + (progress * 3.9 * math.pi)) * (waveHeight * 0.35);
+      final y = surfaceY + wave1 + wave2 - 3;
       foamPath.lineTo(x, y);
     }
 
-    foamPath.lineTo(size.width, surfaceY + 7);
-    foamPath.lineTo(0, surfaceY + 7);
+    foamPath.lineTo(size.width, surfaceY + 5);
+    foamPath.lineTo(0, surfaceY + 5);
     foamPath.close();
 
     canvas.drawPath(foamPath, foamPaint);
+
+    // Subtle internal ripples throughout the *entire* liquid body so the
+    // animation is visible across the whole button height (not just near the top).
+    final ripplePaint = Paint()
+      ..color = foamColor.withValues(alpha: 0.13)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+
+    final liquidHeight = size.height - surfaceY;
+    for (int i = 0; i < 5; i++) {
+      final depth = 0.15 + (i * 0.17); // spread ripples from near surface down toward bottom
+      final yBase = surfaceY + liquidHeight * depth +
+          math.sin((progress + i * 0.17) * 2 * math.pi) * 0.8; // tiny vertical drift
+
+      final rPath = Path();
+      rPath.moveTo(0, yBase);
+
+      final rAmp = 2.2;
+      final rFreq = 26 + (i % 2) * 5;
+
+      for (double x = 0; x <= size.width; x += 2.0) {
+        final wy = math.sin((x / rFreq) + (progress * (1.7 + i * 0.35) * 2 * math.pi)) * rAmp;
+        rPath.lineTo(x, yBase + wy);
+      }
+      canvas.drawPath(rPath, ripplePaint);
+    }
   }
 
   @override
