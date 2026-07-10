@@ -1,6 +1,7 @@
 // ignore_for_file: prefer_initializing_formals
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart';
@@ -339,74 +340,74 @@ class _CoffeeLiquidPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
 
-    // Fill the *entire* button area with coffee — no cup/rim visible.
-    // Use full size rounded rect matching the stadium pill shape.
+    // Full coffee — the entire button is thick liquid, no cup/rim.
     final fullRect = Rect.fromLTWH(0, 0, size.width, size.height);
-    final fullRRect = RRect.fromRectAndRadius(
-      fullRect,
-      const Radius.circular(32),
-    );
+    final fullRRect = RRect.fromRectAndRadius(fullRect, const Radius.circular(32));
 
-    // Base thick dark espresso liquid — covers the whole button.
     final liquidPaint = Paint()..color = liquidColor;
     canvas.drawRRect(fullRRect, liquidPaint);
 
-    // Subtle inner depth layer for thick, viscous appearance.
-    final depthPaint = Paint()..color = const Color(0xFF1A120D).withValues(alpha: 0.55);
-    final innerRRect = RRect.fromRectAndRadius(
-      fullRect.deflate(6),
-      const Radius.circular(26),
-    );
-    canvas.drawRRect(innerRRect, depthPaint);
+    // Depth for thick look.
+    final depthPaint = Paint()..color = const Color(0xFF1A120D).withValues(alpha: 0.5);
+    canvas.drawRRect(fullRRect.deflate(5), depthPaint);
 
-    // Central pour / drip impact point.
-    final pourPaint = Paint()..color = const Color(0xFF120B08).withValues(alpha: 0.65);
-    canvas.drawCircle(center, 8, pourPaint);
-
-    // Gentle expanding ripples from the center — top-down view of thick coffee
-    // with ripples as the espresso drips in. Full coverage, no inset.
-    final ripplePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6;
-
+    // Drips: a few small drips randomly scattered around the center (smooth animated "random").
+    final dripPaint = Paint()..color = const Color(0xFF120B08).withValues(alpha: 0.75);
     for (int i = 0; i < 5; i++) {
-      final t = ((progress * 0.7) + (i * 0.18)) % 1.0;
-      final alpha = (0.18 * (1.0 - t)).clamp(0.0, 0.18);
-      ripplePaint.color = cremaTint.withValues(alpha: alpha);
-
-      // Ripple grows to cover almost the full button.
-      final rx = (size.width / 2 - 2) * t * 0.95;
-      final ry = (size.height / 2 - 2) * t * 0.95;
-
-      final rippleRect = Rect.fromCenter(
-        center: center,
-        width: rx * 2,
-        height: ry * 2,
-      );
-
-      final corner = 30.0 * (0.5 + 0.5 * (1 - t));
-      final rippleRRect = RRect.fromRectAndRadius(rippleRect, Radius.circular(corner));
-
-      ripplePaint.strokeWidth = 1.9 * (1.0 - t * 0.5);
-      canvas.drawRRect(rippleRRect, ripplePaint);
+      final seed = i * 1.618034; // golden ratio for nice distribution
+      final phase = progress * 2.3 + seed;
+      final ox = math.cos(phase * 1.6 + seed) * 11;   // jitter around center
+      final oy = math.sin(phase * 1.3 + seed * 1.7) * 5.5;
+      final dripC = center + Offset(ox, oy);
+      final dr = 3.2 + math.sin(phase * 4.5 + seed) * 1.3;
+      canvas.drawCircle(dripC, dr, dripPaint);
     }
 
-    // Extra subtle micro-ripples / texture across the full area for thickness.
-    final microPaint = Paint()
-      ..color = cremaTint.withValues(alpha: 0.07)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.9;
+    // Circular ripples (perfect circles, ignore pill shape).
+    // Not lines: soft filled disks/bands.
+    // Vertical gradient top-to-bottom on the ripples.
+    final rippleShader = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        cremaTint.withValues(alpha: 0.30),
+        liquidColor.withValues(alpha: 0.06),
+        cremaTint.withValues(alpha: 0.24),
+      ],
+      stops: const [0.0, 0.5, 1.0],
+    ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
-    for (int i = 0; i < 3; i++) {
-      final t = ((progress * 1.1 + i * 0.33) % 1.0);
-      final rx = (size.width / 2 - 4) * (0.2 + t * 0.75);
-      final ry = (size.height / 2 - 4) * (0.2 + t * 0.75);
+    final ripplePaint = Paint()
+      ..shader = rippleShader
+      ..style = PaintingStyle.fill;
 
-      final rRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: center, width: rx * 2, height: ry * 2),
-        const Radius.circular(22),
-      );
-      canvas.drawRRect(rRect, microPaint);
+    final maxR = math.min(size.width, size.height) / 2 - 3;
+    for (int i = 0; i < 6; i++) {
+      final t = ((progress + i * 0.12) % 1.0);
+      final r = maxR * t * 0.9;
+      canvas.drawCircle(center, r, ripplePaint);
+      // Inner to give soft ring/band feel without hard lines.
+      final innerA = (0.10 * (1 - t)).clamp(0.0, 0.10);
+      final innerP = Paint()..color = liquidColor.withValues(alpha: innerA)..style = PaintingStyle.fill;
+      canvas.drawCircle(center, r * 0.78, innerP);
+    }
+
+    // Tops and bottoms interact as waves.
+    // Subtle horizontal sine waves spanning the view; "top" and "bottom" wave trains
+    // have offset phases/freqs so they interfere (add/subtract) like real surface waves.
+    final wavePaint = Paint()..color = cremaTint.withValues(alpha: 0.055);
+    for (int w = 0; w < 5; w++) {
+      final baseY = size.height * (0.15 + w * 0.155);
+      final path = Path();
+      path.moveTo(0, baseY);
+      for (double x = 0; x <= size.width; x += 3) {
+        // Top-originating wave component (stronger influence from upper area)
+        final topW = math.sin((x * 0.016) + (progress * 5.2 * math.pi) + w * 0.7) * 2.6 * (1.0 - w * 0.12);
+        // Bottom-originating wave component (phase shifted for interaction)
+        final botW = math.sin((x * 0.023) + (progress * 3.8 * math.pi) + w + math.pi) * 2.1 * (w * 0.18 + 0.1);
+        path.lineTo(x, baseY + topW + botW);
+      }
+      canvas.drawPath(path, wavePaint);
     }
   }
 
