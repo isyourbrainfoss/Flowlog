@@ -130,6 +130,7 @@ class _LiveScreenState extends State<LiveScreen> {
   ShotEventsNotifier? _shotEventsNotifier;
 
   late final ValueNotifier<double?> _livePressureNotifier;
+  late final ValueNotifier<double?> _liveTempNotifier;
 
   @override
   void initState() {
@@ -140,6 +141,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
     _samplesNotifier = ValueNotifier<List<ShotSample>>(const []);
     _livePressureNotifier = ValueNotifier<double?>(null);
+    _liveTempNotifier = ValueNotifier<double?>(null);
     _annotationController = ShotAnnotationController();
     _annotationsNotifier = ValueNotifier<List<ShotAnnotation>>(
       List<ShotAnnotation>.from(_annotationController.annotations),
@@ -800,20 +802,53 @@ class _LiveScreenState extends State<LiveScreen> {
                             previousSample: previousSample,
                           )
                         else if (state == ShotSessionState.idle)
-                          // Live pressure (and reassurance) before brew starts.
-                          // Shows updating bar value so user can confirm Pressensor is connected.
+                          // Live pressure and temperature before brew starts (reassurance sensors connected).
+                          // Pressure and temp shown side by side.
                           ValueListenableBuilder<double?>(
                             valueListenable: _livePressureNotifier,
                             builder: (context, pressureBar, _) {
-                              if (pressureBar == null) {
-                                return const SizedBox.shrink();
-                              }
-                              return Card(
-                                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  child: LivePressureReadout(pressureBar: pressureBar),
-                                ),
+                              return ValueListenableBuilder<double?>(
+                                valueListenable: _liveTempNotifier,
+                                builder: (context, tempC, _) {
+                                  if (pressureBar == null && tempC == null) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Card(
+                                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (pressureBar != null)
+                                            LivePressureReadout(pressureBar: pressureBar),
+                                          if (pressureBar != null && tempC != null)
+                                            const SizedBox(width: 16),
+                                          if (tempC != null)
+                                            Column(
+                                              crossAxisAlignment: CrossAxisAlignment.end,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  tempC.toStringAsFixed(1),
+                                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                                        fontFeatures: const [FontFeature.tabularFigures()],
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                ),
+                                                Text(
+                                                  '°C',
+                                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               );
                             },
                           )
@@ -925,6 +960,7 @@ class _LiveScreenState extends State<LiveScreen> {
           settings: autoStartSettings,
           isDemoMode: demoModeActive,
           pressureBarNotifier: _livePressureNotifier,
+          tempCNotifier: _liveTempNotifier,
           child: shell,
         );
       },

@@ -141,6 +141,7 @@ class LiveAutoStartListener extends StatefulWidget {
     this.settings = const AutoStartSettings(),
     this.isDemoMode = false,
     this.pressureBarNotifier,
+    this.tempCNotifier,
     super.key,
   });
 
@@ -152,6 +153,9 @@ class LiveAutoStartListener extends StatefulWidget {
 
   /// Updated with the latest live pressensor reading while monitoring.
   final ValueNotifier<double?>? pressureBarNotifier;
+
+  /// Updated with the latest live temperature (from scale or pressensor) while monitoring.
+  final ValueNotifier<double?>? tempCNotifier;
   final Widget child;
 
   @override
@@ -161,6 +165,8 @@ class LiveAutoStartListener extends StatefulWidget {
 class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
   StreamSubscription<SensorSample>? _pressureSub;
   SensorAdapter? _ownedMonitorAdapter;
+  StreamSubscription<SensorSample>? _scaleSub;
+  SensorAdapter? _ownedScaleAdapter;
   AutoStartArming _arming = const AutoStartArming();
   bool _starting = false;
 
@@ -243,45 +249,60 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
     final hubAdapter = widget.hub.activeAdapterFor(SensorKind.pressensor);
     if (hubAdapter != null) {
       _pressureSub = hubAdapter.samples.listen(_onPressureSample);
-      return;
+    } else {
+      final source = widget.sensorSource;
+      if (source != null && source.hasConnectedSensors) {
+        final adapter = source.resolveSampleAdapter();
+        if (adapter is! IdleSensorAdapter) {
+          _ownedMonitorAdapter = adapter;
+          await adapter.connect();
+          _pressureSub = adapter.samples.listen(_onPressureSample);
+        }
+      }
     }
 
-    final source = widget.sensorSource;
-    if (source == null || !source.hasConnectedSensors) {
-      await _stopMonitoring();
-      return;
+    // Monitor scale for live temp if it has hub adapter (when pressure monitoring didn't include scale).
+    if (_scaleSub == null && widget.controller.canStart && !widget.isDemoMode) {
+      final hubScale = widget.hub.activeAdapterFor(SensorKind.scale);
+      if (hubScale != null) {
+        _scaleSub = hubScale.samples.listen(_onPressureSample);
+      }
     }
-
-    final adapter = source.resolveSampleAdapter();
-    if (adapter is IdleSensorAdapter) {
-      await _stopMonitoring();
-      return;
-    }
-
-    _ownedMonitorAdapter = adapter;
-    await adapter.connect();
-    _pressureSub = adapter.samples.listen(_onPressureSample);
   }
 
   Future<void> _stopMonitoring() async {
     await _pressureSub?.cancel();
     _pressureSub = null;
     widget.pressureBarNotifier?.value = null;
+    widget.tempCNotifier?.value = null;
+
+    await _scaleSub?.cancel();
+    _scaleSub = null;
 
     final owned = _ownedMonitorAdapter;
     _ownedMonitorAdapter = null;
-    if (owned == null) {
-      return;
+    if (owned != null) {
+      await owned.disconnect();
+      if (owned is MergedSampleStreamAdapter) {
+        await owned.dispose();
+      }
     }
 
-    await owned.disconnect();
-    if (owned is MergedSampleStreamAdapter) {
-      await owned.dispose();
+    final ownedScale = _ownedScaleAdapter;
+    _ownedScaleAdapter = null;
+    if (ownedScale != null) {
+      await ownedScale.disconnect();
+      if (ownedScale is MergedSampleStreamAdapter) {
+        await ownedScale.dispose();
+      }
     }
   }
 
   void _onPressureSample(SensorSample sample) {
     widget.pressureBarNotifier?.value = sample.pressureBar;
+    if (sample.tempC != null) {
+      widget.tempCNotifier?.value = sample.tempC;
+    }
 
     if (!mounted || _starting || !widget.controller.canStart) {
       return;
