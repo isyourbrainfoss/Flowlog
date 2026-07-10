@@ -206,7 +206,9 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
   }
 
   bool get _shouldMonitor {
-    if (!widget.settings.enabled || widget.isDemoMode) {
+    // Always monitor pressure for live display (reassurance that Pressensor is connected)
+    // when a source is available and we can start. Auto-start logic below is gated by enabled.
+    if (widget.isDemoMode) {
       return false;
     }
     return widget.controller.canStart && _hasPressureSource;
@@ -282,6 +284,11 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
     widget.pressureBarNotifier?.value = sample.pressureBar;
 
     if (!mounted || _starting || !widget.controller.canStart) {
+      return;
+    }
+
+    // Only perform auto-start arming/trigger if the feature is enabled.
+    if (!widget.settings.enabled) {
       return;
     }
 

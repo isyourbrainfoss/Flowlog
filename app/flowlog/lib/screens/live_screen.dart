@@ -129,6 +129,8 @@ class _LiveScreenState extends State<LiveScreen> {
   ActiveBrewNotifier? _activeBrewNotifier;
   ShotEventsNotifier? _shotEventsNotifier;
 
+  late final ValueNotifier<double?> _livePressureNotifier;
+
   @override
   void initState() {
     super.initState();
@@ -137,6 +139,7 @@ class _LiveScreenState extends State<LiveScreen> {
     _brewGpsCapture = widget.brewGpsCapture ?? const BrewGpsCapture();
 
     _samplesNotifier = ValueNotifier<List<ShotSample>>(const []);
+    _livePressureNotifier = ValueNotifier<double?>(null);
     _annotationController = ShotAnnotationController();
     _annotationsNotifier = ValueNotifier<List<ShotAnnotation>>(
       List<ShotAnnotation>.from(_annotationController.annotations),
@@ -796,6 +799,24 @@ class _LiveScreenState extends State<LiveScreen> {
                             sample: latestSample,
                             previousSample: previousSample,
                           )
+                        else if (state == ShotSessionState.idle)
+                          // Live pressure (and reassurance) before brew starts.
+                          // Shows updating bar value so user can confirm Pressensor is connected.
+                          ValueListenableBuilder<double?>(
+                            valueListenable: _livePressureNotifier,
+                            builder: (context, pressureBar, _) {
+                              if (pressureBar == null) {
+                                return const SizedBox.shrink();
+                              }
+                              return Card(
+                                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  child: LivePressureReadout(pressureBar: pressureBar),
+                                ),
+                              );
+                            },
+                          )
                         else
                           const LiveMetricsRow(
                             metrics: LiveMetrics(elapsedMs: 0),
@@ -903,6 +924,7 @@ class _LiveScreenState extends State<LiveScreen> {
           sensorSource: _sensorSource,
           settings: autoStartSettings,
           isDemoMode: demoModeActive,
+          pressureBarNotifier: _livePressureNotifier,
           child: shell,
         );
       },
