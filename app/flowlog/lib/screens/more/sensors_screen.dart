@@ -243,40 +243,81 @@ Future<void> _runSensorScanFlow(
   SensorHub hub,
   SensorKind kind,
 ) async {
+  // Captured before awaits; safe for post-await use of the navigator/messenger objects.
+  // ignore: use_build_context_synchronously
   final messenger = ScaffoldMessenger.of(context);
+  // ignore: use_build_context_synchronously
   final navigator = Navigator.of(context, rootNavigator: true);
 
-  // Keep a visible progress dialog for the full BLE scan window.
+  // Capture a context tied to the progress dialog itself so we can dismiss reliably
+  // even if the caller's context unmounts or navigator references drift.
+  BuildContext? dialogContext;
   unawaited(
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        key: Key('scan_progress_${kind.name}'),
-        title: Text('Scanning for ${kind.defaultName}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const LinearProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(
-              'Keep ${kind.defaultName} powered on and nearby.',
-              style: Theme.of(dialogContext).textTheme.bodyMedium,
-            ),
-          ],
-        ),
-      ),
+      builder: (dctx) {
+        dialogContext = dctx;
+        return AlertDialog(
+          key: Key('scan_progress_${kind.name}'),
+          title: Text('Scanning for ${kind.defaultName}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const LinearProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                'Keep ${kind.defaultName} powered on and nearby.',
+                style: Theme.of(dctx).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        );
+      },
     ),
   );
 
-  final result = await hub.scanAndAssign(kind);
-  if (navigator.mounted) {
-    navigator.pop();
+  // Yield once so that even when the subsequent scan is synchronous (as in tests with
+  // stub backends), the showDialog has a chance to run its builder and insert the route.
+  // In real usage with an 8s BLE scan this is imperceptible.
+  await Future<void>.delayed(Duration.zero);
+
+  BleScanAssignResult result;
+  try {
+    result = await hub.scanAndAssign(kind);
+  } catch (e) {
+    hub.setLastError('Scan failed: $e');
+    result = BleScanAssignResult.unavailable('Scan error: $e');
+  } finally {
+    // Only pop if we have the dialog's own context (meaning the route was inserted).
+    // Never fall back to an unconditional pop on the navigator here — doing so while
+    // the progress dialog hasn't been pushed yet would pop the parent route (e.g. the
+    // sensors page), invalidating the caller's context for later showDialog calls.
+    final dc = dialogContext;
+    if (dc != null) {
+      try {
+        // dc originates from the progress dialog builder (pre-await); using after the
+        // scan await is the standard way to dismiss your own dialog.
+        // ignore: use_build_context_synchronously
+        if (Navigator.canPop(dc)) {
+          // ignore: use_build_context_synchronously
+          Navigator.pop(dc);
+        }
+      } catch (_) {}
+    }
   }
-  if (!context.mounted) {
+  // ignore: use_build_context_synchronously
+  if (!context.mounted && !navigator.mounted) {
     return;
   }
+  // The navigator was captured pre-await above; using its .context and .mounted after
+  // the scan await is intentional and guarded.
+
+  // Use the navigator captured *before* awaits for follow-up dialogs. This context
+  // is tied to the root navigator and survives even if the caller's widget context
+  // becomes invalid after async gaps (common gotcha after awaiting in dialog flows).
+  final dialogNavContext = navigator.context;
 
   switch (result.outcome) {
     case BleScanAssignOutcome.assigned:
@@ -291,7 +332,7 @@ Future<void> _runSensorScanFlow(
       );
     case BleScanAssignOutcome.notFound:
       await showDialog<void>(
-        context: context,
+        context: dialogNavContext,
         builder: (dialogContext) => AlertDialog(
           key: const Key('scan_not_found_dialog'),
           title: const Text('Sensor not found'),
@@ -309,7 +350,7 @@ Future<void> _runSensorScanFlow(
       );
     case BleScanAssignOutcome.multiple:
       final selected = await showDialog<BleDiscoveredDevice>(
-        context: context,
+        context: dialogNavContext,
         builder: (dialogContext) =>
             _PickScannedDeviceDialog(devices: result.devices),
       );
@@ -333,7 +374,7 @@ Future<void> _runSensorScanFlow(
       }
     case BleScanAssignOutcome.unavailable:
       await showDialog<void>(
-        context: context,
+        context: dialogNavContext,
         builder: (dialogContext) => AlertDialog(
           title: const Text('Bluetooth unavailable'),
           content: Text(

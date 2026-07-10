@@ -222,24 +222,44 @@ class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
     FlutterBluePlus.cancelWhenScanComplete(subscription);
 
     try {
-      await FlutterBluePlus.adapterState
-          .where((state) => state == BluetoothAdapterState.on)
-          .first;
+      // Use synchronous current value to avoid hanging on .first when state is already reached
+      // (newStreamWithInitialValue + .where chains can be racy without it).
+      if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
+        await FlutterBluePlus.adapterState
+            .where((state) => state == BluetoothAdapterState.on)
+            .first
+            .timeout(const Duration(seconds: 5));
+      }
+
       await FlutterBluePlus.startScan(
         timeout: timeout,
         withNames: kind == SensorKind.scale
             ? [DecentScaleConstants.deviceName]
             : const [],
       );
-      await FlutterBluePlus.isScanning
-          .where((scanning) => scanning == false)
-          .first;
+
+      // After startScan returns, scanning should be true; wait for the timeout-driven stop.
+      // Guard with isScanningNow and a safety timeout so we never hang forever.
+      final scanStopTimeout = timeout + const Duration(seconds: 3);
+      if (FlutterBluePlus.isScanningNow) {
+        await FlutterBluePlus.isScanning
+            .where((scanning) => scanning == false)
+            .first
+            .timeout(scanStopTimeout);
+      }
+    } catch (_) {
+      // Any timeout or platform hiccup during wait: stop and return whatever we collected.
+      try {
+        await FlutterBluePlus.stopScan();
+      } catch (_) {}
     } finally {
       await subscription.cancel();
     }
 
     if (Platform.isLinux) {
-      await _mergeLinuxCachedDevices(kind: kind, found: found);
+      try {
+        await _mergeLinuxCachedDevices(kind: kind, found: found);
+      } catch (_) {}
     }
 
     final devices = found.values.toList()
