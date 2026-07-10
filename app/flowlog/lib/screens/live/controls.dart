@@ -191,54 +191,74 @@ class LiveControls extends StatelessWidget {
 
         final isIdleProminent = !brewing && prominent && enabled;
 
-        Widget buttonChild = Text(brewing ? 'Stop brew' : 'Start brew');
+        late final Widget button;
 
         if (isIdleProminent) {
-          buttonChild = Stack(
-            alignment: Alignment.center,
-            children: [
-              // Coffee-like liquid filling lower portion of the button area, with gentle floating wave across full width
-              Positioned.fill(
-                child: _AnimatedCoffeeLiquid(),
-              ),
-              // Text on top, with shadow for legibility over the liquid
-              Text(
-                'Start brew',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black.withValues(alpha: 0.35),
-                          blurRadius: 3,
-                        ),
-                      ],
+          // Custom full-bleed button so the coffee liquid fills the *entire*
+          // visual pill (no internal padding inset, no small rectangular box
+          // around the text).
+          button = Material(
+            color: const Color(0xFF3D2E24), // dark coffee cup color
+            shape: const StadiumBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () async {
+                await controller.start();
+              },
+              customBorder: const StadiumBorder(),
+              child: SizedBox(
+                height: 64,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Liquid now paints the full 64px height of the button.
+                    Positioned.fill(
+                      child: _AnimatedCoffeeLiquid(),
                     ),
+                    // Text centered over the liquid/foam.
+                    Text(
+                      'Start brew',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFFF5F0E8), // light crema for contrast
+                            shadows: const [
+                              Shadow(
+                                color: Colors.black54,
+                                blurRadius: 3,
+                              ),
+                            ],
+                          ),
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
+          );
+        } else {
+          Widget buttonChild = Text(brewing ? 'Stop brew' : 'Start brew');
+
+          button = FilledButton(
+            key: const Key('live_brew'),
+            style: brewing
+                ? (baseStyle ?? FilledButton.styleFrom()).merge(
+                    FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                      foregroundColor: Theme.of(context).colorScheme.onError,
+                    ),
+                  )
+                : baseStyle,
+            onPressed: enabled
+                ? () async {
+                    if (brewing) {
+                      await controller.stop();
+                    } else {
+                      await controller.start();
+                    }
+                  }
+                : null,
+            child: buttonChild,
           );
         }
-
-        final button = FilledButton(
-          key: const Key('live_brew'),
-          style: brewing
-              ? (baseStyle ?? FilledButton.styleFrom()).merge(
-                  FilledButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.error,
-                    foregroundColor: Theme.of(context).colorScheme.onError,
-                  ),
-                )
-              : baseStyle,
-          onPressed: enabled
-              ? () async {
-                  if (brewing) {
-                    await controller.stop();
-                  } else {
-                    await controller.start();
-                  }
-                }
-              : null,
-          child: buttonChild,
-        );
 
         return Semantics(
           button: true,
@@ -252,7 +272,8 @@ class LiveControls extends StatelessWidget {
 }
 
 /// Animated coffee-like liquid that gently "floats" with a moving wave surface.
-/// Used as a visual affordance inside the prominent idle "Start brew" button.
+/// When used inside the custom full-size prominent Start button, it fills
+/// essentially the whole visual pill area.
 class _AnimatedCoffeeLiquid extends StatefulWidget {
   const _AnimatedCoffeeLiquid({super.key}); // ignore: unused_element_parameter
 
@@ -282,9 +303,11 @@ class _AnimatedCoffeeLiquidState extends State<_AnimatedCoffeeLiquid>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Darker coffee liquid, lighter crema foam. Slightly transparent so it blends with button bg.
-    final liquidColor = theme.colorScheme.secondaryContainer.withValues(alpha: 0.92);
-    final foamColor = theme.colorScheme.primary.withValues(alpha: 0.28);
+    // Liquid is a rich dark coffee color filling most of the pill.
+    // Foam is a lighter crema sitting on the animated surface.
+    // These sit on top of the button's cup background color.
+    final liquidColor = const Color(0xFF2C211A); // deep coffee
+    final foamColor = theme.colorScheme.primary.withValues(alpha: 0.45);
 
     return AnimatedBuilder(
       animation: _controller,
@@ -316,24 +339,25 @@ class _CoffeeLiquidPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = liquidColor;
 
-    // Liquid fills the lower ~60% of the button content area for a fuller "in the button" look
-    final liquidFillRatio = 0.60;
+    // Fill the vast majority of the button so the liquid looks like it fills
+    // the *entire* pill (only a thin band of "cup" + foam at the very top).
+    final liquidFillRatio = 0.88;
     final surfaceBase = size.height * (1.0 - liquidFillRatio);
 
     // Gentle vertical bob for "floating" liquid feel (slow, continuous)
-    final bob = math.sin(progress * 2 * math.pi) * 2.5;
+    final bob = math.sin(progress * 2 * math.pi) * 3.0;
     final surfaceY = surfaceBase + bob;
 
     final path = Path();
     path.moveTo(0, size.height);
     path.lineTo(0, surfaceY);
 
-    final waveHeight = 7.0;
+    final waveHeight = 8.0;
 
-    // Two overlaid sine waves for natural liquid surface, full width
+    // Two overlaid sine waves for natural liquid surface, full width of content area
     for (double x = 0; x <= size.width; x += 1.5) {
-      final wave1 = math.sin((x / 32) + (progress * 2 * math.pi)) * waveHeight;
-      final wave2 = math.sin((x / 11) + (progress * 3.5 * math.pi)) * (waveHeight * 0.35);
+      final wave1 = math.sin((x / 30) + (progress * 2 * math.pi)) * waveHeight;
+      final wave2 = math.sin((x / 12) + (progress * 3.7 * math.pi)) * (waveHeight * 0.4);
       final y = surfaceY + wave1 + wave2;
       path.lineTo(x, y);
     }
@@ -343,20 +367,20 @@ class _CoffeeLiquidPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // Subtle lighter foam band along the surface for coffee crema look
+    // Lighter foam "crema" band sitting on the surface
     final foamPaint = Paint()..color = foamColor;
     final foamPath = Path();
-    foamPath.moveTo(0, surfaceY - 2);
+    foamPath.moveTo(0, surfaceY - 3);
 
     for (double x = 0; x <= size.width; x += 1.5) {
-      final wave1 = math.sin((x / 32) + (progress * 2 * math.pi)) * waveHeight;
-      final wave2 = math.sin((x / 11) + (progress * 3.5 * math.pi)) * (waveHeight * 0.35);
-      final y = surfaceY + wave1 + wave2 - 4;
+      final wave1 = math.sin((x / 30) + (progress * 2 * math.pi)) * waveHeight;
+      final wave2 = math.sin((x / 12) + (progress * 3.7 * math.pi)) * (waveHeight * 0.4);
+      final y = surfaceY + wave1 + wave2 - 5;
       foamPath.lineTo(x, y);
     }
 
-    foamPath.lineTo(size.width, surfaceY + 6);
-    foamPath.lineTo(0, surfaceY + 6);
+    foamPath.lineTo(size.width, surfaceY + 7);
+    foamPath.lineTo(0, surfaceY + 7);
     foamPath.close();
 
     canvas.drawPath(foamPath, foamPaint);
