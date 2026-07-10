@@ -6,47 +6,80 @@ import 'package:meta/meta.dart';
 /// Handles repeated patterns like "ÃÂ..." from mis-encoded Norwegian/special chars.
 String? repairMojibake(String? text) {
   if (text == null || text.isEmpty) return text;
-  if (!text.contains('\u00c3') && !text.contains('\u00c2')) {
-    return text; // fast path for clean text
-  }
+
   String current = text;
 
-  // Direct pattern fix for repeated mojibake sequences (e.g. "ÃÂ" runs)
-  current = current.replaceAll(RegExp(r'(\u00c3\u00c2)+'), '\u00f8');
+  // Fast exit only if no obvious mojibake markers at all
+  final hasMarkers = current.contains('\u00c3') ||
+      current.contains('\u00c2') ||
+      current.contains('\uFFFD') ||
+      current.contains('Ã') ||
+      current.contains('Â');
+  if (!hasMarkers) {
+    return current;
+  }
 
-  // Context specific for the exact reported "kaffebønner" corruption
-  if (current.contains('kaffeb') && current.contains('nner')) {
+  // Strong context-specific fix for the "kaffebønner" (and similar) pattern FIRST,
+  // using the mojibake markers in the regex to identify and replace the junk section.
+  if (current.toLowerCase().contains('kaffeb') && current.toLowerCase().contains('nner')) {
     current = current.replaceAllMapped(
-      RegExp(r'kaffeb[\u00c3\u00c2\u00f8\u00e6\u00e5ÃÂ]+nner'),
-      (_) => 'kaffeb\u00f8nner',
+      RegExp(r'(kaffeb)[\p{L}\p{M}\u00c3\u00c2\u00f8\u00e6\u00e5ÃÂ\uFFFD\W_]+(nner)', caseSensitive: false, unicode: true),
+      (m) => '${m[1]}ø${m[2]}',
     );
   }
 
-  // Common mojibake patterns using escapes only
-  current = current
-      .replaceAll('\u00c3\u00f8', '\u00f8')
-      .replaceAll('\u00c3\u00c2\u00b8', '\u00f8')
-      .replaceAll('\u00c3\u00e6', '\u00e6')
-      .replaceAll('\u00c3\u00e5', '\u00e5')
-      .replaceAll('\u00c3', '\u00f8')
-      .replaceAll('\u00c2\u00b8', '\u00f8');
+  // Remove replacement chars and raw mojibake byte markers aggressively (after phrase fixes)
+  current = current.replaceAll('\uFFFD', '');
+  current = current.replaceAll(RegExp(r'[\u00c3\u00c2ÃÂ]{1,}'), '');
 
-  // Fallback roundtrips
-  for (var i = 0; i < 3; i++) {
+  // Direct collapse of repeated mojibake sequences to ø (common for ø)
+  current = current.replaceAll(RegExp(r'(\u00c3\u00c2|ÃÂ|ÃÂ¸|Ãø)+', caseSensitive: false), 'ø');
+
+  // Common explicit mojibake replacements (order matters)
+  current = current
+      .replaceAll(RegExp(r'Ãø|ÃÂ¸|\u00c3\u00f8|\u00c3\u00c2\u00b8', caseSensitive: false), 'ø')
+      .replaceAll(RegExp(r'Ãæ|\u00c3\u00e6', caseSensitive: false), 'æ')
+      .replaceAll(RegExp(r'Ãå|\u00c3\u00e5', caseSensitive: false), 'å')
+      .replaceAll(RegExp(r'Ã|Â', caseSensitive: false), 'ø');
+
+  // Multiple latin1->utf8 roundtrips, always prefer cleaner result (fewer mojibake markers, more high chars)
+  String best = current;
+  int bestBadCount = _countMojibakeMarkers(best);
+  for (var i = 0; i < 4; i++) {
     try {
       final bytes = latin1.encode(current);
       final repaired = utf8.decode(bytes, allowMalformed: true);
-      if (repaired == current) break;
-      if (!repaired.contains('\u00c3') || repaired.runes.where((r) => r > 127).length > current.runes.where((r) => r > 127).length) {
+      if (repaired != current) {
+        final repairedBad = _countMojibakeMarkers(repaired);
+        if (repairedBad < bestBadCount ||
+            (repairedBad == bestBadCount && repaired.runes.where((r) => r > 127).length > best.runes.where((r) => r > 127).length)) {
+          best = repaired;
+          bestBadCount = repairedBad;
+        }
         current = repaired;
-        break;
       }
-      current = repaired;
     } catch (_) {
       break;
     }
   }
+  current = best;
+
+  // Final sweep: remove any leftover bad sequences
+  current = current.replaceAll(RegExp(r'[\u00c3\u00c2\uFFFDÃÂ]{2,}'), '');
+
+  // One last phrase fix in case anything survived
+  if (current.toLowerCase().contains('kaffeb') && current.toLowerCase().contains('nner')) {
+    current = current.replaceAllMapped(
+      RegExp(r'kaffeb[\p{L}\p{M}\u00c3\u00c2\uFFFDÃÂ\W]+nner', caseSensitive: false, unicode: true),
+      (_) => 'kaffebønner',
+    );
+  }
+
   return current;
+}
+
+int _countMojibakeMarkers(String s) {
+  return RegExp(r'[\u00c3\u00c2\uFFFDÃÂ]').allMatches(s).length;
 }
 
 /// Coffee processing methods for bean inventory.

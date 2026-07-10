@@ -115,5 +115,21 @@ Here is the bean info:
       expect(fixed, clean);
       expect(fixed, isNot(contains('\u00c3')));
     });
+
+    test('strips heavy replacement char mojibake and fixes kaffebønner', () {
+      final bad = 'En blanding av sesongens beste kaffeb' +
+          '\uFFFD\uFFFD\uFFFD\uFFFD\uFFFD' * 20 +
+          'nner brent til espresso. Floral og fruktig espresso med god fylde.';
+      final fixed = repairMojibake(bad);
+      expect(fixed, contains('kaffeb\u00f8nner'));
+      expect(fixed, isNot(contains('\uFFFD')));
+      expect(fixed, isNot(contains('\u00c3')));
+    });
+
+    test('returns empty when input is only mojibake garbage', () {
+      final bad = '\uFFFD\uFFFD' * 50 + 'ÃÂ' * 30;
+      final fixed = repairMojibake(bad);
+      expect(fixed?.trim(), isEmpty);
+    });
   });
 }

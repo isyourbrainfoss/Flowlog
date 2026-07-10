@@ -311,20 +311,41 @@ String? _mergeText(String? primary, String? secondary) {
 /// For bean notes, prefer the version that is non-empty and does not contain
 /// mojibake markers (Ã or replacement chars). This prevents corrupted remote
 /// versions from overwriting local manual fixes.
+/// Explicitly cleared local notes (empty) are respected and will not be
+/// overwritten by (even repaired) remote notes. This stops bad data from
+/// reappearing after the user removes notes.
 String? _mergeBeanNotes(String? local, String? remote) {
   final l = repairMojibake(local?.trim());
   final r = repairMojibake(remote?.trim());
-  if (l != null && l.isNotEmpty) {
-    final lHasBad = l.contains('Ã') || l.contains('\uFFFD');
-    final rHasBad = (r ?? '').contains('Ã') || (r ?? '').contains('\uFFFD');
-    if (lHasBad && !rHasBad && (r?.isNotEmpty ?? false)) {
-      return r;
+
+  final lEmpty = l == null || l.isEmpty;
+  final rEmpty = r == null || r.isEmpty;
+
+  final lHasBad = !lEmpty && (l!.contains('Ã') || l.contains('\uFFFD'));
+  final rHasBad = !rEmpty && (r!.contains('Ã') || r.contains('\uFFFD'));
+
+  if (lEmpty) {
+    // Respect local clear: do not pull remote notes (prevents reappearance of
+    // corrupted remote data after user removes notes).
+    if (rHasBad || rEmpty) {
+      return null;
     }
-    if (!lHasBad) {
-      return l;
-    }
+    // Only adopt remote if it is clean. (Rare case; user cleared locally.)
+    return r;
   }
-  return r?.isNotEmpty == true ? r : l;
+
+  if (rEmpty) {
+    return l;
+  }
+
+  if (lHasBad && !rHasBad) {
+    return r;
+  }
+  if (!lHasBad) {
+    return l;
+  }
+  // Both bad or ambiguous: prefer the longer/cleaner one after repair
+  return (r!.length >= l!.length) ? r : l;
 }
 
 Map<String, List<String>> _groupShotTagLinks(List<ShotTagLink> links) {
