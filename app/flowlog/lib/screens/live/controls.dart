@@ -194,8 +194,8 @@ class LiveControls extends StatelessWidget {
         late final Widget button;
 
         if (isIdleProminent) {
-          // Custom full-bleed button showing *only* the coffee liquid (no cup rim visible).
-          // The entire pill is filled with the animated top-down espresso.
+          // Custom full-bleed button showing *only* the coffee (vertical stripes).
+          // No cup/rim. Subtle animated stripes using two coffee colors.
           button = Material(
             color: const Color(0xFF2C211A), // deep coffee liquid color (no separate cup)
             shape: const StadiumBorder(),
@@ -269,10 +269,9 @@ class LiveControls extends StatelessWidget {
   }
 }
 
-/// Top-down view into an espresso cup for the prominent Start brew button.
-/// Thick dark liquid with a central pour point and gentle expanding ripples
-/// (as if espresso is dripping in). Subtle, tasteful animation using low
-/// opacity and slow timing. The pill shape approximates the cup top view.
+/// Animated vertical stripes filling the entire prominent "Start brew" button
+/// with coffee colors. Very subtle, slow shift so the pattern changes gradually
+/// across the button (not all at once). Only the coffee, no cup visible.
 class _AnimatedCoffeeLiquid extends StatefulWidget {
   const _AnimatedCoffeeLiquid({super.key}); // ignore: unused_element_parameter
 
@@ -322,9 +321,10 @@ class _AnimatedCoffeeLiquidState extends State<_AnimatedCoffeeLiquid>
   }
 }
 
-/// Custom painter for top-down view of thick coffee filling the *entire* button.
-/// No cup/rim visible — just the animated espresso liquid across the full pill.
-/// Central drip point + expanding ripples for the "dripping down" effect.
+/// Simple vertical stripes filling the entire prominent Start brew button with coffee.
+/// Subtle animation using two coffee shades. Stripes shift slowly so the color
+/// change does not affect the whole button uniformly at the same time.
+/// No drips, no complex shapes or heavy gradients.
 class _CoffeeLiquidPainter extends CustomPainter {
   _CoffeeLiquidPainter({
     required this.progress,
@@ -338,77 +338,55 @@ class _CoffeeLiquidPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
+    // Base coffee color filling the whole button (only coffee, no cup).
+    final basePaint = Paint()..color = liquidColor;
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), basePaint);
 
-    // Full coffee — the entire button is thick liquid, no cup/rim.
-    final fullRect = Rect.fromLTWH(0, 0, size.width, size.height);
-    final fullRRect = RRect.fromRectAndRadius(fullRect, const Radius.circular(32));
+    // Vertical stripes using a second subtle coffee shade.
+    // Animation shifts them slowly so the color change sweeps and does not
+    // affect the entire button at exactly the same moment.
+    final stripePaint = Paint()
+      ..color = cremaTint.withValues(alpha: 0.20);
 
-    final liquidPaint = Paint()..color = liquidColor;
-    canvas.drawRRect(fullRRect, liquidPaint);
+    const double stripeWidth = 4.0;
+    const double period = 9.0; // stripe + gap
 
-    // Depth for thick look.
-    final depthPaint = Paint()..color = const Color(0xFF1A120D).withValues(alpha: 0.5);
-    canvas.drawRRect(fullRRect.deflate(5), depthPaint);
+    // Slow continuous drift + small oscillation.
+    final drift = (progress * 12.0) % period;
+    final bob = math.sin(progress * 2 * math.pi) * 1.2;
 
-    // Drips: a few small drips randomly scattered around the center (smooth animated "random").
-    final dripPaint = Paint()..color = const Color(0xFF120B08).withValues(alpha: 0.75);
-    for (int i = 0; i < 5; i++) {
-      final seed = i * 1.618034; // golden ratio for nice distribution
-      final phase = progress * 2.3 + seed;
-      final ox = math.cos(phase * 1.6 + seed) * 11;   // jitter around center
-      final oy = math.sin(phase * 1.3 + seed * 1.7) * 5.5;
-      final dripC = center + Offset(ox, oy);
-      final dr = 3.2 + math.sin(phase * 4.5 + seed) * 1.3;
-      canvas.drawCircle(dripC, dr, dripPaint);
+    for (double x = drift + bob - period; x < size.width + period; x += period) {
+      canvas.drawRect(
+        Rect.fromLTWH(x, 0, stripeWidth, size.height),
+        stripePaint,
+      );
     }
 
-    // Circular ripples (perfect circles, ignore pill shape).
-    // Not lines: soft filled disks/bands.
-    // Vertical gradient top-to-bottom on the ripples.
-    final rippleShader = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        cremaTint.withValues(alpha: 0.30),
-        liquidColor.withValues(alpha: 0.06),
-        cremaTint.withValues(alpha: 0.24),
-      ],
-      stops: const [0.0, 0.5, 1.0],
-    ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    // Second, narrower set of stripes with different phase/speed for more
+    // organic "not uniform" movement across the height.
+    final stripe2 = Paint()
+      ..color = const Color(0xFF3D2E24).withValues(alpha: 0.10);
 
-    final ripplePaint = Paint()
-      ..shader = rippleShader
-      ..style = PaintingStyle.fill;
-
-    final maxR = math.min(size.width, size.height) / 2 - 3;
-    for (int i = 0; i < 6; i++) {
-      final t = ((progress + i * 0.12) % 1.0);
-      final r = maxR * t * 0.9;
-      canvas.drawCircle(center, r, ripplePaint);
-      // Inner to give soft ring/band feel without hard lines.
-      final innerA = (0.10 * (1 - t)).clamp(0.0, 0.10);
-      final innerP = Paint()..color = liquidColor.withValues(alpha: innerA)..style = PaintingStyle.fill;
-      canvas.drawCircle(center, r * 0.78, innerP);
+    const double period2 = 3.0;
+    final drift2 = (progress * 7.0 + 1.5) % period2;
+    for (double x = drift2 - period2; x < size.width + period2; x += period2 * 2) {
+      canvas.drawRect(
+        Rect.fromLTWH(x, 0, 1.5, size.height),
+        stripe2,
+      );
     }
 
-    // Tops and bottoms interact as waves.
-    // Subtle horizontal sine waves spanning the view; "top" and "bottom" wave trains
-    // have offset phases/freqs so they interfere (add/subtract) like real surface waves.
-    final wavePaint = Paint()..color = cremaTint.withValues(alpha: 0.055);
-    for (int w = 0; w < 5; w++) {
-      final baseY = size.height * (0.15 + w * 0.155);
-      final path = Path();
-      path.moveTo(0, baseY);
-      for (double x = 0; x <= size.width; x += 3) {
-        // Top-originating wave component (stronger influence from upper area)
-        final topW = math.sin((x * 0.016) + (progress * 5.2 * math.pi) + w * 0.7) * 2.6 * (1.0 - w * 0.12);
-        // Bottom-originating wave component (phase shifted for interaction)
-        final botW = math.sin((x * 0.023) + (progress * 3.8 * math.pi) + w + math.pi) * 2.1 * (w * 0.18 + 0.1);
-        path.lineTo(x, baseY + topW + botW);
-      }
-      canvas.drawPath(path, wavePaint);
-    }
+    // Very subtle moving vertical band so the color shift does not happen
+    // across the whole button at exactly the same time (top-to-bottom sweep).
+    final sweepT = (progress * 0.8) % 1.0;
+    final sweepY = sweepT * size.height;
+    final sweepH = size.height * 0.25;
+    final sweepPaint = Paint()
+      ..color = cremaTint.withValues(alpha: 0.06);
+    canvas.drawRect(
+      Rect.fromLTWH(0, sweepY - sweepH / 2, size.width, sweepH),
+      sweepPaint,
+    );
   }
 
   @override
