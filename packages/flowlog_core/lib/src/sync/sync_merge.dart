@@ -200,13 +200,24 @@ bool _shouldMergeShot({
 
   final localActivity = _shotActivityAt(local);
   if (localActivity != null && remoteExportedAt.isAfter(localActivity)) {
-    return true;
+    // A later remote export may contain additional metadata or annotations
+    // from another device. However, do not force-merge if the local side
+    // already has equal or higher completeness (protects local edits to
+    // notes/taste/etc made after the remote backup was taken).
+    if (_shotCompleteness(remote) > _shotCompleteness(local)) {
+      return true;
+    }
+    return false;
   }
 
   return _shotCompleteness(remote) > _shotCompleteness(local);
 }
 
 /// Combines [local] and [remote] so metadata and samples from both are kept.
+/// Bases the result on [local] (if present) so that local post-brew edits to
+/// metadata (notes, taste, dose, etc.) are preserved and not overwritten by
+/// an older remote export of the same shot. Missing fields on local are filled
+/// from remote. Samples/annotations prefer the longer set.
 @visibleForTesting
 Shot mergeShotRecords({
   required Shot? local,
@@ -217,40 +228,38 @@ Shot mergeShotRecords({
     return remote;
   }
 
-  final localActivity = _shotActivityAt(local)!;
-  final remoteIsNewer = remoteExportedAt.isAfter(localActivity);
-  final primary = remoteIsNewer ? remote : local;
-  final secondary = remoteIsNewer ? local : remote;
-
-  return primary.copyWith(
+  // Always base on local so manual metadata edits on this device survive
+  // sync rounds that bring in older exports (remoteExportedAt is based on
+  // backup time, not on when metadata was last edited).
+  return local.copyWith(
     startedAt: local.startedAt,
-    endedAt: primary.endedAt ?? secondary.endedAt,
-    doseG: primary.doseG ?? secondary.doseG,
-    yieldG: primary.yieldG ?? secondary.yieldG,
-    grindSetting: primary.grindSetting ?? secondary.grindSetting,
-    beanId: primary.beanId ?? secondary.beanId,
-    waterTempC: primary.waterTempC ?? secondary.waterTempC,
-    notes: _mergeText(primary.notes, secondary.notes),
-    location: primary.location ?? secondary.location,
-    latitude: primary.latitude ?? secondary.latitude,
-    longitude: primary.longitude ?? secondary.longitude,
-    tasteScore: primary.tasteScore ?? secondary.tasteScore,
+    endedAt: local.endedAt ?? remote.endedAt,
+    doseG: local.doseG ?? remote.doseG,
+    yieldG: local.yieldG ?? remote.yieldG,
+    grindSetting: local.grindSetting ?? remote.grindSetting,
+    beanId: local.beanId ?? remote.beanId,
+    waterTempC: local.waterTempC ?? remote.waterTempC,
+    notes: _mergeText(local.notes, remote.notes),
+    location: local.location ?? remote.location,
+    latitude: local.latitude ?? remote.latitude,
+    longitude: local.longitude ?? remote.longitude,
+    tasteScore: local.tasteScore ?? remote.tasteScore,
     coffeejackRewindTurns:
-        primary.coffeejackRewindTurns ?? secondary.coffeejackRewindTurns,
-    coffeejackPreinfusionTurns: primary.coffeejackPreinfusionTurns ??
-        secondary.coffeejackPreinfusionTurns,
-    flavourTags: primary.flavourTags.isNotEmpty
-        ? primary.flavourTags
-        : secondary.flavourTags,
-    flavourIntensities: primary.flavourIntensities.isNotEmpty
-        ? primary.flavourIntensities
-        : secondary.flavourIntensities,
-    samples: primary.samples.length >= secondary.samples.length
-        ? primary.samples
-        : secondary.samples,
-    annotations: primary.annotations.isNotEmpty
-        ? primary.annotations
-        : secondary.annotations,
+        local.coffeejackRewindTurns ?? remote.coffeejackRewindTurns,
+    coffeejackPreinfusionTurns: local.coffeejackPreinfusionTurns ??
+        remote.coffeejackPreinfusionTurns,
+    flavourTags: local.flavourTags.isNotEmpty
+        ? local.flavourTags
+        : remote.flavourTags,
+    flavourIntensities: local.flavourIntensities.isNotEmpty
+        ? local.flavourIntensities
+        : remote.flavourIntensities,
+    samples: local.samples.length >= remote.samples.length
+        ? local.samples
+        : remote.samples,
+    annotations: local.annotations.isNotEmpty
+        ? local.annotations
+        : remote.annotations,
   );
 }
 

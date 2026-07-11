@@ -220,6 +220,12 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
         setState(() => _currentShot = updated);
         await _loadBeanLabel();
         await _loadDisplayMetadata();
+        if (widget.shotRepository == null) {
+          final database = await _ensureDatabase();
+          unawaited(
+            FlowlogSyncCoordinator.syncIfEnabled(database: database),
+          );
+        }
       }
     } finally {
       if (mounted) {

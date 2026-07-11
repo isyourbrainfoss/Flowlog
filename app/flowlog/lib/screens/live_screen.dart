@@ -313,20 +313,29 @@ class _LiveScreenState extends State<LiveScreen> {
     final samples = controller.samples;
     if (samples.length < 8) return; // need some history (~0.8s at 100ms)
 
-    // Look at last ~8 samples (~800ms). If pressure has been near zero,
-    // auto-stop so forgotten brews don't save huge zero tails.
+    // Look at last ~8 samples (~800ms). If pressure has been near zero after
+    // we have seen meaningful pressure, auto-stop so forgotten brews don't
+    // save huge zero tails. Do not auto-stop during initial low-pressure
+    // pre-infusion or when user manually starts the brew button before the
+    // pump has built pressure.
     final recent = samples.sublist(samples.length - 8);
     final allLow = recent.every((s) => (s.pressureBar ?? 100) < 0.4);
 
     if (allLow) {
-      _autoStopTimer ??= Timer(const Duration(milliseconds: 1500), () {
-        if (mounted &&
-            _controller != null &&
-            _controller!.sessionState == ShotSessionState.recording) {
-          _controller!.stop();
-        }
+      final hasSeenPressure = samples.any((s) => (s.pressureBar ?? 0) >= 0.8);
+      if (hasSeenPressure) {
+        _autoStopTimer ??= Timer(const Duration(milliseconds: 1500), () {
+          if (mounted &&
+              _controller != null &&
+              _controller!.sessionState == ShotSessionState.recording) {
+            _controller!.stop();
+          }
+          _autoStopTimer = null;
+        });
+      } else {
+        _autoStopTimer?.cancel();
         _autoStopTimer = null;
-      });
+      }
     } else {
       _autoStopTimer?.cancel();
       _autoStopTimer = null;
@@ -584,6 +593,10 @@ class _LiveScreenState extends State<LiveScreen> {
         repository: repository,
         shot: updated,
         confettiController: _confettiController,
+      );
+      final database = await _ensureDatabase();
+      unawaited(
+        FlowlogSyncCoordinator.syncIfEnabled(database: database),
       );
     }
   }

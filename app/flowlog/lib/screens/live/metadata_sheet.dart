@@ -278,6 +278,12 @@ class _MetadataSheetState extends State<MetadataSheet> {
     _flavourIntensities = Map<String, int>.from(
       initial?.flavourIntensities ?? const {},
     );
+    _coffeejackSettings = CoffeejackSettings(
+      rewindTurnsBeforeFill: initial?.coffeejackRewindTurns ??
+          const CoffeejackSettings().rewindTurnsBeforeFill,
+      slowPreinfusionTurns: initial?.coffeejackPreinfusionTurns ??
+          const CoffeejackSettings().slowPreinfusionTurns,
+    );
     unawaited(_loadDefaults());
     unawaited(_loadBeans());
   }
@@ -769,8 +775,8 @@ class _MetadataSheetState extends State<MetadataSheet> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: FilledButton(
                 key: const Key('metadata_save'),
-                onPressed: () => unawaited(_save()),
-                child: const Text('Save'),
+                onPressed: _defaultsReady ? () => unawaited(_save()) : null,
+                child: Text(_defaultsReady ? 'Save' : 'Loading defaults…'),
               ),
             ),
           ],
