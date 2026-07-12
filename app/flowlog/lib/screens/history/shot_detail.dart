@@ -217,7 +217,12 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
         shot: _currentShot,
       );
       if (updated != null && mounted) {
-        setState(() => _currentShot = updated);
+        // Re-load from DB to ensure we have the exact persisted state
+        // (avoids any in-memory vs DB drift after edit + possible sync).
+        final reloaded = await shotRepository.getShotWithSamples(updated.id);
+        if (reloaded != null && mounted) {
+          setState(() => _currentShot = reloaded);
+        }
         await _loadBeanLabel();
         await _loadDisplayMetadata();
         if (widget.shotRepository == null) {
