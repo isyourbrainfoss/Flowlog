@@ -276,7 +276,7 @@ void main() {
       await tester.enterText(find.byKey(const Key('metadata_yield')), '36');
       final flavourTagsFinder = find.text('Flavour tags');
       await tester.ensureVisible(flavourTagsFinder);
-      await tester.tap(flavourTagsFinder);
+      await tester.tap(flavourTagsFinder, warnIfMissed: false);
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(find.byKey(const Key('metadata_save')));
