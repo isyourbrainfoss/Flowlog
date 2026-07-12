@@ -227,8 +227,12 @@ void main() {
     testWidgets('updates taste score via slider', (tester) async {
       await pumpSheet(tester);
 
+      final sliderFinder = find.byKey(const Key('metadata_taste_slider'));
+      await tester.ensureVisible(sliderFinder);
+      await tester.pumpAndSettle();
+
       await tester.drag(
-        find.byKey(const Key('metadata_taste_slider')),
+        sliderFinder,
         const Offset(200, 0),
       );
       await tester.pumpAndSettle();

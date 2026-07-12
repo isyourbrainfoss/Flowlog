@@ -24,6 +24,12 @@ class ShotMetadata {
     this.flavourIntensities = const {},
     this.coffeejackRewindTurns,
     this.coffeejackPreinfusionTurns,
+    this.grinder,
+    this.showerScreen,
+    this.basket,
+    this.scale,
+    this.brewer,
+    this.lastModifiedAt,
   }) : assert(
           tasteScore == null || (tasteScore >= 0 && tasteScore <= 10),
           'tasteScore must be between 0 and 10',
@@ -41,6 +47,12 @@ class ShotMetadata {
   final Map<String, int> flavourIntensities;
   final int? coffeejackRewindTurns;
   final int? coffeejackPreinfusionTurns;
+  final String? grinder;
+  final String? showerScreen;
+  final String? basket;
+  final String? scale;
+  final String? brewer;
+  final DateTime? lastModifiedAt;
 
   factory ShotMetadata.fromShot(Shot shot) {
     return ShotMetadata(
@@ -56,6 +68,12 @@ class ShotMetadata {
       flavourIntensities: Map<String, int>.from(shot.flavourIntensities),
       coffeejackRewindTurns: shot.coffeejackRewindTurns,
       coffeejackPreinfusionTurns: shot.coffeejackPreinfusionTurns,
+      grinder: shot.grinder,
+      showerScreen: shot.showerScreen,
+      basket: shot.basket,
+      scale: shot.scale,
+      brewer: shot.brewer,
+      lastModifiedAt: shot.lastModifiedAt,
     );
   }
 
@@ -73,6 +91,12 @@ class ShotMetadata {
       flavourIntensities: flavourIntensities,
       coffeejackRewindTurns: coffeejackRewindTurns,
       coffeejackPreinfusionTurns: coffeejackPreinfusionTurns,
+      grinder: grinder,
+      showerScreen: showerScreen,
+      basket: basket,
+      scale: scale,
+      brewer: brewer,
+      lastModifiedAt: lastModifiedAt,
     );
   }
 
@@ -89,6 +113,12 @@ class ShotMetadata {
     Map<String, int>? flavourIntensities,
     int? coffeejackRewindTurns,
     int? coffeejackPreinfusionTurns,
+    String? grinder,
+    String? showerScreen,
+    String? basket,
+    String? scale,
+    String? brewer,
+    DateTime? lastModifiedAt,
   }) {
     return ShotMetadata(
       doseG: doseG ?? this.doseG,
@@ -105,6 +135,12 @@ class ShotMetadata {
           coffeejackRewindTurns ?? this.coffeejackRewindTurns,
       coffeejackPreinfusionTurns:
           coffeejackPreinfusionTurns ?? this.coffeejackPreinfusionTurns,
+      grinder: grinder ?? this.grinder,
+      showerScreen: showerScreen ?? this.showerScreen,
+      basket: basket ?? this.basket,
+      scale: scale ?? this.scale,
+      brewer: brewer ?? this.brewer,
+      lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
     );
   }
 
@@ -122,6 +158,12 @@ class ShotMetadata {
             tasteScore == other.tasteScore &&
             coffeejackRewindTurns == other.coffeejackRewindTurns &&
             coffeejackPreinfusionTurns == other.coffeejackPreinfusionTurns &&
+            grinder == other.grinder &&
+            showerScreen == other.showerScreen &&
+            basket == other.basket &&
+            scale == other.scale &&
+            brewer == other.brewer &&
+            lastModifiedAt == other.lastModifiedAt &&
             _listEquals(flavourTags, other.flavourTags) &&
             _mapEquals(flavourIntensities, other.flavourIntensities);
   }
@@ -138,6 +180,12 @@ class ShotMetadata {
         tasteScore,
         coffeejackRewindTurns,
         coffeejackPreinfusionTurns,
+        grinder,
+        showerScreen,
+        basket,
+        scale,
+        brewer,
+        lastModifiedAt,
         Object.hashAll(flavourTags),
         Object.hashAll(flavourIntensities.entries),
       );
@@ -237,6 +285,11 @@ class _MetadataSheetState extends State<MetadataSheet> {
   late final TextEditingController _tempController;
   late final TextEditingController _notesController;
   late final TextEditingController _locationController;
+  late final TextEditingController _grinderController;
+  late final TextEditingController _showerScreenController;
+  late final TextEditingController _basketController;
+  late final TextEditingController _scaleController;
+  late final TextEditingController _brewerController;
   late double _doseG;
   late double _grindSetting;
   late CoffeejackSettings _coffeejackSettings;
@@ -273,6 +326,11 @@ class _MetadataSheetState extends State<MetadataSheet> {
     );
     _notesController = TextEditingController(text: initial?.notes ?? '');
     _locationController = TextEditingController(text: initial?.location ?? '');
+    _grinderController = TextEditingController(text: initial?.grinder ?? '');
+    _showerScreenController = TextEditingController(text: initial?.showerScreen ?? '');
+    _basketController = TextEditingController(text: initial?.basket ?? '');
+    _scaleController = TextEditingController(text: initial?.scale ?? '');
+    _brewerController = TextEditingController(text: initial?.brewer ?? '');
     _tasteScore = (initial?.tasteScore ?? 5).toDouble();
     _selectedFlavourTags = Set<String>.from(initial?.flavourTags ?? const []);
     _flavourIntensities = Map<String, int>.from(
@@ -289,33 +347,44 @@ class _MetadataSheetState extends State<MetadataSheet> {
   }
 
   Future<void> _loadDefaults() async {
-    final results = await Future.wait([
-      _brewDefaultsStore.load(),
-      _coffeejackSettingsStore.load(),
-    ]);
-    if (!mounted) {
-      return;
+    BrewDefaultsSettings? brewDefaults;
+    CoffeejackSettings? coffeejack;
+    try {
+      final results = await Future.wait([
+        _brewDefaultsStore.load(),
+        _coffeejackSettingsStore.load(),
+      ]);
+      if (!mounted) {
+        return;
+      }
+      brewDefaults = results[0] as BrewDefaultsSettings;
+      coffeejack = results[1] as CoffeejackSettings;
+    } catch (_) {
+      // Fall back to the values we already have (from init or const defaults).
+      // Still allow the user to save.
+    } finally {
+      if (!mounted) {
+        return;
+      }
+      final initial = widget.initial;
+      setState(() {
+        if (brewDefaults != null && initial?.doseG == null) {
+          _doseG = brewDefaults.defaultDoseG;
+        }
+        if (brewDefaults != null && initial?.grindSetting == null) {
+          _grindSetting = snapGrindSetting(brewDefaults.defaultGrindSetting);
+        }
+        if (coffeejack != null) {
+          _coffeejackSettings = CoffeejackSettings(
+            rewindTurnsBeforeFill: initial?.coffeejackRewindTurns ??
+                coffeejack.rewindTurnsBeforeFill,
+            slowPreinfusionTurns: initial?.coffeejackPreinfusionTurns ??
+                coffeejack.slowPreinfusionTurns,
+          );
+        }
+        _defaultsReady = true;
+      });
     }
-
-    final brewDefaults = results[0] as BrewDefaultsSettings;
-    final coffeejack = results[1] as CoffeejackSettings;
-    final initial = widget.initial;
-
-    setState(() {
-      if (initial?.doseG == null) {
-        _doseG = brewDefaults.defaultDoseG;
-      }
-      if (initial?.grindSetting == null) {
-        _grindSetting = snapGrindSetting(brewDefaults.defaultGrindSetting);
-      }
-      _coffeejackSettings = CoffeejackSettings(
-        rewindTurnsBeforeFill: initial?.coffeejackRewindTurns ??
-            coffeejack.rewindTurnsBeforeFill,
-        slowPreinfusionTurns: initial?.coffeejackPreinfusionTurns ??
-            coffeejack.slowPreinfusionTurns,
-      );
-      _defaultsReady = true;
-    });
   }
 
   String _initialBeanLabel(String? beanId) {
@@ -389,6 +458,11 @@ class _MetadataSheetState extends State<MetadataSheet> {
     _tempController.dispose();
     _notesController.dispose();
     _locationController.dispose();
+    _grinderController.dispose();
+    _showerScreenController.dispose();
+    _basketController.dispose();
+    _scaleController.dispose();
+    _brewerController.dispose();
     _customTagController.dispose();
     super.dispose();
   }
@@ -494,6 +568,12 @@ class _MetadataSheetState extends State<MetadataSheet> {
       flavourIntensities: flavourIntensities,
       coffeejackRewindTurns: _coffeejackSettings.rewindTurnsBeforeFill,
       coffeejackPreinfusionTurns: _coffeejackSettings.slowPreinfusionTurns,
+      grinder: _parseString(_grinderController.text),
+      showerScreen: _parseString(_showerScreenController.text),
+      basket: _parseString(_basketController.text),
+      scale: _parseString(_scaleController.text),
+      brewer: _parseString(_brewerController.text),
+      lastModifiedAt: DateTime.now().toUtc(),
     );
   }
 
@@ -651,7 +731,80 @@ class _MetadataSheetState extends State<MetadataSheet> {
                   alignLabelWithHint: true,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+              Text(
+                'Equipment',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 4),
+              TextField(
+                key: const Key('metadata_grinder'),
+                controller: _grinderController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Grinder',
+                  hintText: 'e.g. Chestnut X',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextField(
+                key: const Key('metadata_shower_screen'),
+                controller: _showerScreenController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Shower screen',
+                  hintText: 'e.g. CoffeeJack v2, IKAPE v3',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextField(
+                key: const Key('metadata_basket'),
+                controller: _basketController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Basket',
+                  hintText: 'e.g. CJ v2, IKAPE 54→32mm',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      key: const Key('metadata_scale'),
+                      controller: _scaleController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Scale',
+                        hintText: 'e.g. Acaia',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: TextField(
+                      key: const Key('metadata_brewer'),
+                      controller: _brewerController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Brewer',
+                        hintText: 'e.g. CoffeeJack v2',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               Text(
                 'Taste',
                 style: Theme.of(context).textTheme.titleSmall,

@@ -126,6 +126,11 @@ Map<String, dynamic> _metadataMap(Shot shot) {
       'coffeejackRewindTurns': shot.coffeejackRewindTurns,
     if (shot.coffeejackPreinfusionTurns != null)
       'coffeejackPreinfusionTurns': shot.coffeejackPreinfusionTurns,
+    if (shot.grinder != null) 'grinder': shot.grinder,
+    if (shot.showerScreen != null) 'showerScreen': shot.showerScreen,
+    if (shot.basket != null) 'basket': shot.basket,
+    if (shot.scale != null) 'scale': shot.scale,
+    if (shot.brewer != null) 'brewer': shot.brewer,
   };
 }
 

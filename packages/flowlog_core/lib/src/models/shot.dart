@@ -29,6 +29,12 @@ class Shot {
     this.flavourIntensities = const {},
     this.coffeejackRewindTurns,
     this.coffeejackPreinfusionTurns,
+    this.grinder,
+    this.showerScreen,
+    this.basket,
+    this.scale,
+    this.brewer,
+    this.lastModifiedAt,
     this.autoStartPressureBar,
     this.samples = const [],
     this.annotations = const [],
@@ -54,6 +60,12 @@ class Shot {
   final Map<String, int> flavourIntensities;
   final int? coffeejackRewindTurns;
   final int? coffeejackPreinfusionTurns;
+  final String? grinder;
+  final String? showerScreen;
+  final String? basket;
+  final String? scale;
+  final String? brewer;
+  final DateTime? lastModifiedAt;
   final double? autoStartPressureBar;
   final List<ShotSample> samples;
   final List<ShotAnnotation> annotations;
@@ -78,6 +90,14 @@ class Shot {
       coffeejackRewindTurns: (json['coffeejackRewindTurns'] as num?)?.toInt(),
       coffeejackPreinfusionTurns:
           (json['coffeejackPreinfusionTurns'] as num?)?.toInt(),
+      grinder: json['grinder'] as String?,
+      showerScreen: json['showerScreen'] as String?,
+      basket: json['basket'] as String?,
+      scale: json['scale'] as String?,
+      brewer: json['brewer'] as String?,
+      lastModifiedAt: json['lastModifiedAt'] == null
+          ? null
+          : DateTime.parse(json['lastModifiedAt'] as String),
       autoStartPressureBar: (json['autoStartPressureBar'] as num?)?.toDouble(),
       flavourTags: (json['flavourTags'] as List<dynamic>?)
               ?.map((e) => e as String)
@@ -114,6 +134,13 @@ class Shot {
         'coffeejackRewindTurns': coffeejackRewindTurns,
       if (coffeejackPreinfusionTurns != null)
         'coffeejackPreinfusionTurns': coffeejackPreinfusionTurns,
+      if (grinder != null) 'grinder': grinder,
+      if (showerScreen != null) 'showerScreen': showerScreen,
+      if (basket != null) 'basket': basket,
+      if (scale != null) 'scale': scale,
+      if (brewer != null) 'brewer': brewer,
+      if (lastModifiedAt != null)
+        'lastModifiedAt': lastModifiedAt!.toUtc().toIso8601String(),
       if (autoStartPressureBar != null)
         'autoStartPressureBar': autoStartPressureBar,
       if (flavourTags.isNotEmpty) 'flavourTags': flavourTags,
@@ -144,6 +171,12 @@ class Shot {
     Map<String, int>? flavourIntensities,
     int? coffeejackRewindTurns,
     int? coffeejackPreinfusionTurns,
+    String? grinder,
+    String? showerScreen,
+    String? basket,
+    String? scale,
+    String? brewer,
+    DateTime? lastModifiedAt,
     double? autoStartPressureBar,
     List<ShotSample>? samples,
     List<ShotAnnotation>? annotations,
@@ -168,6 +201,12 @@ class Shot {
           coffeejackRewindTurns ?? this.coffeejackRewindTurns,
       coffeejackPreinfusionTurns:
           coffeejackPreinfusionTurns ?? this.coffeejackPreinfusionTurns,
+      grinder: grinder ?? this.grinder,
+      showerScreen: showerScreen ?? this.showerScreen,
+      basket: basket ?? this.basket,
+      scale: scale ?? this.scale,
+      brewer: brewer ?? this.brewer,
+      lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
       autoStartPressureBar: autoStartPressureBar ?? this.autoStartPressureBar,
       samples: samples ?? this.samples,
       annotations: annotations ?? this.annotations,
@@ -193,6 +232,12 @@ class Shot {
             tasteScore == other.tasteScore &&
             coffeejackRewindTurns == other.coffeejackRewindTurns &&
             coffeejackPreinfusionTurns == other.coffeejackPreinfusionTurns &&
+            grinder == other.grinder &&
+            showerScreen == other.showerScreen &&
+            basket == other.basket &&
+            scale == other.scale &&
+            brewer == other.brewer &&
+            lastModifiedAt == other.lastModifiedAt &&
             autoStartPressureBar == other.autoStartPressureBar &&
             _listEquals(flavourTags, other.flavourTags) &&
             _mapEquals(flavourIntensities, other.flavourIntensities) &&
@@ -218,10 +263,18 @@ class Shot {
         tasteScore,
         coffeejackRewindTurns,
         coffeejackPreinfusionTurns,
-        Object.hashAll(flavourTags),
-        Object.hashAll(flavourIntensities.entries),
-        Object.hashAll(samples),
-        Object.hashAll(annotations),
+        grinder,
+        showerScreen,
+        Object.hash(
+          basket,
+          scale,
+          brewer,
+          lastModifiedAt,
+          Object.hashAll(flavourTags),
+          Object.hashAll(flavourIntensities.entries),
+          Object.hashAll(samples),
+          Object.hashAll(annotations),
+        ),
       );
 
   @override

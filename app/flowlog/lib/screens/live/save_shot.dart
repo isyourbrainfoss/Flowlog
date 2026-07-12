@@ -38,6 +38,7 @@ Shot buildShotFromSession({
     autoStartPressureBar: autoStartPressureBar,
     samples: List<ShotSample>.from(samples),
     annotations: List<ShotAnnotation>.from(annotations),
+    lastModifiedAt: endedAt ?? DateTime.now().toUtc(),
   );
 
   if (metadata != null) {
@@ -94,7 +95,6 @@ Future<ShotMetadata> defaultMetadataFromSamples(
   final brewTemp = brewTempRangeFromSamples(samples);
   return ShotMetadata(
     doseG: defaults.defaultDoseG,
-    yieldG: last.weightG,
     grindSetting: lastGrind ?? defaults.defaultGrindSetting,
     waterTempC: brewTemp.endTempC ?? last.tempC,
     beanId: beanId,
@@ -116,7 +116,11 @@ ShotMetadata applyShotMetadataDefaults(
   );
 }
 
-/// Infers yield from the last weight sample when not stored on the shot.
+/// Returns the explicit yieldG stored on the shot if present.
+/// Otherwise falls back to the last weight sample (the measured end weight).
+/// This fallback is used for history cards, ratios, etc. even when the user
+/// has not manually noted a yield in metadata (yieldG is now null by default
+/// on new shots unless entered in the metadata sheet).
 double? inferredYieldG(Shot shot) {
   if (shot.yieldG != null) {
     return shot.yieldG;
@@ -127,7 +131,9 @@ double? inferredYieldG(Shot shot) {
   return shot.samples.last.weightG;
 }
 
-/// Metadata for history display, filling gaps the edit sheet would show.
+/// Metadata for history display. Fills safe defaults (dose, grind, temp, coffeejack)
+/// but does *not* auto-populate yieldG (it is empty by default unless the user
+/// explicitly entered a value via the metadata editor).
 Future<ShotMetadata> displayMetadataForShot(
   Shot shot, {
   BrewDefaultsSettingsStore? brewDefaultsStore,
@@ -153,7 +159,10 @@ Future<ShotMetadata> displayMetadataForShot(
     final last = shot.samples.last;
     final brewTemp = brewTempRangeFromSamples(shot.samples);
     metadata = metadata.copyWith(
-      yieldG: metadata.yieldG ?? last.weightG,
+      // Yield is intentionally left as stored on the shot (null by default).
+      // Only set via explicit user input in the metadata editor.
+      // Callers that need a fallback for ratios etc. use inferredYieldG(shot).
+      // yieldG: metadata.yieldG ?? last.weightG,
       waterTempC: metadata.waterTempC ?? brewTemp.endTempC ?? last.tempC,
     );
   }

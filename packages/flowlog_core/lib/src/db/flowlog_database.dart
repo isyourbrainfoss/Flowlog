@@ -26,7 +26,7 @@ class FlowlogDatabase extends _$FlowlogDatabase {
   FlowlogDatabase(super.executor);
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -128,6 +128,54 @@ class FlowlogDatabase extends _$FlowlogDatabase {
                 .get();
             if (!shotColumns.contains('flavour_intensities')) {
               await m.addColumn(shots, shots.flavourIntensities);
+            }
+          }
+          if (from < 14) {
+            final shotColumns = await m.database
+                .customSelect(
+                  'PRAGMA table_info(shots)',
+                  readsFrom: {shots},
+                )
+                .map((row) => row.read<String>('name'))
+                .get();
+            if (!shotColumns.contains('grinder')) {
+              await m.database.customStatement(
+                'ALTER TABLE shots ADD COLUMN grinder TEXT',
+              );
+            }
+            if (!shotColumns.contains('shower_screen')) {
+              await m.database.customStatement(
+                'ALTER TABLE shots ADD COLUMN shower_screen TEXT',
+              );
+            }
+            if (!shotColumns.contains('basket')) {
+              await m.database.customStatement(
+                'ALTER TABLE shots ADD COLUMN basket TEXT',
+              );
+            }
+            if (!shotColumns.contains('scale')) {
+              await m.database.customStatement(
+                'ALTER TABLE shots ADD COLUMN scale TEXT',
+              );
+            }
+            if (!shotColumns.contains('brewer')) {
+              await m.database.customStatement(
+                'ALTER TABLE shots ADD COLUMN brewer TEXT',
+              );
+            }
+          }
+          if (from < 15) {
+            final shotColumns = await m.database
+                .customSelect(
+                  'PRAGMA table_info(shots)',
+                  readsFrom: {shots},
+                )
+                .map((row) => row.read<String>('name'))
+                .get();
+            if (!shotColumns.contains('last_modified_at')) {
+              await m.database.customStatement(
+                'ALTER TABLE shots ADD COLUMN last_modified_at TEXT',
+              );
             }
           }
         },

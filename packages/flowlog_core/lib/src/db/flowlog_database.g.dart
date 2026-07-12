@@ -182,6 +182,52 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         type: DriftSqlType.int,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _grinderMeta = const VerificationMeta('grinder');
+  @override
+  late final GeneratedColumn<String> grinder = GeneratedColumn<String>(
+    'grinder',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _showerScreenMeta =
+      const VerificationMeta('showerScreen');
+  @override
+  late final GeneratedColumn<String> showerScreen = GeneratedColumn<String>(
+    'shower_screen',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _basketMeta = const VerificationMeta('basket');
+  @override
+  late final GeneratedColumn<String> basket = GeneratedColumn<String>(
+    'basket',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _scaleMeta = const VerificationMeta('scale');
+  @override
+  late final GeneratedColumn<String> scale = GeneratedColumn<String>(
+    'scale',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _brewerMeta = const VerificationMeta('brewer');
+  @override
+  late final GeneratedColumn<String> brewer = GeneratedColumn<String>(
+    'brewer',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _autoStartPressureBarMeta =
       const VerificationMeta('autoStartPressureBar');
   @override
@@ -212,6 +258,11 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     longitude,
     coffeejackRewindTurns,
     coffeejackPreinfusionTurns,
+    grinder,
+    showerScreen,
+    basket,
+    scale,
+    brewer,
     autoStartPressureBar,
   ];
   @override
@@ -423,6 +474,34 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         DriftSqlType.int,
         data['${effectivePrefix}coffeejack_preinfusion_turns'],
       ),
+      grinder: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}grinder'],
+      ),
+      showerScreen: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shower_screen'],
+      ),
+      basket: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}basket'],
+      ),
+      scale: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}scale'],
+      ),
+      brewer: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}brewer'],
+      ),
+      lastModifiedAt: data['${effectivePrefix}last_modified_at'] == null
+          ? null
+          : DateTime.parse(
+              attachedDatabase.typeMapping.read(
+                DriftSqlType.string,
+                data['${effectivePrefix}last_modified_at'],
+              ) as String,
+            ).toUtc(),
       autoStartPressureBar: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}auto_start_pressure_bar'],
@@ -459,6 +538,12 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
   final double? longitude;
   final int? coffeejackRewindTurns;
   final int? coffeejackPreinfusionTurns;
+  final String? grinder;
+  final String? showerScreen;
+  final String? basket;
+  final String? scale;
+  final String? brewer;
+  final DateTime? lastModifiedAt;
   final double? autoStartPressureBar;
   const ShotRow({
     required this.id,
@@ -478,6 +563,12 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     this.longitude,
     this.coffeejackRewindTurns,
     this.coffeejackPreinfusionTurns,
+    this.grinder,
+    this.showerScreen,
+    this.basket,
+    this.scale,
+    this.brewer,
+    this.lastModifiedAt,
     this.autoStartPressureBar,
   });
   @override
@@ -533,6 +624,21 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       map['coffeejack_preinfusion_turns'] = Variable<int>(
         coffeejackPreinfusionTurns,
       );
+    }
+    if (!nullToAbsent || grinder != null) {
+      map['grinder'] = Variable<String>(grinder);
+    }
+    if (!nullToAbsent || showerScreen != null) {
+      map['shower_screen'] = Variable<String>(showerScreen);
+    }
+    if (!nullToAbsent || basket != null) {
+      map['basket'] = Variable<String>(basket);
+    }
+    if (!nullToAbsent || scale != null) {
+      map['scale'] = Variable<String>(scale);
+    }
+    if (!nullToAbsent || brewer != null) {
+      map['brewer'] = Variable<String>(brewer);
     }
     if (!nullToAbsent || autoStartPressureBar != null) {
       map['auto_start_pressure_bar'] = Variable<double>(autoStartPressureBar);
@@ -804,6 +910,11 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           other.longitude == this.longitude &&
           other.coffeejackRewindTurns == this.coffeejackRewindTurns &&
           other.coffeejackPreinfusionTurns == this.coffeejackPreinfusionTurns &&
+          other.grinder == this.grinder &&
+          other.showerScreen == this.showerScreen &&
+          other.basket == this.basket &&
+          other.scale == this.scale &&
+          other.brewer == this.brewer &&
           other.autoStartPressureBar == this.autoStartPressureBar);
 }
 
@@ -825,6 +936,11 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
   final Value<double?> longitude;
   final Value<int?> coffeejackRewindTurns;
   final Value<int?> coffeejackPreinfusionTurns;
+  final Value<String?> grinder;
+  final Value<String?> showerScreen;
+  final Value<String?> basket;
+  final Value<String?> scale;
+  final Value<String?> brewer;
   final Value<double?> autoStartPressureBar;
   final Value<int> rowid;
   const ShotsCompanion({
@@ -845,6 +961,11 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.longitude = const Value.absent(),
     this.coffeejackRewindTurns = const Value.absent(),
     this.coffeejackPreinfusionTurns = const Value.absent(),
+    this.grinder = const Value.absent(),
+    this.showerScreen = const Value.absent(),
+    this.basket = const Value.absent(),
+    this.scale = const Value.absent(),
+    this.brewer = const Value.absent(),
     this.autoStartPressureBar = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -866,6 +987,11 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.longitude = const Value.absent(),
     this.coffeejackRewindTurns = const Value.absent(),
     this.coffeejackPreinfusionTurns = const Value.absent(),
+    this.grinder = const Value.absent(),
+    this.showerScreen = const Value.absent(),
+    this.basket = const Value.absent(),
+    this.scale = const Value.absent(),
+    this.brewer = const Value.absent(),
     this.autoStartPressureBar = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -958,6 +1084,11 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
           coffeejackRewindTurns ?? this.coffeejackRewindTurns,
       coffeejackPreinfusionTurns:
           coffeejackPreinfusionTurns ?? this.coffeejackPreinfusionTurns,
+      grinder: grinder ?? this.grinder,
+      showerScreen: showerScreen ?? this.showerScreen,
+      basket: basket ?? this.basket,
+      scale: scale ?? this.scale,
+      brewer: brewer ?? this.brewer,
       autoStartPressureBar: autoStartPressureBar ?? this.autoStartPressureBar,
       rowid: rowid ?? this.rowid,
     );
@@ -1024,6 +1155,21 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
       map['coffeejack_preinfusion_turns'] = Variable<int>(
         coffeejackPreinfusionTurns.value,
       );
+    }
+    if (grinder.present) {
+      map['grinder'] = Variable<String>(grinder.value);
+    }
+    if (showerScreen.present) {
+      map['shower_screen'] = Variable<String>(showerScreen.value);
+    }
+    if (basket.present) {
+      map['basket'] = Variable<String>(basket.value);
+    }
+    if (scale.present) {
+      map['scale'] = Variable<String>(scale.value);
+    }
+    if (brewer.present) {
+      map['brewer'] = Variable<String>(brewer.value);
     }
     if (autoStartPressureBar.present) {
       map['auto_start_pressure_bar'] = Variable<double>(

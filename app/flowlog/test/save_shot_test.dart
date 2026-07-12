@@ -90,7 +90,7 @@ void main() {
       expect(metadata.coffeejackPreinfusionTurns, 5);
     });
 
-    test('applies default dose and last grind setting', () async {
+    test('applies default dose and last grind setting (yield no longer auto-set)', () async {
       final prior = _loadFixtureShot().copyWith(
         id: 'prior-shot',
         grindSetting: 14.5,
@@ -108,7 +108,9 @@ void main() {
 
       expect(metadata.doseG, kDefaultBrewDoseG);
       expect(metadata.grindSetting, 14.5);
-      expect(metadata.yieldG, 36);
+      // Yield is no longer auto-populated from samples; defaults to empty
+      // unless the user manually enters it in the metadata sheet.
+      expect(metadata.yieldG, isNull);
     });
 
     test('uses default grind when no prior brew exists', () async {
@@ -137,7 +139,7 @@ void main() {
       await db.close();
     });
 
-    test('fills missing dose, grind, yield, temp, and turns for history display',
+    test('fills missing dose, grind, temp, and turns for history display (yield stays empty unless manually set)',
         () async {
       final coffeejackStore = CoffeejackSettingsStore(
         settingsPath:
@@ -173,7 +175,9 @@ void main() {
 
       expect(metadata.doseG, kDefaultBrewDoseG);
       expect(metadata.grindSetting, 14.5);
-      expect(metadata.yieldG, 36.2);
+      // Yield is no longer auto-filled for display (explicitly empty by default
+      // unless manually noted via the metadata editor). Other gaps are still filled.
+      expect(metadata.yieldG, isNull);
       expect(metadata.waterTempC, 93.5);
       expect(metadata.coffeejackRewindTurns, 10);
       expect(metadata.coffeejackPreinfusionTurns, 6);

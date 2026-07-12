@@ -26,6 +26,13 @@ class Shots extends Table {
   RealColumn get longitude => real().nullable()();
   IntColumn get coffeejackRewindTurns => integer().nullable()();
   IntColumn get coffeejackPreinfusionTurns => integer().nullable()();
+  TextColumn get grinder => text().nullable()();
+  TextColumn get showerScreen => text().nullable()();
+  TextColumn get basket => text().nullable()();
+  TextColumn get scale => text().nullable()();
+  TextColumn get brewer => text().nullable()();
+  TextColumn get lastModifiedAt =>
+      text().nullable().map(const NullableUtcIso8601Converter())();
   RealColumn get autoStartPressureBar => real().nullable()();
 
   @override

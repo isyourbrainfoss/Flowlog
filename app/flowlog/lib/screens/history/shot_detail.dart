@@ -691,6 +691,52 @@ class _MetadataGrid extends StatelessWidget {
             valueStyle: valueStyle,
           ),
         ],
+        // Equipment (shown only if recorded)
+        if (metadata.grinder != null) ...[
+          const SizedBox(height: 12),
+          _MetadataField(
+            label: 'Grinder',
+            value: metadata.grinder!,
+            labelStyle: labelStyle,
+            valueStyle: valueStyle,
+          ),
+        ],
+        if (metadata.showerScreen != null) ...[
+          const SizedBox(height: 12),
+          _MetadataField(
+            label: 'Shower screen',
+            value: metadata.showerScreen!,
+            labelStyle: labelStyle,
+            valueStyle: valueStyle,
+          ),
+        ],
+        if (metadata.basket != null) ...[
+          const SizedBox(height: 12),
+          _MetadataField(
+            label: 'Basket',
+            value: metadata.basket!,
+            labelStyle: labelStyle,
+            valueStyle: valueStyle,
+          ),
+        ],
+        if (metadata.scale != null) ...[
+          const SizedBox(height: 12),
+          _MetadataField(
+            label: 'Scale',
+            value: metadata.scale!,
+            labelStyle: labelStyle,
+            valueStyle: valueStyle,
+          ),
+        ],
+        if (metadata.brewer != null) ...[
+          const SizedBox(height: 12),
+          _MetadataField(
+            label: 'Brewer',
+            value: metadata.brewer!,
+            labelStyle: labelStyle,
+            valueStyle: valueStyle,
+          ),
+        ],
       ],
     );
   }
