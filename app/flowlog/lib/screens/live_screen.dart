@@ -130,7 +130,7 @@ class _LiveScreenState extends State<LiveScreen> {
   ShotEventsNotifier? _shotEventsNotifier;
 
   late final ValueNotifier<double?> _livePressureNotifier;
-  late final ValueNotifier<double?> _liveTempNotifier;
+  late final ValueNotifier<DateTime?> _livePressureLastUpdate;
 
   @override
   void initState() {
@@ -141,7 +141,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
     _samplesNotifier = ValueNotifier<List<ShotSample>>(const []);
     _livePressureNotifier = ValueNotifier<double?>(null);
-    _liveTempNotifier = ValueNotifier<double?>(null);
+    _livePressureLastUpdate = ValueNotifier<DateTime?>(null);
     _annotationController = ShotAnnotationController();
     _annotationsNotifier = ValueNotifier<List<ShotAnnotation>>(
       List<ShotAnnotation>.from(_annotationController.annotations),
@@ -815,47 +815,24 @@ class _LiveScreenState extends State<LiveScreen> {
                             previousSample: previousSample,
                           )
                         else if (state == ShotSessionState.idle || state == ShotSessionState.stopped)
-                          // Live pressure (always) and temperature (when available from Pressensor or scale)
-                          // before starting the shot (or after finished shot, to confirm sensor for next).
-                          // Shown side by side to make it crystal clear the sensor is live.
+                          // Live pressure (always) before starting the shot (or after finished shot,
+                          // to confirm sensor for next). Make it crystal clear the sensor is live.
                           ValueListenableBuilder<double?>(
                             valueListenable: _livePressureNotifier,
                             builder: (context, pressureBar, _) {
                               if (pressureBar == null) {
                                 return const SizedBox.shrink();
                               }
-                              return ValueListenableBuilder<double?>(
-                                valueListenable: _liveTempNotifier,
-                                builder: (context, tempC, _) {
+                              return ValueListenableBuilder<DateTime?>(
+                                valueListenable: _livePressureLastUpdate,
+                                builder: (context, lastUpdate, _) {
                                   return Card(
                                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          LivePressureReadout(pressureBar: pressureBar),
-                                          const SizedBox(width: 16),
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.end,
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                tempC != null ? tempC.toStringAsFixed(1) : '—',
-                                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                                      fontFeatures: const [FontFeature.tabularFigures()],
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                              ),
-                                              Text(
-                                                '°C',
-                                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                    ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
+                                      child: LivePressureReadout(
+                                        pressureBar: pressureBar,
+                                        lastUpdated: lastUpdate,
                                       ),
                                     ),
                                   );
@@ -971,7 +948,7 @@ class _LiveScreenState extends State<LiveScreen> {
           settings: autoStartSettings,
           isDemoMode: demoModeActive,
           pressureBarNotifier: _livePressureNotifier,
-          tempCNotifier: _liveTempNotifier,
+          pressureLastUpdateNotifier: _livePressureLastUpdate,
           child: shell,
         );
       },

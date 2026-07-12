@@ -43,7 +43,7 @@ class FlowlogShell extends StatefulWidget {
 
 class _FlowlogShellState extends State<FlowlogShell> {
   late int _selectedIndex;
-  String _beanName = kDefaultBeanName;
+  String _beanName = '';
   String? _beanId;
   BeanRepository? _beanRepository;
   FlowlogDatabase? _database;

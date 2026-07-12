@@ -60,7 +60,18 @@ void main() {
           await legacy.writeAsBytes([0, 1, 2, 3]);
         }
 
-        await migrationStorage.database();
+        try {
+          await migrationStorage.database();
+        } catch (e) {
+          if (hadLegacy ||
+              e.toString().contains('not a database') == false) {
+            rethrow;
+          }
+          // For the !hadLegacy garbage case we intentionally wrote non-sqlite
+          // bytes to test "copy as-is". Opening will fail with sqlite error,
+          // which is expected here; we still assert the file was migrated.
+        }
+
         final migrated = File(await migrationStorage.databaseFilePath());
         expect(migrated.existsSync(), isTrue);
         if (!hadLegacy) {

@@ -8,7 +8,7 @@ import 'package:flowlog_sensors/flowlog_sensors.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 
 /// Default pressure (bar) that triggers an automatic brew start.
-const double kDefaultAutoStartPressureBar = 1.0;
+const double kDefaultAutoStartPressureBar = 0.5;
 
 /// Minimum allowed auto-start threshold (bar).
 const double kMinAutoStartPressureBar = 0.1;
@@ -141,7 +141,7 @@ class LiveAutoStartListener extends StatefulWidget {
     this.settings = const AutoStartSettings(),
     this.isDemoMode = false,
     this.pressureBarNotifier,
-    this.tempCNotifier,
+    this.pressureLastUpdateNotifier,
     super.key,
   });
 
@@ -154,8 +154,8 @@ class LiveAutoStartListener extends StatefulWidget {
   /// Updated with the latest live pressensor reading while monitoring.
   final ValueNotifier<double?>? pressureBarNotifier;
 
-  /// Updated with the latest live temperature (from scale or pressensor) while monitoring.
-  final ValueNotifier<double?>? tempCNotifier;
+  /// Updated with the timestamp of the last pressure reading (for staleness indication).
+  final ValueNotifier<DateTime?>? pressureLastUpdateNotifier;
   final Widget child;
 
   @override
@@ -165,10 +165,9 @@ class LiveAutoStartListener extends StatefulWidget {
 class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
   StreamSubscription<SensorSample>? _pressureSub;
   SensorAdapter? _ownedMonitorAdapter;
-  StreamSubscription<SensorSample>? _scaleSub;
-  SensorAdapter? _ownedScaleAdapter;
   AutoStartArming _arming = const AutoStartArming();
   bool _starting = false;
+  double? _lastPressure;
 
   @override
   void initState() {
@@ -189,7 +188,24 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
       oldWidget.hub.removeListener(_onHubChanged);
       widget.hub.addListener(_onHubChanged);
     }
+    final settingsChanged =
+        oldWidget.settings.startThresholdBar != widget.settings.startThresholdBar ||
+        oldWidget.settings.enabled != widget.settings.enabled;
+    if (settingsChanged) {
+      _arming = _rearmForCurrentSettings();
+    }
     _syncMonitoring();
+  }
+
+  AutoStartArming _rearmForCurrentSettings() {
+    final p = _lastPressure;
+    if (p == null) {
+      return const AutoStartArming(armed: true);
+    }
+    if (p >= widget.settings.startThresholdBar) {
+      return const AutoStartArming(armed: false);
+    }
+    return const AutoStartArming(armed: true);
   }
 
   @override
@@ -261,23 +277,13 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
       }
     }
 
-    // Monitor scale for live temp if it has hub adapter (when pressure monitoring didn't include scale).
-    if (_scaleSub == null && widget.controller.canStart && !widget.isDemoMode) {
-      final hubScale = widget.hub.activeAdapterFor(SensorKind.scale);
-      if (hubScale != null) {
-        _scaleSub = hubScale.samples.listen(_onPressureSample);
-      }
-    }
   }
 
   Future<void> _stopMonitoring() async {
     await _pressureSub?.cancel();
     _pressureSub = null;
     widget.pressureBarNotifier?.value = null;
-    widget.tempCNotifier?.value = null;
-
-    await _scaleSub?.cancel();
-    _scaleSub = null;
+    widget.pressureLastUpdateNotifier?.value = null;
 
     final owned = _ownedMonitorAdapter;
     _ownedMonitorAdapter = null;
@@ -287,22 +293,12 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
         await owned.dispose();
       }
     }
-
-    final ownedScale = _ownedScaleAdapter;
-    _ownedScaleAdapter = null;
-    if (ownedScale != null) {
-      await ownedScale.disconnect();
-      if (ownedScale is MergedSampleStreamAdapter) {
-        await ownedScale.dispose();
-      }
-    }
   }
 
   void _onPressureSample(SensorSample sample) {
     widget.pressureBarNotifier?.value = sample.pressureBar;
-    if (sample.tempC != null) {
-      widget.tempCNotifier?.value = sample.tempC;
-    }
+    widget.pressureLastUpdateNotifier?.value = DateTime.now();
+    _lastPressure = sample.pressureBar;
 
     if (!mounted || _starting || !widget.controller.canStart) {
       return;
@@ -391,11 +387,13 @@ class AutoStartArmedBanner extends StatelessWidget {
   const AutoStartArmedBanner({
     required this.thresholdBar,
     this.pressureBarNotifier,
+    this.lastUpdateNotifier,
     super.key,
   });
 
   final double thresholdBar;
   final ValueNotifier<double?>? pressureBarNotifier;
+  final ValueNotifier<DateTime?>? lastUpdateNotifier;
 
   @override
   Widget build(BuildContext context) {
@@ -404,7 +402,15 @@ class AutoStartArmedBanner extends StatelessWidget {
         : ValueListenableBuilder<double?>(
             valueListenable: pressureBarNotifier!,
             builder: (context, pressureBar, _) {
-              return LivePressureReadout(pressureBar: pressureBar);
+              return ValueListenableBuilder<DateTime?>(
+                valueListenable: lastUpdateNotifier ?? ValueNotifier<DateTime?>(null),
+                builder: (context, lastUpdate, _) {
+                  return LivePressureReadout(
+                    pressureBar: pressureBar,
+                    lastUpdated: lastUpdate,
+                  );
+                },
+              );
             },
           );
 
@@ -432,24 +438,60 @@ class AutoStartArmedBanner extends StatelessWidget {
 }
 
 /// Live pressensor reading shown before a brew starts.
-class LivePressureReadout extends StatelessWidget {
+/// If [lastUpdated] is old, renders with muted styling to indicate a stale reading.
+class LivePressureReadout extends StatefulWidget {
   const LivePressureReadout({
     required this.pressureBar,
+    this.lastUpdated,
     super.key,
   });
 
   final double? pressureBar;
+  final DateTime? lastUpdated;
+
+  @override
+  State<LivePressureReadout> createState() => _LivePressureReadoutState();
+}
+
+class _LivePressureReadoutState extends State<LivePressureReadout> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  bool get _isStale {
+    final t = widget.lastUpdated;
+    if (t == null) return false;
+    return DateTime.now().difference(t) > const Duration(seconds: 3);
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final value = pressureBar;
+    final value = widget.pressureBar;
     final label = value == null ? '—' : value.toStringAsFixed(2);
+    final isStale = _isStale;
+    final valueColor = isStale
+        ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6)
+        : theme.colorScheme.onSurface;
 
     return Semantics(
       label: value == null
           ? 'Live pressure unavailable'
-          : 'Live pressure $label bar',
+          : isStale
+              ? 'Live pressure $label bar (stale)'
+              : 'Live pressure $label bar',
       readOnly: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -461,13 +503,29 @@ class LivePressureReadout extends StatelessWidget {
             style: theme.textTheme.titleLarge?.copyWith(
               fontFeatures: const [FontFeature.tabularFigures()],
               fontWeight: FontWeight.w600,
+              color: valueColor,
             ),
           ),
-          Text(
-            'bar',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'bar',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (isStale) ...[
+                const SizedBox(width: 4),
+                Text(
+                  '(stale)',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    fontSize: 9,
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),

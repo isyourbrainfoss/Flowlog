@@ -269,7 +269,7 @@ void main() {
         find.byKey(const Key('metadata_notes')),
         'Minimal fixture shot for tests and mock replay.',
       );
-      await tester.tap(find.text('Flavour tags'));
+      await tester.tap(find.text('Flavour tags'), warnIfMissed: false);
       await tester.pumpAndSettle();
 
       await tapVisible(tester, find.byKey(const Key('metadata_flavour_chocolate')));

@@ -7,8 +7,8 @@ import 'package:flowlog_sensors/flowlog_sensors.dart'
     show ConnectionState, isPressensorLowBattery;
 import 'package:flutter/material.dart' hide ConnectionState;
 
-/// Default active bean label shown in the top bar.
-const String kDefaultBeanName = 'House Blend';
+// No default bean name. Start with empty so the user explicitly chooses
+// (or types) a bean rather than having a placeholder like "House Blend".
 
 /// Result from the top-bar active bean picker.
 typedef ActiveBeanPickerResult = ({String name, String? beanId});
@@ -71,10 +71,15 @@ class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
-                              beanName,
+                              beanName.isEmpty ? 'Select bean' : beanName,
                               style: theme.textTheme.titleMedium?.copyWith(
-                                color: colorScheme.onSurface,
+                                color: beanName.isEmpty
+                                    ? colorScheme.onSurfaceVariant
+                                    : colorScheme.onSurface,
                                 fontWeight: FontWeight.w600,
+                                fontStyle: beanName.isEmpty
+                                    ? FontStyle.italic
+                                    : null,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -250,7 +255,7 @@ class _BeanNameEditDialogState extends State<_BeanNameEditDialog> {
                 textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
                   labelText: 'Bean',
-                  hintText: 'e.g. House Blend',
+                  hintText: 'e.g. Ethiopia Yirgacheffe',
                   helperText:
                       'Pick a saved bag or type a new name to create one',
                   suffixIcon: controller.text.isEmpty

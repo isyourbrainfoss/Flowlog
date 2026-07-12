@@ -9,10 +9,12 @@ import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_test/flutter_test.dart';
 
+const String _testBeanName = 'Test Blend';
+
 void main() {
   Future<void> pumpTopBar(
     WidgetTester tester, {
-    String beanName = kDefaultBeanName,
+    String beanName = _testBeanName,
     Future<List<Bean>> Function()? loadBeans,
     void Function(String name, {String? beanId})? onActiveBeanChanged,
     ConnectionState pressensorState = ConnectionState.disconnected,
@@ -41,7 +43,7 @@ void main() {
     testWidgets('shows bean name and sensor status icons', (tester) async {
       await pumpTopBar(tester);
 
-      expect(find.text(kDefaultBeanName), findsOneWidget);
+      expect(find.text(_testBeanName), findsOneWidget);
       expect(find.byKey(const Key('top_bar_prs_status')), findsOneWidget);
       expect(find.byKey(const Key('top_bar_scale_status')), findsOneWidget);
       expect(find.byIcon(Icons.speed), findsOneWidget);
@@ -75,7 +77,7 @@ void main() {
         tester.widget<TextField>(find.byKey(const Key('top_bar_bean_edit_field')))
             .controller
             ?.text,
-        kDefaultBeanName,
+        _testBeanName,
       );
     });
 
@@ -216,7 +218,7 @@ void main() {
             home: FlowlogShellScope(
               switchTab: (_) {},
               child: Scaffold(
-                appBar: const FlowlogTopBar(beanName: kDefaultBeanName),
+                appBar: const FlowlogTopBar(beanName: _testBeanName),
                 body: const SizedBox.shrink(),
               ),
             ),
@@ -234,7 +236,7 @@ void main() {
   });
 
   group('FlowlogShell top bar integration', () {
-    testWidgets('shell shows top bar with default bean name', (tester) async {
+    testWidgets('shell shows top bar bean picker (no default bean)', (tester) async {
       tester.view.physicalSize = const Size(800, 600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -246,7 +248,7 @@ void main() {
       await tester.pump();
 
       expect(find.byType(FlowlogTopBar), findsOneWidget);
-      expect(find.text(kDefaultBeanName), findsOneWidget);
+      expect(find.text('Select bean'), findsOneWidget);
       expect(find.byKey(const Key('top_bar_prs_status')), findsOneWidget);
       expect(find.byKey(const Key('top_bar_scale_status')), findsOneWidget);
     });
