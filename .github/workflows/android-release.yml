@@ -54,17 +54,11 @@ jobs:
           cp "$APK" flowlog-release.apk
           cp "$APK" flowlog-arm64-v8a.apk
           echo "VERSION=$BUILD" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
           ls -lh flowlog-*.apk
 
-      - name: Read version code from APK
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq aapt >/dev/null
-          VC=$(aapt dump badging flowlog-arm64-v8a.apk | grep versionCode | sed "s/.*versionCode='\([0-9]*\)'.*/\1/" || echo "")
-          if [ -z "$VC" ]; then
-            echo "Failed to extract versionCode from APK"
-            exit 1
-          fi
-          echo "VERSION_CODE=$VC" >> "$GITHUB_ENV"
+      # Version code is set directly from the --build-number passed to flutter build above.
+      # This avoids fragile aapt parsing, extra apt installs, and potential mismatches.
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
