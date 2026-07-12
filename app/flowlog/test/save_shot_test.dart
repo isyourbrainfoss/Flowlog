@@ -274,7 +274,9 @@ void main() {
       await pumpUntilFound(tester, find.text('Shot metadata'));
 
       await tester.enterText(find.byKey(const Key('metadata_yield')), '36');
-      await tester.tap(find.text('Flavour tags'));
+      final flavourTagsFinder = find.text('Flavour tags');
+      await tester.ensureVisible(flavourTagsFinder);
+      await tester.tap(flavourTagsFinder);
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(find.byKey(const Key('metadata_save')));
