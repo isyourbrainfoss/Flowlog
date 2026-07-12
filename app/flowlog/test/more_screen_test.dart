@@ -37,8 +37,8 @@ void main() {
     await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.tune));
-    await tester.pumpAndSettle();
+    await _openMoreTab(tester);
+    await _scrollToMoreTile(tester, find.text('Export shots (CSV)'));
 
     await tester.tap(find.text('Export shots (CSV)'));
     await pumpForAsync(tester, frames: 5);

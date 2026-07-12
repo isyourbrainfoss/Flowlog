@@ -325,6 +325,7 @@ void main() {
         flavourIntensities: const {'chocolate': 5, 'nutty': 5},
         coffeejackRewindTurns: kDefaultCoffeejackRewindTurns,
         coffeejackPreinfusionTurns: kDefaultCoffeejackPreinfusionTurns,
+        lastModifiedAt: saved!.lastModifiedAt,  // set during _buildMetadata
       );
       expect(saved, expected);
       expect(
@@ -333,6 +334,7 @@ void main() {
           flavourIntensities: const {'chocolate': 5, 'nutty': 5},
           coffeejackRewindTurns: kDefaultCoffeejackRewindTurns,
           coffeejackPreinfusionTurns: kDefaultCoffeejackPreinfusionTurns,
+          lastModifiedAt: saved!.lastModifiedAt,
         ),
       );
     });

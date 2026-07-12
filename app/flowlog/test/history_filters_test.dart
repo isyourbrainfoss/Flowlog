@@ -209,7 +209,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('No shots match filters'), findsOneWidget);
+      expect(find.text('No shots match your filters'), findsOneWidget);
       expect(find.byType(HistoryShotCard), findsNothing);
     });
 

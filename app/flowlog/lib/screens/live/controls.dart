@@ -197,6 +197,7 @@ class LiveControls extends StatelessWidget {
           // Custom full-bleed button: the whole thing is one solid coffee color
           // that slowly transitions between two shades. No cup/rim.
           button = Material(
+            key: const Key('live_brew'),
             color: const Color(0xFF2C211A), // base (painter fills over it)
             shape: const StadiumBorder(),
             clipBehavior: Clip.antiAlias,
@@ -289,7 +290,16 @@ class _AnimatedCoffeeLiquidState extends State<_AnimatedCoffeeLiquid>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 12000), // very slow, subtle pulse
-    )..repeat();
+    );
+    // Repeating animations prevent pumpAndSettle from completing in widget tests.
+    // Only repeat the pulse in real runs; in tests use a static mid value.
+    final binding = WidgetsBinding.instance;
+    final isTest = binding.runtimeType.toString().contains('TestWidgetsFlutterBinding');
+    if (!isTest) {
+      _controller.repeat();
+    } else {
+      _controller.value = 0.5;
+    }
   }
 
   @override

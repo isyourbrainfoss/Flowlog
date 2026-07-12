@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flowlog/screens/live/auto_start.dart';
 import 'package:flowlog/screens/more/brew_defaults_screen.dart';
+import 'package:flowlog/screens/more/equipment_screen.dart';
 import 'package:flowlog/screens/more/brew_location_screen.dart';
 import 'package:flowlog/screens/more/target_brew_screen.dart';
 
@@ -82,6 +83,18 @@ class _MoreScreenState extends State<MoreScreen> {
                       AutoStartSettingsScope.maybeOf(context),
                 ),
               ),
+            );
+          },
+        ),
+        ListTile(
+          key: const Key('more_equipment_tile'),
+          leading: const Icon(Icons.build),
+          title: const Text('Equipment'),
+          subtitle: const Text('Manage grinders, screens, baskets, scales & brewers + presets'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const EquipmentScreen()),
             );
           },
         ),

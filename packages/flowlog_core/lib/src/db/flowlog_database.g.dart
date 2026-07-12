@@ -182,7 +182,9 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         type: DriftSqlType.int,
         requiredDuringInsert: false,
       );
-  static const VerificationMeta _grinderMeta = const VerificationMeta('grinder');
+  static const VerificationMeta _grinderMeta = const VerificationMeta(
+    'grinder',
+  );
   @override
   late final GeneratedColumn<String> grinder = GeneratedColumn<String>(
     'grinder',
@@ -191,8 +193,9 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _showerScreenMeta =
-      const VerificationMeta('showerScreen');
+  static const VerificationMeta _showerScreenMeta = const VerificationMeta(
+    'showerScreen',
+  );
   @override
   late final GeneratedColumn<String> showerScreen = GeneratedColumn<String>(
     'shower_screen',
@@ -228,6 +231,15 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime?, String>
+  lastModifiedAt = GeneratedColumn<String>(
+    'last_modified_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  ).withConverter<DateTime?>($ShotsTable.$converterlastModifiedAt);
   static const VerificationMeta _autoStartPressureBarMeta =
       const VerificationMeta('autoStartPressureBar');
   @override
@@ -263,6 +275,7 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     basket,
     scale,
     brewer,
+    lastModifiedAt,
     autoStartPressureBar,
   ];
   @override
@@ -384,6 +397,39 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         ),
       );
     }
+    if (data.containsKey('grinder')) {
+      context.handle(
+        _grinderMeta,
+        grinder.isAcceptableOrUnknown(data['grinder']!, _grinderMeta),
+      );
+    }
+    if (data.containsKey('shower_screen')) {
+      context.handle(
+        _showerScreenMeta,
+        showerScreen.isAcceptableOrUnknown(
+          data['shower_screen']!,
+          _showerScreenMeta,
+        ),
+      );
+    }
+    if (data.containsKey('basket')) {
+      context.handle(
+        _basketMeta,
+        basket.isAcceptableOrUnknown(data['basket']!, _basketMeta),
+      );
+    }
+    if (data.containsKey('scale')) {
+      context.handle(
+        _scaleMeta,
+        scale.isAcceptableOrUnknown(data['scale']!, _scaleMeta),
+      );
+    }
+    if (data.containsKey('brewer')) {
+      context.handle(
+        _brewerMeta,
+        brewer.isAcceptableOrUnknown(data['brewer']!, _brewerMeta),
+      );
+    }
     if (data.containsKey('auto_start_pressure_bar')) {
       context.handle(
         _autoStartPressureBarMeta,
@@ -494,14 +540,12 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         DriftSqlType.string,
         data['${effectivePrefix}brewer'],
       ),
-      lastModifiedAt: data['${effectivePrefix}last_modified_at'] == null
-          ? null
-          : DateTime.parse(
-              attachedDatabase.typeMapping.read(
-                DriftSqlType.string,
-                data['${effectivePrefix}last_modified_at'],
-              ) as String,
-            ).toUtc(),
+      lastModifiedAt: $ShotsTable.$converterlastModifiedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}last_modified_at'],
+        ),
+      ),
       autoStartPressureBar: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}auto_start_pressure_bar'],
@@ -517,6 +561,8 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
   static TypeConverter<DateTime, String> $converterstartedAt =
       const UtcIso8601Converter();
   static TypeConverter<DateTime?, String?> $converterendedAt =
+      const NullableUtcIso8601Converter();
+  static TypeConverter<DateTime?, String?> $converterlastModifiedAt =
       const NullableUtcIso8601Converter();
 }
 
@@ -640,6 +686,11 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     if (!nullToAbsent || brewer != null) {
       map['brewer'] = Variable<String>(brewer);
     }
+    if (!nullToAbsent || lastModifiedAt != null) {
+      map['last_modified_at'] = Variable<String>(
+        $ShotsTable.$converterlastModifiedAt.toSql(lastModifiedAt),
+      );
+    }
     if (!nullToAbsent || autoStartPressureBar != null) {
       map['auto_start_pressure_bar'] = Variable<double>(autoStartPressureBar);
     }
@@ -692,6 +743,24 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           coffeejackPreinfusionTurns == null && nullToAbsent
           ? const Value.absent()
           : Value(coffeejackPreinfusionTurns),
+      grinder: grinder == null && nullToAbsent
+          ? const Value.absent()
+          : Value(grinder),
+      showerScreen: showerScreen == null && nullToAbsent
+          ? const Value.absent()
+          : Value(showerScreen),
+      basket: basket == null && nullToAbsent
+          ? const Value.absent()
+          : Value(basket),
+      scale: scale == null && nullToAbsent
+          ? const Value.absent()
+          : Value(scale),
+      brewer: brewer == null && nullToAbsent
+          ? const Value.absent()
+          : Value(brewer),
+      lastModifiedAt: lastModifiedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastModifiedAt),
       autoStartPressureBar: autoStartPressureBar == null && nullToAbsent
           ? const Value.absent()
           : Value(autoStartPressureBar),
@@ -727,6 +796,12 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       coffeejackPreinfusionTurns: serializer.fromJson<int?>(
         json['coffeejackPreinfusionTurns'],
       ),
+      grinder: serializer.fromJson<String?>(json['grinder']),
+      showerScreen: serializer.fromJson<String?>(json['showerScreen']),
+      basket: serializer.fromJson<String?>(json['basket']),
+      scale: serializer.fromJson<String?>(json['scale']),
+      brewer: serializer.fromJson<String?>(json['brewer']),
+      lastModifiedAt: serializer.fromJson<DateTime?>(json['lastModifiedAt']),
       autoStartPressureBar: serializer.fromJson<double?>(
         json['autoStartPressureBar'],
       ),
@@ -755,6 +830,12 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       'coffeejackPreinfusionTurns': serializer.toJson<int?>(
         coffeejackPreinfusionTurns,
       ),
+      'grinder': serializer.toJson<String?>(grinder),
+      'showerScreen': serializer.toJson<String?>(showerScreen),
+      'basket': serializer.toJson<String?>(basket),
+      'scale': serializer.toJson<String?>(scale),
+      'brewer': serializer.toJson<String?>(brewer),
+      'lastModifiedAt': serializer.toJson<DateTime?>(lastModifiedAt),
       'autoStartPressureBar': serializer.toJson<double?>(autoStartPressureBar),
     };
   }
@@ -777,6 +858,12 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     Value<double?> longitude = const Value.absent(),
     Value<int?> coffeejackRewindTurns = const Value.absent(),
     Value<int?> coffeejackPreinfusionTurns = const Value.absent(),
+    Value<String?> grinder = const Value.absent(),
+    Value<String?> showerScreen = const Value.absent(),
+    Value<String?> basket = const Value.absent(),
+    Value<String?> scale = const Value.absent(),
+    Value<String?> brewer = const Value.absent(),
+    Value<DateTime?> lastModifiedAt = const Value.absent(),
     Value<double?> autoStartPressureBar = const Value.absent(),
   }) => ShotRow(
     id: id ?? this.id,
@@ -800,6 +887,14 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     coffeejackPreinfusionTurns: coffeejackPreinfusionTurns.present
         ? coffeejackPreinfusionTurns.value
         : this.coffeejackPreinfusionTurns,
+    grinder: grinder.present ? grinder.value : this.grinder,
+    showerScreen: showerScreen.present ? showerScreen.value : this.showerScreen,
+    basket: basket.present ? basket.value : this.basket,
+    scale: scale.present ? scale.value : this.scale,
+    brewer: brewer.present ? brewer.value : this.brewer,
+    lastModifiedAt: lastModifiedAt.present
+        ? lastModifiedAt.value
+        : this.lastModifiedAt,
     autoStartPressureBar: autoStartPressureBar.present
         ? autoStartPressureBar.value
         : this.autoStartPressureBar,
@@ -837,6 +932,16 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       coffeejackPreinfusionTurns: data.coffeejackPreinfusionTurns.present
           ? data.coffeejackPreinfusionTurns.value
           : this.coffeejackPreinfusionTurns,
+      grinder: data.grinder.present ? data.grinder.value : this.grinder,
+      showerScreen: data.showerScreen.present
+          ? data.showerScreen.value
+          : this.showerScreen,
+      basket: data.basket.present ? data.basket.value : this.basket,
+      scale: data.scale.present ? data.scale.value : this.scale,
+      brewer: data.brewer.present ? data.brewer.value : this.brewer,
+      lastModifiedAt: data.lastModifiedAt.present
+          ? data.lastModifiedAt.value
+          : this.lastModifiedAt,
       autoStartPressureBar: data.autoStartPressureBar.present
           ? data.autoStartPressureBar.value
           : this.autoStartPressureBar,
@@ -863,13 +968,19 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           ..write('longitude: $longitude, ')
           ..write('coffeejackRewindTurns: $coffeejackRewindTurns, ')
           ..write('coffeejackPreinfusionTurns: $coffeejackPreinfusionTurns, ')
+          ..write('grinder: $grinder, ')
+          ..write('showerScreen: $showerScreen, ')
+          ..write('basket: $basket, ')
+          ..write('scale: $scale, ')
+          ..write('brewer: $brewer, ')
+          ..write('lastModifiedAt: $lastModifiedAt, ')
           ..write('autoStartPressureBar: $autoStartPressureBar')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     startedAt,
     endedAt,
@@ -887,8 +998,14 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     longitude,
     coffeejackRewindTurns,
     coffeejackPreinfusionTurns,
+    grinder,
+    showerScreen,
+    basket,
+    scale,
+    brewer,
+    lastModifiedAt,
     autoStartPressureBar,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -915,6 +1032,7 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           other.basket == this.basket &&
           other.scale == this.scale &&
           other.brewer == this.brewer &&
+          other.lastModifiedAt == this.lastModifiedAt &&
           other.autoStartPressureBar == this.autoStartPressureBar);
 }
 
@@ -941,6 +1059,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
   final Value<String?> basket;
   final Value<String?> scale;
   final Value<String?> brewer;
+  final Value<DateTime?> lastModifiedAt;
   final Value<double?> autoStartPressureBar;
   final Value<int> rowid;
   const ShotsCompanion({
@@ -966,6 +1085,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.basket = const Value.absent(),
     this.scale = const Value.absent(),
     this.brewer = const Value.absent(),
+    this.lastModifiedAt = const Value.absent(),
     this.autoStartPressureBar = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -992,6 +1112,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.basket = const Value.absent(),
     this.scale = const Value.absent(),
     this.brewer = const Value.absent(),
+    this.lastModifiedAt = const Value.absent(),
     this.autoStartPressureBar = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1014,6 +1135,12 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Expression<double>? longitude,
     Expression<int>? coffeejackRewindTurns,
     Expression<int>? coffeejackPreinfusionTurns,
+    Expression<String>? grinder,
+    Expression<String>? showerScreen,
+    Expression<String>? basket,
+    Expression<String>? scale,
+    Expression<String>? brewer,
+    Expression<String>? lastModifiedAt,
     Expression<double>? autoStartPressureBar,
     Expression<int>? rowid,
   }) {
@@ -1037,6 +1164,12 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
         'coffeejack_rewind_turns': coffeejackRewindTurns,
       if (coffeejackPreinfusionTurns != null)
         'coffeejack_preinfusion_turns': coffeejackPreinfusionTurns,
+      if (grinder != null) 'grinder': grinder,
+      if (showerScreen != null) 'shower_screen': showerScreen,
+      if (basket != null) 'basket': basket,
+      if (scale != null) 'scale': scale,
+      if (brewer != null) 'brewer': brewer,
+      if (lastModifiedAt != null) 'last_modified_at': lastModifiedAt,
       if (autoStartPressureBar != null)
         'auto_start_pressure_bar': autoStartPressureBar,
       if (rowid != null) 'rowid': rowid,
@@ -1061,6 +1194,12 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Value<double?>? longitude,
     Value<int?>? coffeejackRewindTurns,
     Value<int?>? coffeejackPreinfusionTurns,
+    Value<String?>? grinder,
+    Value<String?>? showerScreen,
+    Value<String?>? basket,
+    Value<String?>? scale,
+    Value<String?>? brewer,
+    Value<DateTime?>? lastModifiedAt,
     Value<double?>? autoStartPressureBar,
     Value<int>? rowid,
   }) {
@@ -1089,6 +1228,7 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
       basket: basket ?? this.basket,
       scale: scale ?? this.scale,
       brewer: brewer ?? this.brewer,
+      lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
       autoStartPressureBar: autoStartPressureBar ?? this.autoStartPressureBar,
       rowid: rowid ?? this.rowid,
     );
@@ -1171,6 +1311,11 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     if (brewer.present) {
       map['brewer'] = Variable<String>(brewer.value);
     }
+    if (lastModifiedAt.present) {
+      map['last_modified_at'] = Variable<String>(
+        $ShotsTable.$converterlastModifiedAt.toSql(lastModifiedAt.value),
+      );
+    }
     if (autoStartPressureBar.present) {
       map['auto_start_pressure_bar'] = Variable<double>(
         autoStartPressureBar.value,
@@ -1202,6 +1347,12 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
           ..write('longitude: $longitude, ')
           ..write('coffeejackRewindTurns: $coffeejackRewindTurns, ')
           ..write('coffeejackPreinfusionTurns: $coffeejackPreinfusionTurns, ')
+          ..write('grinder: $grinder, ')
+          ..write('showerScreen: $showerScreen, ')
+          ..write('basket: $basket, ')
+          ..write('scale: $scale, ')
+          ..write('brewer: $brewer, ')
+          ..write('lastModifiedAt: $lastModifiedAt, ')
           ..write('autoStartPressureBar: $autoStartPressureBar, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -4001,6 +4152,12 @@ typedef $$ShotsTableCreateCompanionBuilder =
       Value<double?> longitude,
       Value<int?> coffeejackRewindTurns,
       Value<int?> coffeejackPreinfusionTurns,
+      Value<String?> grinder,
+      Value<String?> showerScreen,
+      Value<String?> basket,
+      Value<String?> scale,
+      Value<String?> brewer,
+      Value<DateTime?> lastModifiedAt,
       Value<double?> autoStartPressureBar,
       Value<int> rowid,
     });
@@ -4023,6 +4180,12 @@ typedef $$ShotsTableUpdateCompanionBuilder =
       Value<double?> longitude,
       Value<int?> coffeejackRewindTurns,
       Value<int?> coffeejackPreinfusionTurns,
+      Value<String?> grinder,
+      Value<String?> showerScreen,
+      Value<String?> basket,
+      Value<String?> scale,
+      Value<String?> brewer,
+      Value<DateTime?> lastModifiedAt,
       Value<double?> autoStartPressureBar,
       Value<int> rowid,
     });
@@ -4183,6 +4346,37 @@ class $$ShotsTableFilterComposer
   ColumnFilters<int> get coffeejackPreinfusionTurns => $composableBuilder(
     column: $table.coffeejackPreinfusionTurns,
     builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get grinder => $composableBuilder(
+    column: $table.grinder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get showerScreen => $composableBuilder(
+    column: $table.showerScreen,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get basket => $composableBuilder(
+    column: $table.basket,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get scale => $composableBuilder(
+    column: $table.scale,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get brewer => $composableBuilder(
+    column: $table.brewer,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, String>
+  get lastModifiedAt => $composableBuilder(
+    column: $table.lastModifiedAt,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
   ColumnFilters<double> get autoStartPressureBar => $composableBuilder(
@@ -4360,6 +4554,36 @@ class $$ShotsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get grinder => $composableBuilder(
+    column: $table.grinder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get showerScreen => $composableBuilder(
+    column: $table.showerScreen,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get basket => $composableBuilder(
+    column: $table.basket,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get scale => $composableBuilder(
+    column: $table.scale,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get brewer => $composableBuilder(
+    column: $table.brewer,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastModifiedAt => $composableBuilder(
+    column: $table.lastModifiedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get autoStartPressureBar => $composableBuilder(
     column: $table.autoStartPressureBar,
     builder: (column) => ColumnOrderings(column),
@@ -4439,6 +4663,29 @@ class $$ShotsTableAnnotationComposer
     column: $table.coffeejackPreinfusionTurns,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get grinder =>
+      $composableBuilder(column: $table.grinder, builder: (column) => column);
+
+  GeneratedColumn<String> get showerScreen => $composableBuilder(
+    column: $table.showerScreen,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get basket =>
+      $composableBuilder(column: $table.basket, builder: (column) => column);
+
+  GeneratedColumn<String> get scale =>
+      $composableBuilder(column: $table.scale, builder: (column) => column);
+
+  GeneratedColumn<String> get brewer =>
+      $composableBuilder(column: $table.brewer, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime?, String> get lastModifiedAt =>
+      $composableBuilder(
+        column: $table.lastModifiedAt,
+        builder: (column) => column,
+      );
 
   GeneratedColumn<double> get autoStartPressureBar => $composableBuilder(
     column: $table.autoStartPressureBar,
@@ -4570,6 +4817,12 @@ class $$ShotsTableTableManager
                 Value<double?> longitude = const Value.absent(),
                 Value<int?> coffeejackRewindTurns = const Value.absent(),
                 Value<int?> coffeejackPreinfusionTurns = const Value.absent(),
+                Value<String?> grinder = const Value.absent(),
+                Value<String?> showerScreen = const Value.absent(),
+                Value<String?> basket = const Value.absent(),
+                Value<String?> scale = const Value.absent(),
+                Value<String?> brewer = const Value.absent(),
+                Value<DateTime?> lastModifiedAt = const Value.absent(),
                 Value<double?> autoStartPressureBar = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShotsCompanion(
@@ -4590,6 +4843,12 @@ class $$ShotsTableTableManager
                 longitude: longitude,
                 coffeejackRewindTurns: coffeejackRewindTurns,
                 coffeejackPreinfusionTurns: coffeejackPreinfusionTurns,
+                grinder: grinder,
+                showerScreen: showerScreen,
+                basket: basket,
+                scale: scale,
+                brewer: brewer,
+                lastModifiedAt: lastModifiedAt,
                 autoStartPressureBar: autoStartPressureBar,
                 rowid: rowid,
               ),
@@ -4612,6 +4871,12 @@ class $$ShotsTableTableManager
                 Value<double?> longitude = const Value.absent(),
                 Value<int?> coffeejackRewindTurns = const Value.absent(),
                 Value<int?> coffeejackPreinfusionTurns = const Value.absent(),
+                Value<String?> grinder = const Value.absent(),
+                Value<String?> showerScreen = const Value.absent(),
+                Value<String?> basket = const Value.absent(),
+                Value<String?> scale = const Value.absent(),
+                Value<String?> brewer = const Value.absent(),
+                Value<DateTime?> lastModifiedAt = const Value.absent(),
                 Value<double?> autoStartPressureBar = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShotsCompanion.insert(
@@ -4632,6 +4897,12 @@ class $$ShotsTableTableManager
                 longitude: longitude,
                 coffeejackRewindTurns: coffeejackRewindTurns,
                 coffeejackPreinfusionTurns: coffeejackPreinfusionTurns,
+                grinder: grinder,
+                showerScreen: showerScreen,
+                basket: basket,
+                scale: scale,
+                brewer: brewer,
+                lastModifiedAt: lastModifiedAt,
                 autoStartPressureBar: autoStartPressureBar,
                 rowid: rowid,
               ),

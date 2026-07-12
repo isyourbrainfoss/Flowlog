@@ -53,6 +53,10 @@ class FlowlogStorage {
     return p.join(await rootPath(), fileName);
   }
 
+  Future<String> equipmentPath() async {
+    return p.join(await rootPath(), 'flowlog_equipment.json');
+  }
+
   Future<FlowlogDatabase> database() async {
     if (_database != null) {
       return _database!;

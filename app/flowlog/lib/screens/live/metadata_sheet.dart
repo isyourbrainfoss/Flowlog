@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flowlog/screens/live/brew_metadata_sliders.dart';
+import 'package:flowlog/screens/more/equipment_screen.dart';
 import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog/settings/coffeejack_settings_store.dart';
+import 'package:flowlog/settings/equipment_store.dart';
 import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -301,9 +303,11 @@ class _MetadataSheetState extends State<MetadataSheet> {
       BrewDefaultsSettingsStore();
   final CoffeejackSettingsStore _coffeejackSettingsStore =
       CoffeejackSettingsStore();
+  final EquipmentStore _equipmentStore = EquipmentStore();
   List<Bean> _beans = const [];
   bool _beansReady = false;
   bool _defaultsReady = false;
+  bool _equipmentReady = false;
   String? _selectedBeanId;
 
   @override
@@ -344,6 +348,12 @@ class _MetadataSheetState extends State<MetadataSheet> {
     );
     unawaited(_loadDefaults());
     unawaited(_loadBeans());
+    unawaited(_loadEquipment());
+  }
+
+  Future<void> _loadEquipment() async {
+    await _equipmentStore.load();
+    if (mounted) setState(() => _equipmentReady = true);
   }
 
   Future<void> _loadDefaults() async {
@@ -732,74 +742,92 @@ class _MetadataSheetState extends State<MetadataSheet> {
                 ),
               ),
               const SizedBox(height: 12),
-              Text(
-                'Equipment',
-                style: Theme.of(context).textTheme.titleSmall,
+              Row(
+                children: [
+                  Text('Equipment', style: Theme.of(context).textTheme.titleSmall),
+                  const Spacer(),
+                  if (_equipmentReady && _equipmentStore.settings.presets.isNotEmpty)
+                    PopupMenuButton<String>(
+                      tooltip: 'Load preset',
+                      onSelected: (presetId) {
+                        final preset = _equipmentStore.settings.presets.firstWhere((p) => p.id == presetId);
+                        preset.selections.forEach((cat, name) {
+                          switch (cat) {
+                            case 'grinder':
+                              _grinderController.text = name;
+                              break;
+                            case 'showerScreen':
+                              _showerScreenController.text = name;
+                              break;
+                            case 'basket':
+                              _basketController.text = name;
+                              break;
+                            case 'scale':
+                              _scaleController.text = name;
+                              break;
+                            case 'brewer':
+                              _brewerController.text = name;
+                              break;
+                          }
+                        });
+                        setState(() {});
+                      },
+                      itemBuilder: (ctx) => _equipmentStore.settings.presets
+                          .map((p) => PopupMenuItem(value: p.id, child: Text(p.name)))
+                          .toList(),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text('Load preset', style: TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                  TextButton.icon(
+                    onPressed: () => Navigator.of(context, rootNavigator: true).push(
+                      MaterialPageRoute(builder: (_) => const EquipmentScreen()),
+                    ),
+                    icon: const Icon(Icons.settings, size: 16),
+                    label: const Text('Manage', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
               ),
               const SizedBox(height: 4),
-              TextField(
-                key: const Key('metadata_grinder'),
+              _EquipmentAutocomplete(
                 controller: _grinderController,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Grinder',
-                  hintText: 'e.g. Chestnut X',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
+                label: 'Grinder',
+                hint: 'e.g. Chestnut X',
+                options: _equipmentReady ? _equipmentStore.itemsForCategory('grinder').map((e) => e.name).toList() : const [],
               ),
               const SizedBox(height: 4),
-              TextField(
-                key: const Key('metadata_shower_screen'),
+              _EquipmentAutocomplete(
                 controller: _showerScreenController,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Shower screen',
-                  hintText: 'e.g. CoffeeJack v2, IKAPE v3',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
+                label: 'Shower screen',
+                hint: 'e.g. CoffeeJack v2, IKAPE v3',
+                options: _equipmentReady ? _equipmentStore.itemsForCategory('showerScreen').map((e) => e.name).toList() : const [],
               ),
               const SizedBox(height: 4),
-              TextField(
-                key: const Key('metadata_basket'),
+              _EquipmentAutocomplete(
                 controller: _basketController,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Basket',
-                  hintText: 'e.g. CJ v2, IKAPE 54→32mm',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
+                label: 'Basket',
+                hint: 'e.g. CJ v2, IKAPE 54→32mm',
+                options: _equipmentReady ? _equipmentStore.itemsForCategory('basket').map((e) => e.name).toList() : const [],
               ),
               const SizedBox(height: 4),
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      key: const Key('metadata_scale'),
+                    child: _EquipmentAutocomplete(
                       controller: _scaleController,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Scale',
-                        hintText: 'e.g. Acaia',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
+                      label: 'Scale',
+                      hint: 'e.g. Acaia',
+                      options: _equipmentReady ? _equipmentStore.itemsForCategory('scale').map((e) => e.name).toList() : const [],
                     ),
                   ),
                   const SizedBox(width: 4),
                   Expanded(
-                    child: TextField(
-                      key: const Key('metadata_brewer'),
+                    child: _EquipmentAutocomplete(
                       controller: _brewerController,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Brewer',
-                        hintText: 'e.g. CoffeeJack v2',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
+                      label: 'Brewer',
+                      hint: 'e.g. CoffeeJack v2',
+                      options: _equipmentReady ? _equipmentStore.itemsForCategory('brewer').map((e) => e.name).toList() : const [],
                     ),
                   ),
                 ],
@@ -985,6 +1013,53 @@ class _FlavourIntensityRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+/// Autocomplete for equipment that pulls suggestions from the user's list for the category,
+/// while still allowing free-text custom entry.
+class _EquipmentAutocomplete extends StatelessWidget {
+  const _EquipmentAutocomplete({
+    required this.controller,
+    required this.label,
+    required this.hint,
+    required this.options,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String hint;
+  final List<String> options;
+
+  @override
+  Widget build(BuildContext context) {
+    return Autocomplete<String>(
+      initialValue: TextEditingValue(text: controller.text),
+      optionsBuilder: (textEditingValue) {
+        final q = textEditingValue.text.toLowerCase();
+        if (q.isEmpty) return options;
+        return options.where((o) => o.toLowerCase().contains(q));
+      },
+      onSelected: (selection) {
+        controller.text = selection;
+      },
+      fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
+        if (textController.text != controller.text) {
+          textController.text = controller.text;
+        }
+        return TextField(
+          controller: textController,
+          focusNode: focusNode,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: hint,
+            border: const OutlineInputBorder(),
+            isDense: true,
+          ),
+          onChanged: (v) => controller.text = v,
+        );
+      },
     );
   }
 }

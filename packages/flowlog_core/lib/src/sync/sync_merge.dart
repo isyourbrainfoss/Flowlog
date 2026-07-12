@@ -200,14 +200,9 @@ bool _shouldMergeShot({
 
   final localActivity = _shotActivityAt(local);
   if (localActivity != null && remoteExportedAt.isAfter(localActivity)) {
-    // A later remote export may contain additional metadata or annotations
-    // from another device. However, do not force-merge if the local side
-    // already has equal or higher completeness (protects local edits to
-    // notes/taste/etc made after the remote backup was taken).
-    if (_shotCompleteness(remote) > _shotCompleteness(local)) {
-      return true;
-    }
-    return false;
+    // Remote snapshot is newer than our local activity (creation or last edit time).
+    // Accept it (it may come from another device after our last change).
+    return true;
   }
 
   return _shotCompleteness(remote) > _shotCompleteness(local);
@@ -239,34 +234,34 @@ Shot mergeShotRecords({
   return local.copyWith(
     startedAt: local.startedAt,
     endedAt: local.endedAt ?? remote.endedAt,
-    doseG: localIsNewer ? local.doseG : (local.doseG ?? remote.doseG),
-    yieldG: localIsNewer ? local.yieldG : (local.yieldG ?? remote.yieldG),
-    grindSetting: localIsNewer ? local.grindSetting : (local.grindSetting ?? remote.grindSetting),
-    beanId: localIsNewer ? local.beanId : (local.beanId ?? remote.beanId),
-    waterTempC: localIsNewer ? local.waterTempC : (local.waterTempC ?? remote.waterTempC),
-    notes: localIsNewer ? local.notes : _mergeText(local.notes, remote.notes),
-    location: localIsNewer ? local.location : (local.location ?? remote.location),
-    latitude: localIsNewer ? local.latitude : (local.latitude ?? remote.latitude),
-    longitude: localIsNewer ? local.longitude : (local.longitude ?? remote.longitude),
-    tasteScore: localIsNewer ? local.tasteScore : (local.tasteScore ?? remote.tasteScore),
+    doseG: localIsNewer ? local.doseG : (remote.doseG ?? local.doseG),
+    yieldG: localIsNewer ? local.yieldG : (remote.yieldG ?? local.yieldG),
+    grindSetting: localIsNewer ? local.grindSetting : (remote.grindSetting ?? local.grindSetting),
+    beanId: localIsNewer ? local.beanId : (remote.beanId ?? local.beanId),
+    waterTempC: localIsNewer ? local.waterTempC : (remote.waterTempC ?? local.waterTempC),
+    notes: localIsNewer ? local.notes : (remote.notes ?? local.notes),
+    location: localIsNewer ? local.location : (remote.location ?? local.location),
+    latitude: localIsNewer ? local.latitude : (remote.latitude ?? local.latitude),
+    longitude: localIsNewer ? local.longitude : (remote.longitude ?? local.longitude),
+    tasteScore: localIsNewer ? local.tasteScore : (remote.tasteScore ?? local.tasteScore),
     coffeejackRewindTurns: localIsNewer
         ? local.coffeejackRewindTurns
-        : (local.coffeejackRewindTurns ?? remote.coffeejackRewindTurns),
+        : (remote.coffeejackRewindTurns ?? local.coffeejackRewindTurns),
     coffeejackPreinfusionTurns: localIsNewer
         ? local.coffeejackPreinfusionTurns
-        : (local.coffeejackPreinfusionTurns ?? remote.coffeejackPreinfusionTurns),
-    grinder: localIsNewer ? local.grinder : (local.grinder ?? remote.grinder),
-    showerScreen: localIsNewer ? local.showerScreen : (local.showerScreen ?? remote.showerScreen),
-    basket: localIsNewer ? local.basket : (local.basket ?? remote.basket),
-    scale: localIsNewer ? local.scale : (local.scale ?? remote.scale),
-    brewer: localIsNewer ? local.brewer : (local.brewer ?? remote.brewer),
+        : (remote.coffeejackPreinfusionTurns ?? local.coffeejackPreinfusionTurns),
+    grinder: localIsNewer ? local.grinder : (remote.grinder ?? local.grinder),
+    showerScreen: localIsNewer ? local.showerScreen : (remote.showerScreen ?? local.showerScreen),
+    basket: localIsNewer ? local.basket : (remote.basket ?? local.basket),
+    scale: localIsNewer ? local.scale : (remote.scale ?? local.scale),
+    brewer: localIsNewer ? local.brewer : (remote.brewer ?? local.brewer),
     lastModifiedAt: local.lastModifiedAt ?? remote.lastModifiedAt,
     flavourTags: localIsNewer
         ? local.flavourTags
-        : (local.flavourTags.isNotEmpty ? local.flavourTags : remote.flavourTags),
+        : (remote.flavourTags.isNotEmpty ? remote.flavourTags : local.flavourTags),
     flavourIntensities: localIsNewer
         ? local.flavourIntensities
-        : (local.flavourIntensities.isNotEmpty ? local.flavourIntensities : remote.flavourIntensities),
+        : (remote.flavourIntensities.isNotEmpty ? remote.flavourIntensities : local.flavourIntensities),
     samples: local.samples.length >= remote.samples.length
         ? local.samples
         : remote.samples,

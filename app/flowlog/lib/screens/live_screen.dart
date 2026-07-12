@@ -809,14 +809,15 @@ class _LiveScreenState extends State<LiveScreen> {
                           onMarkChannel: _onMarkChannel,
                         ),
                         const SizedBox(height: 8),
-                        if (latestSample != null)
+                        if ((state == ShotSessionState.recording || state == ShotSessionState.paused) && latestSample != null)
                           LiveMetricsRow(
                             sample: latestSample,
                             previousSample: previousSample,
                           )
-                        else if (state == ShotSessionState.idle)
+                        else if (state == ShotSessionState.idle || state == ShotSessionState.stopped)
                           // Live pressure (always) and temperature (when available from Pressensor or scale)
-                          // before starting the shot. Shown side by side to confirm sensors are live.
+                          // before starting the shot (or after finished shot, to confirm sensor for next).
+                          // Shown side by side to make it crystal clear the sensor is live.
                           ValueListenableBuilder<double?>(
                             valueListenable: _livePressureNotifier,
                             builder: (context, pressureBar, _) {

@@ -233,11 +233,11 @@ void main() {
       '/live': 'Live',
       '/history': 'History',
       '/library': 'Library',
-      '/more': 'Sensors',
+      '/more': 'More',
     };
 
     await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
-    await tester.pumpAndSettle();
+    await pumpForAsync(tester, frames: 5);  // avoid pumpAndSettle because of repeating live button animation
 
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));
     for (final entry in routeBodies.entries) {

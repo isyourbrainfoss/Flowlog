@@ -326,7 +326,7 @@ void main() {
       );
 
       await _startAndStopSession(tester, harness.controller);
-      expect(find.text('Discard'), findsOneWidget);
+      expect(find.byKey(const Key('shot_discard_action')), findsOneWidget);
       final saved = await repository.getShotWithSamples('shot-discard-test');
       expect(saved, isNotNull);
       await repository.deleteShot(saved!.id);
