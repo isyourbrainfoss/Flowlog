@@ -144,10 +144,9 @@ class ChartViewport {
 /// Holds zoom/pan viewport and view-mode state for [DualCurveChart].
 class ChartInteractionController extends ChangeNotifier {
   ChartInteractionController({
-    ChartViewMode viewMode = ChartViewMode.overlay,
-    ChartViewport? viewport,
-  })  : _viewMode = viewMode,
-        _viewport = viewport;
+    this._viewMode = ChartViewMode.overlay,
+    this._viewport,
+  });
 
   ChartViewMode _viewMode;
   ChartViewport? _viewport;

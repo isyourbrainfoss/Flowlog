@@ -1016,10 +1016,6 @@ class DualCurveChartPainter extends CustomPainter {
   static const bottomPad = 24.0;
   static const axisUnitTop = 2.0;
 
-  static double _snap(double value, double pixelRatio) {
-    return (value * pixelRatio).roundToDouble() / pixelRatio;
-  }
-
   static double _snapStrokeCoord(double value, double strokeWidth, double pixelRatio) {
     final scaled = value * pixelRatio;
     final stroke = strokeWidth * pixelRatio;

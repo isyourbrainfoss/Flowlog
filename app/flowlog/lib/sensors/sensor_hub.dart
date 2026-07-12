@@ -71,10 +71,9 @@ class SensorHub extends ChangeNotifier {
   SensorHub({
     List<PairedSensorEntry>? initialDevices,
     BleConnectionBackend? bleBackend,
-    PairedSensorsStore? pairedSensorsStore,
+    this._pairedSensorsStore,
   })  : _devices = List.of(initialDevices ?? []),
-        _bleBackend = bleBackend ?? const UnsupportedBleConnectionBackend(),
-        _pairedSensorsStore = pairedSensorsStore {
+        _bleBackend = bleBackend ?? const UnsupportedBleConnectionBackend() {
     _syncIdCounterFromDevices();
   }
 

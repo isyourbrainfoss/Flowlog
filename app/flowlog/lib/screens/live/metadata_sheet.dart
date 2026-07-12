@@ -373,27 +373,26 @@ class _MetadataSheetState extends State<MetadataSheet> {
       // Fall back to the values we already have (from init or const defaults).
       // Still allow the user to save.
     } finally {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        final initial = widget.initial;
+        setState(() {
+          if (brewDefaults != null && initial?.doseG == null) {
+            _doseG = brewDefaults.defaultDoseG;
+          }
+          if (brewDefaults != null && initial?.grindSetting == null) {
+            _grindSetting = snapGrindSetting(brewDefaults.defaultGrindSetting);
+          }
+          if (coffeejack != null) {
+            _coffeejackSettings = CoffeejackSettings(
+              rewindTurnsBeforeFill: initial?.coffeejackRewindTurns ??
+                  coffeejack.rewindTurnsBeforeFill,
+              slowPreinfusionTurns: initial?.coffeejackPreinfusionTurns ??
+                  coffeejack.slowPreinfusionTurns,
+            );
+          }
+          _defaultsReady = true;
+        });
       }
-      final initial = widget.initial;
-      setState(() {
-        if (brewDefaults != null && initial?.doseG == null) {
-          _doseG = brewDefaults.defaultDoseG;
-        }
-        if (brewDefaults != null && initial?.grindSetting == null) {
-          _grindSetting = snapGrindSetting(brewDefaults.defaultGrindSetting);
-        }
-        if (coffeejack != null) {
-          _coffeejackSettings = CoffeejackSettings(
-            rewindTurnsBeforeFill: initial?.coffeejackRewindTurns ??
-                coffeejack.rewindTurnsBeforeFill,
-            slowPreinfusionTurns: initial?.coffeejackPreinfusionTurns ??
-                coffeejack.slowPreinfusionTurns,
-          );
-        }
-        _defaultsReady = true;
-      });
     }
   }
 

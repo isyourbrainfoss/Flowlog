@@ -1,0 +1,190 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flowlog/persistence/flowlog_storage.dart';
+
+/// Categories for user equipment.
+const List<String> kEquipmentCategories = [
+  'grinder',
+  'showerScreen',
+  'basket',
+  'scale',
+  'brewer',
+];
+
+/// Human labels for categories.
+const Map<String, String> kEquipmentCategoryLabels = {
+  'grinder': 'Grinder',
+  'showerScreen': 'Shower screen',
+  'basket': 'Basket',
+  'scale': 'Scale',
+  'brewer': 'Brewer / Machine',
+};
+
+/// A piece of user equipment.
+class EquipmentItem {
+  const EquipmentItem({
+    required this.id,
+    required this.name,
+    required this.category,
+  });
+
+  final String id;
+  final String name;
+  final String category; // one of kEquipmentCategories
+
+  factory EquipmentItem.fromJson(Map<String, dynamic> json) {
+    return EquipmentItem(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      category: json['category'] as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'category': category,
+      };
+
+  EquipmentItem copyWith({String? name, String? category}) {
+    return EquipmentItem(
+      id: id,
+      name: name ?? this.name,
+      category: category ?? this.category,
+    );
+  }
+}
+
+/// Named preset of equipment selections (e.g. "CoffeeJack original parts").
+class EquipmentPreset {
+  const EquipmentPreset({
+    required this.id,
+    required this.name,
+    required this.selections, // category -> equipment name
+  });
+
+  final String id;
+  final String name;
+  final Map<String, String> selections;
+
+  factory EquipmentPreset.fromJson(Map<String, dynamic> json) {
+    return EquipmentPreset(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      selections: Map<String, String>.from(json['selections'] as Map),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'selections': selections,
+      };
+}
+
+/// User's equipment inventory and presets.
+class EquipmentSettings {
+  const EquipmentSettings({
+    this.items = const [],
+    this.presets = const [],
+  });
+
+  final List<EquipmentItem> items;
+  final List<EquipmentPreset> presets;
+
+  EquipmentSettings copyWith({
+    List<EquipmentItem>? items,
+    List<EquipmentPreset>? presets,
+  }) {
+    return EquipmentSettings(
+      items: items ?? this.items,
+      presets: presets ?? this.presets,
+    );
+  }
+}
+
+/// Persisted user equipment (items + presets).
+class EquipmentStore {
+  EquipmentStore({this._path});
+
+  final String? _path;
+  EquipmentSettings _settings = const EquipmentSettings();
+
+  Future<String> _effectivePath() async {
+    if (_path != null) return _path;
+    return FlowlogStorage.shared.equipmentPath();
+  }
+
+  EquipmentSettings get settings => _settings;
+
+  Future<void> load() async {
+    try {
+      final path = await _effectivePath();
+      final file = File(path);
+      if (await file.exists()) {
+        final json = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+        final items = (json['items'] as List<dynamic>? ?? [])
+            .map((e) => EquipmentItem.fromJson(e as Map<String, dynamic>))
+            .toList();
+        final presets = (json['presets'] as List<dynamic>? ?? [])
+            .map((e) => EquipmentPreset.fromJson(e as Map<String, dynamic>))
+            .toList();
+        _settings = EquipmentSettings(items: items, presets: presets);
+      }
+    } catch (_) {
+      // ignore corrupt file
+      _settings = const EquipmentSettings();
+    }
+  }
+
+  Future<void> save(EquipmentSettings settings) async {
+    _settings = settings;
+    final path = await _effectivePath();
+    final file = File(path);
+    await file.parent.create(recursive: true);
+    await file.writeAsString(jsonEncode({
+      'items': settings.items.map((e) => e.toJson()).toList(),
+      'presets': settings.presets.map((e) => e.toJson()).toList(),
+    }));
+  }
+
+  Future<void> addItem(EquipmentItem item) async {
+    final items = List<EquipmentItem>.from(_settings.items)..add(item);
+    await save(_settings.copyWith(items: items));
+  }
+
+  Future<void> updateItem(EquipmentItem item) async {
+    final items = _settings.items.map((e) => e.id == item.id ? item : e).toList();
+    await save(_settings.copyWith(items: items));
+  }
+
+  Future<void> deleteItem(String id) async {
+    final items = _settings.items.where((e) => e.id != id).toList();
+    await save(_settings.copyWith(items: items));
+  }
+
+  Future<void> addPreset(EquipmentPreset preset) async {
+    final presets = List<EquipmentPreset>.from(_settings.presets)..add(preset);
+    await save(_settings.copyWith(presets: presets));
+  }
+
+  Future<void> deletePreset(String id) async {
+    final presets = _settings.presets.where((p) => p.id != id).toList();
+    await save(_settings.copyWith(presets: presets));
+  }
+
+  /// Get items for a category.
+  List<EquipmentItem> itemsForCategory(String category) {
+    return _settings.items.where((i) => i.category == category).toList();
+  }
+
+  /// Apply a preset to category selections (map category -> name).
+  Map<String, String> applyPreset(String presetId) {
+    final preset = _settings.presets.firstWhere(
+      (p) => p.id == presetId,
+      orElse: () => const EquipmentPreset(id: '', name: '', selections: {}),
+    );
+    return Map<String, String>.from(preset.selections);
+  }
+}
