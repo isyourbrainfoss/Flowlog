@@ -39,18 +39,42 @@ class BrewDefaultsSettings {
   const BrewDefaultsSettings({
     this.defaultDoseG = kDefaultBrewDoseG,
     this.defaultGrindSetting = kDefaultBrewGrindSetting,
+    this.useDefaultDose = true,
+    this.useDefaultGrind = true,
+    this.useDefaultCoffeejack = true,
+    this.useDefaultTargetBrew = true,
   });
 
   final double defaultDoseG;
   final double defaultGrindSetting;
 
+  /// Whether the default dose should be applied to new brews / metadata.
+  final bool useDefaultDose;
+
+  /// Whether the default grind should be applied to new brews / metadata.
+  final bool useDefaultGrind;
+
+  /// Whether the default Coffeejack turns should be applied.
+  final bool useDefaultCoffeejack;
+
+  /// Whether the default target brew curve should be shown/used.
+  final bool useDefaultTargetBrew;
+
   BrewDefaultsSettings copyWith({
     double? defaultDoseG,
     double? defaultGrindSetting,
+    bool? useDefaultDose,
+    bool? useDefaultGrind,
+    bool? useDefaultCoffeejack,
+    bool? useDefaultTargetBrew,
   }) {
     return BrewDefaultsSettings(
       defaultDoseG: defaultDoseG ?? this.defaultDoseG,
       defaultGrindSetting: defaultGrindSetting ?? this.defaultGrindSetting,
+      useDefaultDose: useDefaultDose ?? this.useDefaultDose,
+      useDefaultGrind: useDefaultGrind ?? this.useDefaultGrind,
+      useDefaultCoffeejack: useDefaultCoffeejack ?? this.useDefaultCoffeejack,
+      useDefaultTargetBrew: useDefaultTargetBrew ?? this.useDefaultTargetBrew,
     );
   }
 }
@@ -84,6 +108,10 @@ class BrewDefaultsSettingsStore {
         defaultGrindSetting: (decoded['defaultGrindSetting'] as num?)
                 ?.toDouble() ??
             kDefaultBrewGrindSetting,
+        useDefaultDose: decoded['useDefaultDose'] as bool? ?? true,
+        useDefaultGrind: decoded['useDefaultGrind'] as bool? ?? true,
+        useDefaultCoffeejack: decoded['useDefaultCoffeejack'] as bool? ?? true,
+        useDefaultTargetBrew: decoded['useDefaultTargetBrew'] as bool? ?? true,
       );
     } catch (_) {
       return const BrewDefaultsSettings();
@@ -97,6 +125,10 @@ class BrewDefaultsSettingsStore {
       const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
         'defaultDoseG': settings.defaultDoseG,
         'defaultGrindSetting': settings.defaultGrindSetting,
+        'useDefaultDose': settings.useDefaultDose,
+        'useDefaultGrind': settings.useDefaultGrind,
+        'useDefaultCoffeejack': settings.useDefaultCoffeejack,
+        'useDefaultTargetBrew': settings.useDefaultTargetBrew,
       }),
     );
   }

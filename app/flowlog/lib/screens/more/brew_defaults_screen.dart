@@ -83,6 +83,30 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
     await _coffeejackStore.save(settings);
   }
 
+  Future<void> _updateUseDefaultDose(bool enabled) async {
+    final updated = _brewDefaults.copyWith(useDefaultDose: enabled);
+    setState(() => _brewDefaults = updated);
+    await _brewDefaultsStore.save(updated);
+  }
+
+  Future<void> _updateUseDefaultGrind(bool enabled) async {
+    final updated = _brewDefaults.copyWith(useDefaultGrind: enabled);
+    setState(() => _brewDefaults = updated);
+    await _brewDefaultsStore.save(updated);
+  }
+
+  Future<void> _updateUseDefaultCoffeejack(bool enabled) async {
+    final updated = _brewDefaults.copyWith(useDefaultCoffeejack: enabled);
+    setState(() => _brewDefaults = updated);
+    await _brewDefaultsStore.save(updated);
+  }
+
+  Future<void> _updateUseDefaultTargetBrew(bool enabled) async {
+    final updated = _brewDefaults.copyWith(useDefaultTargetBrew: enabled);
+    setState(() => _brewDefaults = updated);
+    await _brewDefaultsStore.save(updated);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -110,7 +134,32 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
                                 Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Use default dose'),
+                      value: _brewDefaults.useDefaultDose,
+                      onChanged: _updateUseDefaultDose,
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Use default grind'),
+                      value: _brewDefaults.useDefaultGrind,
+                      onChanged: _updateUseDefaultGrind,
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Use default Coffeejack turns'),
+                      value: _brewDefaults.useDefaultCoffeejack,
+                      onChanged: _updateUseDefaultCoffeejack,
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Use default target brew curve'),
+                      value: _brewDefaults.useDefaultTargetBrew,
+                      onChanged: _updateUseDefaultTargetBrew,
+                    ),
+                    const SizedBox(height: 16),
                     BrewMetadataSliders(
                       doseG: _brewDefaults.defaultDoseG,
                       grindSetting: _brewDefaults.defaultGrindSetting,

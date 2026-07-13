@@ -201,7 +201,13 @@ class ChartInteractionController extends ChangeNotifier {
 
     if (followEndWhenZoomedOut) {
       if (wasFullyZoomedOut) {
-        _viewport!.visibleDurationMs = totalDurationMs;
+        // In live follow (zoomed out), keep the latest point inset from the right
+        // edge of the plot so it's easier to see and follow the current reading.
+        // Use a fixed fraction so there's always "some more space" on the right
+        // regardless of shot duration.
+        const currentPointFraction = 0.78;
+        final span = (totalDurationMs / currentPointFraction).round();
+        _viewport!.visibleDurationMs = span;
         _viewport!.visibleStartMs = 0;
       } else if (wasFollowingEnd) {
         _viewport!.followEnd();

@@ -297,6 +297,9 @@ class _MetadataSheetState extends State<MetadataSheet> {
   late CoffeejackSettings _coffeejackSettings;
   late double _tasteScore;
   late Set<String> _selectedFlavourTags;
+
+  double? _initialDose;
+  double? _initialGrind;
   late Map<String, int> _flavourIntensities;
   final _customTagController = TextEditingController();
   final BrewDefaultsSettingsStore _brewDefaultsStore =
@@ -318,6 +321,8 @@ class _MetadataSheetState extends State<MetadataSheet> {
     _grindSetting = snapGrindSetting(
       initial?.grindSetting ?? kDefaultBrewGrindSetting,
     );
+    _initialDose = _doseG;
+    _initialGrind = _grindSetting;
     _coffeejackSettings = const CoffeejackSettings();
     _yieldController = TextEditingController(
       text: _formatDouble(initial?.yieldG),
@@ -376,13 +381,17 @@ class _MetadataSheetState extends State<MetadataSheet> {
       if (mounted) {
         final initial = widget.initial;
         setState(() {
-          if (brewDefaults != null && initial?.doseG == null) {
+          if (brewDefaults != null &&
+              brewDefaults.useDefaultDose &&
+              initial?.doseG == null) {
             _doseG = brewDefaults.defaultDoseG;
           }
-          if (brewDefaults != null && initial?.grindSetting == null) {
+          if (brewDefaults != null &&
+              brewDefaults.useDefaultGrind &&
+              initial?.grindSetting == null) {
             _grindSetting = snapGrindSetting(brewDefaults.defaultGrindSetting);
           }
-          if (coffeejack != null) {
+          if (coffeejack != null && (brewDefaults?.useDefaultCoffeejack ?? true)) {
             _coffeejackSettings = CoffeejackSettings(
               rewindTurnsBeforeFill: initial?.coffeejackRewindTurns ??
                   coffeejack.rewindTurnsBeforeFill,
@@ -769,6 +778,23 @@ class _MetadataSheetState extends State<MetadataSheet> {
                               break;
                           }
                         });
+                        // Apply preset-tied defaults if present (dose/grind)
+                        if (preset.defaultDoseG != null && _doseG == _initialDose) {
+                          _doseG = preset.defaultDoseG!;
+                        }
+                        if (preset.defaultGrindSetting != null && _grindSetting == _initialGrind) {
+                          _grindSetting = snapGrindSetting(preset.defaultGrindSetting!);
+                        }
+                        if (preset.defaultRewindTurnsBeforeFill != null) {
+                          _coffeejackSettings = _coffeejackSettings.copyWith(
+                            rewindTurnsBeforeFill: preset.defaultRewindTurnsBeforeFill!,
+                          );
+                        }
+                        if (preset.defaultSlowPreinfusionTurns != null) {
+                          _coffeejackSettings = _coffeejackSettings.copyWith(
+                            slowPreinfusionTurns: preset.defaultSlowPreinfusionTurns!,
+                          );
+                        }
                         setState(() {});
                       },
                       itemBuilder: (ctx) => _equipmentStore.settings.presets

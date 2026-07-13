@@ -94,12 +94,14 @@ Future<ShotMetadata> defaultMetadataFromSamples(
 
   final brewTemp = brewTempRangeFromSamples(samples);
   return ShotMetadata(
-    doseG: defaults.defaultDoseG,
-    grindSetting: lastGrind ?? defaults.defaultGrindSetting,
+    doseG: defaults.useDefaultDose ? defaults.defaultDoseG : null,
+    grindSetting: defaults.useDefaultGrind
+        ? (lastGrind ?? defaults.defaultGrindSetting)
+        : null,
     waterTempC: brewTemp.endTempC ?? last.tempC,
     beanId: beanId,
-    coffeejackRewindTurns: coffeejack.rewindTurnsBeforeFill,
-    coffeejackPreinfusionTurns: coffeejack.slowPreinfusionTurns,
+    coffeejackRewindTurns: defaults.useDefaultCoffeejack ? coffeejack.rewindTurnsBeforeFill : null,
+    coffeejackPreinfusionTurns: defaults.useDefaultCoffeejack ? coffeejack.slowPreinfusionTurns : null,
   );
 }
 
@@ -107,12 +109,14 @@ ShotMetadata applyShotMetadataDefaults(
   ShotMetadata metadata, {
   required double defaultDoseG,
   required double defaultGrindSetting,
+  bool useDefaultDose = true,
+  bool useDefaultGrind = true,
   double? lastGrindSetting,
 }) {
   return metadata.copyWith(
-    doseG: metadata.doseG ?? defaultDoseG,
-    grindSetting:
-        metadata.grindSetting ?? lastGrindSetting ?? defaultGrindSetting,
+    doseG: metadata.doseG ?? (useDefaultDose ? defaultDoseG : null),
+    grindSetting: metadata.grindSetting ??
+        (useDefaultGrind ? (lastGrindSetting ?? defaultGrindSetting) : null),
   );
 }
 
@@ -152,6 +156,8 @@ Future<ShotMetadata> displayMetadataForShot(
     ShotMetadata.fromShot(shot),
     defaultDoseG: defaults.defaultDoseG,
     defaultGrindSetting: defaults.defaultGrindSetting,
+    useDefaultDose: defaults.useDefaultDose,
+    useDefaultGrind: defaults.useDefaultGrind,
     lastGrindSetting: lastGrind,
   );
 
@@ -167,12 +173,15 @@ Future<ShotMetadata> displayMetadataForShot(
     );
   }
 
-  return metadata.copyWith(
-    coffeejackRewindTurns: metadata.coffeejackRewindTurns ??
-        coffeejack.rewindTurnsBeforeFill,
-    coffeejackPreinfusionTurns: metadata.coffeejackPreinfusionTurns ??
-        coffeejack.slowPreinfusionTurns,
-  );
+  if (defaults.useDefaultCoffeejack) {
+    return metadata.copyWith(
+      coffeejackRewindTurns: metadata.coffeejackRewindTurns ??
+          coffeejack.rewindTurnsBeforeFill,
+      coffeejackPreinfusionTurns: metadata.coffeejackPreinfusionTurns ??
+          coffeejack.slowPreinfusionTurns,
+    );
+  }
+  return metadata;
 }
 
 /// Persists a stopped session immediately with inferred metadata.
@@ -214,6 +223,8 @@ Future<Shot?> runAutoSaveFlow({
       initialMetadata,
       defaultDoseG: defaults.defaultDoseG,
       defaultGrindSetting: defaults.defaultGrindSetting,
+      useDefaultDose: defaults.useDefaultDose,
+      useDefaultGrind: defaults.useDefaultGrind,
       lastGrindSetting: lastGrind,
     );
     if (metadata.beanId == null && beanRepository != null) {

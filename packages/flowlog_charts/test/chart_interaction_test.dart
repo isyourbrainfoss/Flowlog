@@ -75,8 +75,10 @@ void main() {
 
       controller.syncTotalDuration(20000, followEndWhenZoomedOut: true);
 
-      expect(controller.viewport.visibleEndMs, 20000);
+      // With live follow inset (current point ~78% across), visible window
+      // extends beyond the data total to leave space on the right.
       expect(controller.viewport.visibleStartMs, 0);
+      expect(controller.viewport.visibleEndMs, greaterThan(20000));
     });
   });
 

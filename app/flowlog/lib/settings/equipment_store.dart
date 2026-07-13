@@ -62,17 +62,31 @@ class EquipmentPreset {
     required this.id,
     required this.name,
     required this.selections, // category -> equipment name
+    this.defaultDoseG,
+    this.defaultGrindSetting,
+    this.defaultRewindTurnsBeforeFill,
+    this.defaultSlowPreinfusionTurns,
   });
 
   final String id;
   final String name;
   final Map<String, String> selections;
 
+  /// Optional defaults tied to this equipment setup.
+  final double? defaultDoseG;
+  final double? defaultGrindSetting;
+  final int? defaultRewindTurnsBeforeFill;
+  final int? defaultSlowPreinfusionTurns;
+
   factory EquipmentPreset.fromJson(Map<String, dynamic> json) {
     return EquipmentPreset(
       id: json['id'] as String,
       name: json['name'] as String,
       selections: Map<String, String>.from(json['selections'] as Map),
+      defaultDoseG: (json['defaultDoseG'] as num?)?.toDouble(),
+      defaultGrindSetting: (json['defaultGrindSetting'] as num?)?.toDouble(),
+      defaultRewindTurnsBeforeFill: (json['defaultRewindTurnsBeforeFill'] as num?)?.toInt(),
+      defaultSlowPreinfusionTurns: (json['defaultSlowPreinfusionTurns'] as num?)?.toInt(),
     );
   }
 
@@ -80,7 +94,30 @@ class EquipmentPreset {
         'id': id,
         'name': name,
         'selections': selections,
+        if (defaultDoseG != null) 'defaultDoseG': defaultDoseG,
+        if (defaultGrindSetting != null) 'defaultGrindSetting': defaultGrindSetting,
+        if (defaultRewindTurnsBeforeFill != null) 'defaultRewindTurnsBeforeFill': defaultRewindTurnsBeforeFill,
+        if (defaultSlowPreinfusionTurns != null) 'defaultSlowPreinfusionTurns': defaultSlowPreinfusionTurns,
       };
+
+  EquipmentPreset copyWith({
+    String? name,
+    Map<String, String>? selections,
+    double? defaultDoseG,
+    double? defaultGrindSetting,
+    int? defaultRewindTurnsBeforeFill,
+    int? defaultSlowPreinfusionTurns,
+  }) {
+    return EquipmentPreset(
+      id: id,
+      name: name ?? this.name,
+      selections: selections ?? this.selections,
+      defaultDoseG: defaultDoseG ?? this.defaultDoseG,
+      defaultGrindSetting: defaultGrindSetting ?? this.defaultGrindSetting,
+      defaultRewindTurnsBeforeFill: defaultRewindTurnsBeforeFill ?? this.defaultRewindTurnsBeforeFill,
+      defaultSlowPreinfusionTurns: defaultSlowPreinfusionTurns ?? this.defaultSlowPreinfusionTurns,
+    );
+  }
 }
 
 /// User's equipment inventory and presets.

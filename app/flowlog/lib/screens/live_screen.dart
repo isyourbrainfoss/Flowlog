@@ -14,6 +14,7 @@ import 'package:flowlog/screens/live/metrics_row.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
+import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog/settings/brew_location_store.dart';
 import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog/sensors/live_sensor_source.dart';
@@ -118,6 +119,8 @@ class _LiveScreenState extends State<LiveScreen> {
   RepeatShotController? _repeatShotController;
   TargetBrewController? _targetBrewController;
   final ConfettiController _confettiController = ConfettiController();
+  late final BrewDefaultsSettingsStore _brewDefaultsStore;
+  BrewDefaultsSettings? _brewDefaults;
   late final ChartInteractionController _chartInteractionController;
   late final AutoStartSettingsController _ownedAutoStartController;
   AutoStartSettingsController? _autoStartController;
@@ -150,6 +153,11 @@ class _LiveScreenState extends State<LiveScreen> {
     _chartInteractionController = ChartInteractionController();
     _ownedAutoStartController = AutoStartSettingsController();
     unawaited(_ownedAutoStartController.load());
+    _brewDefaultsStore = BrewDefaultsSettingsStore();
+    unawaited(_brewDefaultsStore.load().then((d) {
+      _brewDefaults = d;
+      if (mounted) setState(() {});
+    }));
 
     if (widget.controller != null) {
       _sensorSource = widget.sensorSource;
@@ -647,7 +655,10 @@ class _LiveScreenState extends State<LiveScreen> {
     if (repeatSamples != null && repeatSamples.isNotEmpty) {
       return repeatSamples;
     }
-    return _targetBrewController?.pressureSamples ?? const [];
+    if (_brewDefaults?.useDefaultTargetBrew ?? true) {
+      return _targetBrewController?.pressureSamples ?? const [];
+    }
+    return const [];
   }
 
   void _onOpenFullscreenChart() {

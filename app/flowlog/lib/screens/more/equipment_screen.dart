@@ -103,25 +103,58 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
   }
 
   Future<void> _addPreset() async {
-    // Simple preset creation: name + current selections from items (demo: pick one per category if available)
+    // Preset creation with name, selections, and optional defaults for dose/grind.
     final nameController = TextEditingController();
     final selections = <String, String>{};
+    final doseController = TextEditingController();
+    final grindController = TextEditingController();
+    final rewindController = TextEditingController();
+    final slowController = TextEditingController();
 
     for (final cat in kEquipmentCategories) {
       final items = _store.itemsForCategory(cat);
       if (items.isNotEmpty) {
-        selections[cat] = items.first.name; // default to first; user can edit later
+        selections[cat] = items.first.name;
       }
     }
 
-    final result = await showDialog<String>(
+    final result = await showDialog<({String name, double? dose, double? grind, int? rewind, int? slow})>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('New equipment preset'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(labelText: 'Preset name', hintText: 'CoffeeJack original parts'),
-          autofocus: true,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Preset name', hintText: 'CoffeeJack original parts'),
+              autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: doseController,
+              decoration: const InputDecoration(labelText: 'Default dose (g, optional)', hintText: '18.0'),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: grindController,
+              decoration: const InputDecoration(labelText: 'Default grind (optional)', hintText: '4.2'),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: rewindController,
+              decoration: const InputDecoration(labelText: 'Default rewind turns (optional)', hintText: '5'),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: slowController,
+              decoration: const InputDecoration(labelText: 'Default slow preinfusion turns (optional)', hintText: '5'),
+              keyboardType: TextInputType.number,
+            ),
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
@@ -129,7 +162,11 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
             onPressed: () {
               final name = nameController.text.trim();
               if (name.isEmpty) return;
-              Navigator.pop(ctx, name);
+              final dose = double.tryParse(doseController.text.trim());
+              final grind = double.tryParse(grindController.text.trim());
+              final rewind = int.tryParse(rewindController.text.trim());
+              final slow = int.tryParse(slowController.text.trim());
+              Navigator.pop(ctx, (name: name, dose: dose, grind: grind, rewind: rewind, slow: slow));
             },
             child: const Text('Create'),
           ),
@@ -138,7 +175,15 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
     );
 
     if (result != null && selections.isNotEmpty) {
-      final preset = EquipmentPreset(id: const Uuid().v4(), name: result, selections: selections);
+      final preset = EquipmentPreset(
+        id: const Uuid().v4(),
+        name: result.name,
+        selections: selections,
+        defaultDoseG: result.dose,
+        defaultGrindSetting: result.grind,
+        defaultRewindTurnsBeforeFill: result.rewind,
+        defaultSlowPreinfusionTurns: result.slow,
+      );
       await _store.addPreset(preset);
       setState(() {});
     }
@@ -188,7 +233,13 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
             for (final p in _store.settings.presets)
               ListTile(
                 title: Text(p.name),
-                subtitle: Text(p.selections.entries.map((e) => '${kEquipmentCategoryLabels[e.key] ?? e.key}: ${e.value}').join(', ')),
+                subtitle: Text([
+                  p.selections.entries.map((e) => '${kEquipmentCategoryLabels[e.key] ?? e.key}: ${e.value}').join(', '),
+                  if (p.defaultDoseG != null) 'dose: ${p.defaultDoseG}g',
+                  if (p.defaultGrindSetting != null) 'grind: ${p.defaultGrindSetting}',
+                  if (p.defaultRewindTurnsBeforeFill != null) 'rewind: ${p.defaultRewindTurnsBeforeFill}',
+                  if (p.defaultSlowPreinfusionTurns != null) 'slow: ${p.defaultSlowPreinfusionTurns}',
+                ].join(' • ')),
                 trailing: IconButton(icon: const Icon(Icons.delete), onPressed: () => _deletePreset(p)),
               ),
           const SizedBox(height: 16),
