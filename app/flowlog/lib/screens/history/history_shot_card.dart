@@ -90,6 +90,30 @@ class HistoryShotCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (shot.targetScore != null || shot.targetClosenessPercent != null) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MetricCell(
+                      label: 'Target',
+                      value: _formatTargetScore(shot.targetScore, shot.targetClosenessPercent),
+                      labelStyle: labelStyle,
+                      valueStyle: valueStyle,
+                    ),
+                  ),
+                  Expanded(
+                    child: _MetricCell(
+                      label: 'Streak',
+                      value: _formatTargetStreak(shot.targetMaxStreakSeconds),
+                      labelStyle: labelStyle,
+                      valueStyle: valueStyle,
+                    ),
+                  ),
+                  const Spacer(),
+                ],
+              ),
+            ],
             ],
           ),
         ),
@@ -131,6 +155,24 @@ class HistoryShotCard extends StatelessWidget {
       return '—';
     }
     return '$tasteScore/10';
+  }
+
+  static String _formatTargetScore(double? score, double? closeness) {
+    if (score != null) {
+      final c = closeness != null ? ' ${closeness.toStringAsFixed(0)}%' : '';
+      return '${score.toStringAsFixed(0)}$c';
+    }
+    if (closeness != null) {
+      return '${closeness.toStringAsFixed(0)}%';
+    }
+    return '—';
+  }
+
+  static String _formatTargetStreak(int? seconds) {
+    if (seconds == null || seconds <= 0) {
+      return '—';
+    }
+    return '${seconds}s';
   }
 }
 

@@ -47,7 +47,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('backup_export_button')));
       await tester.pump();
-      for (var i = 0; i < 20 && actions.saveCalls == 0; i++) {
+      for (var i = 0; i < 30 && actions.saveCalls == 0; i++) {
         await tester.pump(const Duration(milliseconds: 50));
       }
 

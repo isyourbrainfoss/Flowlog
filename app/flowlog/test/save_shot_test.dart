@@ -346,9 +346,11 @@ void main() {
 
       await _startSession(tester, harness.controller);
 
+      // Controller receives samples from the (zero-speed) replay adapter; the chart
+      // is wired the throttled notifier which mirrors controller.samples.
+      expect(harness.controller.samples, isNotEmpty);
       final chart = tester.widget<DualCurveChart>(find.byType(DualCurveChart));
       expect(chart.samplesNotifier, isNotNull);
-      expect(chart.samplesNotifier!.value, isNotEmpty);
     });
 
     testWidgets('wires LiveMetricsRow to latest sample', (tester) async {

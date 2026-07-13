@@ -112,11 +112,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
         filters: _filters,
       ),
       tagRepository.listTags(),
+      shotRepository.topTargetScores(limit: 5),
     ]);
 
     return _HistoryData(
       shots: results[0] as List<Shot>,
       tags: results[1] as List<Tag>,
+      topScores: results[2] as List<Shot>,
     );
   }
 
@@ -272,6 +274,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
               tags: data.tags,
               onChanged: _onFiltersChanged,
             ),
+            if (data.topScores.isNotEmpty) ...[
+              _LeaderboardSection(
+                topScores: data.topScores,
+                onOpenShot: _openShotDetail,
+              ),
+              const SizedBox(height: 8),
+            ],
             Expanded(
               child: _HistoryShotList(
                 shots: shots,
@@ -294,10 +303,12 @@ class _HistoryData {
   const _HistoryData({
     required this.shots,
     required this.tags,
+    this.topScores = const [],
   });
 
   final List<Shot> shots;
   final List<Tag> tags;
+  final List<Shot> topScores;
 }
 
 class _HistoryShotList extends StatelessWidget {
@@ -389,5 +400,130 @@ class _HistoryShotList extends StatelessWidget {
         },
       ),
     );
+  }
+}
+
+/// Leaderboard section for highest target-curve scores among saved shots.
+class _LeaderboardSection extends StatelessWidget {
+  const _LeaderboardSection({
+    required this.topScores,
+    required this.onOpenShot,
+    super.key,
+  });
+
+  final List<Shot> topScores;
+  final Future<void> Function(Shot shot) onOpenShot;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Row(
+            children: [
+              const Icon(Icons.emoji_events, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                'High scores',
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '— target curve',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 78,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            scrollDirection: Axis.horizontal,
+            itemCount: topScores.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final shot = topScores[index];
+              final rank = index + 1;
+              final score = shot.targetScore!;
+              final close = shot.targetClosenessPercent;
+              final streak = shot.targetMaxStreakSeconds;
+              return InkWell(
+                onTap: () => unawaited(onOpenShot(shot)),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 120,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.15)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 18,
+                            height: 18,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: rank <= 3 ? theme.colorScheme.primary : theme.colorScheme.outline,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '$rank',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: rank <= 3 ? theme.colorScheme.onPrimary : theme.colorScheme.surface,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            score.toStringAsFixed(0),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _shortDate(shot.startedAt),
+                        style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          if (close != null) '${close.toStringAsFixed(0)}%',
+                          if (streak != null && streak > 0) '${streak}s',
+                        ].join(' · '),
+                        style: theme.textTheme.labelSmall,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _shortDate(DateTime dt) {
+    final local = dt.toLocal();
+    return '${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 }

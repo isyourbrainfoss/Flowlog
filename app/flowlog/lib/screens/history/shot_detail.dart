@@ -501,6 +501,10 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
                 ),
               ),
             ),
+            if (shot.targetScore != null || shot.targetClosenessPercent != null || (shot.targetMaxStreakSeconds ?? 0) > 0) ...[
+              const SizedBox(height: 16),
+              _TargetGamificationCard(shot: shot),
+            ],
             const SizedBox(height: 24),
             Text(
               'Metadata',
@@ -800,6 +804,93 @@ class _MetadataField extends StatelessWidget {
           const SizedBox(height: 2),
           Text(value, style: valueStyle),
         ],
+      ),
+    );
+  }
+}
+
+/// Card summarizing target curve gamification results for a completed shot.
+class _TargetGamificationCard extends StatelessWidget {
+  const _TargetGamificationCard({required this.shot, super.key});
+
+  final Shot shot;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final closeness = shot.targetClosenessPercent;
+    final streak = shot.targetMaxStreakSeconds;
+    final score = shot.targetScore;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.emoji_events_outlined, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  'Target curve',
+                  style: theme.textTheme.titleSmall,
+                ),
+                const Spacer(),
+                if (score != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Score ${score.toStringAsFixed(0)}',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _MetadataField(
+                    label: 'Closeness',
+                    value: closeness != null ? '${closeness.toStringAsFixed(0)}%' : '—',
+                    labelStyle: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    valueStyle: theme.textTheme.titleMedium,
+                  ),
+                ),
+                Expanded(
+                  child: _MetadataField(
+                    label: 'Max green streak',
+                    value: (streak != null && streak > 0) ? '${streak}s' : '—',
+                    labelStyle: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    valueStyle: theme.textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            if (shot.samples.isNotEmpty && closeness != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'How closely your pressure followed the active target curve (lower deviation = higher %).',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

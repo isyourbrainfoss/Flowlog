@@ -6,6 +6,129 @@ import 'package:flowlog/settings/coffeejack_settings_store.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
+/// Simple linear interpolation for target pressure at a given elapsed time.
+double? interpolateTargetPressure(List<ShotSample> targets, int elapsedMs) {
+  if (targets.isEmpty) return null;
+  final validTargets = targets.where((t) => t.pressureBar != null).toList();
+  if (validTargets.isEmpty) return null;
+  if (elapsedMs <= validTargets.first.elapsedMs) return validTargets.first.pressureBar;
+  if (elapsedMs >= validTargets.last.elapsedMs) return validTargets.last.pressureBar;
+  for (int i = 0; i < validTargets.length - 1; i++) {
+    final t0 = validTargets[i];
+    final t1 = validTargets[i + 1];
+    if (elapsedMs >= t0.elapsedMs && elapsedMs <= t1.elapsedMs) {
+      final frac = (elapsedMs - t0.elapsedMs) / (t1.elapsedMs - t0.elapsedMs);
+      return t0.pressureBar! + frac * (t1.pressureBar! - t0.pressureBar!);
+    }
+  }
+  return validTargets.last.pressureBar;
+}
+
+/// Computes gamification metrics for a brew against a target curve.
+///
+/// Returns a map with:
+/// - closenessPercent: 0-100 or null
+/// - maxStreakSeconds: longest time in green zone (diff <= 0.25 bar)
+/// - currentStreakSeconds: ongoing streak at end of samples (0 if last was out)
+/// - penaltyCount: number of samples with |diff| > 1.0 bar
+/// - score: composite 0-100
+Map<String, dynamic> computeTargetGamification(
+  List<ShotSample> samples,
+  List<ShotSample> targetSamples, {
+  double greenThreshold = 0.25,
+  double penaltyThreshold = 1.0,
+}) {
+  if (samples.isEmpty || targetSamples.isEmpty) {
+    return {
+      'closenessPercent': null,
+      'maxStreakSeconds': 0,
+      'currentStreakSeconds': 0,
+      'penaltyCount': 0,
+      'score': null,
+    };
+  }
+
+  double totalError = 0;
+  int count = 0;
+  int maxStreakMs = 0;
+  int currentStreakMs = 0;
+  int? lastStreakTime;
+  int penaltyCount = 0;
+
+  for (final s in samples) {
+    if (s.pressureBar == null) {
+      currentStreakMs = 0;
+      lastStreakTime = null;
+      continue;
+    }
+    final targetP = interpolateTargetPressure(targetSamples, s.elapsedMs);
+    if (targetP == null) {
+      currentStreakMs = 0;
+      lastStreakTime = null;
+      continue;
+    }
+    final diff = (s.pressureBar! - targetP).abs();
+    totalError += diff;
+    count++;
+
+    if (diff > penaltyThreshold) {
+      penaltyCount++;
+    }
+
+    if (diff <= greenThreshold) {
+      if (lastStreakTime != null) {
+        currentStreakMs += (s.elapsedMs - lastStreakTime);
+      }
+      lastStreakTime = s.elapsedMs;
+      if (currentStreakMs > maxStreakMs) maxStreakMs = currentStreakMs;
+    } else {
+      currentStreakMs = 0;
+      lastStreakTime = null;
+    }
+  }
+
+  final closeness = count > 0
+      ? (100 * (1 - (totalError / count / 2.0).clamp(0.0, 1.0))).roundToDouble()
+      : null;
+
+  final streakSec = (maxStreakMs / 1000).round();
+
+  // Score: closeness + streak bonus - penalty
+  double? score;
+  if (closeness != null) {
+    score = closeness + (streakSec * 0.5) - (penaltyCount * 2);
+    score = score.clamp(0.0, 100.0);
+  }
+
+  final currentStreakSec = (currentStreakMs / 1000).round();
+
+  return {
+    'closenessPercent': closeness,
+    'maxStreakSeconds': streakSec,
+    'currentStreakSeconds': currentStreakSec,
+    'penaltyCount': penaltyCount,
+    'score': score,
+  };
+}
+
+/// Applies computed target-curve gamification results (closeness, streak, score)
+/// into a [ShotMetadata] copy when target samples are available.
+ShotMetadata applyTargetGamification(
+  ShotMetadata base,
+  List<ShotSample> samples,
+  List<ShotSample> targetSamples,
+) {
+  if (targetSamples.isEmpty || samples.isEmpty) {
+    return base;
+  }
+  final g = computeTargetGamification(samples, targetSamples);
+  return base.copyWith(
+    targetClosenessPercent: g['closenessPercent'] as double?,
+    targetMaxStreakSeconds: g['maxStreakSeconds'] as int?,
+    targetScore: g['score'] as double?,
+  );
+}
+
 /// Generates a unique shot id for persistence.
 typedef ShotIdGenerator = String Function();
 
@@ -202,6 +325,7 @@ Future<Shot?> runAutoSaveFlow({
   double? latitude,
   double? longitude,
   double? autoStartPressureBar,
+  List<ShotSample> targetPressureSamples = const [],
   ShotIdGenerator idGenerator = generateShotId,
   void Function(Shot shot)? onSaved,
   Future<void> Function(Shot shot)? onAddNotes,
@@ -245,6 +369,12 @@ Future<Shot?> runAutoSaveFlow({
       activeBeanName: activeBeanName,
       activeBeanId: activeBeanId,
     );
+  }
+
+  // Attach gamification results (closeness / streak / score) if a target curve
+  // was active for this brew. This is computed from performed samples vs target.
+  if (targetPressureSamples.isNotEmpty) {
+    metadata = applyTargetGamification(metadata, samples, targetPressureSamples);
   }
 
   final shot = buildShotFromSession(
@@ -354,6 +484,7 @@ Future<Shot?> runStarShotSaveFlow({
   required DateTime startedAt,
   DateTime? endedAt,
   ShotMetadata? initialMetadata,
+  List<ShotSample> targetPressureSamples = const [],
   List<ShotAnnotation> annotations = const [],
   ShotIdGenerator idGenerator = generateShotId,
   void Function(Shot shot)? onSaved,
@@ -362,14 +493,19 @@ Future<Shot?> runStarShotSaveFlow({
     return null;
   }
 
-  final ShotMetadata? initial;
+  ShotMetadata initial;
   if (initialMetadata != null) {
     initial = initialMetadata;
   } else {
-    initial = await defaultMetadataFromSamples(samples);
+    final fromDefaults = await defaultMetadataFromSamples(samples);
     if (!context.mounted) {
       return null;
     }
+    initial = fromDefaults;
+  }
+
+  if (targetPressureSamples.isNotEmpty) {
+    initial = applyTargetGamification(initial, samples, targetPressureSamples);
   }
 
   final metadata = await showMetadataSheet(

@@ -214,6 +214,23 @@ class ShotRepository {
     return row?.grindSetting;
   }
 
+  /// Returns the top shots by target gamification score (highest first).
+  /// Only includes shots that have a non-null targetScore.
+  /// Useful for high-score leaderboards.
+  Future<List<models.Shot>> topTargetScores({int limit = 10}) async {
+    final query = _db.select(_db.shots)
+      ..where((shot) => shot.targetScore.isNotNull())
+      ..orderBy([
+        (shot) => OrderingTerm.desc(shot.targetScore),
+        (shot) => OrderingTerm.desc(shot.startedAt),
+      ])
+      ..limit(limit);
+    final rows = await query.get();
+    return rows
+        .map((row) => _shotFromRow(row, samples: const [], annotations: const []))
+        .toList();
+  }
+
   /// Deletes a shot and its related samples, annotations, and tag links.
   Future<void> deleteShot(String id) async {
     await _db.transaction(() async {
@@ -285,6 +302,9 @@ class ShotRepository {
       brewer: Value(shot.brewer),
       lastModifiedAt: Value(shot.lastModifiedAt),
       autoStartPressureBar: Value(shot.autoStartPressureBar),
+      targetClosenessPercent: Value(shot.targetClosenessPercent),
+      targetMaxStreakSeconds: Value(shot.targetMaxStreakSeconds),
+      targetScore: Value(shot.targetScore),
     );
   }
 
@@ -344,6 +364,9 @@ class ShotRepository {
       brewer: row.brewer,
       lastModifiedAt: row.lastModifiedAt,
       autoStartPressureBar: row.autoStartPressureBar,
+      targetClosenessPercent: row.targetClosenessPercent,
+      targetMaxStreakSeconds: row.targetMaxStreakSeconds,
+      targetScore: row.targetScore,
       samples: samples,
       annotations: annotations,
     );

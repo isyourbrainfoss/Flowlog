@@ -34,6 +34,9 @@ class Shots extends Table {
   TextColumn get lastModifiedAt =>
       text().nullable().map(const NullableUtcIso8601Converter())();
   RealColumn get autoStartPressureBar => real().nullable()();
+  RealColumn get targetClosenessPercent => real().nullable()();
+  IntColumn get targetMaxStreakSeconds => integer().nullable()();
+  RealColumn get targetScore => real().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

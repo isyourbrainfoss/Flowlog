@@ -38,6 +38,9 @@ class Shot {
     this.autoStartPressureBar,
     this.samples = const [],
     this.annotations = const [],
+    this.targetClosenessPercent,
+    this.targetMaxStreakSeconds,
+    this.targetScore,
   }) : assert(
           tasteScore == null || (tasteScore >= 0 && tasteScore <= 10),
           'tasteScore must be between 0 and 10',
@@ -70,6 +73,11 @@ class Shot {
   final List<ShotSample> samples;
   final List<ShotAnnotation> annotations;
 
+  /// Gamification fields for target curve closeness.
+  final double? targetClosenessPercent;
+  final int? targetMaxStreakSeconds;
+  final double? targetScore;
+
   factory Shot.fromJson(Map<String, dynamic> json) {
     return Shot(
       id: json['id'] as String,
@@ -99,6 +107,9 @@ class Shot {
           ? null
           : DateTime.parse(json['lastModifiedAt'] as String),
       autoStartPressureBar: (json['autoStartPressureBar'] as num?)?.toDouble(),
+      targetClosenessPercent: (json['targetClosenessPercent'] as num?)?.toDouble(),
+      targetMaxStreakSeconds: (json['targetMaxStreakSeconds'] as num?)?.toInt(),
+      targetScore: (json['targetScore'] as num?)?.toDouble(),
       flavourTags: (json['flavourTags'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
@@ -143,6 +154,11 @@ class Shot {
         'lastModifiedAt': lastModifiedAt!.toUtc().toIso8601String(),
       if (autoStartPressureBar != null)
         'autoStartPressureBar': autoStartPressureBar,
+      if (targetClosenessPercent != null)
+        'targetClosenessPercent': targetClosenessPercent,
+      if (targetMaxStreakSeconds != null)
+        'targetMaxStreakSeconds': targetMaxStreakSeconds,
+      if (targetScore != null) 'targetScore': targetScore,
       if (flavourTags.isNotEmpty) 'flavourTags': flavourTags,
       if (flavourIntensities.isNotEmpty)
         'flavourIntensities': flavourIntensities,
@@ -180,6 +196,9 @@ class Shot {
     double? autoStartPressureBar,
     List<ShotSample>? samples,
     List<ShotAnnotation>? annotations,
+    double? targetClosenessPercent,
+    int? targetMaxStreakSeconds,
+    double? targetScore,
   }) {
     return Shot(
       id: id ?? this.id,
@@ -210,6 +229,9 @@ class Shot {
       autoStartPressureBar: autoStartPressureBar ?? this.autoStartPressureBar,
       samples: samples ?? this.samples,
       annotations: annotations ?? this.annotations,
+      targetClosenessPercent: targetClosenessPercent ?? this.targetClosenessPercent,
+      targetMaxStreakSeconds: targetMaxStreakSeconds ?? this.targetMaxStreakSeconds,
+      targetScore: targetScore ?? this.targetScore,
     );
   }
 
@@ -239,6 +261,9 @@ class Shot {
             brewer == other.brewer &&
             lastModifiedAt == other.lastModifiedAt &&
             autoStartPressureBar == other.autoStartPressureBar &&
+            targetClosenessPercent == other.targetClosenessPercent &&
+            targetMaxStreakSeconds == other.targetMaxStreakSeconds &&
+            targetScore == other.targetScore &&
             _listEquals(flavourTags, other.flavourTags) &&
             _mapEquals(flavourIntensities, other.flavourIntensities) &&
             _listEquals(samples, other.samples) &&
@@ -270,6 +295,9 @@ class Shot {
           scale,
           brewer,
           lastModifiedAt,
+          targetClosenessPercent,
+          targetMaxStreakSeconds,
+          targetScore,
           Object.hashAll(flavourTags),
           Object.hashAll(flavourIntensities.entries),
           Object.hashAll(samples),

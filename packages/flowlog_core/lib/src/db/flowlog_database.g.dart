@@ -251,6 +251,38 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         type: DriftSqlType.double,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _targetClosenessPercentMeta =
+      const VerificationMeta('targetClosenessPercent');
+  @override
+  late final GeneratedColumn<double> targetClosenessPercent =
+      GeneratedColumn<double>(
+        'target_closeness_percent',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _targetMaxStreakSecondsMeta =
+      const VerificationMeta('targetMaxStreakSeconds');
+  @override
+  late final GeneratedColumn<int> targetMaxStreakSeconds = GeneratedColumn<int>(
+    'target_max_streak_seconds',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _targetScoreMeta = const VerificationMeta(
+    'targetScore',
+  );
+  @override
+  late final GeneratedColumn<double> targetScore = GeneratedColumn<double>(
+    'target_score',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -277,6 +309,9 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
     brewer,
     lastModifiedAt,
     autoStartPressureBar,
+    targetClosenessPercent,
+    targetMaxStreakSeconds,
+    targetScore,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -439,6 +474,33 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         ),
       );
     }
+    if (data.containsKey('target_closeness_percent')) {
+      context.handle(
+        _targetClosenessPercentMeta,
+        targetClosenessPercent.isAcceptableOrUnknown(
+          data['target_closeness_percent']!,
+          _targetClosenessPercentMeta,
+        ),
+      );
+    }
+    if (data.containsKey('target_max_streak_seconds')) {
+      context.handle(
+        _targetMaxStreakSecondsMeta,
+        targetMaxStreakSeconds.isAcceptableOrUnknown(
+          data['target_max_streak_seconds']!,
+          _targetMaxStreakSecondsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('target_score')) {
+      context.handle(
+        _targetScoreMeta,
+        targetScore.isAcceptableOrUnknown(
+          data['target_score']!,
+          _targetScoreMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -550,6 +612,18 @@ class $ShotsTable extends Shots with TableInfo<$ShotsTable, ShotRow> {
         DriftSqlType.double,
         data['${effectivePrefix}auto_start_pressure_bar'],
       ),
+      targetClosenessPercent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}target_closeness_percent'],
+      ),
+      targetMaxStreakSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}target_max_streak_seconds'],
+      ),
+      targetScore: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}target_score'],
+      ),
     );
   }
 
@@ -591,6 +665,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
   final String? brewer;
   final DateTime? lastModifiedAt;
   final double? autoStartPressureBar;
+  final double? targetClosenessPercent;
+  final int? targetMaxStreakSeconds;
+  final double? targetScore;
   const ShotRow({
     required this.id,
     required this.startedAt,
@@ -616,6 +693,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     this.brewer,
     this.lastModifiedAt,
     this.autoStartPressureBar,
+    this.targetClosenessPercent,
+    this.targetMaxStreakSeconds,
+    this.targetScore,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -694,6 +774,17 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     if (!nullToAbsent || autoStartPressureBar != null) {
       map['auto_start_pressure_bar'] = Variable<double>(autoStartPressureBar);
     }
+    if (!nullToAbsent || targetClosenessPercent != null) {
+      map['target_closeness_percent'] = Variable<double>(
+        targetClosenessPercent,
+      );
+    }
+    if (!nullToAbsent || targetMaxStreakSeconds != null) {
+      map['target_max_streak_seconds'] = Variable<int>(targetMaxStreakSeconds);
+    }
+    if (!nullToAbsent || targetScore != null) {
+      map['target_score'] = Variable<double>(targetScore);
+    }
     return map;
   }
 
@@ -764,6 +855,15 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       autoStartPressureBar: autoStartPressureBar == null && nullToAbsent
           ? const Value.absent()
           : Value(autoStartPressureBar),
+      targetClosenessPercent: targetClosenessPercent == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetClosenessPercent),
+      targetMaxStreakSeconds: targetMaxStreakSeconds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetMaxStreakSeconds),
+      targetScore: targetScore == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetScore),
     );
   }
 
@@ -805,6 +905,13 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       autoStartPressureBar: serializer.fromJson<double?>(
         json['autoStartPressureBar'],
       ),
+      targetClosenessPercent: serializer.fromJson<double?>(
+        json['targetClosenessPercent'],
+      ),
+      targetMaxStreakSeconds: serializer.fromJson<int?>(
+        json['targetMaxStreakSeconds'],
+      ),
+      targetScore: serializer.fromJson<double?>(json['targetScore']),
     );
   }
   @override
@@ -837,6 +944,11 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       'brewer': serializer.toJson<String?>(brewer),
       'lastModifiedAt': serializer.toJson<DateTime?>(lastModifiedAt),
       'autoStartPressureBar': serializer.toJson<double?>(autoStartPressureBar),
+      'targetClosenessPercent': serializer.toJson<double?>(
+        targetClosenessPercent,
+      ),
+      'targetMaxStreakSeconds': serializer.toJson<int?>(targetMaxStreakSeconds),
+      'targetScore': serializer.toJson<double?>(targetScore),
     };
   }
 
@@ -865,6 +977,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     Value<String?> brewer = const Value.absent(),
     Value<DateTime?> lastModifiedAt = const Value.absent(),
     Value<double?> autoStartPressureBar = const Value.absent(),
+    Value<double?> targetClosenessPercent = const Value.absent(),
+    Value<int?> targetMaxStreakSeconds = const Value.absent(),
+    Value<double?> targetScore = const Value.absent(),
   }) => ShotRow(
     id: id ?? this.id,
     startedAt: startedAt ?? this.startedAt,
@@ -898,6 +1013,13 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     autoStartPressureBar: autoStartPressureBar.present
         ? autoStartPressureBar.value
         : this.autoStartPressureBar,
+    targetClosenessPercent: targetClosenessPercent.present
+        ? targetClosenessPercent.value
+        : this.targetClosenessPercent,
+    targetMaxStreakSeconds: targetMaxStreakSeconds.present
+        ? targetMaxStreakSeconds.value
+        : this.targetMaxStreakSeconds,
+    targetScore: targetScore.present ? targetScore.value : this.targetScore,
   );
   ShotRow copyWithCompanion(ShotsCompanion data) {
     return ShotRow(
@@ -945,6 +1067,15 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
       autoStartPressureBar: data.autoStartPressureBar.present
           ? data.autoStartPressureBar.value
           : this.autoStartPressureBar,
+      targetClosenessPercent: data.targetClosenessPercent.present
+          ? data.targetClosenessPercent.value
+          : this.targetClosenessPercent,
+      targetMaxStreakSeconds: data.targetMaxStreakSeconds.present
+          ? data.targetMaxStreakSeconds.value
+          : this.targetMaxStreakSeconds,
+      targetScore: data.targetScore.present
+          ? data.targetScore.value
+          : this.targetScore,
     );
   }
 
@@ -974,7 +1105,10 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           ..write('scale: $scale, ')
           ..write('brewer: $brewer, ')
           ..write('lastModifiedAt: $lastModifiedAt, ')
-          ..write('autoStartPressureBar: $autoStartPressureBar')
+          ..write('autoStartPressureBar: $autoStartPressureBar, ')
+          ..write('targetClosenessPercent: $targetClosenessPercent, ')
+          ..write('targetMaxStreakSeconds: $targetMaxStreakSeconds, ')
+          ..write('targetScore: $targetScore')
           ..write(')'))
         .toString();
   }
@@ -1005,6 +1139,9 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
     brewer,
     lastModifiedAt,
     autoStartPressureBar,
+    targetClosenessPercent,
+    targetMaxStreakSeconds,
+    targetScore,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -1033,7 +1170,10 @@ class ShotRow extends DataClass implements Insertable<ShotRow> {
           other.scale == this.scale &&
           other.brewer == this.brewer &&
           other.lastModifiedAt == this.lastModifiedAt &&
-          other.autoStartPressureBar == this.autoStartPressureBar);
+          other.autoStartPressureBar == this.autoStartPressureBar &&
+          other.targetClosenessPercent == this.targetClosenessPercent &&
+          other.targetMaxStreakSeconds == this.targetMaxStreakSeconds &&
+          other.targetScore == this.targetScore);
 }
 
 class ShotsCompanion extends UpdateCompanion<ShotRow> {
@@ -1061,6 +1201,9 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
   final Value<String?> brewer;
   final Value<DateTime?> lastModifiedAt;
   final Value<double?> autoStartPressureBar;
+  final Value<double?> targetClosenessPercent;
+  final Value<int?> targetMaxStreakSeconds;
+  final Value<double?> targetScore;
   final Value<int> rowid;
   const ShotsCompanion({
     this.id = const Value.absent(),
@@ -1087,6 +1230,9 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.brewer = const Value.absent(),
     this.lastModifiedAt = const Value.absent(),
     this.autoStartPressureBar = const Value.absent(),
+    this.targetClosenessPercent = const Value.absent(),
+    this.targetMaxStreakSeconds = const Value.absent(),
+    this.targetScore = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ShotsCompanion.insert({
@@ -1114,6 +1260,9 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     this.brewer = const Value.absent(),
     this.lastModifiedAt = const Value.absent(),
     this.autoStartPressureBar = const Value.absent(),
+    this.targetClosenessPercent = const Value.absent(),
+    this.targetMaxStreakSeconds = const Value.absent(),
+    this.targetScore = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        startedAt = Value(startedAt);
@@ -1142,6 +1291,9 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Expression<String>? brewer,
     Expression<String>? lastModifiedAt,
     Expression<double>? autoStartPressureBar,
+    Expression<double>? targetClosenessPercent,
+    Expression<int>? targetMaxStreakSeconds,
+    Expression<double>? targetScore,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1172,6 +1324,11 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
       if (lastModifiedAt != null) 'last_modified_at': lastModifiedAt,
       if (autoStartPressureBar != null)
         'auto_start_pressure_bar': autoStartPressureBar,
+      if (targetClosenessPercent != null)
+        'target_closeness_percent': targetClosenessPercent,
+      if (targetMaxStreakSeconds != null)
+        'target_max_streak_seconds': targetMaxStreakSeconds,
+      if (targetScore != null) 'target_score': targetScore,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1201,6 +1358,9 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
     Value<String?>? brewer,
     Value<DateTime?>? lastModifiedAt,
     Value<double?>? autoStartPressureBar,
+    Value<double?>? targetClosenessPercent,
+    Value<int?>? targetMaxStreakSeconds,
+    Value<double?>? targetScore,
     Value<int>? rowid,
   }) {
     return ShotsCompanion(
@@ -1230,6 +1390,11 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
       brewer: brewer ?? this.brewer,
       lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
       autoStartPressureBar: autoStartPressureBar ?? this.autoStartPressureBar,
+      targetClosenessPercent:
+          targetClosenessPercent ?? this.targetClosenessPercent,
+      targetMaxStreakSeconds:
+          targetMaxStreakSeconds ?? this.targetMaxStreakSeconds,
+      targetScore: targetScore ?? this.targetScore,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1321,6 +1486,19 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
         autoStartPressureBar.value,
       );
     }
+    if (targetClosenessPercent.present) {
+      map['target_closeness_percent'] = Variable<double>(
+        targetClosenessPercent.value,
+      );
+    }
+    if (targetMaxStreakSeconds.present) {
+      map['target_max_streak_seconds'] = Variable<int>(
+        targetMaxStreakSeconds.value,
+      );
+    }
+    if (targetScore.present) {
+      map['target_score'] = Variable<double>(targetScore.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1354,6 +1532,9 @@ class ShotsCompanion extends UpdateCompanion<ShotRow> {
           ..write('brewer: $brewer, ')
           ..write('lastModifiedAt: $lastModifiedAt, ')
           ..write('autoStartPressureBar: $autoStartPressureBar, ')
+          ..write('targetClosenessPercent: $targetClosenessPercent, ')
+          ..write('targetMaxStreakSeconds: $targetMaxStreakSeconds, ')
+          ..write('targetScore: $targetScore, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4159,6 +4340,9 @@ typedef $$ShotsTableCreateCompanionBuilder =
       Value<String?> brewer,
       Value<DateTime?> lastModifiedAt,
       Value<double?> autoStartPressureBar,
+      Value<double?> targetClosenessPercent,
+      Value<int?> targetMaxStreakSeconds,
+      Value<double?> targetScore,
       Value<int> rowid,
     });
 typedef $$ShotsTableUpdateCompanionBuilder =
@@ -4187,6 +4371,9 @@ typedef $$ShotsTableUpdateCompanionBuilder =
       Value<String?> brewer,
       Value<DateTime?> lastModifiedAt,
       Value<double?> autoStartPressureBar,
+      Value<double?> targetClosenessPercent,
+      Value<int?> targetMaxStreakSeconds,
+      Value<double?> targetScore,
       Value<int> rowid,
     });
 
@@ -4381,6 +4568,21 @@ class $$ShotsTableFilterComposer
 
   ColumnFilters<double> get autoStartPressureBar => $composableBuilder(
     column: $table.autoStartPressureBar,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get targetClosenessPercent => $composableBuilder(
+    column: $table.targetClosenessPercent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get targetMaxStreakSeconds => $composableBuilder(
+    column: $table.targetMaxStreakSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get targetScore => $composableBuilder(
+    column: $table.targetScore,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4588,6 +4790,21 @@ class $$ShotsTableOrderingComposer
     column: $table.autoStartPressureBar,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<double> get targetClosenessPercent => $composableBuilder(
+    column: $table.targetClosenessPercent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get targetMaxStreakSeconds => $composableBuilder(
+    column: $table.targetMaxStreakSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get targetScore => $composableBuilder(
+    column: $table.targetScore,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ShotsTableAnnotationComposer
@@ -4689,6 +4906,21 @@ class $$ShotsTableAnnotationComposer
 
   GeneratedColumn<double> get autoStartPressureBar => $composableBuilder(
     column: $table.autoStartPressureBar,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get targetClosenessPercent => $composableBuilder(
+    column: $table.targetClosenessPercent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get targetMaxStreakSeconds => $composableBuilder(
+    column: $table.targetMaxStreakSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get targetScore => $composableBuilder(
+    column: $table.targetScore,
     builder: (column) => column,
   );
 
@@ -4824,6 +5056,9 @@ class $$ShotsTableTableManager
                 Value<String?> brewer = const Value.absent(),
                 Value<DateTime?> lastModifiedAt = const Value.absent(),
                 Value<double?> autoStartPressureBar = const Value.absent(),
+                Value<double?> targetClosenessPercent = const Value.absent(),
+                Value<int?> targetMaxStreakSeconds = const Value.absent(),
+                Value<double?> targetScore = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShotsCompanion(
                 id: id,
@@ -4850,6 +5085,9 @@ class $$ShotsTableTableManager
                 brewer: brewer,
                 lastModifiedAt: lastModifiedAt,
                 autoStartPressureBar: autoStartPressureBar,
+                targetClosenessPercent: targetClosenessPercent,
+                targetMaxStreakSeconds: targetMaxStreakSeconds,
+                targetScore: targetScore,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4878,6 +5116,9 @@ class $$ShotsTableTableManager
                 Value<String?> brewer = const Value.absent(),
                 Value<DateTime?> lastModifiedAt = const Value.absent(),
                 Value<double?> autoStartPressureBar = const Value.absent(),
+                Value<double?> targetClosenessPercent = const Value.absent(),
+                Value<int?> targetMaxStreakSeconds = const Value.absent(),
+                Value<double?> targetScore = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ShotsCompanion.insert(
                 id: id,
@@ -4904,6 +5145,9 @@ class $$ShotsTableTableManager
                 brewer: brewer,
                 lastModifiedAt: lastModifiedAt,
                 autoStartPressureBar: autoStartPressureBar,
+                targetClosenessPercent: targetClosenessPercent,
+                targetMaxStreakSeconds: targetMaxStreakSeconds,
+                targetScore: targetScore,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

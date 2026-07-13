@@ -32,6 +32,9 @@ class ShotMetadata {
     this.scale,
     this.brewer,
     this.lastModifiedAt,
+    this.targetClosenessPercent,
+    this.targetMaxStreakSeconds,
+    this.targetScore,
   }) : assert(
           tasteScore == null || (tasteScore >= 0 && tasteScore <= 10),
           'tasteScore must be between 0 and 10',
@@ -56,6 +59,15 @@ class ShotMetadata {
   final String? brewer;
   final DateTime? lastModifiedAt;
 
+  /// Gamification: how closely the pressure curve matched the target (0-100).
+  final double? targetClosenessPercent;
+
+  /// Gamification: longest consecutive time (seconds) within green zone of target.
+  final int? targetMaxStreakSeconds;
+
+  /// Gamification: overall score (e.g. 0-1000) based on closeness, streak, penalties.
+  final double? targetScore;
+
   factory ShotMetadata.fromShot(Shot shot) {
     return ShotMetadata(
       doseG: shot.doseG,
@@ -76,6 +88,9 @@ class ShotMetadata {
       scale: shot.scale,
       brewer: shot.brewer,
       lastModifiedAt: shot.lastModifiedAt,
+      targetClosenessPercent: shot.targetClosenessPercent,
+      targetMaxStreakSeconds: shot.targetMaxStreakSeconds,
+      targetScore: shot.targetScore,
     );
   }
 
@@ -99,6 +114,9 @@ class ShotMetadata {
       scale: scale,
       brewer: brewer,
       lastModifiedAt: lastModifiedAt,
+      targetClosenessPercent: targetClosenessPercent,
+      targetMaxStreakSeconds: targetMaxStreakSeconds,
+      targetScore: targetScore,
     );
   }
 
@@ -121,6 +139,9 @@ class ShotMetadata {
     String? scale,
     String? brewer,
     DateTime? lastModifiedAt,
+    double? targetClosenessPercent,
+    int? targetMaxStreakSeconds,
+    double? targetScore,
   }) {
     return ShotMetadata(
       doseG: doseG ?? this.doseG,
@@ -143,6 +164,9 @@ class ShotMetadata {
       scale: scale ?? this.scale,
       brewer: brewer ?? this.brewer,
       lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
+      targetClosenessPercent: targetClosenessPercent ?? this.targetClosenessPercent,
+      targetMaxStreakSeconds: targetMaxStreakSeconds ?? this.targetMaxStreakSeconds,
+      targetScore: targetScore ?? this.targetScore,
     );
   }
 
@@ -166,6 +190,9 @@ class ShotMetadata {
             scale == other.scale &&
             brewer == other.brewer &&
             lastModifiedAt == other.lastModifiedAt &&
+            targetClosenessPercent == other.targetClosenessPercent &&
+            targetMaxStreakSeconds == other.targetMaxStreakSeconds &&
+            targetScore == other.targetScore &&
             _listEquals(flavourTags, other.flavourTags) &&
             _mapEquals(flavourIntensities, other.flavourIntensities);
   }
@@ -188,8 +215,13 @@ class ShotMetadata {
         scale,
         brewer,
         lastModifiedAt,
-        Object.hashAll(flavourTags),
-        Object.hashAll(flavourIntensities.entries),
+        targetClosenessPercent,
+        targetMaxStreakSeconds,
+        targetScore,
+        Object.hash(
+          Object.hashAll(flavourTags),
+          Object.hashAll(flavourIntensities.entries),
+        ),
       );
 }
 
@@ -655,6 +687,9 @@ class _MetadataSheetState extends State<MetadataSheet> {
       scale: _parseString(_scaleController.text),
       brewer: _parseString(_brewerController.text),
       lastModifiedAt: DateTime.now().toUtc(),
+      targetClosenessPercent: widget.initial?.targetClosenessPercent,
+      targetMaxStreakSeconds: widget.initial?.targetMaxStreakSeconds,
+      targetScore: widget.initial?.targetScore,
     );
   }
 

@@ -536,6 +536,7 @@ class _LiveScreenState extends State<LiveScreen> {
         return;
       }
 
+      final targetSamples = _chartTargetPressureSamples();
       final shot = await runAutoSaveFlow(
         context: context,
         repository: repository,
@@ -552,6 +553,7 @@ class _LiveScreenState extends State<LiveScreen> {
         latitude: gps?.latitude,
         longitude: gps?.longitude,
         autoStartPressureBar: controller.autoStartPressureBar,
+        targetPressureSamples: targetSamples,
         idGenerator: widget.shotIdGenerator,
         onSaved: (saved) {
           _lastAutoSavedShotId = saved.id;
@@ -673,22 +675,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
   double? _targetPressureAtElapsed(int elapsedMs) {
     final targets = _chartTargetPressureSamples();
-    if (targets.isEmpty) return null;
-    if (elapsedMs <= targets.first.elapsedMs) {
-      return targets.first.pressureBar;
-    }
-    if (elapsedMs >= targets.last.elapsedMs) {
-      return targets.last.pressureBar;
-    }
-    for (int i = 0; i < targets.length - 1; i++) {
-      final t0 = targets[i];
-      final t1 = targets[i + 1];
-      if (elapsedMs >= t0.elapsedMs && elapsedMs <= t1.elapsedMs && t0.pressureBar != null && t1.pressureBar != null) {
-        final frac = (elapsedMs - t0.elapsedMs) / (t1.elapsedMs - t0.elapsedMs);
-        return t0.pressureBar! + frac * (t1.pressureBar! - t0.pressureBar!);
-      }
-    }
-    return targets.last.pressureBar;
+    return interpolateTargetPressure(targets, elapsedMs);
   }
 
   void _onOpenFullscreenChart() {
@@ -778,6 +765,23 @@ class _LiveScreenState extends State<LiveScreen> {
         final chartTargetSamples = _chartTargetPressureSamples();
         final autoStartSettings = _resolvedAutoStartController.settings;
 
+        // Live gamification stats (recomputed cheaply on each sample update)
+        final bool showLiveGamif =
+            (state == ShotSessionState.recording ||
+                state == ShotSessionState.paused ||
+                state == ShotSessionState.stopped) &&
+            samples.isNotEmpty &&
+            chartTargetSamples.isNotEmpty;
+        final Map<String, dynamic> liveGamif = showLiveGamif
+            ? computeTargetGamification(samples, chartTargetSamples)
+            : const <String, dynamic>{
+                'closenessPercent': null,
+                'maxStreakSeconds': 0,
+                'currentStreakSeconds': 0,
+                'penaltyCount': 0,
+                'score': null,
+              };
+
         final shell = ConfettiOverlay(
           controller: _confettiController,
           child: LiveShotEndListener(
@@ -850,7 +854,7 @@ class _LiveScreenState extends State<LiveScreen> {
                           onMarkChannel: _onMarkChannel,
                         ),
                         const SizedBox(height: 8),
-                        if ((state == ShotSessionState.recording || state == ShotSessionState.paused) && latestSample != null) ...[
+                        if ((state == ShotSessionState.recording || state == ShotSessionState.paused || state == ShotSessionState.stopped) && latestSample != null) ...[
                           LiveMetricsRow(
                             sample: latestSample,
                             previousSample: previousSample,
@@ -860,6 +864,16 @@ class _LiveScreenState extends State<LiveScreen> {
                             currentPressure: latestSample.pressureBar,
                             targetPressure: _targetPressureAtElapsed(latestSample.elapsedMs),
                           ),
+                          if (chartTargetSamples.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            _LiveTargetGamification(
+                              closeness: liveGamif['closenessPercent'] as double?,
+                              maxStreakSec: liveGamif['maxStreakSeconds'] as int? ?? 0,
+                              currentStreakSec: liveGamif['currentStreakSeconds'] as int? ?? 0,
+                              penaltyCount: liveGamif['penaltyCount'] as int? ?? 0,
+                              score: liveGamif['score'] as double?,
+                            ),
+                          ],
                         ]
                         else if (state == ShotSessionState.idle || state == ShotSessionState.stopped)
                           // Live pressure (always) before starting the shot (or after finished shot,
@@ -1027,6 +1041,119 @@ double _liveChartHeight(BoxConstraints constraints) {
   }
 
   return 220;
+}
+
+/// Compact live gamification strip shown while brewing against a target curve.
+/// Displays running closeness %, current/max green streak, penalty count, and score.
+class _LiveTargetGamification extends StatelessWidget {
+  const _LiveTargetGamification({
+    super.key,
+    required this.closeness,
+    required this.maxStreakSec,
+    required this.currentStreakSec,
+    required this.penaltyCount,
+    required this.score,
+  });
+
+  final double? closeness;
+  final int maxStreakSec;
+  final int currentStreakSec;
+  final int penaltyCount;
+  final double? score;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasTarget = closeness != null || score != null || maxStreakSec > 0 || currentStreakSec > 0;
+
+    if (!hasTarget) {
+      return const SizedBox.shrink();
+    }
+
+    final closenessStr = closeness != null ? '${closeness!.toStringAsFixed(0)}%' : '—';
+    final scoreStr = score != null ? score!.toStringAsFixed(0) : '—';
+    final streakStr = currentStreakSec > 0
+        ? '${currentStreakSec}s / ${maxStreakSec}s'
+        : (maxStreakSec > 0 ? 'max ${maxStreakSec}s' : '—');
+
+    final isGoodStreak = currentStreakSec >= 3;
+    final streakColor = isGoodStreak ? Colors.green.shade700 : theme.colorScheme.onSurfaceVariant;
+    final hasPenalties = penaltyCount > 0;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.track_changes, size: 16),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              children: [
+                _GamifPill(label: 'Close', value: closenessStr),
+                _GamifPill(
+                  label: 'Streak',
+                  value: streakStr,
+                  valueColor: streakColor,
+                ),
+                if (hasPenalties)
+                  _GamifPill(
+                    label: 'Penalties',
+                    value: '$penaltyCount',
+                    valueColor: theme.colorScheme.error,
+                  ),
+                _GamifPill(label: 'Score', value: scoreStr),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GamifPill extends StatelessWidget {
+  const _GamifPill({
+    super.key,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '$label ',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        Text(
+          value,
+          style: theme.textTheme.labelMedium?.copyWith(
+            fontFeatures: const [FontFeature.tabularFigures()],
+            color: valueColor ?? theme.colorScheme.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 const String kBundledDemoFixtureAsset = 'assets/demo_shot.jsonl';

@@ -26,7 +26,7 @@ class FlowlogDatabase extends _$FlowlogDatabase {
   FlowlogDatabase(super.executor);
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -175,6 +175,30 @@ class FlowlogDatabase extends _$FlowlogDatabase {
             if (!shotColumns.contains('last_modified_at')) {
               await m.database.customStatement(
                 'ALTER TABLE shots ADD COLUMN last_modified_at TEXT',
+              );
+            }
+          }
+          if (from < 16) {
+            final shotColumns = await m.database
+                .customSelect(
+                  'PRAGMA table_info(shots)',
+                  readsFrom: {shots},
+                )
+                .map((row) => row.read<String>('name'))
+                .get();
+            if (!shotColumns.contains('target_closeness_percent')) {
+              await m.database.customStatement(
+                'ALTER TABLE shots ADD COLUMN target_closeness_percent REAL',
+              );
+            }
+            if (!shotColumns.contains('target_max_streak_seconds')) {
+              await m.database.customStatement(
+                'ALTER TABLE shots ADD COLUMN target_max_streak_seconds INTEGER',
+              );
+            }
+            if (!shotColumns.contains('target_score')) {
+              await m.database.customStatement(
+                'ALTER TABLE shots ADD COLUMN target_score REAL',
               );
             }
           }
