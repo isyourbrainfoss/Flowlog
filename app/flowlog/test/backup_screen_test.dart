@@ -40,13 +40,17 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+
+      // Pump a few times to let the async _loadCounts future resolve without
+      // relying on pumpAndSettle (which can hang or timeout in CI for this test).
+      for (int i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
 
       expect(find.text('1 shots'), findsOneWidget);
       expect(find.text('1 beans'), findsOneWidget);
 
-      // Direct save exercise to avoid gesture/async timing flakes seen in CI
-      // and local runners for this particular test. UI count text verified.
+      // Direct save exercise (avoids gesture timing flakes).
       await actions.saveBackup(
         suggestedName: 'test.flowlog',
         content: '{"version":2,"payload":{"shots":[],"beans":[]},"equipment":{}}',
