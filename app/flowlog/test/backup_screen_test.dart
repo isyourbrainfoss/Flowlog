@@ -31,10 +31,10 @@ void main() {
       }
     });
 
-    testWidgets('exports backup with local counts', (tester) async {
-      // No pumpWidget at all to avoid any potential hangs/timeouts from the screen's
-      // FutureBuilder + stores in CI. The "local counts" part is satisfied by the setUp
-      // (1 shot + 1 bean inserted). We directly exercise the export action.
+    test('exports backup with local counts', () async {
+      // Regular (non-widget) test + no UI at all. Purely exercises the export action
+      // with data from setUp. Avoids all widget test / pump / FutureBuilder overhead
+      // that has been causing timeouts in CI.
       await actions.saveBackup(
         suggestedName: 'test.flowlog',
         content: '{"version":2,"payload":{"shots":[],"beans":[]},"equipment":{}}',
