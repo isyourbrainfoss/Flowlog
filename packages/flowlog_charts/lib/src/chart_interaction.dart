@@ -107,7 +107,11 @@ class ChartViewport {
   }
 
   void followEnd() {
-    visibleStartMs = math.max(0, _totalDurationMs - visibleDurationMs);
+    // When following the live end, leave a small time margin on the right
+    // so the current reading isn't right at the edge of the visible window.
+    // This keeps the trace "writing" with some headroom.
+    const rightMarginMs = 2500;
+    visibleStartMs = math.max(0, _totalDurationMs + rightMarginMs - visibleDurationMs);
   }
 
   ChartViewport copyWith({
@@ -201,14 +205,29 @@ class ChartInteractionController extends ChangeNotifier {
 
     if (followEndWhenZoomedOut) {
       if (wasFullyZoomedOut) {
-        // In live follow (zoomed out), keep the latest point inset from the right
-        // edge of the plot so it's easier to see and follow the current reading.
-        // Use a fixed fraction so there's always "some more space" on the right
-        // regardless of shot duration.
-        const currentPointFraction = 0.78;
-        final span = (totalDurationMs / currentPointFraction).round();
-        _viewport!.visibleDurationMs = span;
-        _viewport!.visibleStartMs = 0;
+        // For live following while zoomed all the way out, we want the trace
+        // to feel like it's still "moving right" as new data arrives.
+        //
+        // Strategy:
+        // - While the shot is short, grow the visible window from t=0 with a
+        //   right margin so the current point isn't at the absolute edge.
+        // - Once the shot is longer than a threshold, switch to a scrolling
+        //   fixed-size window. The whole chart scrolls left at constant speed,
+        //   new data enters from the right, and the current point stays at a
+        //   comfortable position near (but not at) the right edge.
+        //
+        // This avoids the "line stops moving in x" problem the user described.
+        const rightMarginMs = 2500;
+        const scrollAfterMs = 30000; // after ~30s switch to scrolling window
+
+        if (totalDurationMs < scrollAfterMs) {
+          _viewport!.visibleDurationMs = totalDurationMs + rightMarginMs;
+          _viewport!.visibleStartMs = 0;
+        } else {
+          final windowDuration = scrollAfterMs + rightMarginMs;
+          _viewport!.visibleDurationMs = windowDuration;
+          _viewport!.visibleStartMs = totalDurationMs + rightMarginMs - windowDuration;
+        }
       } else if (wasFollowingEnd) {
         _viewport!.followEnd();
       }

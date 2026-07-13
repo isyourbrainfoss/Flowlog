@@ -75,8 +75,8 @@ void main() {
 
       controller.syncTotalDuration(20000, followEndWhenZoomedOut: true);
 
-      // With live follow inset (current point ~78% across), visible window
-      // extends beyond the data total to leave space on the right.
+      // Live follow: growing phase with right margin so the current point
+      // isn't jammed at the edge (and the trace keeps a "moving right" feel).
       expect(controller.viewport.visibleStartMs, 0);
       expect(controller.viewport.visibleEndMs, greaterThan(20000));
     });
