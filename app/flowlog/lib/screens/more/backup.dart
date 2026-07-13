@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
+import 'package:flowlog/settings/equipment_store.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -287,10 +289,22 @@ class _BackupScreenState extends State<BackupScreen> {
     try {
       final database = await _ensureDatabase();
       final payload = await buildSyncPayloadFromDatabase(database);
-      final content = encodeSyncBackup(payload);
+      final equipmentStore = EquipmentStore();
+      await equipmentStore.load();
+      final equipment = <String, dynamic>{
+        'items': equipmentStore.settings.items.map((e) => e.toJson()).toList(),
+        'presets': equipmentStore.settings.presets.map((e) => e.toJson()).toList(),
+        if (equipmentStore.settings.defaultPresetId != null)
+          'defaultPresetId': equipmentStore.settings.defaultPresetId,
+      };
+      final combined = const JsonEncoder.withIndent('  ').convert({
+        'version': 2,
+        'payload': payload.toJson(),
+        'equipment': equipment,
+      });
       final outcome = await _actions.saveBackup(
         suggestedName: defaultBackupFilename(),
-        content: content,
+        content: combined,
       );
 
       if (!mounted) {
@@ -300,7 +314,8 @@ class _BackupScreenState extends State<BackupScreen> {
       setState(() {
         _statusMessage = outcome.success
             ? '${outcome.message}: ${payload.shots.length} shots, '
-                '${payload.profiles.length} profiles, ${payload.beans.length} beans'
+                '${payload.profiles.length} profiles, ${payload.beans.length} beans, '
+                'equipment'
             : outcome.message;
       });
     } catch (error) {
@@ -337,12 +352,42 @@ class _BackupScreenState extends State<BackupScreen> {
         return;
       }
 
-      final payload = parseSyncBackup(pick.contents!);
+      final contents = pick.contents!;
+      SyncPayload payload;
+      Map<String, dynamic>? equipmentData;
+      try {
+        final decoded = jsonDecode(contents) as Map<String, dynamic>;
+        if (decoded['version'] == 2 && decoded['payload'] != null) {
+          payload = SyncPayload.fromJson((decoded['payload'] as Map).cast<String, dynamic>());
+          equipmentData = (decoded['equipment'] as Map?)?.cast<String, dynamic>();
+        } else {
+          payload = parseSyncBackup(contents);
+        }
+      } catch (_) {
+        payload = parseSyncBackup(contents);
+      }
+
       final database = await _ensureDatabase();
       final result = await mergeSyncPayload(
         database: database,
         payload: payload,
       );
+
+      if (equipmentData != null) {
+        final eqStore = EquipmentStore();
+        final items = (equipmentData['items'] as List? ?? [])
+            .map((e) => EquipmentItem.fromJson((e as Map).cast()))
+            .toList();
+        final presets = (equipmentData['presets'] as List? ?? [])
+            .map((e) => EquipmentPreset.fromJson((e as Map).cast()))
+            .toList();
+        final defId = equipmentData['defaultPresetId'] as String?;
+        await eqStore.save(EquipmentSettings(
+          items: items,
+          presets: presets,
+          defaultPresetId: defId,
+        ));
+      }
 
       await _refreshCounts();
 
@@ -353,7 +398,8 @@ class _BackupScreenState extends State<BackupScreen> {
       setState(() {
         _statusMessage =
             'Merged ${result.shotsMerged} shots, ${result.profilesMerged} '
-            'profiles, and ${result.beansMerged} beans from backup.';
+            'profiles, and ${result.beansMerged} beans from backup.'
+            '${equipmentData != null ? ' Equipment synced.' : ''}';
       });
     } catch (error) {
       if (!mounted) {

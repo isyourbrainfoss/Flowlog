@@ -498,6 +498,7 @@ class _LiveScreenState extends State<LiveScreen> {
     if (brewing && !_wasBrewing) {
       _autoSavedCurrent = false;
       _lastAutoSavedShotId = null;
+      _chartInteractionController.resetViewport();
     }
     _wasBrewing = brewing;
   }
@@ -670,6 +671,26 @@ class _LiveScreenState extends State<LiveScreen> {
     return const [];
   }
 
+  double? _targetPressureAtElapsed(int elapsedMs) {
+    final targets = _chartTargetPressureSamples();
+    if (targets.isEmpty) return null;
+    if (elapsedMs <= targets.first.elapsedMs) {
+      return targets.first.pressureBar;
+    }
+    if (elapsedMs >= targets.last.elapsedMs) {
+      return targets.last.pressureBar;
+    }
+    for (int i = 0; i < targets.length - 1; i++) {
+      final t0 = targets[i];
+      final t1 = targets[i + 1];
+      if (elapsedMs >= t0.elapsedMs && elapsedMs <= t1.elapsedMs && t0.pressureBar != null && t1.pressureBar != null) {
+        final frac = (elapsedMs - t0.elapsedMs) / (t1.elapsedMs - t0.elapsedMs);
+        return t0.pressureBar! + frac * (t1.pressureBar! - t0.pressureBar!);
+      }
+    }
+    return targets.last.pressureBar;
+  }
+
   void _onOpenFullscreenChart() {
     final controller = _controller;
     if (controller == null) {
@@ -829,11 +850,17 @@ class _LiveScreenState extends State<LiveScreen> {
                           onMarkChannel: _onMarkChannel,
                         ),
                         const SizedBox(height: 8),
-                        if ((state == ShotSessionState.recording || state == ShotSessionState.paused) && latestSample != null)
+                        if ((state == ShotSessionState.recording || state == ShotSessionState.paused) && latestSample != null) ...[
                           LiveMetricsRow(
                             sample: latestSample,
                             previousSample: previousSample,
-                          )
+                          ),
+                          const SizedBox(height: 4),
+                          LivePressureDeviationBar(
+                            currentPressure: latestSample.pressureBar,
+                            targetPressure: _targetPressureAtElapsed(latestSample.elapsedMs),
+                          ),
+                        ]
                         else if (state == ShotSessionState.idle || state == ShotSessionState.stopped)
                           // Live pressure (always) before starting the shot (or after finished shot,
                           // to confirm sensor for next). Make it crystal clear the sensor is live.

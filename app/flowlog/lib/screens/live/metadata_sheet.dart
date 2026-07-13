@@ -358,7 +358,70 @@ class _MetadataSheetState extends State<MetadataSheet> {
 
   Future<void> _loadEquipment() async {
     await _equipmentStore.load();
-    if (mounted) setState(() => _equipmentReady = true);
+    if (mounted) {
+      setState(() => _equipmentReady = true);
+      _maybeApplyDefaultPreset();
+    }
+  }
+
+  void _maybeApplyDefaultPreset() {
+    if (!_equipmentReady) return;
+    final defaultId = _equipmentStore.settings.defaultPresetId;
+    if (defaultId == null) return;
+
+    // Only apply if no equipment has been set yet (from initial or manual)
+    final hasEquipment = _grinderController.text.isNotEmpty ||
+        _showerScreenController.text.isNotEmpty ||
+        _basketController.text.isNotEmpty ||
+        _scaleController.text.isNotEmpty ||
+        _brewerController.text.isNotEmpty;
+    if (hasEquipment) return;
+
+    final preset = _equipmentStore.settings.presets.firstWhere(
+      (p) => p.id == defaultId,
+      orElse: () => const EquipmentPreset(id: '', name: '', selections: {}),
+    );
+    if (preset.id.isEmpty) return;
+
+    preset.selections.forEach((cat, name) {
+      switch (cat) {
+        case 'grinder':
+          _grinderController.text = name;
+          break;
+        case 'showerScreen':
+          _showerScreenController.text = name;
+          break;
+        case 'basket':
+          _basketController.text = name;
+          break;
+        case 'scale':
+          _scaleController.text = name;
+          break;
+        case 'brewer':
+          _brewerController.text = name;
+          break;
+      }
+    });
+
+    // Apply tied defaults from preset
+    if (preset.defaultDoseG != null) {
+      _doseG = preset.defaultDoseG!;
+    }
+    if (preset.defaultGrindSetting != null) {
+      _grindSetting = snapGrindSetting(preset.defaultGrindSetting!);
+    }
+    if (preset.defaultRewindTurnsBeforeFill != null) {
+      _coffeejackSettings = _coffeejackSettings.copyWith(
+        rewindTurnsBeforeFill: preset.defaultRewindTurnsBeforeFill!,
+      );
+    }
+    if (preset.defaultSlowPreinfusionTurns != null) {
+      _coffeejackSettings = _coffeejackSettings.copyWith(
+        slowPreinfusionTurns: preset.defaultSlowPreinfusionTurns!,
+      );
+    }
+
+    setState(() {});
   }
 
   Future<void> _loadDefaults() async {

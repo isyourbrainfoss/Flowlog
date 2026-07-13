@@ -125,18 +125,22 @@ class EquipmentSettings {
   const EquipmentSettings({
     this.items = const [],
     this.presets = const [],
+    this.defaultPresetId,
   });
 
   final List<EquipmentItem> items;
   final List<EquipmentPreset> presets;
+  final String? defaultPresetId;
 
   EquipmentSettings copyWith({
     List<EquipmentItem>? items,
     List<EquipmentPreset>? presets,
+    String? defaultPresetId,
   }) {
     return EquipmentSettings(
       items: items ?? this.items,
       presets: presets ?? this.presets,
+      defaultPresetId: defaultPresetId ?? this.defaultPresetId,
     );
   }
 }
@@ -167,7 +171,11 @@ class EquipmentStore {
         final presets = (json['presets'] as List<dynamic>? ?? [])
             .map((e) => EquipmentPreset.fromJson(e as Map<String, dynamic>))
             .toList();
-        _settings = EquipmentSettings(items: items, presets: presets);
+        _settings = EquipmentSettings(
+          items: items,
+          presets: presets,
+          defaultPresetId: json['defaultPresetId'] as String?,
+        );
       }
     } catch (_) {
       // ignore corrupt file
@@ -183,6 +191,7 @@ class EquipmentStore {
     await file.writeAsString(jsonEncode({
       'items': settings.items.map((e) => e.toJson()).toList(),
       'presets': settings.presets.map((e) => e.toJson()).toList(),
+      if (settings.defaultPresetId != null) 'defaultPresetId': settings.defaultPresetId,
     }));
   }
 
@@ -208,7 +217,16 @@ class EquipmentStore {
 
   Future<void> deletePreset(String id) async {
     final presets = _settings.presets.where((p) => p.id != id).toList();
-    await save(_settings.copyWith(presets: presets));
+    String? newDefault = _settings.defaultPresetId;
+    if (newDefault == id) newDefault = null;
+    await save(_settings.copyWith(presets: presets, defaultPresetId: newDefault));
+  }
+
+  Future<void> setDefaultPreset(String? presetId) async {
+    if (presetId != null && !_settings.presets.any((p) => p.id == presetId)) {
+      return; // invalid
+    }
+    await save(_settings.copyWith(defaultPresetId: presetId));
   }
 
   /// Get items for a category.

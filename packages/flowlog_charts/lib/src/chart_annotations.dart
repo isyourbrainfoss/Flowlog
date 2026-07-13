@@ -17,8 +17,8 @@ int chartElapsedMsFromLocalX({
   required double chartWidth,
   required ChartViewport viewport,
 }) {
-  const leftPad = 40.0;
-  const rightPad = 55.0;
+  const leftPad = 25.0;
+  const rightPad = 35.0;
   final plotWidth = math.max(1, chartWidth - leftPad - rightPad);
   final fraction = ((localX - leftPad) / plotWidth).clamp(0.0, 1.0);
   return viewport.visibleStartMs +

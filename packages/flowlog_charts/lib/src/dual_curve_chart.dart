@@ -1010,8 +1010,8 @@ class DualCurveChartPainter extends CustomPainter {
   final bool denseTimeAxis;
   final double devicePixelRatio;
 
-  static const leftPad = 40.0;
-  static const rightPad = 55.0;
+  static const leftPad = 25.0;
+  static const rightPad = 35.0;
   static const topPad = 16.0;
   static const bottomPad = 24.0;
   static const axisUnitTop = 2.0;

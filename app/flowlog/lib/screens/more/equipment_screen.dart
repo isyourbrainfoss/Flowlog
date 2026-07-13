@@ -232,6 +232,21 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
           else
             for (final p in _store.settings.presets)
               ListTile(
+                leading: IconButton(
+                  icon: Icon(
+                    _store.settings.defaultPresetId == p.id
+                        ? Icons.star
+                        : Icons.star_border,
+                  ),
+                  onPressed: () async {
+                    final newDefault = _store.settings.defaultPresetId == p.id ? null : p.id;
+                    await _store.setDefaultPreset(newDefault);
+                    setState(() {});
+                  },
+                  tooltip: _store.settings.defaultPresetId == p.id
+                      ? 'Clear default preset'
+                      : 'Set as default preset',
+                ),
                 title: Text(p.name),
                 subtitle: Text([
                   p.selections.entries.map((e) => '${kEquipmentCategoryLabels[e.key] ?? e.key}: ${e.value}').join(', '),
