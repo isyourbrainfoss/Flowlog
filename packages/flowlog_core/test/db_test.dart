@@ -7,11 +7,11 @@ import 'package:test/test.dart';
 
 void main() {
   group('schema', () {
-    test('schema version is 15', () async {
+    test('schema version is 16', () async {
       final db = FlowlogDatabase.inMemory();
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 15);
+      expect(db.schemaVersion, 16);
     });
 
     test(
@@ -383,13 +383,13 @@ void main() {
         final shot = _loadFixtureShot('shots/minimal_shot.json');
 
         await writerRepo.insertShot(shot);
-        expect(writer.schemaVersion, 15);
+        expect(writer.schemaVersion, 16);
         await writer.close();
 
         final reader = FlowlogDatabase.openFile(dbPath);
         final readerRepo = ShotRepository(reader);
 
-        expect(reader.schemaVersion, 15);
+        expect(reader.schemaVersion, 16);
         expect(await readerRepo.getShotWithSamples(shot.id), shot);
 
         await reader.close();
@@ -439,7 +439,7 @@ void main() {
         final migrated = FlowlogDatabase.openFile(dbPath);
         addTearDown(migrated.close);
 
-        expect(migrated.schemaVersion, 15);
+        expect(migrated.schemaVersion, 16);
 
         final tables = await migrated
             .customSelect(
@@ -529,7 +529,7 @@ void main() {
         final migrated = FlowlogDatabase.openFile(dbPath);
         addTearDown(migrated.close);
 
-        expect(migrated.schemaVersion, 15);
+        expect(migrated.schemaVersion, 16);
 
         final tables = await migrated
             .customSelect(
