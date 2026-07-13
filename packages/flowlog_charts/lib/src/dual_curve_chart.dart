@@ -325,9 +325,13 @@ class _DualCurveChartState extends State<DualCurveChart> {
     final totalDurationMs = _resolveTotalDurationMs(prepared);
 
     if (widget.enableInteraction) {
+      final follow = widget.samplesNotifier != null;
+      final liveProgressMs =
+          follow && prepared.isNotEmpty ? prepared.last.elapsedMs : null;
       _interactionController.syncTotalDuration(
         totalDurationMs,
-        followEndWhenZoomedOut: widget.samplesNotifier != null,
+        followEndWhenZoomedOut: follow,
+        liveProgressMs: liveProgressMs,
       );
     }
 

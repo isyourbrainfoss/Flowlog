@@ -192,9 +192,16 @@ class ChartInteractionController extends ChangeNotifier {
   ///
   /// Callers that rebuild from sample changes (e.g. [ValueListenableBuilder])
   /// should use this during [State.build] to avoid notifying mid-build.
+  ///
+  /// [totalDurationMs] is the full span needed for all data (live samples + any
+  /// target curve). When [liveProgressMs] is provided for live following, the
+  /// auto-follow window (grow/scroll) is positioned relative to live progress
+  /// so the current pressure trace stays visible near the right even when a
+  /// long target curve makes the axis total much larger than current brew time.
   void syncTotalDuration(
     int totalDurationMs, {
     bool followEndWhenZoomedOut = false,
+    int? liveProgressMs,
   }) {
     final wasFollowingEnd = _viewport != null &&
         _viewport!.visibleEndMs >= _viewport!.totalDurationMs - 1;
@@ -216,17 +223,20 @@ class ChartInteractionController extends ChangeNotifier {
         //   new data enters from the right, and the current point stays at a
         //   comfortable position near (but not at) the right edge.
         //
-        // This avoids the "line stops moving in x" problem the user described.
+        // IMPORTANT: base grow/scroll on [liveProgressMs] (or total as fallback)
+        // so a long target curve does not push the viewport start far ahead of
+        // actual live data, which would hide the live pressure trace.
         const rightMarginMs = 2500;
         const scrollAfterMs = 30000; // after ~30s switch to scrolling window
 
-        if (totalDurationMs < scrollAfterMs) {
-          _viewport!.visibleDurationMs = totalDurationMs + rightMarginMs;
+        final progress = liveProgressMs ?? totalDurationMs;
+        if (progress < scrollAfterMs) {
+          _viewport!.visibleDurationMs = progress + rightMarginMs;
           _viewport!.visibleStartMs = 0;
         } else {
           final windowDuration = scrollAfterMs + rightMarginMs;
           _viewport!.visibleDurationMs = windowDuration;
-          _viewport!.visibleStartMs = totalDurationMs + rightMarginMs - windowDuration;
+          _viewport!.visibleStartMs = progress + rightMarginMs - windowDuration;
         }
       } else if (wasFollowingEnd) {
         _viewport!.followEnd();

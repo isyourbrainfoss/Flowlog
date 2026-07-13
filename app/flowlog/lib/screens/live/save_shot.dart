@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flowlog/screens/live/metadata_sheet.dart';
 import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog/settings/coffeejack_settings_store.dart';
+import 'package:flowlog/settings/equipment_store.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
@@ -216,7 +217,9 @@ Future<ShotMetadata> defaultMetadataFromSamples(
       : await shotRepository.lastGrindSetting();
 
   final brewTemp = brewTempRangeFromSamples(samples);
-  return ShotMetadata(
+
+  // Start with brew + last-used defaults.
+  var metadata = ShotMetadata(
     doseG: defaults.useDefaultDose ? defaults.defaultDoseG : null,
     grindSetting: defaults.useDefaultGrind
         ? (lastGrind ?? defaults.defaultGrindSetting)
@@ -226,6 +229,50 @@ Future<ShotMetadata> defaultMetadataFromSamples(
     coffeejackRewindTurns: defaults.useDefaultCoffeejack ? coffeejack.rewindTurnsBeforeFill : null,
     coffeejackPreinfusionTurns: defaults.useDefaultCoffeejack ? coffeejack.slowPreinfusionTurns : null,
   );
+
+  // Apply default equipment preset (and any tied defaults it carries) for the
+  // auto-save path. This ensures "default preset" works for quick saves without
+  // requiring the user to open the notes sheet. The sheet applies similarly
+  // (and will see values already present so it won't overwrite).
+  final equipmentStore = EquipmentStore();
+  await equipmentStore.load();
+  final defaultPresetId = equipmentStore.settings.defaultPresetId;
+  if (defaultPresetId != null) {
+    final preset = equipmentStore.settings.presets.firstWhere(
+      (p) => p.id == defaultPresetId,
+      orElse: () => const EquipmentPreset(id: '', name: '', selections: {}),
+    );
+    if (preset.id.isNotEmpty) {
+      final sel = preset.selections;
+      metadata = metadata.copyWith(
+        grinder: metadata.grinder ?? sel['grinder'],
+        showerScreen: metadata.showerScreen ?? sel['showerScreen'],
+        basket: metadata.basket ?? sel['basket'],
+        scale: metadata.scale ?? sel['scale'],
+        brewer: metadata.brewer ?? sel['brewer'],
+      );
+      if (defaults.useDefaultDose && preset.defaultDoseG != null) {
+        metadata = metadata.copyWith(doseG: preset.defaultDoseG);
+      }
+      if (defaults.useDefaultGrind && preset.defaultGrindSetting != null) {
+        metadata = metadata.copyWith(grindSetting: preset.defaultGrindSetting);
+      }
+      if (defaults.useDefaultCoffeejack) {
+        if (preset.defaultRewindTurnsBeforeFill != null) {
+          metadata = metadata.copyWith(
+            coffeejackRewindTurns: preset.defaultRewindTurnsBeforeFill,
+          );
+        }
+        if (preset.defaultSlowPreinfusionTurns != null) {
+          metadata = metadata.copyWith(
+            coffeejackPreinfusionTurns: preset.defaultSlowPreinfusionTurns,
+          );
+        }
+      }
+    }
+  }
+
+  return metadata;
 }
 
 ShotMetadata applyShotMetadataDefaults(
