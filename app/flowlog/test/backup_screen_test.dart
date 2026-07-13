@@ -41,9 +41,12 @@ void main() {
         ),
       );
 
-      // Pump a few times to let the async _loadCounts future resolve without
-      // relying on pumpAndSettle (which can hang or timeout in CI for this test).
-      for (int i = 0; i < 5; i++) {
+      // Wait for the async counts FutureBuilder to populate the UI text.
+      // Use short pumps (no long settle) to avoid CI timeouts/hangs.
+      for (int i = 0; i < 20; i++) {
+        if (find.text('1 shots').evaluate().isNotEmpty && find.text('1 beans').evaluate().isNotEmpty) {
+          break;
+        }
         await tester.pump(const Duration(milliseconds: 50));
       }
 
