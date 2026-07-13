@@ -11,6 +11,7 @@ import 'package:flowlog/screens/live/delight.dart';
 import 'package:flowlog/screens/live/feedback.dart';
 import 'package:flowlog/screens/live/fullscreen_chart.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
+import 'package:flowlog/screens/live/live_pressure_bar.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
@@ -134,6 +135,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
   late final ValueNotifier<double?> _livePressureNotifier;
   late final ValueNotifier<DateTime?> _livePressureLastUpdate;
+  DateTime _lastSamplesUpdate = DateTime.now();
 
   @override
   void initState() {
@@ -306,7 +308,14 @@ class _LiveScreenState extends State<LiveScreen> {
       _annotationController.clear();
     }
     _lastSessionState = state;
-    _samplesNotifier.value = List<ShotSample>.from(controller.samples);
+
+    // Full samples list to chart at ~30 fps to reduce repaint lag/cost.
+    // Individual pressure value updates at full sensor rate (see _livePressureNotifier).
+    final now = DateTime.now();
+    if (now.difference(_lastSamplesUpdate).inMilliseconds >= 33) {
+      _samplesNotifier.value = List<ShotSample>.from(controller.samples);
+      _lastSamplesUpdate = now;
+    }
 
     _checkAutoStop(controller);
   }
@@ -837,13 +846,26 @@ class _LiveScreenState extends State<LiveScreen> {
                               return ValueListenableBuilder<DateTime?>(
                                 valueListenable: _livePressureLastUpdate,
                                 builder: (context, lastUpdate, _) {
+                                  final targetP = chartTargetSamples.isNotEmpty
+                                      ? chartTargetSamples.last.pressureBar
+                                      : null;
                                   return Card(
                                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      child: LivePressureReadout(
-                                        pressureBar: pressureBar,
-                                        lastUpdated: lastUpdate,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          LivePressureReadout(
+                                            pressureBar: pressureBar,
+                                            lastUpdated: lastUpdate,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          LivePressureDeviationBar(
+                                            currentPressure: pressureBar,
+                                            targetPressure: targetP,
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   );
