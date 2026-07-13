@@ -408,6 +408,7 @@ class _LeaderboardSection extends StatelessWidget {
   const _LeaderboardSection({
     required this.topScores,
     required this.onOpenShot,
+    // ignore: unused_element_parameter
     super.key,
   });
 
@@ -446,7 +447,7 @@ class _LeaderboardSection extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             scrollDirection: Axis.horizontal,
             itemCount: topScores.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
               final shot = topScores[index];
               final rank = index + 1;

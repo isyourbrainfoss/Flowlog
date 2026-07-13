@@ -811,7 +811,11 @@ class _MetadataField extends StatelessWidget {
 
 /// Card summarizing target curve gamification results for a completed shot.
 class _TargetGamificationCard extends StatelessWidget {
-  const _TargetGamificationCard({required this.shot, super.key});
+  const _TargetGamificationCard({
+    required this.shot,
+    // ignore: unused_element_parameter
+    super.key,
+  });
 
   final Shot shot;
 

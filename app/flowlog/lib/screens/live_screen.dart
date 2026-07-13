@@ -1047,6 +1047,7 @@ double _liveChartHeight(BoxConstraints constraints) {
 /// Displays running closeness %, current/max green streak, penalty count, and score.
 class _LiveTargetGamification extends StatelessWidget {
   const _LiveTargetGamification({
+    // ignore: unused_element_parameter
     super.key,
     required this.closeness,
     required this.maxStreakSec,
@@ -1121,6 +1122,7 @@ class _LiveTargetGamification extends StatelessWidget {
 
 class _GamifPill extends StatelessWidget {
   const _GamifPill({
+    // ignore: unused_element_parameter
     super.key,
     required this.label,
     required this.value,
