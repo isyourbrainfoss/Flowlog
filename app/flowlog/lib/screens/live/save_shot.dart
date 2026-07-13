@@ -31,7 +31,7 @@ double? interpolateTargetPressure(List<ShotSample> targets, int elapsedMs) {
 /// - closenessPercent: 0-100 or null
 /// - maxStreakSeconds: longest time in green zone (diff <= 0.25 bar)
 /// - currentStreakSeconds: ongoing streak at end of samples (0 if last was out)
-/// - penaltyCount: number of samples with |diff| > 1.0 bar
+/// - penaltyCount: number of distinct penalty periods (|diff| > 1.0 bar)
 /// - score: composite 0-100
 Map<String, dynamic> computeTargetGamification(
   List<ShotSample> samples,
@@ -55,17 +55,20 @@ Map<String, dynamic> computeTargetGamification(
   int currentStreakMs = 0;
   int? lastStreakTime;
   int penaltyCount = 0;
+  bool wasInPenalty = false;
 
   for (final s in samples) {
     if (s.pressureBar == null) {
       currentStreakMs = 0;
       lastStreakTime = null;
+      wasInPenalty = false;
       continue;
     }
     final targetP = interpolateTargetPressure(targetSamples, s.elapsedMs);
     if (targetP == null) {
       currentStreakMs = 0;
       lastStreakTime = null;
+      wasInPenalty = false;
       continue;
     }
     final diff = (s.pressureBar! - targetP).abs();
@@ -73,7 +76,12 @@ Map<String, dynamic> computeTargetGamification(
     count++;
 
     if (diff > penaltyThreshold) {
-      penaltyCount++;
+      if (!wasInPenalty) {
+        penaltyCount++;
+        wasInPenalty = true;
+      }
+    } else {
+      wasInPenalty = false;
     }
 
     if (diff <= greenThreshold) {
@@ -95,9 +103,10 @@ Map<String, dynamic> computeTargetGamification(
   final streakSec = (maxStreakMs / 1000).round();
 
   // Score: closeness + streak bonus - penalty
+  // Penalties now count distinct bad periods (not per-sample), so less harsh.
   double? score;
   if (closeness != null) {
-    score = closeness + (streakSec * 0.5) - (penaltyCount * 2);
+    score = closeness + (streakSec * 1.0) - (penaltyCount * 1);
     score = score.clamp(0.0, 100.0);
   }
 

@@ -1044,7 +1044,8 @@ double _liveChartHeight(BoxConstraints constraints) {
 }
 
 /// Compact live gamification strip shown while brewing against a target curve.
-/// Displays running closeness %, current/max green streak, penalty count, and score.
+/// Displays running closeness %, current/max green streak, number of distinct
+/// penalty periods, and score (less strict event-based penalties).
 class _LiveTargetGamification extends StatelessWidget {
   const _LiveTargetGamification({
     // ignore: unused_element_parameter

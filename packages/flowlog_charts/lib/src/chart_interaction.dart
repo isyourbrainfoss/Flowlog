@@ -211,9 +211,24 @@ class ChartInteractionController extends ChangeNotifier {
     _viewport!.setTotalDuration(totalDurationMs);
 
     if (followEndWhenZoomedOut) {
-      if (wasFullyZoomedOut) {
-        // For live following while zoomed all the way out, we want the trace
-        // to feel like it's still "moving right" as new data arrives.
+      bool shouldFollowLive = wasFullyZoomedOut;
+
+      if (!shouldFollowLive && liveProgressMs != null && _viewport != null) {
+        // Even if the viewport is not "fully zoomed out" relative to the axis
+        // total (e.g. because of the 30s fallback or a long target curve, or
+        // after the headroom window was applied), keep following as long as the
+        // current view was showing near the live end. This ensures the latest
+        // pressure stays visible without the user having to manually pan.
+        final prevEnd = _viewport!.visibleEndMs;
+        if (prevEnd >= liveProgressMs - 10000) {
+          shouldFollowLive = true;
+        }
+      }
+
+      if (shouldFollowLive) {
+        // For live following while zoomed all the way out (or still near the
+        // end), we want the trace to feel like it's still "moving right" as
+        // new data arrives.
         //
         // Strategy:
         // - While the shot is short, grow the visible window from t=0 with a
