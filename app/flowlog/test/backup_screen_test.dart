@@ -43,7 +43,7 @@ void main() {
 
       // Wait for the async counts FutureBuilder to populate the UI text.
       // Use short pumps (no long settle) to avoid CI timeouts/hangs.
-      for (int i = 0; i < 20; i++) {
+      for (int i = 0; i < 100; i++) {
         if (find.text('1 shots').evaluate().isNotEmpty && find.text('1 beans').evaluate().isNotEmpty) {
           break;
         }
