@@ -1418,6 +1418,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         final state = snapshot.data!;
         _applyLoadedState(state);
 
+        final displayName = _profile?.name ?? state.profile.name ?? 'Demo profile';
+
         final pressureProfile = expandKeyframesToProfile(_keyframes);
         final predictedSamples = buildPredictedFlowSamples(pressureProfile);
         final summary = summarizePredictedFlow(predictedSamples);
@@ -1439,7 +1441,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                _profile?.name ?? 'Demo profile',
+                displayName,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 8),
