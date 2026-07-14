@@ -30,6 +30,10 @@ class ShotRepository {
             ..where((row) => row.shotId.equals(shot.id)))
           .go();
 
+      await (_db.delete(_db.shotTargetSamples)
+            ..where((row) => row.shotId.equals(shot.id)))
+          .go();
+
       if (shot.samples.isNotEmpty) {
         await _db.batch((batch) {
           batch.insertAll(
@@ -51,6 +55,17 @@ class ShotRepository {
           );
         });
       }
+
+      if (shot.targetPressureSamples.isNotEmpty) {
+        await _db.batch((batch) {
+          batch.insertAll(
+            _db.shotTargetSamples,
+            shot.targetPressureSamples
+                .map((sample) => _targetSampleToCompanion(shot.id, sample))
+                .toList(),
+          );
+        });
+      }
     });
   }
 
@@ -64,7 +79,7 @@ class ShotRepository {
       return null;
     }
 
-    return _shotFromRow(row, samples: const [], annotations: const []);
+    return _shotFromRow(row, samples: const [], annotations: const [], targetPressureSamples: const []);
   }
 
   /// Returns shots ordered by [models.Shot.startedAt] descending.
@@ -85,7 +100,7 @@ class ShotRepository {
 
     if (!includeSamples) {
       return rows
-          .map((row) => _shotFromRow(row, samples: const [], annotations: const []))
+          .map((row) => _shotFromRow(row, samples: const [], annotations: const [], targetPressureSamples: const []))
           .toList();
     }
 
@@ -104,11 +119,17 @@ class ShotRepository {
             ]))
           .get();
 
+      final targetSampleRows = await (_db.select(_db.shotTargetSamples)
+            ..where((sample) => sample.shotId.equals(row.id))
+            ..orderBy([(sample) => OrderingTerm.asc(sample.elapsedMs)]))
+          .get();
+
       shots.add(
         _shotFromRow(
           row,
           samples: sampleRows.map(_sampleFromRow).toList(),
           annotations: annotationRows.map(_annotationFromRow).toList(),
+          targetPressureSamples: targetSampleRows.map(_targetSampleFromRow).toList(),
         ),
       );
     }
@@ -179,6 +200,8 @@ class ShotRepository {
     }
   }
 
+  // Note: the target samples loading for filtered list is handled in listShots when includeSamples.
+
   Future<List<String>> _shotIdsWithAnyTag(Set<String> tagIds) async {
     final rows = await (_db.select(_db.shotTags)
           ..where((row) => row.tagId.isIn(tagIds)))
@@ -227,7 +250,7 @@ class ShotRepository {
       ..limit(limit);
     final rows = await query.get();
     return rows
-        .map((row) => _shotFromRow(row, samples: const [], annotations: const []))
+        .map((row) => _shotFromRow(row, samples: const [], annotations: const [], targetPressureSamples: const []))
         .toList();
   }
 
@@ -269,10 +292,16 @@ class ShotRepository {
           ]))
         .get();
 
+    final targetSampleRows = await (_db.select(_db.shotTargetSamples)
+          ..where((sample) => sample.shotId.equals(id))
+          ..orderBy([(sample) => OrderingTerm.asc(sample.elapsedMs)]))
+        .get();
+
     return _shotFromRow(
       row,
       samples: sampleRows.map(_sampleFromRow).toList(),
       annotations: annotationRows.map(_annotationFromRow).toList(),
+      targetPressureSamples: targetSampleRows.map(_targetSampleFromRow).toList(),
     );
   }
 
@@ -322,6 +351,17 @@ class ShotRepository {
     );
   }
 
+  ShotTargetSamplesCompanion _targetSampleToCompanion(
+    String shotId,
+    models.ShotSample sample,
+  ) {
+    return ShotTargetSamplesCompanion.insert(
+      shotId: shotId,
+      elapsedMs: sample.elapsedMs,
+      pressureBar: Value(sample.pressureBar),
+    );
+  }
+
   ShotAnnotationsCompanion _annotationToCompanion(
     String shotId,
     models.ShotAnnotation annotation,
@@ -338,6 +378,7 @@ class ShotRepository {
     ShotRow row, {
     required List<models.ShotSample> samples,
     required List<models.ShotAnnotation> annotations,
+    List<models.ShotSample> targetPressureSamples = const [],
   }) {
     return models.Shot(
       id: row.id,
@@ -369,6 +410,7 @@ class ShotRepository {
       targetScore: row.targetScore,
       samples: samples,
       annotations: annotations,
+      targetPressureSamples: targetPressureSamples,
     );
   }
 
@@ -387,6 +429,13 @@ class ShotRepository {
       weightG: row.weightG,
       flowGs: row.flowGs,
       tempC: row.tempC,
+    );
+  }
+
+  models.ShotSample _targetSampleFromRow(ShotTargetSampleRow row) {
+    return models.ShotSample(
+      elapsedMs: row.elapsedMs,
+      pressureBar: row.pressureBar,
     );
   }
 

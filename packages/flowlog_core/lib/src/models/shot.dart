@@ -38,6 +38,7 @@ class Shot {
     this.autoStartPressureBar,
     this.samples = const [],
     this.annotations = const [],
+    this.targetPressureSamples = const [],
     this.targetClosenessPercent,
     this.targetMaxStreakSeconds,
     this.targetScore,
@@ -72,6 +73,10 @@ class Shot {
   final double? autoStartPressureBar;
   final List<ShotSample> samples;
   final List<ShotAnnotation> annotations;
+
+  /// The target pressure curve (if any) that was active for this brew.
+  /// Stored so history can show exactly what target was followed.
+  final List<ShotSample> targetPressureSamples;
 
   /// Gamification fields for target curve closeness.
   final double? targetClosenessPercent;
@@ -123,6 +128,10 @@ class Shot {
               ?.map((e) => ShotAnnotation.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
+      targetPressureSamples: (json['targetPressureSamples'] as List<dynamic>?)
+              ?.map((e) => ShotSample.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
     );
   }
 
@@ -166,6 +175,9 @@ class Shot {
         'samples': samples.map((s) => s.toJson()).toList(),
       if (annotations.isNotEmpty)
         'annotations': annotations.map((a) => a.toJson()).toList(),
+      if (targetPressureSamples.isNotEmpty)
+        'targetPressureSamples':
+            targetPressureSamples.map((s) => s.toJson()).toList(),
     };
   }
 
@@ -196,6 +208,7 @@ class Shot {
     double? autoStartPressureBar,
     List<ShotSample>? samples,
     List<ShotAnnotation>? annotations,
+    List<ShotSample>? targetPressureSamples,
     double? targetClosenessPercent,
     int? targetMaxStreakSeconds,
     double? targetScore,
@@ -229,6 +242,7 @@ class Shot {
       autoStartPressureBar: autoStartPressureBar ?? this.autoStartPressureBar,
       samples: samples ?? this.samples,
       annotations: annotations ?? this.annotations,
+      targetPressureSamples: targetPressureSamples ?? this.targetPressureSamples,
       targetClosenessPercent: targetClosenessPercent ?? this.targetClosenessPercent,
       targetMaxStreakSeconds: targetMaxStreakSeconds ?? this.targetMaxStreakSeconds,
       targetScore: targetScore ?? this.targetScore,
@@ -264,6 +278,7 @@ class Shot {
             targetClosenessPercent == other.targetClosenessPercent &&
             targetMaxStreakSeconds == other.targetMaxStreakSeconds &&
             targetScore == other.targetScore &&
+            _listEquals(targetPressureSamples, other.targetPressureSamples) &&
             _listEquals(flavourTags, other.flavourTags) &&
             _mapEquals(flavourIntensities, other.flavourIntensities) &&
             _listEquals(samples, other.samples) &&
@@ -298,6 +313,7 @@ class Shot {
           targetClosenessPercent,
           targetMaxStreakSeconds,
           targetScore,
+          Object.hashAll(targetPressureSamples),
           Object.hashAll(flavourTags),
           Object.hashAll(flavourIntensities.entries),
           Object.hashAll(samples),

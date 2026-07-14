@@ -387,6 +387,7 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
             DualCurveChart(
               samples: shot.samples,
               annotations: shot.annotations,
+              targetPressureSamples: shot.targetPressureSamples,
               maxDurationMs: _chartDurationMs(shot),
             ),
             const SizedBox(height: 16),
@@ -550,13 +551,17 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
   }
 
   static int? _chartDurationMs(Shot shot) {
+    int? dur;
     if (shot.endedAt != null) {
-      return shot.endedAt!.difference(shot.startedAt).inMilliseconds;
+      dur = shot.endedAt!.difference(shot.startedAt).inMilliseconds;
+    } else if (shot.samples.isNotEmpty) {
+      dur = shot.samples.last.elapsedMs;
     }
-    if (shot.samples.isEmpty) {
-      return null;
+    // Include target duration if longer, so the full target curve is visible in history.
+    for (final t in shot.targetPressureSamples) {
+      dur = (dur ?? 0) > t.elapsedMs ? dur : t.elapsedMs;
     }
-    return shot.samples.last.elapsedMs;
+    return dur;
   }
 
   static String _formatStartedAt(DateTime startedAt) {

@@ -4246,6 +4246,314 @@ class SavedProfileSamplesCompanion
   }
 }
 
+class $ShotTargetSamplesTable extends ShotTargetSamples
+    with TableInfo<$ShotTargetSamplesTable, ShotTargetSampleRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ShotTargetSamplesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _shotIdMeta = const VerificationMeta('shotId');
+  @override
+  late final GeneratedColumn<String> shotId = GeneratedColumn<String>(
+    'shot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES shots (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _elapsedMsMeta = const VerificationMeta(
+    'elapsedMs',
+  );
+  @override
+  late final GeneratedColumn<int> elapsedMs = GeneratedColumn<int>(
+    'elapsed_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _pressureBarMeta = const VerificationMeta(
+    'pressureBar',
+  );
+  @override
+  late final GeneratedColumn<double> pressureBar = GeneratedColumn<double>(
+    'pressure_bar',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, shotId, elapsedMs, pressureBar];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'shot_target_samples';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ShotTargetSampleRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('shot_id')) {
+      context.handle(
+        _shotIdMeta,
+        shotId.isAcceptableOrUnknown(data['shot_id']!, _shotIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_shotIdMeta);
+    }
+    if (data.containsKey('elapsed_ms')) {
+      context.handle(
+        _elapsedMsMeta,
+        elapsedMs.isAcceptableOrUnknown(data['elapsed_ms']!, _elapsedMsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_elapsedMsMeta);
+    }
+    if (data.containsKey('pressure_bar')) {
+      context.handle(
+        _pressureBarMeta,
+        pressureBar.isAcceptableOrUnknown(
+          data['pressure_bar']!,
+          _pressureBarMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ShotTargetSampleRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ShotTargetSampleRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      shotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shot_id'],
+      )!,
+      elapsedMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}elapsed_ms'],
+      )!,
+      pressureBar: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}pressure_bar'],
+      ),
+    );
+  }
+
+  @override
+  $ShotTargetSamplesTable createAlias(String alias) {
+    return $ShotTargetSamplesTable(attachedDatabase, alias);
+  }
+}
+
+class ShotTargetSampleRow extends DataClass
+    implements Insertable<ShotTargetSampleRow> {
+  final int id;
+  final String shotId;
+  final int elapsedMs;
+  final double? pressureBar;
+  const ShotTargetSampleRow({
+    required this.id,
+    required this.shotId,
+    required this.elapsedMs,
+    this.pressureBar,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['shot_id'] = Variable<String>(shotId);
+    map['elapsed_ms'] = Variable<int>(elapsedMs);
+    if (!nullToAbsent || pressureBar != null) {
+      map['pressure_bar'] = Variable<double>(pressureBar);
+    }
+    return map;
+  }
+
+  ShotTargetSamplesCompanion toCompanion(bool nullToAbsent) {
+    return ShotTargetSamplesCompanion(
+      id: Value(id),
+      shotId: Value(shotId),
+      elapsedMs: Value(elapsedMs),
+      pressureBar: pressureBar == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pressureBar),
+    );
+  }
+
+  factory ShotTargetSampleRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ShotTargetSampleRow(
+      id: serializer.fromJson<int>(json['id']),
+      shotId: serializer.fromJson<String>(json['shotId']),
+      elapsedMs: serializer.fromJson<int>(json['elapsedMs']),
+      pressureBar: serializer.fromJson<double?>(json['pressureBar']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'shotId': serializer.toJson<String>(shotId),
+      'elapsedMs': serializer.toJson<int>(elapsedMs),
+      'pressureBar': serializer.toJson<double?>(pressureBar),
+    };
+  }
+
+  ShotTargetSampleRow copyWith({
+    int? id,
+    String? shotId,
+    int? elapsedMs,
+    Value<double?> pressureBar = const Value.absent(),
+  }) => ShotTargetSampleRow(
+    id: id ?? this.id,
+    shotId: shotId ?? this.shotId,
+    elapsedMs: elapsedMs ?? this.elapsedMs,
+    pressureBar: pressureBar.present ? pressureBar.value : this.pressureBar,
+  );
+  ShotTargetSampleRow copyWithCompanion(ShotTargetSamplesCompanion data) {
+    return ShotTargetSampleRow(
+      id: data.id.present ? data.id.value : this.id,
+      shotId: data.shotId.present ? data.shotId.value : this.shotId,
+      elapsedMs: data.elapsedMs.present ? data.elapsedMs.value : this.elapsedMs,
+      pressureBar: data.pressureBar.present
+          ? data.pressureBar.value
+          : this.pressureBar,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShotTargetSampleRow(')
+          ..write('id: $id, ')
+          ..write('shotId: $shotId, ')
+          ..write('elapsedMs: $elapsedMs, ')
+          ..write('pressureBar: $pressureBar')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, shotId, elapsedMs, pressureBar);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ShotTargetSampleRow &&
+          other.id == this.id &&
+          other.shotId == this.shotId &&
+          other.elapsedMs == this.elapsedMs &&
+          other.pressureBar == this.pressureBar);
+}
+
+class ShotTargetSamplesCompanion extends UpdateCompanion<ShotTargetSampleRow> {
+  final Value<int> id;
+  final Value<String> shotId;
+  final Value<int> elapsedMs;
+  final Value<double?> pressureBar;
+  const ShotTargetSamplesCompanion({
+    this.id = const Value.absent(),
+    this.shotId = const Value.absent(),
+    this.elapsedMs = const Value.absent(),
+    this.pressureBar = const Value.absent(),
+  });
+  ShotTargetSamplesCompanion.insert({
+    this.id = const Value.absent(),
+    required String shotId,
+    required int elapsedMs,
+    this.pressureBar = const Value.absent(),
+  }) : shotId = Value(shotId),
+       elapsedMs = Value(elapsedMs);
+  static Insertable<ShotTargetSampleRow> custom({
+    Expression<int>? id,
+    Expression<String>? shotId,
+    Expression<int>? elapsedMs,
+    Expression<double>? pressureBar,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (shotId != null) 'shot_id': shotId,
+      if (elapsedMs != null) 'elapsed_ms': elapsedMs,
+      if (pressureBar != null) 'pressure_bar': pressureBar,
+    });
+  }
+
+  ShotTargetSamplesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? shotId,
+    Value<int>? elapsedMs,
+    Value<double?>? pressureBar,
+  }) {
+    return ShotTargetSamplesCompanion(
+      id: id ?? this.id,
+      shotId: shotId ?? this.shotId,
+      elapsedMs: elapsedMs ?? this.elapsedMs,
+      pressureBar: pressureBar ?? this.pressureBar,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (shotId.present) {
+      map['shot_id'] = Variable<String>(shotId.value);
+    }
+    if (elapsedMs.present) {
+      map['elapsed_ms'] = Variable<int>(elapsedMs.value);
+    }
+    if (pressureBar.present) {
+      map['pressure_bar'] = Variable<double>(pressureBar.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShotTargetSamplesCompanion(')
+          ..write('id: $id, ')
+          ..write('shotId: $shotId, ')
+          ..write('elapsedMs: $elapsedMs, ')
+          ..write('pressureBar: $pressureBar')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$FlowlogDatabase extends GeneratedDatabase {
   _$FlowlogDatabase(QueryExecutor e) : super(e);
   $FlowlogDatabaseManager get managers => $FlowlogDatabaseManager(this);
@@ -4260,6 +4568,8 @@ abstract class _$FlowlogDatabase extends GeneratedDatabase {
   late final $SavedProfilesTable savedProfiles = $SavedProfilesTable(this);
   late final $SavedProfileSamplesTable savedProfileSamples =
       $SavedProfileSamplesTable(this);
+  late final $ShotTargetSamplesTable shotTargetSamples =
+      $ShotTargetSamplesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4273,6 +4583,7 @@ abstract class _$FlowlogDatabase extends GeneratedDatabase {
     shotTags,
     savedProfiles,
     savedProfileSamples,
+    shotTargetSamples,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -4310,6 +4621,13 @@ abstract class _$FlowlogDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('saved_profile_samples', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'shots',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('shot_target_samples', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -4433,6 +4751,27 @@ final class $$ShotsTableReferences
     ).filter((f) => f.shotId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_shotTagsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$ShotTargetSamplesTable, List<ShotTargetSampleRow>>
+  _shotTargetSamplesRefsTable(_$FlowlogDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.shotTargetSamples,
+        aliasName: 'shots__id__shot_target_samples__shot_id',
+      );
+
+  $$ShotTargetSamplesTableProcessedTableManager get shotTargetSamplesRefs {
+    final manager = $$ShotTargetSamplesTableTableManager(
+      $_db,
+      $_db.shotTargetSamples,
+    ).filter((f) => f.shotId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _shotTargetSamplesRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -4652,6 +4991,31 @@ class $$ShotsTableFilterComposer
           }) => $$ShotTagsTableFilterComposer(
             $db: $db,
             $table: $db.shotTags,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> shotTargetSamplesRefs(
+    Expression<bool> Function($$ShotTargetSamplesTableFilterComposer f) f,
+  ) {
+    final $$ShotTargetSamplesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.shotTargetSamples,
+      getReferencedColumn: (t) => t.shotId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotTargetSamplesTableFilterComposer(
+            $db: $db,
+            $table: $db.shotTargetSamples,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -4998,6 +5362,32 @@ class $$ShotsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> shotTargetSamplesRefs<T extends Object>(
+    Expression<T> Function($$ShotTargetSamplesTableAnnotationComposer a) f,
+  ) {
+    final $$ShotTargetSamplesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.shotTargetSamples,
+          getReferencedColumn: (t) => t.shotId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ShotTargetSamplesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.shotTargetSamples,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$ShotsTableTableManager
@@ -5017,6 +5407,7 @@ class $$ShotsTableTableManager
             bool shotSamplesRefs,
             bool shotAnnotationsRefs,
             bool shotTagsRefs,
+            bool shotTargetSamplesRefs,
           })
         > {
   $$ShotsTableTableManager(_$FlowlogDatabase db, $ShotsTable table)
@@ -5161,6 +5552,7 @@ class $$ShotsTableTableManager
                 shotSamplesRefs = false,
                 shotAnnotationsRefs = false,
                 shotTagsRefs = false,
+                shotTargetSamplesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -5168,6 +5560,7 @@ class $$ShotsTableTableManager
                     if (shotSamplesRefs) db.shotSamples,
                     if (shotAnnotationsRefs) db.shotAnnotations,
                     if (shotTagsRefs) db.shotTags,
+                    if (shotTargetSamplesRefs) db.shotTargetSamples,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -5235,6 +5628,27 @@ class $$ShotsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (shotTargetSamplesRefs)
+                        await $_getPrefetchedData<
+                          ShotRow,
+                          $ShotsTable,
+                          ShotTargetSampleRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ShotsTableReferences
+                              ._shotTargetSamplesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ShotsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).shotTargetSamplesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.shotId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -5259,6 +5673,7 @@ typedef $$ShotsTableProcessedTableManager =
         bool shotSamplesRefs,
         bool shotAnnotationsRefs,
         bool shotTagsRefs,
+        bool shotTargetSamplesRefs,
       })
     >;
 typedef $$ShotSamplesTableCreateCompanionBuilder =
@@ -7517,6 +7932,316 @@ typedef $$SavedProfileSamplesTableProcessedTableManager =
       SavedProfileSampleRow,
       PrefetchHooks Function({bool profileId})
     >;
+typedef $$ShotTargetSamplesTableCreateCompanionBuilder =
+    ShotTargetSamplesCompanion Function({
+      Value<int> id,
+      required String shotId,
+      required int elapsedMs,
+      Value<double?> pressureBar,
+    });
+typedef $$ShotTargetSamplesTableUpdateCompanionBuilder =
+    ShotTargetSamplesCompanion Function({
+      Value<int> id,
+      Value<String> shotId,
+      Value<int> elapsedMs,
+      Value<double?> pressureBar,
+    });
+
+final class $$ShotTargetSamplesTableReferences
+    extends
+        BaseReferences<
+          _$FlowlogDatabase,
+          $ShotTargetSamplesTable,
+          ShotTargetSampleRow
+        > {
+  $$ShotTargetSamplesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ShotsTable _shotIdTable(_$FlowlogDatabase db) =>
+      db.shots.createAlias('shot_target_samples__shot_id__shots__id');
+
+  $$ShotsTableProcessedTableManager get shotId {
+    final $_column = $_itemColumn<String>('shot_id')!;
+
+    final manager = $$ShotsTableTableManager(
+      $_db,
+      $_db.shots,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_shotIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ShotTargetSamplesTableFilterComposer
+    extends Composer<_$FlowlogDatabase, $ShotTargetSamplesTable> {
+  $$ShotTargetSamplesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get elapsedMs => $composableBuilder(
+    column: $table.elapsedMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get pressureBar => $composableBuilder(
+    column: $table.pressureBar,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ShotsTableFilterComposer get shotId {
+    final $$ShotsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.shotId,
+      referencedTable: $db.shots,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotsTableFilterComposer(
+            $db: $db,
+            $table: $db.shots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ShotTargetSamplesTableOrderingComposer
+    extends Composer<_$FlowlogDatabase, $ShotTargetSamplesTable> {
+  $$ShotTargetSamplesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get elapsedMs => $composableBuilder(
+    column: $table.elapsedMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get pressureBar => $composableBuilder(
+    column: $table.pressureBar,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ShotsTableOrderingComposer get shotId {
+    final $$ShotsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.shotId,
+      referencedTable: $db.shots,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotsTableOrderingComposer(
+            $db: $db,
+            $table: $db.shots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ShotTargetSamplesTableAnnotationComposer
+    extends Composer<_$FlowlogDatabase, $ShotTargetSamplesTable> {
+  $$ShotTargetSamplesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get elapsedMs =>
+      $composableBuilder(column: $table.elapsedMs, builder: (column) => column);
+
+  GeneratedColumn<double> get pressureBar => $composableBuilder(
+    column: $table.pressureBar,
+    builder: (column) => column,
+  );
+
+  $$ShotsTableAnnotationComposer get shotId {
+    final $$ShotsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.shotId,
+      referencedTable: $db.shots,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ShotsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.shots,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ShotTargetSamplesTableTableManager
+    extends
+        RootTableManager<
+          _$FlowlogDatabase,
+          $ShotTargetSamplesTable,
+          ShotTargetSampleRow,
+          $$ShotTargetSamplesTableFilterComposer,
+          $$ShotTargetSamplesTableOrderingComposer,
+          $$ShotTargetSamplesTableAnnotationComposer,
+          $$ShotTargetSamplesTableCreateCompanionBuilder,
+          $$ShotTargetSamplesTableUpdateCompanionBuilder,
+          (ShotTargetSampleRow, $$ShotTargetSamplesTableReferences),
+          ShotTargetSampleRow,
+          PrefetchHooks Function({bool shotId})
+        > {
+  $$ShotTargetSamplesTableTableManager(
+    _$FlowlogDatabase db,
+    $ShotTargetSamplesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ShotTargetSamplesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ShotTargetSamplesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ShotTargetSamplesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> shotId = const Value.absent(),
+                Value<int> elapsedMs = const Value.absent(),
+                Value<double?> pressureBar = const Value.absent(),
+              }) => ShotTargetSamplesCompanion(
+                id: id,
+                shotId: shotId,
+                elapsedMs: elapsedMs,
+                pressureBar: pressureBar,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String shotId,
+                required int elapsedMs,
+                Value<double?> pressureBar = const Value.absent(),
+              }) => ShotTargetSamplesCompanion.insert(
+                id: id,
+                shotId: shotId,
+                elapsedMs: elapsedMs,
+                pressureBar: pressureBar,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ShotTargetSamplesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({shotId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (shotId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.shotId,
+                                referencedTable:
+                                    $$ShotTargetSamplesTableReferences
+                                        ._shotIdTable(db),
+                                referencedColumn:
+                                    $$ShotTargetSamplesTableReferences
+                                        ._shotIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ShotTargetSamplesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$FlowlogDatabase,
+      $ShotTargetSamplesTable,
+      ShotTargetSampleRow,
+      $$ShotTargetSamplesTableFilterComposer,
+      $$ShotTargetSamplesTableOrderingComposer,
+      $$ShotTargetSamplesTableAnnotationComposer,
+      $$ShotTargetSamplesTableCreateCompanionBuilder,
+      $$ShotTargetSamplesTableUpdateCompanionBuilder,
+      (ShotTargetSampleRow, $$ShotTargetSamplesTableReferences),
+      ShotTargetSampleRow,
+      PrefetchHooks Function({bool shotId})
+    >;
 
 class $FlowlogDatabaseManager {
   final _$FlowlogDatabase _db;
@@ -7536,4 +8261,6 @@ class $FlowlogDatabaseManager {
       $$SavedProfilesTableTableManager(_db, _db.savedProfiles);
   $$SavedProfileSamplesTableTableManager get savedProfileSamples =>
       $$SavedProfileSamplesTableTableManager(_db, _db.savedProfileSamples);
+  $$ShotTargetSamplesTableTableManager get shotTargetSamples =>
+      $$ShotTargetSamplesTableTableManager(_db, _db.shotTargetSamples);
 }

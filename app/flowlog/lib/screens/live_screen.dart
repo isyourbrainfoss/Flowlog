@@ -426,6 +426,21 @@ class _LiveScreenState extends State<LiveScreen> {
     setState(() {});
   }
 
+  void _onReconnectSensors() {
+    final hub = SensorHubScope.maybeOf(context);
+    if (hub != null) {
+      unawaited(hub.reconnectPairedDevices());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reconnecting paired sensors...'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   Future<FlowlogDatabase> _ensureDatabase() async {
     if (_database != null) {
       return _database!;
@@ -874,15 +889,44 @@ class _LiveScreenState extends State<LiveScreen> {
                               score: liveGamif['score'] as double?,
                             ),
                           ],
-                        ]
-                        else if (state == ShotSessionState.idle || state == ShotSessionState.stopped)
-                          // Live pressure (always) before starting the shot (or after finished shot,
-                          // to confirm sensor for next). Make it crystal clear the sensor is live.
+                        ] else if (state == ShotSessionState.idle || state == ShotSessionState.stopped) ...[
+                          // Make post-brew auto-start readiness crystal clear.
+                          if (_resolvedAutoStartController.settings.enabled)
+                            AutoStartArmedBanner(
+                              thresholdBar: _resolvedAutoStartController.settings.startThresholdBar,
+                              pressureBarNotifier: _livePressureNotifier,
+                              lastUpdateNotifier: _livePressureLastUpdate,
+                            ),
+                          // Pressure or reconnect.
                           ValueListenableBuilder<double?>(
                             valueListenable: _livePressureNotifier,
                             builder: (context, pressureBar, _) {
                               if (pressureBar == null) {
-                                return const SizedBox.shrink();
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Row(
+                                          children: [
+                                            Icon(Icons.sensors_off, size: 18),
+                                            SizedBox(width: 8),
+                                            Expanded(child: Text('No live pressure reading')),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        OutlinedButton.icon(
+                                          onPressed: _onReconnectSensors,
+                                          icon: const Icon(Icons.refresh),
+                                          label: const Text('Reconnect sensors'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
                               }
                               return ValueListenableBuilder<DateTime?>(
                                 valueListenable: _livePressureLastUpdate,
@@ -913,8 +957,8 @@ class _LiveScreenState extends State<LiveScreen> {
                                 },
                               );
                             },
-                          )
-                        else
+                          ),
+                        ] else
                           const LiveMetricsRow(
                             metrics: LiveMetrics(elapsedMs: 0),
                           ),

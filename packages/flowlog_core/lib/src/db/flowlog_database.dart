@@ -20,13 +20,14 @@ part 'flowlog_database.g.dart';
     ShotTags,
     SavedProfiles,
     SavedProfileSamples,
+    ShotTargetSamples,
   ],
 )
 class FlowlogDatabase extends _$FlowlogDatabase {
   FlowlogDatabase(super.executor);
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -201,6 +202,9 @@ class FlowlogDatabase extends _$FlowlogDatabase {
                 'ALTER TABLE shots ADD COLUMN target_score REAL',
               );
             }
+          }
+          if (from < 17) {
+            await m.createTable(shotTargetSamples);
           }
         },
       );

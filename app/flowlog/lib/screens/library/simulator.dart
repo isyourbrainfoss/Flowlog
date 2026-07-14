@@ -1073,11 +1073,18 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   SavedProfile? _profile;
   bool _initialized = false;
   bool _profileEditorActive = false;
+  TargetBrewController? _targetBrewController;
 
   @override
   void initState() {
     super.initState();
     _stateFuture = _loadState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _targetBrewController = TargetBrewScope.maybeOf(context);
   }
 
   Future<ProfileRepository> _ensureProfileRepository() async {
@@ -1154,6 +1161,22 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
     _initialized = true;
   }
 
+  void _maybeLoadTargetBrewAsDefault() {
+    final target = _targetBrewController;
+    if (target != null && target.hasTarget && target.pressureSamples.isNotEmpty) {
+      final samples = target.pressureSamples;
+      final contentMs = samples.isEmpty ? _timelineDurationMs : samples.last.elapsedMs;
+      final newDuration = suggestSimulatorTimelineDuration(contentMs);
+      final newKeyframes = keyframesFromPressureSamples(samples, durationMs: newDuration);
+      // Load the active target so tweaks are easy right after setting it as target brew.
+      setState(() {
+        _profile = null;
+        _keyframes = newKeyframes;
+        _timelineDurationMs = newDuration;
+      });
+    }
+  }
+
   void _onKeyframesChanged(List<PressureKeyframe> keyframes) {
     setState(() => _keyframes = keyframes);
   }
@@ -1213,6 +1236,49 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         durationMs: timelineDurationMs,
       );
     });
+  }
+
+  Future<void> _onLoadSavedSimulation() async {
+    final repository = await _ensureProfileRepository();
+    if (!mounted) {
+      return;
+    }
+
+    final profiles = await repository.listProfiles(includeSamples: true);
+    if (!mounted || profiles.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No saved profiles to load')),
+        );
+      }
+      return;
+    }
+
+    final selected = await showDialog<SavedProfile>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Load simulation'),
+        children: [
+          for (final p in profiles)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, p),
+              child: Text(p.name),
+            ),
+        ],
+      ),
+    );
+
+    if (selected != null && mounted) {
+      final samples = selected.pressureSamples;
+      final contentMs = samples.isEmpty ? _timelineDurationMs : samples.last.elapsedMs;
+      final dur = suggestSimulatorTimelineDuration(contentMs);
+      final kfs = keyframesFromPressureSamples(samples, durationMs: dur);
+      setState(() {
+        _profile = selected;
+        _keyframes = kfs;
+        _timelineDurationMs = dur;
+      });
+    }
   }
 
   Future<void> _onExportProfilePressed() async {
@@ -1353,6 +1419,12 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         final state = snapshot.data!;
         _applyLoadedState(state);
 
+        // Prefer the active target brew so the user can immediately tweak it
+        // after setting one (post-frame to avoid build-time setState).
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _maybeLoadTargetBrewAsDefault();
+        });
+
         final pressureProfile = expandKeyframesToProfile(_keyframes);
         final predictedSamples = buildPredictedFlowSamples(pressureProfile);
         final summary = summarizePredictedFlow(predictedSamples);
@@ -1395,6 +1467,12 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                     onPressed: _onImportShotPressed,
                     icon: const Icon(Icons.download_outlined),
                     label: const Text('Import shot'),
+                  ),
+                  OutlinedButton.icon(
+                    key: const Key('simulator_load_simulation'),
+                    onPressed: _onLoadSavedSimulation,
+                    icon: const Icon(Icons.folder_open_outlined),
+                    label: const Text('Load simulation'),
                   ),
                   OutlinedButton.icon(
                     key: const Key('simulator_export_profile'),

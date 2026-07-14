@@ -62,6 +62,7 @@ class _HistoryFullscreenChartScreenState
               height: constraints.maxHeight,
               samples: widget.shot.samples,
               annotations: widget.shot.annotations,
+              targetPressureSamples: widget.shot.targetPressureSamples,
               maxDurationMs: durationMs,
               interactionController: _interactionController,
               enableCrosshair: true,
@@ -73,13 +74,16 @@ class _HistoryFullscreenChartScreenState
   }
 
   static int? _chartDurationMs(Shot shot) {
+    int? dur;
     if (shot.endedAt != null) {
-      return shot.endedAt!.difference(shot.startedAt).inMilliseconds;
+      dur = shot.endedAt!.difference(shot.startedAt).inMilliseconds;
+    } else if (shot.samples.isNotEmpty) {
+      dur = shot.samples.last.elapsedMs;
     }
-    if (shot.samples.isEmpty) {
-      return null;
+    for (final t in shot.targetPressureSamples) {
+      dur = (dur ?? 0) > t.elapsedMs ? dur : t.elapsedMs;
     }
-    return shot.samples.last.elapsedMs;
+    return dur;
   }
 }
 

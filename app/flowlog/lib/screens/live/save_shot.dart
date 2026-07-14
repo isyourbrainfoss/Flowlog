@@ -159,6 +159,7 @@ Shot buildShotFromSession({
   double? latitude,
   double? longitude,
   double? autoStartPressureBar,
+  List<ShotSample> targetPressureSamples = const [],
   ShotIdGenerator idGenerator = generateShotId,
 }) {
   var shot = Shot(
@@ -171,6 +172,7 @@ Shot buildShotFromSession({
     autoStartPressureBar: autoStartPressureBar,
     samples: List<ShotSample>.from(samples),
     annotations: List<ShotAnnotation>.from(annotations),
+    targetPressureSamples: List<ShotSample>.from(targetPressureSamples),
     lastModifiedAt: endedAt ?? DateTime.now().toUtc(),
   );
 
@@ -443,6 +445,7 @@ Future<Shot?> runAutoSaveFlow({
     latitude: latitude,
     longitude: longitude,
     autoStartPressureBar: autoStartPressureBar,
+    targetPressureSamples: targetPressureSamples,
     idGenerator: idGenerator,
   );
 
@@ -578,6 +581,7 @@ Future<Shot?> runStarShotSaveFlow({
     endedAt: endedAt,
     metadata: metadata,
     annotations: annotations,
+    targetPressureSamples: targetPressureSamples,
     idGenerator: idGenerator,
   );
 

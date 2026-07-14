@@ -107,6 +107,17 @@ class ShotSamples extends Table {
   RealColumn get tempC => real().nullable()();
 }
 
+/// Target pressure curve samples stored with a shot (to show the target used
+/// in history and compare closeness visually).
+@DataClassName('ShotTargetSampleRow')
+class ShotTargetSamples extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get shotId =>
+      text().references(Shots, #id, onDelete: KeyAction.cascade)();
+  IntColumn get elapsedMs => integer()();
+  RealColumn get pressureBar => real().nullable()();
+}
+
 /// Saved pressure profile and metadata for repeat shots.
 @DataClassName('SavedProfileRow')
 class SavedProfiles extends Table {
