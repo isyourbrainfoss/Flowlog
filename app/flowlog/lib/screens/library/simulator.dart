@@ -1418,7 +1418,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         final state = snapshot.data!;
         _applyLoadedState(state);
 
-        final displayName = _profile?.name ?? state.profile.name ?? 'Demo profile';
+        final displayName = (_profile ?? state.profile).name;
 
         final pressureProfile = expandKeyframesToProfile(_keyframes);
         final predictedSamples = buildPredictedFlowSamples(pressureProfile);
@@ -1426,76 +1426,90 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
         final durationMs = _timelineDurationMs;
 
         return Scaffold(
-          body: RefreshIndicator(
-            onRefresh: _refresh,
-            child: ListView(
-              key: const Key('simulator_screen'),
-              physics: _profileEditorActive
-                  ? const NeverScrollableScrollPhysics()
-                  : const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              children: [
-              Text(
-                'What-if simulator',
-                style: Theme.of(context).textTheme.titleLarge,
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header outside the scroll view so the loaded profile name is
+              // always present in the widget tree (helps tests) and always
+              // visible to the user.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'What-if simulator',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      displayName,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                displayName,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Drag vertically for pressure, horizontally to move a point in '
-                'time. Tap the curve to add a point. Tap a point to select it, '
-                'then use Remove point — or long-press to delete. Predicted '
-                'flow is a simple stub (higher pressure → higher g/s).',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  OutlinedButton.icon(
-                    key: const Key('simulator_import_shot'),
-                    onPressed: _onImportShotPressed,
-                    icon: const Icon(Icons.download_outlined),
-                    label: const Text('Import shot'),
-                  ),
-                  OutlinedButton.icon(
-                    key: const Key('simulator_load_simulation'),
-                    onPressed: _onLoadSavedSimulation,
-                    icon: const Icon(Icons.folder_open_outlined),
-                    label: const Text('Load simulation'),
-                  ),
-                  OutlinedButton.icon(
-                    key: const Key('simulator_load_target'),
-                    onPressed: _onLoadCurrentTarget,
-                    icon: const Icon(Icons.outlined_flag),
-                    label: const Text('Load current target'),
-                  ),
-                  OutlinedButton.icon(
-                    key: const Key('simulator_export_profile'),
-                    onPressed: _onExportProfilePressed,
-                    icon: const Icon(Icons.save_outlined),
-                    label: const Text('Export profile'),
-                  ),
-                  FilledButton.icon(
-                    key: const Key('simulator_use_on_live'),
-                    onPressed: _onUseOnLivePressed,
-                    icon: const Icon(Icons.play_arrow_outlined),
-                    label: const Text('Use on Live'),
-                  ),
-                  FilledButton.tonalIcon(
-                    key: const Key('simulator_set_default_target'),
-                    onPressed: _onSetDefaultTargetPressed,
-                    icon: const Icon(Icons.timeline),
-                    label: const Text('Set as target brew'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: ListView(
+                    key: const Key('simulator_screen'),
+                    physics: _profileEditorActive
+                        ? const NeverScrollableScrollPhysics()
+                        : const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    children: [
+                    Text(
+                      'Drag vertically for pressure, horizontally to move a point in '
+                      'time. Tap the curve to add a point. Tap a point to select it, '
+                      'then use Remove point — or long-press to delete. Predicted '
+                      'flow is a simple stub (higher pressure → higher g/s).',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          key: const Key('simulator_import_shot'),
+                          onPressed: _onImportShotPressed,
+                          icon: const Icon(Icons.download_outlined),
+                          label: const Text('Import shot'),
+                        ),
+                        OutlinedButton.icon(
+                          key: const Key('simulator_load_simulation'),
+                          onPressed: _onLoadSavedSimulation,
+                          icon: const Icon(Icons.folder_open_outlined),
+                          label: const Text('Load simulation'),
+                        ),
+                        OutlinedButton.icon(
+                          key: const Key('simulator_load_target'),
+                          onPressed: _onLoadCurrentTarget,
+                          icon: const Icon(Icons.outlined_flag),
+                          label: const Text('Load current target'),
+                        ),
+                        OutlinedButton.icon(
+                          key: const Key('simulator_export_profile'),
+                          onPressed: _onExportProfilePressed,
+                          icon: const Icon(Icons.save_outlined),
+                          label: const Text('Export profile'),
+                        ),
+                        FilledButton.icon(
+                          key: const Key('simulator_use_on_live'),
+                          onPressed: _onUseOnLivePressed,
+                          icon: const Icon(Icons.play_arrow_outlined),
+                          label: const Text('Use on Live'),
+                        ),
+                        FilledButton.tonalIcon(
+                          key: const Key('simulator_set_default_target'),
+                          onPressed: _onSetDefaultTargetPressed,
+                          icon: const Icon(Icons.timeline),
+                          label: const Text('Set as target brew'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -1608,10 +1622,13 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 enableInteraction: false,
                 targetPressureSamples: pressureProfile,
               ),
-              ],
-            ),
-          ),
-        );
+            ],
+          ), // ListView
+        ), // RefreshIndicator
+      ), // Expanded
+    ], // Column children
+  ), // Column
+); // Scaffold
       },
     );
   }
