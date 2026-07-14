@@ -364,22 +364,6 @@ class _LiveScreenState extends State<LiveScreen> {
         List<ShotAnnotation>.from(_annotationController.annotations);
   }
 
-  int? _currentElapsedMs() {
-    final samples = _controller?.samples ?? const [];
-    if (samples.isEmpty) {
-      return null;
-    }
-    return samples.last.elapsedMs;
-  }
-
-  void _onMarkChannel() {
-    final elapsedMs = _currentElapsedMs();
-    if (elapsedMs == null) {
-      return;
-    }
-    _annotationController.markChannel(elapsedMs: elapsedMs);
-  }
-
   Future<void> _onAnnotateAtElapsedMs(int elapsedMs) async {
     if (_controller?.sessionState == ShotSessionState.idle) {
       return;
@@ -774,8 +758,6 @@ class _LiveScreenState extends State<LiveScreen> {
         final latestSample = samples.isEmpty ? null : samples.last;
         final previousSample =
             samples.length < 2 ? null : samples[samples.length - 2];
-        final canAnnotate =
-            state != ShotSessionState.idle && samples.isNotEmpty;
         final repeatPrefill = _repeatShotController?.prefill;
         final chartTargetSamples = _chartTargetPressureSamples();
         final autoStartSettings = _resolvedAutoStartController.settings;
@@ -836,6 +818,21 @@ class _LiveScreenState extends State<LiveScreen> {
                           ),
                           const SizedBox(height: 8),
                         ],
+                        // Prominent sensor readiness shown with the plot after a shot,
+                        // so it's obvious whether pressensor is still connected and
+                        // ready for the next brew (was clear on first shot, now reinforced).
+                        if ((state == ShotSessionState.idle || state == ShotSessionState.stopped) &&
+                            !controller.isBrewing)
+                          _IdleSensorStatus(
+                            pressureBarNotifier: _livePressureNotifier,
+                            lastUpdateNotifier: _livePressureLastUpdate,
+                            onReconnect: _onReconnectSensors,
+                            autoStartEnabled: _resolvedAutoStartController.settings.enabled,
+                            autoStartThreshold: _resolvedAutoStartController.settings.startThresholdBar,
+                          ),
+                        if ((state == ShotSessionState.idle || state == ShotSessionState.stopped) &&
+                            !controller.isBrewing)
+                          const SizedBox(height: 8),
                         LiveFullscreenChartButton(
                           onPressed: _onOpenFullscreenChart,
                         ),
@@ -847,7 +844,9 @@ class _LiveScreenState extends State<LiveScreen> {
                           denseTimeAxis: true,
                           targetPressureSamples: chartTargetSamples,
                           onAnnotateAtElapsedMs:
-                              canAnnotate ? _onAnnotateAtElapsedMs : null,
+                              (state != ShotSessionState.idle && samples.isNotEmpty)
+                                  ? _onAnnotateAtElapsedMs
+                                  : null,
                         ),
                       ],
                     ),
@@ -865,8 +864,6 @@ class _LiveScreenState extends State<LiveScreen> {
                       children: [
                         AnnotationControls(
                           controller: _annotationController,
-                          canMarkChannel: canAnnotate,
-                          onMarkChannel: _onMarkChannel,
                         ),
                         const SizedBox(height: 8),
                         if ((state == ShotSessionState.recording || state == ShotSessionState.paused || state == ShotSessionState.stopped) && latestSample != null) ...[
@@ -890,74 +887,13 @@ class _LiveScreenState extends State<LiveScreen> {
                             ),
                           ],
                         ] else if (state == ShotSessionState.idle || state == ShotSessionState.stopped) ...[
-                          // Make post-brew auto-start readiness crystal clear.
+                          // Make post-brew auto-start readiness crystal clear (still shown below plot).
                           if (_resolvedAutoStartController.settings.enabled)
                             AutoStartArmedBanner(
                               thresholdBar: _resolvedAutoStartController.settings.startThresholdBar,
                               pressureBarNotifier: _livePressureNotifier,
                               lastUpdateNotifier: _livePressureLastUpdate,
                             ),
-                          // Pressure or reconnect.
-                          ValueListenableBuilder<double?>(
-                            valueListenable: _livePressureNotifier,
-                            builder: (context, pressureBar, _) {
-                              if (pressureBar == null) {
-                                return Card(
-                                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Row(
-                                          children: [
-                                            Icon(Icons.sensors_off, size: 18),
-                                            SizedBox(width: 8),
-                                            Expanded(child: Text('No live pressure reading')),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 8),
-                                        OutlinedButton.icon(
-                                          onPressed: _onReconnectSensors,
-                                          icon: const Icon(Icons.refresh),
-                                          label: const Text('Reconnect sensors'),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }
-                              return ValueListenableBuilder<DateTime?>(
-                                valueListenable: _livePressureLastUpdate,
-                                builder: (context, lastUpdate, _) {
-                                  final targetP = chartTargetSamples.isNotEmpty
-                                      ? chartTargetSamples.last.pressureBar
-                                      : null;
-                                  return Card(
-                                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          LivePressureReadout(
-                                            pressureBar: pressureBar,
-                                            lastUpdated: lastUpdate,
-                                          ),
-                                          const SizedBox(height: 4),
-                                          LivePressureDeviationBar(
-                                            currentPressure: pressureBar,
-                                            targetPressure: targetP,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                          ),
                         ] else
                           const LiveMetricsRow(
                             metrics: LiveMetrics(elapsedMs: 0),
@@ -1199,6 +1135,113 @@ class _GamifPill extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Clear sensor connection + readiness status shown above the plot in idle
+/// (post-shot) state on the main/home view. Makes it obvious the pressensor
+/// is (or isn't) still connected and the app is ready for a new shot.
+class _IdleSensorStatus extends StatelessWidget {
+  const _IdleSensorStatus({
+    required this.pressureBarNotifier,
+    required this.lastUpdateNotifier,
+    required this.onReconnect,
+    required this.autoStartEnabled,
+    required this.autoStartThreshold,
+    super.key,
+  });
+
+  final ValueNotifier<double?> pressureBarNotifier;
+  final ValueNotifier<DateTime?> lastUpdateNotifier;
+  final VoidCallback onReconnect;
+  final bool autoStartEnabled;
+  final double autoStartThreshold;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return ValueListenableBuilder<double?>(
+      valueListenable: pressureBarNotifier,
+      builder: (context, pressure, _) {
+        final bool connected = pressure != null;
+        final color = connected ? cs.primaryContainer : cs.errorContainer;
+        final onColor = connected ? cs.onPrimaryContainer : cs.onErrorContainer;
+        final icon = connected ? Icons.sensors : Icons.sensors_off;
+        final title = connected
+            ? 'Pressensor connected — ready for new shot'
+            : 'Pressensor not connected';
+
+        return Material(
+          color: color,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Icon(icon, color: onColor, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: onColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (connected) ...[
+                        const SizedBox(height: 2),
+                        ValueListenableBuilder<DateTime?>(
+                          valueListenable: lastUpdateNotifier,
+                          builder: (context, last, _) {
+                            final isStale = last != null &&
+                                DateTime.now().difference(last) > const Duration(seconds: 4);
+                            final pStr = pressure.toStringAsFixed(2);
+                            return Text(
+                              'Live: $pStr bar${isStale ? ' (stale)' : ''}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: onColor.withValues(alpha: isStale ? 0.7 : 0.9),
+                              ),
+                            );
+                          },
+                        ),
+                        if (autoStartEnabled)
+                          Text(
+                            'Auto-start at ${autoStartThreshold.toStringAsFixed(1)} bar',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: onColor.withValues(alpha: 0.8),
+                            ),
+                          ),
+                      ] else ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Reconnect to start recording',
+                          style: theme.textTheme.bodySmall?.copyWith(color: onColor),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (!connected)
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: onColor,
+                      side: BorderSide(color: onColor.withValues(alpha: 0.5)),
+                    ),
+                    onPressed: onReconnect,
+                    child: const Text('Reconnect'),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

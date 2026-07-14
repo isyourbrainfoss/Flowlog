@@ -48,7 +48,7 @@ void main() {
   });
 
   group('AnnotationControls', () {
-    testWidgets('mark channel and undo buttons are present on live screen',
+    testWidgets('undo button is present on live screen',
         (tester) async {
       final controller = ShotAnnotationController();
 
@@ -57,17 +57,16 @@ void main() {
           home: Scaffold(
             body: AnnotationControls(
               controller: controller,
-              canMarkChannel: true,
-              onMarkChannel: () => controller.markChannel(elapsedMs: 1000),
             ),
           ),
         ),
       );
 
-      expect(find.byKey(const Key('mark_channel_button')), findsOneWidget);
       expect(find.byKey(const Key('undo_annotation_button')), findsOneWidget);
+      expect(find.byKey(const Key('mark_channel_button')), findsNothing);
 
-      await tester.tap(find.byKey(const Key('mark_channel_button')));
+      // Simulate adding an annotation directly (marking now done via chart long-press)
+      controller.markChannel(elapsedMs: 1000);
       await tester.pump();
 
       expect(controller.annotations, hasLength(1));

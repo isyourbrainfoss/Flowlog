@@ -187,18 +187,15 @@ enum ChartAnnotationAction {
   note,
 }
 
-/// Mark channel and undo controls shown under the live chart.
+/// Undo control for annotations shown under the live chart.
+/// Marking is done via long-press on the chart (see promptChartAnnotationAction).
 class AnnotationControls extends StatelessWidget {
   const AnnotationControls({
     required this.controller,
-    required this.canMarkChannel,
-    required this.onMarkChannel,
     super.key,
   });
 
   final ShotAnnotationController controller;
-  final bool canMarkChannel;
-  final VoidCallback onMarkChannel;
 
   @override
   Widget build(BuildContext context) {
@@ -210,31 +207,15 @@ class AnnotationControls extends StatelessWidget {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: [
-                Tooltip(
-                  message: 'Place a channel marker at the current moment',
-                  child: FilledButton.tonalIcon(
-                    key: const Key('mark_channel_button'),
-                    onPressed: canMarkChannel ? onMarkChannel : null,
-                    icon: const Icon(Icons.swap_vert),
-                    label: const Text('Mark channel'),
-                  ),
-                ),
-                IconButton(
-                  key: const Key('undo_annotation_button'),
-                  tooltip: 'Undo last annotation',
-                  onPressed: controller.canUndo ? controller.undo : null,
-                  icon: const Icon(Icons.undo),
-                ),
-              ],
+            IconButton(
+              key: const Key('undo_annotation_button'),
+              tooltip: 'Undo last annotation',
+              onPressed: controller.canUndo ? controller.undo : null,
+              icon: const Icon(Icons.undo),
             ),
             const SizedBox(height: 6),
             Text(
-              'Marks now · long-press chart to place at a time · undo to remove',
+              'Long-press chart to mark channel or add note · undo to remove',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
