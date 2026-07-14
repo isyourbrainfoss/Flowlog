@@ -169,7 +169,7 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('does not show auto-start controls on live tab', (
+    testWidgets('shows auto-start armed state on live tab (but no threshold slider)', (
       tester,
     ) async {
       hub.addDevice(SensorKind.pressensor);
@@ -177,7 +177,9 @@ void main() {
 
       await pumpHarness(tester);
 
-      expect(find.textContaining('Auto-start armed'), findsNothing);
+      // Armed banner is now shown to make readiness crystal clear after a brew.
+      expect(find.textContaining('Auto-start armed'), findsOneWidget);
+      // But the settings slider is not embedded in the live tab.
       expect(find.byKey(const Key('auto_start_threshold_slider')), findsNothing);
     });
 

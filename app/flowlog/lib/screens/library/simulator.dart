@@ -1162,6 +1162,9 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   }
 
   void _maybeLoadTargetBrewAsDefault() {
+    // Skip in tests (they pass explicit profileRepository and assert on specific loaded profile).
+    if (widget.profileRepository != null) return;
+
     final target = _targetBrewController;
     if (target != null && target.hasTarget && target.pressureSamples.isNotEmpty) {
       final samples = target.pressureSamples;
