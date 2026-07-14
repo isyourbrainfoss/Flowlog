@@ -1149,7 +1149,6 @@ class _IdleSensorStatus extends StatelessWidget {
     required this.onReconnect,
     required this.autoStartEnabled,
     required this.autoStartThreshold,
-    super.key,
   });
 
   final ValueNotifier<double?> pressureBarNotifier;
