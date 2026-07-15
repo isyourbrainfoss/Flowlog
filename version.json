@@ -1,8 +1,8 @@
 {
-  "version": "build-101",
-  "versionName": "build-101",
-  "versionCode": 101,
-  "sha256sum": "89193c1812521294ef8a12b9e9ad09a9fce39b795a2fa6f03afaa8d9f028a295",
+  "version": "build-102",
+  "versionName": "build-102",
+  "versionCode": 102,
+  "sha256sum": "f1fc89d954095a214245dbe600d2e2c7e20eaef916b16ca4da38ac7b2ad3d245",
   "url": "https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/flowlog-arm64-v8a.apk",
-  "uploadTimestamp": 1784062200000
+  "uploadTimestamp": 1784112951000
 }
