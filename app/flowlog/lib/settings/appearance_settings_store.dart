@@ -4,13 +4,16 @@ import 'dart:io';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flutter/material.dart';
 
-/// User appearance preference (coffee dark vs café light).
+/// User appearance preference: coffee dark, café light, or follow system.
 class AppearanceSettings {
   const AppearanceSettings({this.themeMode = ThemeMode.dark});
 
   final ThemeMode themeMode;
 
+  /// True only when [themeMode] is explicitly dark (not when following system).
   bool get isDark => themeMode == ThemeMode.dark;
+
+  bool get isSystem => themeMode == ThemeMode.system;
 
   AppearanceSettings copyWith({ThemeMode? themeMode}) {
     return AppearanceSettings(themeMode: themeMode ?? this.themeMode);

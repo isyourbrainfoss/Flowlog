@@ -34,5 +34,13 @@ void main() {
       expect(loaded.themeMode, ThemeMode.light);
       expect(loaded.isDark, isFalse);
     });
+
+    test('persists system (follow system) preference', () async {
+      await store.save(const AppearanceSettings(themeMode: ThemeMode.system));
+      final loaded = await store.load();
+      expect(loaded.themeMode, ThemeMode.system);
+      expect(loaded.isSystem, isTrue);
+      expect(loaded.isDark, isFalse);
+    });
   });
 }

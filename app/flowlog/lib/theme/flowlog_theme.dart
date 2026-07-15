@@ -147,7 +147,7 @@ abstract final class FlowlogTheme {
   }
 }
 
-/// Notifies listeners when the user switches between coffee dark and café light.
+/// Notifies listeners when the user switches coffee dark, café light, or system.
 class FlowlogThemeController extends ChangeNotifier {
   FlowlogThemeController({
     this.themeMode = ThemeMode.dark,
@@ -157,7 +157,17 @@ class FlowlogThemeController extends ChangeNotifier {
   ThemeMode themeMode;
   final Future<void> Function(ThemeMode mode)? onThemeModeChanged;
 
+  /// True only when [themeMode] is explicitly dark (not when following system).
   bool get isDark => themeMode == ThemeMode.dark;
+
+  bool get isSystem => themeMode == ThemeMode.system;
+
+  /// Short label for settings UI.
+  String get themeModeLabel => switch (themeMode) {
+        ThemeMode.dark => 'Coffee dark',
+        ThemeMode.light => 'Café light',
+        ThemeMode.system => 'Follow system',
+      };
 
   void setThemeMode(ThemeMode mode) {
     if (themeMode == mode) {

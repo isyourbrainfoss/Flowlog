@@ -54,17 +54,39 @@ class _MoreScreenState extends State<MoreScreen> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
         ListTile(
+          key: const Key('more_appearance_tile'),
           title: const Text('Appearance'),
-          subtitle: Text(
-            themeController.isDark ? 'Coffee dark' : 'Café light',
-          ),
-          trailing: Switch(
-            value: themeController.isDark,
-            onChanged: (isDark) {
-              themeController.setThemeMode(
-                isDark ? ThemeMode.dark : ThemeMode.light,
-              );
+          subtitle: Text(themeController.themeModeLabel),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: SegmentedButton<ThemeMode>(
+            key: const Key('more_theme_mode_segments'),
+            segments: const [
+              ButtonSegment<ThemeMode>(
+                value: ThemeMode.dark,
+                label: Text('Dark'),
+                icon: Icon(Icons.dark_mode_outlined, size: 18),
+              ),
+              ButtonSegment<ThemeMode>(
+                value: ThemeMode.light,
+                label: Text('Light'),
+                icon: Icon(Icons.light_mode_outlined, size: 18),
+              ),
+              ButtonSegment<ThemeMode>(
+                value: ThemeMode.system,
+                label: Text('System'),
+                icon: Icon(Icons.brightness_auto_outlined, size: 18),
+              ),
+            ],
+            selected: {themeController.themeMode},
+            onSelectionChanged: (selected) {
+              if (selected.isEmpty) {
+                return;
+              }
+              themeController.setThemeMode(selected.first);
             },
+            showSelectedIcon: false,
           ),
         ),
         ListTile(

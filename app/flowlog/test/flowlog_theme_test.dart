@@ -1,7 +1,10 @@
 import 'package:flowlog/main.dart';
+import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'shell_test_helpers.dart';
 
 void main() {
   group('FlowlogTheme', () {
@@ -62,30 +65,67 @@ void main() {
       controller.setThemeMode(ThemeMode.light);
       expect(notifications, 1);
     });
+
+    test('setThemeMode system follows system preference', () {
+      final controller = FlowlogThemeController();
+      addTearDown(controller.dispose);
+
+      controller.setThemeMode(ThemeMode.system);
+
+      expect(controller.themeMode, ThemeMode.system);
+      expect(controller.isSystem, isTrue);
+      expect(controller.isDark, isFalse);
+      expect(controller.themeModeLabel, 'Follow system');
+    });
   });
 
-  testWidgets('Appearance toggle switches theme mode', (tester) async {
+  testWidgets('Appearance segments switch theme mode including system', (
+    tester,
+  ) async {
     final controller = FlowlogThemeController();
     addTearDown(controller.dispose);
 
-    await tester.pumpWidget(FlowlogApp(themeController: controller));
+    await tester.pumpWidget(
+      FlowlogApp(
+        themeController: controller,
+        autoReconnectSensors: false,
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(controller.isDark, isTrue);
 
-    await tester.tap(find.byIcon(Icons.tune));
+    await selectShellTab(tester, AppTab.more);
     await tester.pumpAndSettle();
 
     expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('Coffee dark'), findsOneWidget);
+    expect(find.byKey(const Key('more_theme_mode_segments')), findsOneWidget);
 
-    await tester.tap(find.byType(Switch).first);
+    await tester.tap(find.text('Light'));
     await tester.pumpAndSettle();
 
+    expect(controller.themeMode, ThemeMode.light);
     expect(controller.isDark, isFalse);
     expect(find.text('Café light'), findsOneWidget);
 
-    final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    var materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(materialApp.themeMode, ThemeMode.light);
+
+    await tester.tap(find.text('System'));
+    await tester.pumpAndSettle();
+
+    expect(controller.themeMode, ThemeMode.system);
+    expect(controller.isSystem, isTrue);
+    expect(find.text('Follow system'), findsOneWidget);
+
+    materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(materialApp.themeMode, ThemeMode.system);
+
+    await tester.tap(find.text('Dark'));
+    await tester.pumpAndSettle();
+
+    expect(controller.themeMode, ThemeMode.dark);
+    expect(find.text('Coffee dark'), findsOneWidget);
   });
 }
