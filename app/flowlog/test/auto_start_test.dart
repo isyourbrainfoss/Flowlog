@@ -175,18 +175,15 @@ void main() {
       hub.addDevice(SensorKind.pressensor);
       hub.devices.first.state = ConnectionState.connected;
 
-      // Emit sample before pump so that when LiveAutoStartListener starts monitoring,
-      // the pressure notifier gets a value for "connected" status.
-      pressureTransport.emitPressure(const [0x03, 0xE8]); // some pressure
-
       await pumpHarness(tester);
       await tester.pump();
 
-      // Sensor readiness status is rendered (in this test setup it shows not-connected
-      // because no live sample updates the notifier, but the widget for readiness is present).
-      // The test verifies the armed/ready concept and absence of slider.
+      // Without a fresh live pressure sample, readiness must look the same as a
+      // fresh app open: not ready + Reconnect (stale leftovers must not look ready).
+      expect(find.byKey(const Key('idle_sensor_status')), findsOneWidget);
       expect(find.textContaining('Pressensor not connected'), findsOneWidget);
-      // But the settings slider is not embedded in the live tab.
+      expect(find.byKey(const Key('idle_sensor_reconnect')), findsOneWidget);
+      // Settings slider is not embedded in the live tab.
       expect(find.byKey(const Key('auto_start_threshold_slider')), findsNothing);
     });
 

@@ -411,6 +411,11 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   void _onReconnectSensors() {
+    // Clear leftover post-shot readings so the status banner does not keep
+    // showing a stale "last" value while reconnect is in progress.
+    _livePressureNotifier.value = null;
+    _livePressureLastUpdate.value = null;
+
     final hub = SensorHubScope.maybeOf(context);
     if (hub != null) {
       unawaited(hub.reconnectPairedDevices());
@@ -887,13 +892,8 @@ class _LiveScreenState extends State<LiveScreen> {
                             ),
                           ],
                         ] else if (state == ShotSessionState.idle || state == ShotSessionState.stopped) ...[
-                          // Make post-brew auto-start readiness crystal clear (still shown below plot).
-                          if (_resolvedAutoStartController.settings.enabled)
-                            AutoStartArmedBanner(
-                              thresholdBar: _resolvedAutoStartController.settings.startThresholdBar,
-                              pressureBarNotifier: _livePressureNotifier,
-                              lastUpdateNotifier: _livePressureLastUpdate,
-                            ),
+                          // (sensor readiness and auto-start info is now shown prominently
+                          // above the chart via _IdleSensorStatus for consistency before/after shots)
                         ] else
                           const LiveMetricsRow(
                             metrics: LiveMetrics(elapsedMs: 0),
@@ -1139,10 +1139,19 @@ class _GamifPill extends StatelessWidget {
   }
 }
 
+/// How long a pressure reading stays "live" before the home screen treats
+/// the pressensor as not ready (same UX as a fresh app open).
+const Duration kIdlePressureLiveWindow = Duration(seconds: 3);
+
 /// Clear sensor connection + readiness status shown above the plot in idle
-/// (post-shot) state on the main/home view. Makes it obvious the pressensor
-/// is (or isn't) still connected and the app is ready for a new shot.
-class _IdleSensorStatus extends StatelessWidget {
+/// (post-shot) state on the main/home view.
+///
+/// A leftover pressure value after a brew is NOT treated as "connected /
+/// ready" once it goes stale — otherwise the UI looks ready when the
+/// sensor has already dropped (common right after a shot). Stale and missing
+/// readings both show the red "not connected" state with a Reconnect button,
+/// matching the first-launch experience.
+class _IdleSensorStatus extends StatefulWidget {
   const _IdleSensorStatus({
     required this.pressureBarNotifier,
     required this.lastUpdateNotifier,
@@ -1158,87 +1167,129 @@ class _IdleSensorStatus extends StatelessWidget {
   final double autoStartThreshold;
 
   @override
+  State<_IdleSensorStatus> createState() => _IdleSensorStatusState();
+}
+
+class _IdleSensorStatusState extends State<_IdleSensorStatus> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    // Rebuild periodically so a leftover post-shot reading flips from
+    // "ready" to "not ready + Reconnect" as soon as it becomes stale.
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  bool _isLive(double? pressure, DateTime? lastUpdate) {
+    if (pressure == null) {
+      return false;
+    }
+    if (lastUpdate == null) {
+      // Value without a timestamp is treated as not live (cannot prove freshness).
+      return false;
+    }
+    return DateTime.now().difference(lastUpdate) <= kIdlePressureLiveWindow;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
     return ValueListenableBuilder<double?>(
-      valueListenable: pressureBarNotifier,
+      valueListenable: widget.pressureBarNotifier,
       builder: (context, pressure, _) {
-        final bool connected = pressure != null;
-        final color = connected ? cs.primaryContainer : cs.errorContainer;
-        final onColor = connected ? cs.onPrimaryContainer : cs.onErrorContainer;
-        final icon = connected ? Icons.sensors : Icons.sensors_off;
-        final title = connected
-            ? 'Pressensor connected — ready for new shot'
-            : 'Pressensor not connected';
+        return ValueListenableBuilder<DateTime?>(
+          valueListenable: widget.lastUpdateNotifier,
+          builder: (context, lastUpdate, _) {
+            final isLive = _isLive(pressure, lastUpdate);
+            final hasStaleReading = pressure != null && !isLive;
+            final pressureValue = pressure;
 
-        return Material(
-          color: color,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                Icon(icon, color: onColor, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: onColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (connected) ...[
-                        const SizedBox(height: 2),
-                        ValueListenableBuilder<DateTime?>(
-                          valueListenable: lastUpdateNotifier,
-                          builder: (context, last, _) {
-                            final isStale = last != null &&
-                                DateTime.now().difference(last) > const Duration(seconds: 4);
-                            final pStr = pressure.toStringAsFixed(2);
-                            return Text(
-                              'Live: $pStr bar${isStale ? ' (stale)' : ''}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: onColor.withValues(alpha: isStale ? 0.7 : 0.9),
-                              ),
-                            );
-                          },
-                        ),
-                        if (autoStartEnabled)
+            final color = isLive ? cs.primaryContainer : cs.errorContainer;
+            final onColor =
+                isLive ? cs.onPrimaryContainer : cs.onErrorContainer;
+            final icon = isLive ? Icons.sensors : Icons.sensors_off;
+
+            final String title;
+            final String subtitle;
+            if (isLive && pressureValue != null) {
+              title = 'Pressensor connected — ready for new shot';
+              final pStr = pressureValue.toStringAsFixed(2);
+              subtitle = widget.autoStartEnabled
+                  ? 'Live: $pStr bar · Auto-start at ${widget.autoStartThreshold.toStringAsFixed(1)} bar'
+                  : 'Live: $pStr bar';
+            } else if (hasStaleReading && pressureValue != null) {
+              // Same red "not ready" look as a fresh app open, but keep the
+              // last number visible so the user can see why it looked ready.
+              title = 'Pressensor not ready — no live pressure';
+              final pStr = pressureValue.toStringAsFixed(2);
+              subtitle =
+                  'Last reading: $pStr bar (stale). Reconnect, then start the next shot.';
+            } else {
+              title = 'Pressensor not connected';
+              subtitle = 'Reconnect to start recording';
+            }
+
+            return Material(
+              key: const Key('idle_sensor_status'),
+              color: color,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(icon, color: onColor, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                           Text(
-                            'Auto-start at ${autoStartThreshold.toStringAsFixed(1)} bar',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: onColor.withValues(alpha: 0.8),
+                            title,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: onColor,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                      ] else ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          'Reconnect to start recording',
-                          style: theme.textTheme.bodySmall?.copyWith(color: onColor),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (!connected)
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: onColor,
-                      side: BorderSide(color: onColor.withValues(alpha: 0.5)),
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: onColor.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    onPressed: onReconnect,
-                    child: const Text('Reconnect'),
-                  ),
-              ],
-            ),
-          ),
+                    if (!isLive)
+                      OutlinedButton(
+                        key: const Key('idle_sensor_reconnect'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: onColor,
+                          side: BorderSide(
+                            color: onColor.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        onPressed: widget.onReconnect,
+                        child: const Text('Reconnect'),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
