@@ -1141,7 +1141,11 @@ class _GamifPill extends StatelessWidget {
 
 /// How long a pressure reading stays "live" before the home screen treats
 /// the pressensor as not ready (same UX as a fresh app open).
-const Duration kIdlePressureLiveWindow = Duration(seconds: 3);
+///
+/// Kept in sync with [kLivePressureFreshWindow] in auto_start.dart, which also
+/// clears leftover values after this window so idle never looks "ready" with
+/// a stale sample (especially right after a brew ends).
+Duration get kIdlePressureLiveWindow => kLivePressureFreshWindow;
 
 /// Clear sensor connection + readiness status shown above the plot in idle
 /// (post-shot) state on the main/home view.
@@ -1150,7 +1154,8 @@ const Duration kIdlePressureLiveWindow = Duration(seconds: 3);
 /// ready" once it goes stale — otherwise the UI looks ready when the
 /// sensor has already dropped (common right after a shot). Stale and missing
 /// readings both show the red "not connected" state with a Reconnect button,
-/// matching the first-launch experience.
+/// matching the first-launch experience. LiveAutoStartListener also clears
+/// notifiers on brew start/stop and when samples age out.
 class _IdleSensorStatus extends StatefulWidget {
   const _IdleSensorStatus({
     required this.pressureBarNotifier,

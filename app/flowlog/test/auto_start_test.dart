@@ -208,5 +208,43 @@ void main() {
 
       expect(controller.sessionState, ShotSessionState.recording);
     });
+
+    testWidgets('drops aged idle pressure so banner never stays ready+stale', (
+      tester,
+    ) async {
+      hub.addDevice(SensorKind.pressensor);
+      hub.devices.first.state = ConnectionState.connected;
+
+      await pumpHarness(tester);
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pump();
+
+      // 100 mbar = 0.1 bar — below auto-start threshold, keeps session idle.
+      pressureTransport.emitPressure(const [0x00, 0x64]);
+      await tester.pump();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pump();
+
+      expect(find.textContaining('ready for new shot'), findsOneWidget);
+
+      // Age past the live window; freshness timer should clear the leftover.
+      await tester.runAsync(() async {
+        await Future<void>.delayed(
+          kLivePressureFreshWindow + const Duration(seconds: 2),
+        );
+      });
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.textContaining('ready for new shot'), findsNothing);
+      expect(find.textContaining('Pressensor not connected'), findsOneWidget);
+      expect(find.byKey(const Key('idle_sensor_reconnect')), findsOneWidget);
+      // Must not leave a green-ready-looking "stale" subtitle.
+      expect(find.textContaining('(stale)'), findsNothing);
+    });
   });
 }

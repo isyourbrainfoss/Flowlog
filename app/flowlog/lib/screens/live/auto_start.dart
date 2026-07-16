@@ -162,16 +162,26 @@ class LiveAutoStartListener extends StatefulWidget {
   State<LiveAutoStartListener> createState() => _LiveAutoStartListenerState();
 }
 
+/// How long a monitored pressure sample stays valid before idle UI treats the
+/// pressensor as disconnected (and we drop the leftover value).
+const Duration kLivePressureFreshWindow = Duration(seconds: 3);
+
 class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
   StreamSubscription<SensorSample>? _pressureSub;
   SensorAdapter? _ownedMonitorAdapter;
   AutoStartArming _arming = const AutoStartArming();
   bool _starting = false;
   double? _lastPressure;
+  Timer? _freshnessTimer;
+  int _monitorGeneration = 0;
+  bool _wasBrewing = false;
+  bool _wantMonitor = false;
+  bool _applyingMonitor = false;
 
   @override
   void initState() {
     super.initState();
+    _wasBrewing = widget.controller.isBrewing;
     widget.controller.addListener(_onControllerChanged);
     widget.hub.addListener(_onHubChanged);
     _syncMonitoring();
@@ -212,19 +222,36 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
   void dispose() {
     widget.controller.removeListener(_onControllerChanged);
     widget.hub.removeListener(_onHubChanged);
-    unawaited(_stopMonitoring());
+    _wantMonitor = false;
+    _freshnessTimer?.cancel();
+    unawaited(_stopMonitoringBody());
     super.dispose();
   }
 
   void _onControllerChanged() {
-    if (widget.controller.isBrewing) {
+    final brewing = widget.controller.isBrewing;
+    if (brewing) {
       _arming = const AutoStartArming(armed: false);
+    }
+    // Only clear on brew start/stop edges. Continuous idle notifies must not
+    // wipe a healthy live pressure stream.
+    if (brewing != _wasBrewing) {
+      _clearLivePressure();
+      _wasBrewing = brewing;
     }
     _syncMonitoring();
   }
 
   void _onHubChanged() {
+    if (!_hasPressureSource) {
+      _clearLivePressure();
+    }
     _syncMonitoring();
+  }
+
+  void _clearLivePressure() {
+    widget.pressureBarNotifier?.value = null;
+    widget.pressureLastUpdateNotifier?.value = null;
   }
 
   bool get _shouldMonitor {
@@ -250,40 +277,133 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
   }
 
   void _syncMonitoring() {
-    if (_shouldMonitor) {
-      unawaited(_startMonitoring());
-      return;
-    }
-    unawaited(_stopMonitoring());
+    _wantMonitor = _shouldMonitor;
+    unawaited(_applyMonitoring());
   }
 
-  Future<void> _startMonitoring() async {
+  /// Serializes start/stop so a brew end cannot race a pending stop and leave
+  /// monitoring permanently off (or keep a leftover sample as "ready").
+  Future<void> _applyMonitoring() async {
+    if (_applyingMonitor) {
+      return;
+    }
+    _applyingMonitor = true;
+    try {
+      while (mounted) {
+        final want = _wantMonitor;
+        final active = _pressureSub != null || _ownedMonitorAdapter != null;
+        if (want && !active) {
+          await _startMonitoringBody();
+        } else if (!want && active) {
+          await _stopMonitoringBody();
+        } else if (!want && !active) {
+          _clearLivePressure();
+          _cancelFreshnessTimer();
+          break;
+        } else {
+          break;
+        }
+      }
+    } finally {
+      _applyingMonitor = false;
+    }
+    // A brew start/stop may flip _wantMonitor while we were mid-connect.
+    if (!mounted) {
+      return;
+    }
+    final want = _wantMonitor;
+    final active = _pressureSub != null || _ownedMonitorAdapter != null;
+    if ((want && !active) || (!want && active)) {
+      unawaited(_applyMonitoring());
+    }
+  }
+
+  void _ensureFreshnessTimer() {
+    if (_freshnessTimer != null) {
+      return;
+    }
+    // Drop aged samples so idle never shows "ready" with a leftover reading.
+    _freshnessTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final last = widget.pressureLastUpdateNotifier?.value;
+      if (last == null) {
+        return;
+      }
+      if (DateTime.now().difference(last) > kLivePressureFreshWindow) {
+        _clearLivePressure();
+      }
+    });
+  }
+
+  void _cancelFreshnessTimer() {
+    _freshnessTimer?.cancel();
+    _freshnessTimer = null;
+  }
+
+  Future<void> _startMonitoringBody() async {
     if (_pressureSub != null) {
       return;
     }
 
+    final generation = ++_monitorGeneration;
+    // Fresh slate: ready only after a sample arrives on this monitor session.
+    _clearLivePressure();
+    _ensureFreshnessTimer();
+
     final hubAdapter = widget.hub.activeAdapterFor(SensorKind.pressensor);
     if (hubAdapter != null) {
-      _pressureSub = hubAdapter.samples.listen(_onPressureSample);
-    } else {
-      final source = widget.sensorSource;
-      if (source != null && source.hasConnectedSensors) {
-        final adapter = source.resolveSampleAdapter();
-        if (adapter is! IdleSensorAdapter) {
-          _ownedMonitorAdapter = adapter;
-          await adapter.connect();
-          _pressureSub = adapter.samples.listen(_onPressureSample);
-        }
+      if (!_wantMonitor || generation != _monitorGeneration) {
+        return;
       }
+      _pressureSub = hubAdapter.samples.listen(
+        (sample) => _onPressureSample(sample, generation),
+        onDone: () => _onMonitorStreamEnded(generation),
+        onError: (_) => _onMonitorStreamEnded(generation),
+      );
+      return;
     }
 
+    final source = widget.sensorSource;
+    if (source == null || !source.hasConnectedSensors) {
+      return;
+    }
+    final adapter = source.resolveSampleAdapter();
+    if (adapter is IdleSensorAdapter) {
+      return;
+    }
+
+    _ownedMonitorAdapter = adapter;
+    await adapter.connect();
+    if (!_wantMonitor || generation != _monitorGeneration) {
+      // Stop requested while connecting — tear down owned adapter.
+      _ownedMonitorAdapter = null;
+      await adapter.disconnect();
+      if (adapter is MergedSampleStreamAdapter) {
+        await adapter.dispose();
+      }
+      return;
+    }
+    _pressureSub = adapter.samples.listen(
+      (sample) => _onPressureSample(sample, generation),
+      onDone: () => _onMonitorStreamEnded(generation),
+      onError: (_) => _onMonitorStreamEnded(generation),
+    );
   }
 
-  Future<void> _stopMonitoring() async {
+  void _onMonitorStreamEnded(int generation) {
+    if (generation != _monitorGeneration) {
+      return;
+    }
+    _pressureSub = null;
+    _clearLivePressure();
+    _syncMonitoring();
+  }
+
+  Future<void> _stopMonitoringBody() async {
+    _monitorGeneration++;
+    _cancelFreshnessTimer();
     await _pressureSub?.cancel();
     _pressureSub = null;
-    widget.pressureBarNotifier?.value = null;
-    widget.pressureLastUpdateNotifier?.value = null;
+    _clearLivePressure();
 
     final owned = _ownedMonitorAdapter;
     _ownedMonitorAdapter = null;
@@ -295,12 +415,20 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
     }
   }
 
-  void _onPressureSample(SensorSample sample) {
+  void _onPressureSample(SensorSample sample, int generation) {
+    if (generation != _monitorGeneration) {
+      return;
+    }
+    // Never update idle pressure while a brew is active (session owns the stream).
+    if (widget.controller.isBrewing || !widget.controller.canStart) {
+      return;
+    }
+
     widget.pressureBarNotifier?.value = sample.pressureBar;
     widget.pressureLastUpdateNotifier?.value = DateTime.now();
     _lastPressure = sample.pressureBar;
 
-    if (!mounted || _starting || !widget.controller.canStart) {
+    if (!mounted || _starting) {
       return;
     }
 
@@ -473,7 +601,7 @@ class _LivePressureReadoutState extends State<LivePressureReadout> {
   bool get _isStale {
     final t = widget.lastUpdated;
     if (t == null) return false;
-    return DateTime.now().difference(t) > const Duration(seconds: 3);
+    return DateTime.now().difference(t) > kLivePressureFreshWindow;
   }
 
   @override
