@@ -18,12 +18,15 @@ import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog/settings/brew_location_store.dart';
 import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
+import 'package:flowlog/screens/more/sensors_screen.dart';
 import 'package:flowlog/sensors/live_sensor_source.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog/shell/active_brew_scope.dart';
+import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/shot_events.dart';
 import 'package:flowlog/shell/shell_breakpoints.dart';
+import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -430,6 +433,18 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
+  void _onPairSensors() {
+    FlowlogShellScope.maybeOf(context)?.switchTab(AppTab.more);
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => Scaffold(
+          appBar: AppBar(title: const Text('Sensors')),
+          body: const SensorsScreen(),
+        ),
+      ),
+    );
+  }
+
   Future<FlowlogDatabase> _ensureDatabase() async {
     if (_database != null) {
       return _database!;
@@ -831,7 +846,11 @@ class _LiveScreenState extends State<LiveScreen> {
                           _IdleSensorStatus(
                             pressureBarNotifier: _livePressureNotifier,
                             lastUpdateNotifier: _livePressureLastUpdate,
+                            pressensorPaired: SensorHubScope.maybeOf(context)
+                                    ?.hasKind(SensorKind.pressensor) ??
+                                false,
                             onReconnect: _onReconnectSensors,
+                            onPair: _onPairSensors,
                             autoStartEnabled: _resolvedAutoStartController.settings.enabled,
                             autoStartThreshold: _resolvedAutoStartController.settings.startThresholdBar,
                           ),
@@ -1153,21 +1172,26 @@ Duration get kIdlePressureLiveWindow => kLivePressureFreshWindow;
 /// A leftover pressure value after a brew is NOT treated as "connected /
 /// ready" once it goes stale — otherwise the UI looks ready when the
 /// sensor has already dropped (common right after a shot). Stale and missing
-/// readings both show the red "not connected" state with a Reconnect button,
-/// matching the first-launch experience. LiveAutoStartListener also clears
-/// notifiers on brew start/stop and when samples age out.
+/// readings both show the red "not ready" state. Action is **Reconnect** when
+/// a pressensor is already paired, or **Pair sensor** when none is paired.
+/// LiveAutoStartListener also clears notifiers on brew start/stop and when
+/// samples age out.
 class _IdleSensorStatus extends StatefulWidget {
   const _IdleSensorStatus({
     required this.pressureBarNotifier,
     required this.lastUpdateNotifier,
+    required this.pressensorPaired,
     required this.onReconnect,
+    required this.onPair,
     required this.autoStartEnabled,
     required this.autoStartThreshold,
   });
 
   final ValueNotifier<double?> pressureBarNotifier;
   final ValueNotifier<DateTime?> lastUpdateNotifier;
+  final bool pressensorPaired;
   final VoidCallback onReconnect;
+  final VoidCallback onPair;
   final bool autoStartEnabled;
   final double autoStartThreshold;
 
@@ -1182,7 +1206,7 @@ class _IdleSensorStatusState extends State<_IdleSensorStatus> {
   void initState() {
     super.initState();
     // Rebuild periodically so a leftover post-shot reading flips from
-    // "ready" to "not ready + Reconnect" as soon as it becomes stale.
+    // "ready" to "not ready" as soon as it becomes stale.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -1209,6 +1233,7 @@ class _IdleSensorStatusState extends State<_IdleSensorStatus> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final paired = widget.pressensorPaired;
 
     return ValueListenableBuilder<double?>(
       valueListenable: widget.pressureBarNotifier,
@@ -1234,16 +1259,23 @@ class _IdleSensorStatusState extends State<_IdleSensorStatus> {
                   ? 'Live: $pStr bar · Auto-start at ${widget.autoStartThreshold.toStringAsFixed(1)} bar'
                   : 'Live: $pStr bar';
             } else if (hasStaleReading && pressureValue != null) {
-              // Same red "not ready" look as a fresh app open, but keep the
-              // last number visible so the user can see why it looked ready.
               title = 'Pressensor not ready — no live pressure';
               final pStr = pressureValue.toStringAsFixed(2);
-              subtitle =
-                  'Last reading: $pStr bar (stale). Reconnect, then start the next shot.';
+              subtitle = paired
+                  ? 'Last reading: $pStr bar (stale). Reconnect, then start the next shot.'
+                  : 'Last reading: $pStr bar (stale). Pair a pressensor to continue.';
+            } else if (!paired) {
+              title = 'No pressensor paired';
+              subtitle = 'Pair a pressensor to record pressure and auto-start';
             } else {
               title = 'Pressensor not connected';
               subtitle = 'Reconnect to start recording';
             }
+
+            final actionLabel = paired ? 'Reconnect' : 'Pair sensor';
+            final actionKey = paired
+                ? const Key('idle_sensor_reconnect')
+                : const Key('idle_sensor_pair');
 
             return Material(
               key: const Key('idle_sensor_status'),
@@ -1280,15 +1312,16 @@ class _IdleSensorStatusState extends State<_IdleSensorStatus> {
                     ),
                     if (!isLive)
                       OutlinedButton(
-                        key: const Key('idle_sensor_reconnect'),
+                        key: actionKey,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: onColor,
                           side: BorderSide(
                             color: onColor.withValues(alpha: 0.5),
                           ),
                         ),
-                        onPressed: widget.onReconnect,
-                        child: const Text('Reconnect'),
+                        onPressed:
+                            paired ? widget.onReconnect : widget.onPair,
+                        child: Text(actionLabel),
                       ),
                   ],
                 ),

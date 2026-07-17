@@ -71,6 +71,7 @@ void main() {
     ) async {
       const metrics = LiveMetrics(
         pressureBar: 9.2,
+        weightG: 28.0,
         flowGs: 1.8,
         elapsedMs: 18500,
         projectedYieldG: 34.5,
@@ -85,10 +86,12 @@ void main() {
       );
 
       expect(find.text('Pressure'), findsOneWidget);
+      expect(find.text('Weight'), findsOneWidget);
       expect(find.text('Flow'), findsOneWidget);
       expect(find.text('Elapsed'), findsOneWidget);
       expect(find.text('Proj. yield'), findsOneWidget);
       expect(find.text('9.2 bar'), findsOneWidget);
+      expect(find.text('28.0 g'), findsOneWidget);
       expect(find.text('1.8 g/s'), findsOneWidget);
       expect(find.text('0:18'), findsOneWidget);
       expect(find.text('34.5 g'), findsOneWidget);
@@ -112,8 +115,10 @@ void main() {
       );
 
       expect(find.text('8.0 bar'), findsOneWidget);
+      expect(find.text('24.0 g'), findsOneWidget);
       expect(find.text('2.0 g/s'), findsOneWidget);
       expect(find.text('0:12'), findsOneWidget);
+      // Projected yield at 12s with 24g @ 2 g/s toward 30s target.
       expect(find.text('60.0 g'), findsOneWidget);
     });
 
@@ -142,7 +147,8 @@ void main() {
         ),
       );
 
-      expect(find.byIcon(Icons.arrow_drop_up), findsNWidgets(2));
+      // Pressure↑ weight↑ flow↓ elapsed↑ proj.yield↓
+      expect(find.byIcon(Icons.arrow_drop_up), findsNWidgets(3));
       expect(find.byIcon(Icons.arrow_drop_down), findsNWidgets(2));
       expect(find.byIcon(Icons.remove), findsNothing);
     });
@@ -163,7 +169,8 @@ void main() {
         ),
       );
 
-      expect(find.byIcon(Icons.remove), findsNWidgets(4));
+      // Pressure, weight, flow, elapsed, proj. yield
+      expect(find.byIcon(Icons.remove), findsNWidgets(5));
       expect(find.byIcon(Icons.arrow_drop_up), findsNothing);
       expect(find.byIcon(Icons.arrow_drop_down), findsNothing);
     });
@@ -224,7 +231,8 @@ void main() {
         ),
       );
 
-      expect(find.text('—'), findsNWidgets(3));
+      // Pressure, weight, flow, proj. yield (elapsed is 0:00)
+      expect(find.text('—'), findsNWidgets(4));
       expect(find.text('0:00'), findsOneWidget);
     });
 

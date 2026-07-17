@@ -1119,6 +1119,7 @@ class DualCurveChartPainter extends CustomPainter {
   }
 
   void _drawGrid(Canvas canvas, Rect plotRect, _ChartScales scales) {
+    // Primary (left) grid + labels: pressure when shown, else weight, else flow.
     if (showPressure) {
       _drawValueGrid(
         canvas,
@@ -1146,7 +1147,60 @@ class DualCurveChartPainter extends CustomPainter {
       );
     }
 
+    // Overlay mode: pressure uses the left axis; put weight numbers on the
+    // right so g is readable (flow uses a different scale — numbers in split /
+    // flow-only, or via crosshair + metrics row).
+    if (!compact && showPressure && showWeight) {
+      _drawRightValueLabels(
+        canvas,
+        plotRect,
+        maxValue: scales.weightMax,
+        step: _gridStepForMax(scales.weightMax, targetLines: 5),
+        color: FlowlogChartColors.weightLine,
+      );
+    } else if (!compact && showPressure && showFlow && !showWeight) {
+      _drawRightValueLabels(
+        canvas,
+        plotRect,
+        maxValue: scales.flowMax,
+        step: 1,
+        color: FlowlogChartColors.flowLine,
+      );
+    }
+
     _drawTimeGrid(canvas, plotRect, scales);
+  }
+
+  /// Numeric labels for the secondary (right) axis in overlay mode.
+  void _drawRightValueLabels(
+    Canvas canvas,
+    Rect plotRect, {
+    required double maxValue,
+    required double step,
+    required Color color,
+  }) {
+    if (maxValue <= 0 || step <= 0) {
+      return;
+    }
+
+    final tickStyle = TextStyle(
+      color: color.withValues(alpha: 0.95),
+      fontSize: 9,
+      fontWeight: FontWeight.w500,
+    );
+
+    for (var value = step; value < maxValue - 0.001; value += step) {
+      final y = plotRect.bottom - (value / maxValue) * plotRect.height;
+      final labelY = y <= plotRect.top + 1 ? y + 3 : y - 7;
+      _paintText(
+        canvas,
+        _formatGridValue(value),
+        Offset(plotRect.right + 4, labelY),
+        tickStyle,
+        maxWidth: rightPad - 4,
+        align: TextAlign.left,
+      );
+    }
   }
 
   double _gridStepForMax(double maxValue, {required int targetLines}) {
@@ -1287,24 +1341,58 @@ class DualCurveChartPainter extends CustomPainter {
         textStyle,
       );
     } else {
-      _drawAxisLabel(
-        canvas,
-        'bar',
-        Offset(4, axisUnitTop),
-        textStyle,
-      );
-      _drawAxisLabel(
-        canvas,
-        'g',
-        Offset(plotRect.right + 6, axisUnitTop),
-        textStyle,
-      );
-      _drawAxisLabel(
-        canvas,
-        'g/s',
-        Offset(plotRect.right + 6, plotRect.center.dy),
-        textStyle,
-      );
+      if (showPressure) {
+        _drawAxisLabel(
+          canvas,
+          'bar',
+          Offset(4, axisUnitTop),
+          textStyle,
+        );
+      } else if (showWeight) {
+        _drawAxisLabel(
+          canvas,
+          'g',
+          Offset(4, axisUnitTop),
+          textStyle,
+        );
+      } else if (showFlow) {
+        _drawAxisLabel(
+          canvas,
+          'g/s',
+          Offset(4, axisUnitTop),
+          textStyle,
+        );
+      }
+
+      // Secondary units on the right (overlay). Weight is the primary scale
+      // metric for stopping the shot; flow is marked mid-plot.
+      if (showPressure && showWeight) {
+        _drawAxisLabel(
+          canvas,
+          'g',
+          Offset(plotRect.right + 6, axisUnitTop),
+          textStyle.copyWith(color: FlowlogChartColors.weightLine),
+        );
+      }
+      if (showPressure && showFlow) {
+        final flowLabelTop = showWeight
+            ? plotRect.center.dy
+            : axisUnitTop;
+        _drawAxisLabel(
+          canvas,
+          'g/s',
+          Offset(plotRect.right + 6, flowLabelTop),
+          textStyle.copyWith(color: FlowlogChartColors.flowLine),
+        );
+      }
+      if (!showPressure && showWeight && showFlow) {
+        _drawAxisLabel(
+          canvas,
+          'g/s',
+          Offset(plotRect.right + 6, axisUnitTop),
+          textStyle.copyWith(color: FlowlogChartColors.flowLine),
+        );
+      }
     }
 
     final stepMs = _timeGridStepMs(scales.timeSpanMs);

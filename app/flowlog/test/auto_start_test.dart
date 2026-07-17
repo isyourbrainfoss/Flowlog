@@ -179,12 +179,29 @@ void main() {
       await tester.pump();
 
       // Without a fresh live pressure sample, readiness must look the same as a
-      // fresh app open: not ready + Reconnect (stale leftovers must not look ready).
+      // fresh app open: not ready (stale leftovers must not look ready).
+      // Device is paired in this harness, so action is Reconnect not Pair.
       expect(find.byKey(const Key('idle_sensor_status')), findsOneWidget);
       expect(find.textContaining('Pressensor not connected'), findsOneWidget);
       expect(find.byKey(const Key('idle_sensor_reconnect')), findsOneWidget);
+      expect(find.text('Reconnect'), findsOneWidget);
+      expect(find.byKey(const Key('idle_sensor_pair')), findsNothing);
       // Settings slider is not embedded in the live tab.
       expect(find.byKey(const Key('auto_start_threshold_slider')), findsNothing);
+    });
+
+    testWidgets('shows Pair sensor when no pressensor is paired', (
+      tester,
+    ) async {
+      await pumpHarness(tester);
+      await tester.pump();
+
+      expect(find.byKey(const Key('idle_sensor_status')), findsOneWidget);
+      expect(find.textContaining('No pressensor paired'), findsOneWidget);
+      expect(find.byKey(const Key('idle_sensor_pair')), findsOneWidget);
+      expect(find.text('Pair sensor'), findsOneWidget);
+      expect(find.byKey(const Key('idle_sensor_reconnect')), findsNothing);
+      expect(find.text('Reconnect'), findsNothing);
     });
 
     testWidgets('starts brew when pressure crosses threshold', (

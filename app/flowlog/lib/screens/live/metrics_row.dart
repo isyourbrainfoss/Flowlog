@@ -14,11 +14,13 @@ enum MetricTrend {
 class LiveMetrics {
   const LiveMetrics({
     this.pressureBar,
+    this.weightG,
     this.flowGs,
     this.tempC,
     required this.elapsedMs,
     this.projectedYieldG,
     this.pressureTrend = MetricTrend.neutral,
+    this.weightTrend = MetricTrend.neutral,
     this.flowTrend = MetricTrend.neutral,
     this.tempTrend = MetricTrend.neutral,
     this.elapsedTrend = MetricTrend.neutral,
@@ -28,11 +30,13 @@ class LiveMetrics {
   static const defaultTargetDurationMs = 30000;
 
   final double? pressureBar;
+  final double? weightG;
   final double? flowGs;
   final double? tempC;
   final int elapsedMs;
   final double? projectedYieldG;
   final MetricTrend pressureTrend;
+  final MetricTrend weightTrend;
   final MetricTrend flowTrend;
   final MetricTrend tempTrend;
   final MetricTrend elapsedTrend;
@@ -70,11 +74,13 @@ class LiveMetrics {
 
     return LiveMetrics(
       pressureBar: current.pressureBar,
+      weightG: current.weightG,
       flowGs: current.flowGs,
       tempC: current.tempC,
       elapsedMs: current.elapsedMs,
       projectedYieldG: projectedYieldG,
       pressureTrend: _trend(current.pressureBar, prior?.pressureBar),
+      weightTrend: _trend(current.weightG, prior?.weightG),
       flowTrend: _trend(current.flowGs, prior?.flowGs),
       tempTrend: _trend(current.tempC, prior?.tempC),
       elapsedTrend: _trend(
@@ -178,12 +184,21 @@ class LiveMetricsRow extends StatelessWidget {
         labelStyle: labelStyle,
         valueStyle: valueStyle,
       ),
+      _MetricTile(
+        key: const Key('live_metric_weight'),
+        label: 'Weight',
+        value: _formatWeight(resolved.weightG),
+        trend: resolved.weightTrend,
+        labelStyle: labelStyle,
+        valueStyle: valueStyle,
+      ),
       FlowStabilityPulse(
         isStable: isFlowStable(
           flowGs: resolved.flowGs,
           flowTrendIsNeutral: resolved.flowTrend == MetricTrend.neutral,
         ),
         child: _MetricTile(
+          key: const Key('live_metric_flow'),
           label: 'Flow',
           value: _formatFlow(resolved.flowGs),
           trend: resolved.flowTrend,
@@ -269,6 +284,13 @@ class LiveMetricsRow extends StatelessWidget {
       return '—';
     }
     return '${bar.toStringAsFixed(1)} bar';
+  }
+
+  static String _formatWeight(double? grams) {
+    if (grams == null) {
+      return '—';
+    }
+    return '${grams.toStringAsFixed(1)} g';
   }
 
   static String _formatFlow(double? flowGs) {
