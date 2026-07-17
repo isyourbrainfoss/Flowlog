@@ -90,7 +90,7 @@ void main() {
       expect(metadata.coffeejackPreinfusionTurns, 5);
     });
 
-    test('applies default dose and last grind setting (yield no longer auto-set)', () async {
+    test('applies default dose, last grind, and scale yield', () async {
       final prior = _loadFixtureShot().copyWith(
         id: 'prior-shot',
         grindSetting: 14.5,
@@ -108,9 +108,22 @@ void main() {
 
       expect(metadata.doseG, kDefaultBrewDoseG);
       expect(metadata.grindSetting, 14.5);
-      // Yield is no longer auto-populated from samples; defaults to empty
-      // unless the user manually enters it in the metadata sheet.
+      // Last scale weight becomes yield when it looks like a real beverage.
+      expect(metadata.yieldG, 36);
+    });
+
+    test('does not set yield from empty or noise-scale weight', () async {
+      final metadata = await defaultMetadataFromSamples(
+        const [
+          ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0),
+          ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 0.2),
+        ],
+      );
+
       expect(metadata.yieldG, isNull);
+      expect(yieldFromScaleSamples(const [
+        ShotSample(elapsedMs: 0, weightG: 0),
+      ]), isNull);
     });
 
     test('uses default grind when no prior brew exists', () async {
@@ -139,7 +152,7 @@ void main() {
       await db.close();
     });
 
-    test('fills missing dose, grind, temp, and turns for history display (yield stays empty unless manually set)',
+    test('fills missing dose, grind, temp, turns, and scale yield for history display',
         () async {
       final coffeejackStore = CoffeejackSettingsStore(
         settingsPath:
@@ -175,9 +188,8 @@ void main() {
 
       expect(metadata.doseG, kDefaultBrewDoseG);
       expect(metadata.grindSetting, 14.5);
-      // Yield is no longer auto-filled for display (explicitly empty by default
-      // unless manually noted via the metadata editor). Other gaps are still filled.
-      expect(metadata.yieldG, isNull);
+      // Display uses last scale weight when yield was not stored on the shot.
+      expect(metadata.yieldG, 36.2);
       expect(metadata.waterTempC, 93.5);
       expect(metadata.coffeejackRewindTurns, 10);
       expect(metadata.coffeejackPreinfusionTurns, 6);

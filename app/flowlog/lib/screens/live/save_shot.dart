@@ -229,9 +229,11 @@ Future<ShotMetadata> defaultMetadataFromSamples(
 
   final brewTemp = brewTempRangeFromSamples(samples);
 
-  // Start with brew + last-used defaults.
+  // Start with brew + last-used defaults. Yield is taken from the scale's last
+  // weight sample when present (see [yieldFromScaleSamples]).
   var metadata = ShotMetadata(
     doseG: defaults.useDefaultDose ? defaults.defaultDoseG : null,
+    yieldG: yieldFromScaleSamples(samples),
     grindSetting: defaults.useDefaultGrind
         ? (lastGrind ?? defaults.defaultGrindSetting)
         : null,
@@ -301,24 +303,36 @@ ShotMetadata applyShotMetadataDefaults(
   );
 }
 
+/// Minimum end weight (g) treated as a real scale yield (avoids tare noise).
+const double kMinScaleYieldG = 1.0;
+
+/// Yield from the last scale sample when weight looks like a real beverage.
+///
+/// Returns null when there is no weight stream or the cup is still empty /
+/// only noise after tare.
+double? yieldFromScaleSamples(List<ShotSample> samples) {
+  if (samples.isEmpty) {
+    return null;
+  }
+  final weight = samples.last.weightG;
+  if (weight == null || weight < kMinScaleYieldG) {
+    return null;
+  }
+  return weight;
+}
+
 /// Returns the explicit yieldG stored on the shot if present.
 /// Otherwise falls back to the last weight sample (the measured end weight).
-/// This fallback is used for history cards, ratios, etc. even when the user
-/// has not manually noted a yield in metadata (yieldG is now null by default
-/// on new shots unless entered in the metadata sheet).
+/// Used for history cards, ratios, and older shots saved before auto-fill.
 double? inferredYieldG(Shot shot) {
   if (shot.yieldG != null) {
     return shot.yieldG;
   }
-  if (shot.samples.isEmpty) {
-    return null;
-  }
-  return shot.samples.last.weightG;
+  return yieldFromScaleSamples(shot.samples);
 }
 
-/// Metadata for history display. Fills safe defaults (dose, grind, temp, coffeejack)
-/// but does *not* auto-populate yieldG (it is empty by default unless the user
-/// explicitly entered a value via the metadata editor).
+/// Metadata for history display. Fills safe defaults (dose, grind, temp,
+/// coffeejack) and yield from the scale when the stored yield is empty.
 Future<ShotMetadata> displayMetadataForShot(
   Shot shot, {
   BrewDefaultsSettingsStore? brewDefaultsStore,
@@ -346,10 +360,7 @@ Future<ShotMetadata> displayMetadataForShot(
     final last = shot.samples.last;
     final brewTemp = brewTempRangeFromSamples(shot.samples);
     metadata = metadata.copyWith(
-      // Yield is intentionally left as stored on the shot (null by default).
-      // Only set via explicit user input in the metadata editor.
-      // Callers that need a fallback for ratios etc. use inferredYieldG(shot).
-      // yieldG: metadata.yieldG ?? last.weightG,
+      yieldG: metadata.yieldG ?? yieldFromScaleSamples(shot.samples),
       waterTempC: metadata.waterTempC ?? brewTemp.endTempC ?? last.tempC,
     );
   }
@@ -408,6 +419,10 @@ Future<Shot?> runAutoSaveFlow({
       useDefaultDose: defaults.useDefaultDose,
       useDefaultGrind: defaults.useDefaultGrind,
       lastGrindSetting: lastGrind,
+    );
+    // Prefill yield from scale when the prefill (e.g. repeat shot) left it empty.
+    metadata = metadata.copyWith(
+      yieldG: metadata.yieldG ?? yieldFromScaleSamples(samples),
     );
     if (metadata.beanId == null && beanRepository != null) {
       final resolvedId = await beanRepository.resolveActiveBeanId(
