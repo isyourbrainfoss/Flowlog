@@ -130,54 +130,6 @@ void main() {
     });
   });
 
-  group('smooth keyframe interpolation', () {
-    test('passes through every keyframe exactly', () {
-      const keyframes = [
-        PressureKeyframe(elapsedMs: 0, pressureBar: 0),
-        PressureKeyframe(elapsedMs: 5000, pressureBar: 3),
-        PressureKeyframe(elapsedMs: 10000, pressureBar: 9),
-        PressureKeyframe(elapsedMs: 20000, pressureBar: 9),
-        PressureKeyframe(elapsedMs: 25000, pressureBar: 2),
-      ];
-
-      for (final kf in keyframes) {
-        expect(
-          pressureAtKeyframeTime(kf.elapsedMs, keyframes),
-          closeTo(kf.pressureBar, 1e-9),
-        );
-      }
-    });
-
-    test('eases into plateaus instead of pure linear ramps', () {
-      // Ramp then flat: zero tangent at the hold makes Hermite ease (smoothstep).
-      const keyframes = [
-        PressureKeyframe(elapsedMs: 0, pressureBar: 0),
-        PressureKeyframe(elapsedMs: 10000, pressureBar: 9),
-        PressureKeyframe(elapsedMs: 20000, pressureBar: 9),
-      ];
-
-      // At 25% of the ramp, smoothstep is below linear (2.25).
-      final earlyRamp = pressureAtKeyframeTime(2500, keyframes);
-      expect(earlyRamp, lessThan(2.25));
-      expect(earlyRamp, greaterThan(0));
-
-      // At 75% of the ramp, smoothstep is above linear (6.75) — eases into hold.
-      final lateRamp = pressureAtKeyframeTime(7500, keyframes);
-      expect(lateRamp, greaterThan(6.75));
-      expect(lateRamp, lessThan(9));
-
-      // Flat plateau stays flat (no overshoot above 9).
-      final hold = pressureAtKeyframeTime(15000, keyframes);
-      expect(hold, closeTo(9, 0.01));
-
-      final samples = expandKeyframesToProfile(keyframes, stepMs: 250);
-      final maxP = samples
-          .map((s) => s.pressureBar ?? 0)
-          .fold<double>(0, (a, b) => a > b ? a : b);
-      expect(maxP, lessThanOrEqualTo(9.01));
-    });
-  });
-
   group('SimulatorScreen', () {
     late FlowlogDatabase db;
     late ProfileRepository profileRepository;

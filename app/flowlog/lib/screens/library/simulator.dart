@@ -243,15 +243,10 @@ List<PressureKeyframe> keyframesFromPressureSamples(
   ];
 }
 
-/// Max bar when expanding simulator keyframes (matches editor pressure max).
-const double kSimulatorPressureClampMax = 12.0;
-
-/// Expands keyframes into a dense pressure profile for charting and targets.
+/// Expands keyframes into a dense pressure profile for charting.
 ///
-/// Uses a **centripetal Catmull–Rom** spline through the control points (which
-/// can be drawn as cubic Bézier segments). Real espresso profiles and machine
-/// ramps are smooth; linear segments between a few keyframes look unnaturally
-/// sharp as a target curve.
+/// Segments are **linear** between control points so a flat 9 bar hold
+/// (two keyframes at 9 bar) stays exactly flat and easy to edit.
 List<ShotSample> expandKeyframesToProfile(
   List<PressureKeyframe> keyframes, {
   int stepMs = 500,
@@ -269,7 +264,7 @@ List<ShotSample> expandKeyframesToProfile(
     profile.add(
       ShotSample(
         elapsedMs: elapsedMs,
-        pressureBar: pressureAtKeyframeTime(elapsedMs, sorted),
+        pressureBar: _pressureAtKeyframeTime(elapsedMs, sorted),
       ),
     );
   }
@@ -278,7 +273,7 @@ List<ShotSample> expandKeyframesToProfile(
     profile.add(
       ShotSample(
         elapsedMs: endMs,
-        pressureBar: pressureAtKeyframeTime(endMs, sorted),
+        pressureBar: _pressureAtKeyframeTime(endMs, sorted),
       ),
     );
   }
@@ -286,107 +281,36 @@ List<ShotSample> expandKeyframesToProfile(
   return profile;
 }
 
-/// Smooth pressure (bar) at [elapsedMs] through [keyframes].
-///
-/// Passes through every keyframe. Between points uses centripetal Catmull–Rom
-/// (Bézier-equivalent) so ramps ease instead of drawing sharp corners.
-/// Values are clamped to `[0, kSimulatorPressureClampMax]`.
-double pressureAtKeyframeTime(
-  int elapsedMs,
-  List<PressureKeyframe> keyframes,
-) {
+double _pressureAtKeyframeTime(int elapsedMs, List<PressureKeyframe> keyframes) {
   if (keyframes.isEmpty) {
     return 0;
   }
 
-  final sorted = keyframes.length < 2 ||
-          keyframes.first.elapsedMs <= keyframes.last.elapsedMs
-      ? keyframes
-      : (List<PressureKeyframe>.from(keyframes)
-        ..sort((a, b) => a.elapsedMs.compareTo(b.elapsedMs)));
-
-  if (sorted.length == 1) {
-    return sorted.first.pressureBar.clamp(0.0, kSimulatorPressureClampMax);
-  }
-
-  // Exact hit on a keyframe — preserve the user’s control point.
-  for (final keyframe in sorted) {
+  PressureKeyframe? before;
+  PressureKeyframe? after;
+  for (final keyframe in keyframes) {
     if (keyframe.elapsedMs == elapsedMs) {
-      return keyframe.pressureBar.clamp(0.0, kSimulatorPressureClampMax);
+      return keyframe.pressureBar;
+    }
+    if (keyframe.elapsedMs < elapsedMs) {
+      before = keyframe;
+    } else if (keyframe.elapsedMs > elapsedMs) {
+      after = keyframe;
+      break;
     }
   }
 
-  if (elapsedMs <= sorted.first.elapsedMs) {
-    return sorted.first.pressureBar.clamp(0.0, kSimulatorPressureClampMax);
-  }
-  if (elapsedMs >= sorted.last.elapsedMs) {
-    return sorted.last.pressureBar.clamp(0.0, kSimulatorPressureClampMax);
+  if (before == null || after == null) {
+    return before?.pressureBar ?? after?.pressureBar ?? 0;
   }
 
-  var i = 0;
-  while (i < sorted.length - 1 && sorted[i + 1].elapsedMs < elapsedMs) {
-    i++;
-  }
-
-  final p1 = sorted[i];
-  final p2 = sorted[i + 1];
-  final span = p2.elapsedMs - p1.elapsedMs;
+  final span = after.elapsedMs - before.elapsedMs;
   if (span <= 0) {
-    return p1.pressureBar.clamp(0.0, kSimulatorPressureClampMax);
+    return before.pressureBar;
   }
 
-  final t = (elapsedMs - p1.elapsedMs) / span;
-  final p0 = i > 0 ? sorted[i - 1] : p1;
-  final p3 = i + 2 < sorted.length ? sorted[i + 2] : p2;
-
-  final value = _catmullRomPressure(
-    p0: p0,
-    p1: p1,
-    p2: p2,
-    p3: p3,
-    t: t,
-  );
-  return value.clamp(0.0, kSimulatorPressureClampMax);
-}
-
-/// Cubic Hermite on pressure for segment p1→p2, with [t] in \[0, 1\].
-/// Neighbor-aware slopes make the path C¹-smooth (cubic Bézier equivalent).
-/// Local extrema get zero tangent so flat “hold” plateaus do not overshoot.
-double _catmullRomPressure({
-  required PressureKeyframe p0,
-  required PressureKeyframe p1,
-  required PressureKeyframe p2,
-  required PressureKeyframe p3,
-  required double t,
-}) {
-  final dt1 = math.max(1, p1.elapsedMs - p0.elapsedMs).toDouble();
-  final dt2 = math.max(1, p2.elapsedMs - p1.elapsedMs).toDouble();
-  final dt3 = math.max(1, p3.elapsedMs - p2.elapsedMs).toDouble();
-
-  // Slopes in bar/ms.
-  final s01 = (p1.pressureBar - p0.pressureBar) / dt1;
-  final s12 = (p2.pressureBar - p1.pressureBar) / dt2;
-  final s23 = (p3.pressureBar - p2.pressureBar) / dt3;
-
-  // Hermite m is Δpressure over the full segment (t: 0→1), i.e. slope * dt2.
-  final m1 = _segmentTangent(sIn: s01, sOut: s12) * dt2;
-  final m2 = _segmentTangent(sIn: s12, sOut: s23) * dt2;
-
-  final t2 = t * t;
-  final t3 = t2 * t;
-  final h00 = 2 * t3 - 3 * t2 + 1;
-  final h10 = t3 - 2 * t2 + t;
-  final h01 = -2 * t3 + 3 * t2;
-  final h11 = t3 - t2;
-  return h00 * p1.pressureBar + h10 * m1 + h01 * p2.pressureBar + h11 * m2;
-}
-
-/// Average of incoming/outgoing slopes, or 0 at a local peak/valley.
-double _segmentTangent({required double sIn, required double sOut}) {
-  if (sIn * sOut <= 0) {
-    return 0;
-  }
-  return (sIn + sOut) / 2;
+  final t = (elapsedMs - before.elapsedMs) / span;
+  return before.pressureBar + (after.pressureBar - before.pressureBar) * t;
 }
 
 /// Draggable canvas for editing a target pressure profile.
@@ -1019,10 +943,9 @@ class _PressureProfileEditorPainter extends CustomPainter {
 
     final sorted = List<PressureKeyframe>.from(keyframes)
       ..sort((a, b) => a.elapsedMs.compareTo(b.elapsedMs));
-    // Dense samples along the smooth spline (same math as expandKeyframesToProfile).
     final points = <Offset>[];
-    for (var elapsedMs = 0; elapsedMs <= durationMs; elapsedMs += 100) {
-      final pressure = pressureAtKeyframeTime(elapsedMs, sorted);
+    for (var elapsedMs = 0; elapsedMs <= durationMs; elapsedMs += 250) {
+      final pressure = _pressureAtKeyframeTime(elapsedMs, sorted);
       final x = plot.left +
           (elapsedMs / math.max(durationMs, 1)).clamp(0.0, 1.0) * plot.width;
       final y = plot.bottom -
