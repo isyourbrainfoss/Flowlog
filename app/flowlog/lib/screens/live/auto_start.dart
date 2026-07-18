@@ -86,9 +86,18 @@ class AutoStartSettingsScope
     super.key,
   }) : super(notifier: controller);
 
+  /// Watches the scope (rebuilds when settings change). Prefer for widgets
+  /// that display live threshold / enabled state.
   static AutoStartSettingsController? maybeOf(BuildContext context) {
     return context
         .dependOnInheritedWidgetOfExactType<AutoStartSettingsScope>()
+        ?.notifier;
+  }
+
+  /// One-shot lookup without registering a dependency (e.g. before a push).
+  static AutoStartSettingsController? maybeOfStatic(BuildContext context) {
+    return context
+        .getInheritedWidgetOfExactType<AutoStartSettingsScope>()
         ?.notifier;
   }
 }

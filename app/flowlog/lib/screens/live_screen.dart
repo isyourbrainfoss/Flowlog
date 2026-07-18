@@ -857,20 +857,33 @@ class _LiveScreenState extends State<LiveScreen> {
                         if ((state == ShotSessionState.idle || state == ShotSessionState.stopped) &&
                             !controller.isBrewing)
                           const SizedBox(height: 8),
-                        LiveFullscreenChartButton(
-                          onPressed: _onOpenFullscreenChart,
-                        ),
-                        DualCurveChart(
-                          height: chartHeight,
-                          samplesNotifier: _samplesNotifier,
-                          annotationsNotifier: _annotationsNotifier,
-                          interactionController: _chartInteractionController,
-                          denseTimeAxis: true,
-                          targetPressureSamples: chartTargetSamples,
-                          onAnnotateAtElapsedMs:
-                              (state != ShotSessionState.idle && samples.isNotEmpty)
+                        // Fullscreen control sits on the chart (lower-right) so
+                        // the plot keeps full width/height.
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            DualCurveChart(
+                              height: chartHeight,
+                              samplesNotifier: _samplesNotifier,
+                              annotationsNotifier: _annotationsNotifier,
+                              interactionController:
+                                  _chartInteractionController,
+                              denseTimeAxis: true,
+                              targetPressureSamples: chartTargetSamples,
+                              onAnnotateAtElapsedMs: (state !=
+                                          ShotSessionState.idle &&
+                                      samples.isNotEmpty)
                                   ? _onAnnotateAtElapsedMs
                                   : null,
+                            ),
+                            Positioned(
+                              right: 4,
+                              bottom: 28,
+                              child: LiveFullscreenChartButton(
+                                onPressed: _onOpenFullscreenChart,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -1031,15 +1044,16 @@ class _LiveScreenState extends State<LiveScreen> {
 
 double _liveChartHeight(BoxConstraints constraints) {
   if (!constraints.maxHeight.isFinite) {
-    return 220;
+    return 280;
   }
 
   if (constraints.maxWidth < ShellBreakpoints.sidebar ||
       constraints.maxHeight < ShellBreakpoints.minRailHeight) {
-    return (constraints.maxHeight * 0.34).clamp(140.0, 200.0);
+    // Give the plot more vertical space on phones; cap so controls still fit.
+    return (constraints.maxHeight * 0.42).clamp(180.0, 280.0);
   }
 
-  return 220;
+  return 300;
 }
 
 /// Compact live gamification strip shown while brewing against a target curve.

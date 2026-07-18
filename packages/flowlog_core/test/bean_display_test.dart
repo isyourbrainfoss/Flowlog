@@ -19,6 +19,15 @@ void main() {
       expect(formatBeanDisplayLabel(solo), 'Ethiopia');
     });
 
+    test('omits roast date when name is unique', () {
+      final soloWithDate = Bean(
+        id: 'bean-solo-date',
+        name: 'Ethiopia',
+        roastDate: DateTime.utc(2026, 3, 1),
+      );
+      expect(formatBeanDisplayLabel(soloWithDate), 'Ethiopia');
+    });
+
     test('includes brand before bean name', () {
       const bean = Bean(
         id: 'bean-branded',

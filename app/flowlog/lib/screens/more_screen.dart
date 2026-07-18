@@ -98,11 +98,15 @@ class _MoreScreenState extends State<MoreScreen> {
           ),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
+            // Capture from the More tab context (under AutoStartSettingsScope).
+            // The route builder context is a sibling of the shell and does NOT
+            // see the scope — that used to create a separate controller so
+            // threshold edits never reached Live.
+            final autoStart = AutoStartSettingsScope.maybeOfStatic(context);
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (context) => BrewDefaultsScreen(
-                  autoStartController:
-                      AutoStartSettingsScope.maybeOf(context),
+                builder: (_) => BrewDefaultsScreen(
+                  autoStartController: autoStart,
                 ),
               ),
             );

@@ -69,27 +69,42 @@ class FullscreenPlotScaffold extends StatelessWidget {
   }
 }
 
-/// Expand control shown above an embedded plot.
+/// Expand control for an embedded plot (often overlaid on the chart corner).
 class FullscreenPlotButton extends StatelessWidget {
   const FullscreenPlotButton({
     required this.onPressed,
     this.buttonKey = const Key('fullscreen_plot_open'),
+    this.compact = true,
     super.key,
   });
 
   final VoidCallback? onPressed;
   final Key buttonKey;
 
+  /// When true, paints a compact surface chip suitable for overlay on a chart.
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: IconButton(
-        key: buttonKey,
-        tooltip: 'Fullscreen chart',
-        onPressed: onPressed,
-        icon: const Icon(Icons.fullscreen),
-      ),
+    final scheme = Theme.of(context).colorScheme;
+    final button = IconButton(
+      key: buttonKey,
+      tooltip: 'Fullscreen chart',
+      onPressed: onPressed,
+      visualDensity: VisualDensity.compact,
+      icon: const Icon(Icons.fullscreen),
+    );
+
+    if (!compact) {
+      return Align(alignment: Alignment.centerRight, child: button);
+    }
+
+    return Material(
+      color: scheme.surfaceContainerHighest.withValues(alpha: 0.92),
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      elevation: 1,
+      child: button,
     );
   }
 }

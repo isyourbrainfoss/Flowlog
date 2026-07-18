@@ -647,7 +647,89 @@ class _MetadataSheetState extends State<MetadataSheet> {
       return byId.id;
     }
 
+    // Match existing by display label or plain name so we don't duplicate bags.
+    for (final bean in _beans) {
+      final label = formatBeanDisplayLabel(bean, allBeans: _beans);
+      if (label.toLowerCase() == typed.toLowerCase() ||
+          bean.name.toLowerCase() == typed.toLowerCase()) {
+        return bean.id;
+      }
+    }
+
     return (await repository.createBean(name: typed)).id;
+  }
+
+  Future<void> _promptAddBean({
+    required TextEditingController fieldController,
+  }) async {
+    final repository = widget.beanRepository;
+    if (repository == null || !mounted) {
+      return;
+    }
+
+    final nameController = TextEditingController(
+      text: fieldController.text.trim().isNotEmpty
+          ? fieldController.text.trim()
+          : '',
+    );
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          key: const Key('metadata_add_bean_dialog'),
+          title: const Text('Add bean'),
+          content: TextField(
+            key: const Key('metadata_add_bean_name'),
+            controller: nameController,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Bean name',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (value) {
+              final trimmed = value.trim();
+              if (trimmed.isNotEmpty) {
+                Navigator.of(dialogContext).pop(trimmed);
+              }
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const Key('metadata_add_bean_confirm'),
+              onPressed: () {
+                final trimmed = nameController.text.trim();
+                if (trimmed.isNotEmpty) {
+                  Navigator.of(dialogContext).pop(trimmed);
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+    nameController.dispose();
+    if (name == null || name.isEmpty || !mounted) {
+      return;
+    }
+
+    final created = await repository.createBean(name: name);
+    final beans = await repository.listBeansByRecentUse();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _beans = beans;
+      _selectedBeanId = created.id;
+      final label = formatBeanDisplayLabel(created, allBeans: beans);
+      _beanController.text = label;
+      fieldController.text = label;
+    });
   }
 
   Future<ShotMetadata> _buildMetadata() async {
@@ -809,16 +891,44 @@ class _MetadataSheetState extends State<MetadataSheet> {
                     focusNode: focusNode,
                     enabled: _beansReady,
                     textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Bean',
-                      border: OutlineInputBorder(),
-                      helperText:
-                          'Pick a saved bag (date shown when names repeat) '
-                          'or type a new name to add another',
+                      border: const OutlineInputBorder(),
+                      helperText: 'Pick a bag or type a new name',
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (controller.text.trim().isNotEmpty)
+                            IconButton(
+                              key: const Key('metadata_bean_clear'),
+                              tooltip: 'Clear bean',
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                setState(() {
+                                  controller.clear();
+                                  _beanController.clear();
+                                  _selectedBeanId = null;
+                                });
+                              },
+                            ),
+                          IconButton(
+                            key: const Key('metadata_bean_add'),
+                            tooltip: 'Add new bean',
+                            icon: const Icon(Icons.add_circle_outline),
+                            onPressed: _beansReady
+                                ? () => unawaited(_promptAddBean(
+                                      fieldController: controller,
+                                    ))
+                                : null,
+                          ),
+                        ],
+                      ),
                     ),
                     onChanged: (value) {
-                      _beanController.text = value;
-                      _selectedBeanId = null;
+                      setState(() {
+                        _beanController.text = value;
+                        _selectedBeanId = null;
+                      });
                     },
                     onSubmitted: (_) => onFieldSubmitted(),
                   );

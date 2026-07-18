@@ -23,17 +23,15 @@ String _beanNameWithBrand(Bean bean) {
 
 /// Human-readable bean label for pickers and lists.
 ///
-/// When multiple beans share a [Bean.name], disambiguates with roast date,
-/// origin, or a fallback hint.
+/// Unique names stay short (no roast date). When multiple beans share a
+/// [Bean.name], disambiguates with roast date, process, variety, origin, or
+/// a fallback hint.
 String formatBeanDisplayLabel(Bean bean, {List<Bean>? allBeans}) {
   final displayName = _beanNameWithBrand(bean);
   final duplicates =
       allBeans != null && _sameNameCount(bean, allBeans) > 1;
 
   if (!duplicates) {
-    if (bean.roastDate != null) {
-      return '$displayName · ${formatBeanRoastDate(bean.roastDate!)}';
-    }
     return displayName;
   }
 
