@@ -367,18 +367,6 @@ class _LiveScreenState extends State<LiveScreen> {
         List<ShotAnnotation>.from(_annotationController.annotations);
   }
 
-  Future<void> _onAnnotateAtElapsedMs(int elapsedMs) async {
-    if (_controller?.sessionState == ShotSessionState.idle) {
-      return;
-    }
-
-    await promptChartAnnotationAction(
-      context: context,
-      controller: _annotationController,
-      elapsedMs: elapsedMs,
-    );
-  }
-
   Future<void> _onToggleShotShortcut() async {
     final controller = _controller;
     if (controller == null) {
@@ -711,10 +699,6 @@ class _LiveScreenState extends State<LiveScreen> {
         annotationsNotifier: _annotationsNotifier,
         interactionController: _chartInteractionController,
         targetPressureSamples: _chartTargetPressureSamples(),
-        onAnnotateAtElapsedMs: _controller?.sessionState ==
-                ShotSessionState.idle
-            ? null
-            : _onAnnotateAtElapsedMs,
       ),
     );
   }
@@ -768,6 +752,10 @@ class _LiveScreenState extends State<LiveScreen> {
       listenables.add(_targetBrewController!);
     }
     listenables.add(_resolvedAutoStartController);
+    final sensorHub = SensorHubScope.maybeOf(context);
+    if (sensorHub != null) {
+      listenables.add(sensorHub);
+    }
 
     return ListenableBuilder(
       listenable: Listenable.merge(listenables),
@@ -849,6 +837,9 @@ class _LiveScreenState extends State<LiveScreen> {
                             pressensorPaired: SensorHubScope.maybeOf(context)
                                     ?.hasKind(SensorKind.pressensor) ??
                                 false,
+                            pressensorLinkState: SensorHubScope.maybeOf(context)
+                                    ?.pressensorState ??
+                                ConnectionState.disconnected,
                             onReconnect: _onReconnectSensors,
                             onPair: _onPairSensors,
                             autoStartEnabled: _resolvedAutoStartController.settings.enabled,
@@ -870,11 +861,6 @@ class _LiveScreenState extends State<LiveScreen> {
                                   _chartInteractionController,
                               denseTimeAxis: true,
                               targetPressureSamples: chartTargetSamples,
-                              onAnnotateAtElapsedMs: (state !=
-                                          ShotSessionState.idle &&
-                                      samples.isNotEmpty)
-                                  ? _onAnnotateAtElapsedMs
-                                  : null,
                             ),
                             Positioned(
                               right: 4,
@@ -899,10 +885,6 @@ class _LiveScreenState extends State<LiveScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        AnnotationControls(
-                          controller: _annotationController,
-                        ),
-                        const SizedBox(height: 8),
                         if ((state == ShotSessionState.recording || state == ShotSessionState.paused || state == ShotSessionState.stopped) && latestSample != null) ...[
                           LiveMetricsRow(
                             sample: latestSample,
@@ -1195,6 +1177,7 @@ class _IdleSensorStatus extends StatefulWidget {
     required this.pressureBarNotifier,
     required this.lastUpdateNotifier,
     required this.pressensorPaired,
+    required this.pressensorLinkState,
     required this.onReconnect,
     required this.onPair,
     required this.autoStartEnabled,
@@ -1204,6 +1187,7 @@ class _IdleSensorStatus extends StatefulWidget {
   final ValueNotifier<double?> pressureBarNotifier;
   final ValueNotifier<DateTime?> lastUpdateNotifier;
   final bool pressensorPaired;
+  final ConnectionState pressensorLinkState;
   final VoidCallback onReconnect;
   final VoidCallback onPair;
   final bool autoStartEnabled;
@@ -1248,6 +1232,9 @@ class _IdleSensorStatusState extends State<_IdleSensorStatus> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final paired = widget.pressensorPaired;
+    final link = widget.pressensorLinkState;
+    final linkConnected = link == ConnectionState.connected;
+    final linkConnecting = link == ConnectionState.connecting;
 
     return ValueListenableBuilder<double?>(
       valueListenable: widget.pressureBarNotifier,
@@ -1257,24 +1244,55 @@ class _IdleSensorStatusState extends State<_IdleSensorStatus> {
           builder: (context, lastUpdate, _) {
             final isLive = _isLive(pressure, lastUpdate);
             final hasStaleReading = pressure != null && !isLive;
-            final pressureValue = pressure;
 
-            final color = isLive ? cs.primaryContainer : cs.errorContainer;
-            final onColor =
-                isLive ? cs.onPrimaryContainer : cs.onErrorContainer;
-            final icon = isLive ? Icons.sensors : Icons.sensors_off;
+            // BLE link is the source of truth for "connected". Live samples
+            // only refine readiness for auto-start. Previously "not connected"
+            // was shown whenever samples were missing even if BLE was up.
+            final bool showReady = isLive && pressure != null;
+            final bool showLinkedWaiting =
+                !showReady && (linkConnected || linkConnecting);
+
+            final Color color;
+            final Color onColor;
+            final IconData icon;
+            if (showReady) {
+              color = cs.primaryContainer;
+              onColor = cs.onPrimaryContainer;
+              icon = Icons.sensors;
+            } else if (showLinkedWaiting) {
+              color = cs.secondaryContainer;
+              onColor = cs.onSecondaryContainer;
+              icon = Icons.sensors;
+            } else {
+              color = cs.errorContainer;
+              onColor = cs.onErrorContainer;
+              icon = Icons.sensors_off;
+            }
 
             final String title;
             final String subtitle;
-            if (isLive && pressureValue != null) {
+            if (isLive && pressure != null) {
               title = 'Pressensor connected — ready for new shot';
-              final pStr = pressureValue.toStringAsFixed(2);
+              final pStr = pressure.toStringAsFixed(2);
               subtitle = widget.autoStartEnabled
                   ? 'Live: $pStr bar · Auto-start at ${widget.autoStartThreshold.toStringAsFixed(1)} bar'
                   : 'Live: $pStr bar';
-            } else if (hasStaleReading && pressureValue != null) {
+            } else if (linkConnecting) {
+              title = 'Pressensor connecting…';
+              subtitle = 'Waiting for BLE link';
+            } else if (linkConnected && hasStaleReading) {
+              title = 'Pressensor connected — refreshing live pressure';
+              final pStr = pressure.toStringAsFixed(2);
+              subtitle =
+                  'Last reading: $pStr bar. Auto-start needs a fresh stream.';
+            } else if (linkConnected) {
+              title = 'Pressensor connected';
+              subtitle = widget.autoStartEnabled
+                  ? 'Waiting for live pressure · Auto-start at ${widget.autoStartThreshold.toStringAsFixed(1)} bar'
+                  : 'Waiting for live pressure readings';
+            } else if (hasStaleReading) {
               title = 'Pressensor not ready — no live pressure';
-              final pStr = pressureValue.toStringAsFixed(2);
+              final pStr = pressure.toStringAsFixed(2);
               subtitle = paired
                   ? 'Last reading: $pStr bar (stale). Reconnect, then start the next shot.'
                   : 'Last reading: $pStr bar (stale). Pair a pressensor to continue.';
@@ -1286,7 +1304,10 @@ class _IdleSensorStatusState extends State<_IdleSensorStatus> {
               subtitle = 'Reconnect to start recording';
             }
 
-            final actionLabel = paired ? 'Reconnect' : 'Pair sensor';
+            final showAction = !showReady && !linkConnecting;
+            final actionLabel = paired
+                ? (linkConnected ? 'Refresh' : 'Reconnect')
+                : 'Pair sensor';
             final actionKey = paired
                 ? const Key('idle_sensor_reconnect')
                 : const Key('idle_sensor_pair');
@@ -1324,7 +1345,7 @@ class _IdleSensorStatusState extends State<_IdleSensorStatus> {
                         ],
                       ),
                     ),
-                    if (!isLive)
+                    if (showAction)
                       OutlinedButton(
                         key: actionKey,
                         style: OutlinedButton.styleFrom(

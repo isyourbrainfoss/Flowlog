@@ -178,13 +178,12 @@ void main() {
       await pumpHarness(tester);
       await tester.pump();
 
-      // Without a fresh live pressure sample, readiness must look the same as a
-      // fresh app open: not ready (stale leftovers must not look ready).
-      // Device is paired in this harness, so action is Reconnect not Pair.
+      // Device is paired + marked connected but no live samples yet: link is
+      // connected, waiting for pressure (not the red "not connected" state).
       expect(find.byKey(const Key('idle_sensor_status')), findsOneWidget);
-      expect(find.textContaining('Pressensor not connected'), findsOneWidget);
+      expect(find.textContaining('Pressensor connected'), findsOneWidget);
+      expect(find.textContaining('Waiting for live pressure'), findsOneWidget);
       expect(find.byKey(const Key('idle_sensor_reconnect')), findsOneWidget);
-      expect(find.text('Reconnect'), findsOneWidget);
       expect(find.byKey(const Key('idle_sensor_pair')), findsNothing);
       // Settings slider is not embedded in the live tab.
       expect(find.byKey(const Key('auto_start_threshold_slider')), findsNothing);
@@ -216,7 +215,16 @@ void main() {
       });
       await tester.pump();
 
-      pressureTransport.emitPressure(const [0x03, 0xE8]);
+      // Rising edge: first sample below threshold, then cross it.
+      // (A first sample already above threshold is treated as residual, not a start.)
+      pressureTransport.emitPressure(const [0x00, 0x64]); // 0.1 bar
+      await tester.pump();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pump();
+
+      pressureTransport.emitPressure(const [0x03, 0xE8]); // 1.0 bar
       await tester.pump();
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -258,7 +266,8 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
 
       expect(find.textContaining('ready for new shot'), findsNothing);
-      expect(find.textContaining('Pressensor not connected'), findsOneWidget);
+      // BLE still linked: show connected/waiting (not false "not connected").
+      expect(find.textContaining('Pressensor connected'), findsOneWidget);
       expect(find.byKey(const Key('idle_sensor_reconnect')), findsOneWidget);
       // Must not leave a green-ready-looking "stale" subtitle.
       expect(find.textContaining('(stale)'), findsNothing);
