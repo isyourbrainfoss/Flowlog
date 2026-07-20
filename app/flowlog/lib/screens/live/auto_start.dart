@@ -178,7 +178,9 @@ const Duration kLivePressureFreshWindow = Duration(seconds: 3);
 class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
   StreamSubscription<SensorSample>? _pressureSub;
   SensorAdapter? _ownedMonitorAdapter;
-  AutoStartArming _arming = const AutoStartArming();
+  /// Armed only after pressure has been at/below the release level, then fires
+  /// on the next rise through the start threshold (classic hysteresis).
+  AutoStartArming _arming = const AutoStartArming(armed: false);
   bool _starting = false;
   double? _lastPressure;
   Timer? _freshnessTimer;
@@ -186,9 +188,8 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
   bool _wasBrewing = false;
   bool _wantMonitor = false;
   bool _applyingMonitor = false;
-  /// After a resubscribe we accept the first sample without treating it as a
-  /// rising edge (avoids false starts on residual pressure).
-  bool _awaitingFirstSample = false;
+  DateTime? _monitorStartedAt;
+  DateTime? _lastResubscribeAt;
 
   @override
   void initState() {
@@ -214,8 +215,6 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
         oldWidget.settings.startThresholdBar != widget.settings.startThresholdBar ||
         oldWidget.settings.enabled != widget.settings.enabled;
     if (settingsChanged) {
-      // Threshold change must not leave us permanently disarmed when pressure
-      // is already high — re-arm only if currently at/below the new release.
       _arming = _armingForCurrentPressure();
     }
     _syncMonitoring();
@@ -224,13 +223,12 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
   AutoStartArming _armingForCurrentPressure() {
     final p = _lastPressure;
     if (p == null) {
-      return const AutoStartArming(armed: true);
-    }
-    // Need a dip below release before the next rising edge can fire.
-    if (p > widget.settings.releaseThresholdBar) {
       return const AutoStartArming(armed: false);
     }
-    return const AutoStartArming(armed: true);
+    if (p <= widget.settings.releaseThresholdBar) {
+      return const AutoStartArming(armed: true);
+    }
+    return const AutoStartArming(armed: false);
   }
 
   @override
@@ -249,10 +247,12 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
       if (brewing) {
         _arming = const AutoStartArming(armed: false);
       } else {
-        // Shot ended: forget residual so the next rise can arm cleanly once
-        // pressure settles below the release threshold.
+        // Shot ended: wait for a low pressure sample before re-arming so a
+        // stuck high residual cannot fire immediately.
         _lastPressure = null;
-        _arming = const AutoStartArming(armed: true);
+        _arming = const AutoStartArming(armed: false);
+        // If start/stop left the session unusable, recover so Start works.
+        unawaited(widget.controller.recoverIfStuck());
       }
       _clearLivePressure();
       _wasBrewing = brewing;
@@ -352,22 +352,30 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
       if (!_wantMonitor || !mounted) {
         return;
       }
+      final now = DateTime.now();
       final last = widget.pressureLastUpdateNotifier?.value;
       final hubConnected =
           widget.hub.activeAdapterFor(SensorKind.pressensor) != null;
 
-      // Hub says connected but we have no fresh samples — resubscribe. Common
-      // after app resume or when the first listen raced connect.
-      if (hubConnected &&
-          (last == null ||
-              DateTime.now().difference(last) > kLivePressureFreshWindow)) {
-        unawaited(_resubscribeMonitoring());
-        return;
+      // Clear aged UI readings (does not touch arming).
+      if (last != null && now.difference(last) > kLivePressureFreshWindow) {
+        _clearLivePressure();
       }
 
-      if (last != null &&
-          DateTime.now().difference(last) > kLivePressureFreshWindow) {
-        _clearLivePressure();
+      // Resubscribe only when the stream has gone quiet while BLE is up —
+      // rate-limited so a rising shot is not interrupted every second.
+      final quietSinceStart = last == null &&
+          _monitorStartedAt != null &&
+          now.difference(_monitorStartedAt!) > const Duration(seconds: 4);
+      final quietAfterSamples = last != null &&
+          now.difference(last) > const Duration(seconds: 5);
+      final canResubscribe = _lastResubscribeAt == null ||
+          now.difference(_lastResubscribeAt!) > const Duration(seconds: 6);
+
+      if (hubConnected &&
+          canResubscribe &&
+          (quietSinceStart || quietAfterSamples)) {
+        unawaited(_resubscribeMonitoring());
       }
     });
   }
@@ -376,6 +384,7 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
     if (!_wantMonitor || _applyingMonitor) {
       return;
     }
+    _lastResubscribeAt = DateTime.now();
     await _stopMonitoringBody();
     if (_wantMonitor && mounted) {
       await _startMonitoringBody();
@@ -395,7 +404,7 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
     final generation = ++_monitorGeneration;
     // Fresh slate: ready only after a sample arrives on this monitor session.
     _clearLivePressure();
-    _awaitingFirstSample = true;
+    _monitorStartedAt = DateTime.now();
     _ensureFreshnessTimer();
 
     final hubAdapter = widget.hub.activeAdapterFor(SensorKind.pressensor);
@@ -459,7 +468,7 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
     await _pressureSub?.cancel();
     _pressureSub = null;
     _clearLivePressure();
-    _awaitingFirstSample = false;
+    _monitorStartedAt = null;
 
     final owned = _ownedMonitorAdapter;
     _ownedMonitorAdapter = null;
@@ -480,10 +489,7 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
       return;
     }
 
-    final previous = _lastPressure;
     final current = sample.pressureBar;
-    final isFirst = _awaitingFirstSample;
-    _awaitingFirstSample = false;
 
     widget.pressureBarNotifier?.value = current;
     widget.pressureLastUpdateNotifier?.value = DateTime.now();
@@ -497,44 +503,21 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
       return;
     }
 
-    final threshold = widget.settings.startThresholdBar;
     final release = widget.settings.releaseThresholdBar;
 
-    // Re-arm after a dip below the release level (hysteresis).
-    if (!_arming.armed && current != null && current <= release) {
+    // Classic hysteresis: arm only after a low, fire on next high.
+    // After a brew that ends near 0.0 bar, the next samples re-arm, then a
+    // pump-up through the threshold starts the shot.
+    if (current != null && current <= release) {
       _arming = const AutoStartArming(armed: true);
     }
 
-    // First sample after (re)subscribe: never treat residual high pressure as a
-    // rising edge — require a dip then rise (or a true rise from a lower value).
-    if (isFirst) {
-      if (current != null && current >= threshold) {
-        _arming = const AutoStartArming(armed: false);
-      }
-      return;
-    }
-
-    // Rising edge across the start threshold.
-    if (_arming.armed &&
-        previous != null &&
-        current != null &&
-        previous < threshold &&
-        current >= threshold) {
-      _arming = const AutoStartArming(armed: false);
-      unawaited(_triggerStart());
-      return;
-    }
-
-    // Also handle the classic path if shouldTriggerStart agrees (armed + above).
     if (_arming.shouldTriggerStart(
       pressureBar: current,
       settings: widget.settings,
     )) {
-      // Only if we have evidence of a rise (previous was below threshold).
-      if (previous != null && previous < threshold) {
-        _arming = const AutoStartArming(armed: false);
-        unawaited(_triggerStart());
-      }
+      _arming = const AutoStartArming(armed: false);
+      unawaited(_triggerStart());
     }
   }
 
@@ -548,6 +531,11 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
       await widget.controller.start(
         autoStartPressureBar: widget.settings.startThresholdBar,
       );
+    } on Object {
+      // Recover so a failed auto-start does not brick manual Start either.
+      await widget.controller.recoverIfStuck();
+      // Re-arm only after another low reading.
+      _arming = const AutoStartArming(armed: false);
     } finally {
       _starting = false;
     }

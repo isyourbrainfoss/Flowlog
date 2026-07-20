@@ -92,21 +92,46 @@ class SessionSensorAdapter implements SensorAdapter {
 
   @override
   Future<void> connect() async {
-    _delegate = resolve();
-    _stateSub = _delegate!.state.listen(_stateController.add);
-    _samplesSub = _delegate!.samples.listen(_samplesController.add);
-    await _delegate!.connect();
+    // Tear down any half-open prior session so reconnect after a failed start
+    // does not leave double subscriptions.
+    await disconnect();
+    final adapter = resolve();
+    _delegate = adapter;
+    _stateSub = adapter.state.listen(_stateController.add);
+    _samplesSub = adapter.samples.listen(_samplesController.add);
+    try {
+      await adapter.connect();
+    } on Object {
+      await disconnect();
+      rethrow;
+    }
   }
 
   @override
   Future<void> disconnect() async {
-    await _delegate?.disconnect();
+    final delegate = _delegate;
+    _delegate = null;
     await _stateSub?.cancel();
     await _samplesSub?.cancel();
     _stateSub = null;
     _samplesSub = null;
-    _delegate = null;
-    _stateController.add(ConnectionState.disconnected);
+    if (delegate != null) {
+      try {
+        await delegate.disconnect();
+      } on Object {
+        // ignore adapter disconnect errors so start recovery can continue
+      }
+      if (delegate is MergedSampleStreamAdapter) {
+        try {
+          await delegate.dispose();
+        } on Object {
+          // ignore
+        }
+      }
+    }
+    if (!_stateController.isClosed) {
+      _stateController.add(ConnectionState.disconnected);
+    }
   }
 }
 

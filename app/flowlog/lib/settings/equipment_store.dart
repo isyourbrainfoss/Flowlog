@@ -215,6 +215,13 @@ class EquipmentStore {
     await save(_settings.copyWith(presets: presets));
   }
 
+  Future<void> updatePreset(EquipmentPreset preset) async {
+    final presets = _settings.presets
+        .map((p) => p.id == preset.id ? preset : p)
+        .toList();
+    await save(_settings.copyWith(presets: presets));
+  }
+
   Future<void> deletePreset(String id) async {
     final presets = _settings.presets.where((p) => p.id != id).toList();
     String? newDefault = _settings.defaultPresetId;

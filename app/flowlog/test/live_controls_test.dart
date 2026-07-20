@@ -50,6 +50,16 @@ void main() {
       expect(controller.sessionState, ShotSessionState.stopped);
     });
 
+    test('can start again after stop', () async {
+      await controller.start();
+      await controller.stop();
+      expect(controller.canStart, isTrue);
+
+      await controller.start();
+      expect(controller.sessionState, ShotSessionState.recording);
+      await controller.stop();
+    });
+
     test('pause and resume toggle recording state', () async {
       await controller.start();
 
@@ -128,16 +138,23 @@ void main() {
       await pumpControls(tester);
 
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('live_brew')));
-        await tester.pumpAndSettle();
+        await controller.start();
       });
+      await tester.pumpAndSettle();
 
+      expect(controller.sessionState, ShotSessionState.recording);
+      expect(find.text('Stop brew'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('live_brew')));
+      await tester.pump();
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('live_brew')));
-        await tester.pumpAndSettle();
+        await Future<void>.delayed(const Duration(milliseconds: 50));
       });
+      await tester.pumpAndSettle();
 
       expect(controller.sessionState, ShotSessionState.stopped);
+      expect(controller.canStart, isTrue);
+      expect(controller.isBrewing, isFalse);
       expect(find.text('Start brew'), findsOneWidget);
     });
   });

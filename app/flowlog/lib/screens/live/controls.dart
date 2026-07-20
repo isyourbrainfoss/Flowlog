@@ -28,6 +28,8 @@ class LiveShotController extends ChangeNotifier {
   DateTime? _sessionStartedAt;
   DateTime? _sessionEndedAt;
   bool _disposed = false;
+  bool _startInFlight = false;
+  bool _stopInFlight = false;
 
   ShotSession get session => _session;
 
@@ -65,26 +67,65 @@ class LiveShotController extends ChangeNotifier {
   double? get autoStartPressureBar => _autoStartPressureBar;
 
   /// Tares the scale, connects [sampleAdapter], and begins [ShotSession].
+  ///
+  /// Safe to call repeatedly: concurrent starts are ignored, and a failed
+  /// connect/tare recovers to a state where [canStart] is true again.
   Future<void> start({double? autoStartPressureBar}) async {
-    if (!canStart) {
+    if (!canStart || _startInFlight) {
       return;
     }
 
-    if (sessionState == ShotSessionState.stopped) {
-      await _replaceSession();
-    }
-
-    _autoStartPressureBar = autoStartPressureBar;
-
-    await _onTare();
-    _sessionStartedAt = DateTime.now().toUtc();
-    _sessionEndedAt = null;
-    // Subscribe before connect so instant replay samples are not missed.
-    _session.start(
-      _sampleAdapter.samples.map((sample) => sample.toShotSample()),
-    );
-    await _sampleAdapter.connect();
+    _startInFlight = true;
     _notify();
+    try {
+      if (sessionState == ShotSessionState.stopped) {
+        await _replaceSession();
+      }
+
+      // Half-failed prior start can leave non-idle state without canStop.
+      if (sessionState != ShotSessionState.idle) {
+        await _recoverToIdle();
+      }
+
+      _autoStartPressureBar = autoStartPressureBar;
+
+      try {
+        await _onTare().timeout(const Duration(seconds: 5));
+      } on Object {
+        // Scale tare is best-effort; still allow recording pressure.
+      }
+
+      _sessionStartedAt = DateTime.now().toUtc();
+      _sessionEndedAt = null;
+      // Subscribe before connect so instant replay samples are not missed.
+      _session.start(
+        _sampleAdapter.samples.map((sample) => sample.toShotSample()),
+      );
+
+      try {
+        await _sampleAdapter.connect().timeout(const Duration(seconds: 12));
+      } on Object {
+        // Roll back to idle so Start works again without killing the app.
+        try {
+          if (_session.state == ShotSessionState.recording ||
+              _session.state == ShotSessionState.paused) {
+            _session.stop();
+          }
+        } on Object {
+          // ignore
+        }
+        try {
+          await _sampleAdapter.disconnect();
+        } on Object {
+          // ignore
+        }
+        await _recoverToIdle();
+        return;
+      }
+    } finally {
+      _startInFlight = false;
+      _notify();
+    }
   }
 
   void pause() {
@@ -105,13 +146,51 @@ class LiveShotController extends ChangeNotifier {
 
   /// Ends recording and disconnects the sample adapter.
   Future<void> stop() async {
-    if (!canStop) {
+    if (!canStop || _stopInFlight) {
       return;
     }
 
-    _session.stop();
-    _sessionEndedAt = DateTime.now().toUtc();
-    await _sampleAdapter.disconnect();
+    _stopInFlight = true;
+    _notify();
+    try {
+      if (_session.state == ShotSessionState.recording ||
+          _session.state == ShotSessionState.paused) {
+        _session.stop();
+      }
+      _sessionEndedAt = DateTime.now().toUtc();
+      try {
+        await _sampleAdapter.disconnect().timeout(const Duration(seconds: 8));
+      } on Object {
+        try {
+          await _sampleAdapter.disconnect();
+        } on Object {
+          // ignore
+        }
+      }
+    } finally {
+      _stopInFlight = false;
+      _notify();
+    }
+  }
+
+  /// Forces a fresh idle session after a stuck or failed lifecycle.
+  Future<void> recoverIfStuck() async {
+    if (_startInFlight || _stopInFlight) {
+      return;
+    }
+    if (canStart || canStop) {
+      return;
+    }
+    await _recoverToIdle();
+  }
+
+  Future<void> _recoverToIdle() async {
+    try {
+      await _sampleAdapter.disconnect();
+    } on Object {
+      // ignore
+    }
+    await _replaceSession();
     _notify();
   }
 
@@ -167,6 +246,8 @@ class LiveControls extends StatelessWidget {
       builder: (context, _) {
         final brewing = controller.isBrewing;
         final enabled = brewing ? controller.canStop : controller.canStart;
+        // Stuck after a failed connect: no start/stop — recover on next tap.
+        final needsRecover = !enabled && !brewing && !controller.canStart;
 
         final baseStyle = compact
             ? FilledButton.styleFrom(
@@ -203,6 +284,9 @@ class LiveControls extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: () async {
+                if (needsRecover) {
+                  await controller.recoverIfStuck();
+                }
                 await controller.start();
               },
               customBorder: const StadiumBorder(),
@@ -246,9 +330,12 @@ class LiveControls extends StatelessWidget {
                     ),
                   )
                 : baseStyle,
-            onPressed: enabled
+            onPressed: (enabled || needsRecover)
                 ? () async {
-                    if (brewing) {
+                    if (needsRecover) {
+                      await controller.recoverIfStuck();
+                    }
+                    if (controller.isBrewing) {
                       await controller.stop();
                     } else {
                       await controller.start();
@@ -261,7 +348,7 @@ class LiveControls extends StatelessWidget {
 
         return Semantics(
           button: true,
-          enabled: enabled,
+          enabled: enabled || needsRecover,
           label: brewing ? 'Stop brew' : 'Start brew',
           child: ExcludeSemantics(child: button),
         );

@@ -215,16 +215,15 @@ void main() {
       });
       await tester.pump();
 
-      // Rising edge: first sample below threshold, then cross it.
-      // (A first sample already above threshold is treated as residual, not a start.)
-      pressureTransport.emitPressure(const [0x00, 0x64]); // 0.1 bar
+      // Hysteresis: low sample arms, then high sample starts.
+      pressureTransport.emitPressure(const [0x00, 0x64]); // 0.1 bar arms
       await tester.pump();
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       });
       await tester.pump();
 
-      pressureTransport.emitPressure(const [0x03, 0xE8]); // 1.0 bar
+      pressureTransport.emitPressure(const [0x03, 0xE8]); // 1.0 bar starts
       await tester.pump();
       await tester.runAsync(() async {
         await Future<void>.delayed(const Duration(milliseconds: 300));
