@@ -243,14 +243,15 @@ void main() {
       await db.close();
     });
 
-    testWidgets('shows bean fill indicator during recording', (tester) async {
+    testWidgets('shows live yield progress during recording', (tester) async {
       final harness = await _pumpLiveScreen(tester);
 
-      expect(find.byKey(const Key('bean_fill_icon')), findsNothing);
+      expect(find.byKey(const Key('live_yield_progress')), findsNothing);
 
       await _startSession(tester, harness.controller);
 
-      expect(find.byKey(const Key('bean_fill_icon')), findsOneWidget);
+      expect(find.byKey(const Key('live_yield_progress')), findsOneWidget);
+      expect(find.byKey(const Key('live_yield_weight_digit')), findsOneWidget);
     });
 
     testWidgets('bursts confetti when star shot sets a taste PB', (tester) async {

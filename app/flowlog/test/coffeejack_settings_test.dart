@@ -23,6 +23,7 @@ void main() {
 
     test('load returns defaults when file is missing', () async {
       final settings = await store.load();
+      expect(settings.rewindTurnsBeforeFill, 5);
       expect(settings.rewindTurnsBeforeFill, kDefaultCoffeejackRewindTurns);
       expect(settings.slowPreinfusionTurns, kDefaultCoffeejackPreinfusionTurns);
     });

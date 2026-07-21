@@ -9,9 +9,21 @@ const double kDefaultBrewDoseG = 18.0;
 /// Default grind setting when no previous brew exists.
 const double kDefaultBrewGrindSetting = 4.2;
 
+/// Default target beverage weight in the cup (g).
+const double kDefaultTargetYieldG = 36.0;
+
+/// Default weight at which to alert before the target (g).
+///
+/// Lets you wind the lever back early and coast to [kDefaultTargetYieldG].
+const double kDefaultYieldWarnAtG = 32.0;
+
 /// Dose slider bounds for brew defaults and metadata.
 const double kBrewDoseMinG = 14.0;
 const double kBrewDoseMaxG = 24.0;
+
+/// Target yield slider bounds.
+const double kBrewYieldMinG = 15.0;
+const double kBrewYieldMaxG = 60.0;
 
 /// Grind slider bounds for brew defaults and metadata.
 const double kBrewGrindMin = 0.0;
@@ -43,6 +55,9 @@ class BrewDefaultsSettings {
     this.useDefaultGrind = true,
     this.useDefaultCoffeejack = true,
     this.useDefaultTargetBrew = true,
+    this.targetYieldG = kDefaultTargetYieldG,
+    this.yieldWarnAtG = kDefaultYieldWarnAtG,
+    this.yieldAlertEnabled = true,
   });
 
   final double defaultDoseG;
@@ -60,6 +75,25 @@ class BrewDefaultsSettings {
   /// Whether the default target brew curve should be shown/used.
   final bool useDefaultTargetBrew;
 
+  /// Desired beverage weight in cup (g) for the live fill bar and finish target.
+  final double targetYieldG;
+
+  /// Weight (g) at which to alert during the pull so you can wind back early.
+  final double yieldWarnAtG;
+
+  /// Play sound + show banner when live weight reaches [yieldWarnAtG].
+  final bool yieldAlertEnabled;
+
+  /// Effective warn weight: never above target, never below a small floor.
+  double get effectiveYieldWarnAtG {
+    final target = targetYieldG.clamp(kBrewYieldMinG, kBrewYieldMaxG);
+    final warn = yieldWarnAtG.clamp(kBrewYieldMinG, kBrewYieldMaxG);
+    if (warn >= target) {
+      return (target - 2).clamp(kBrewYieldMinG, target);
+    }
+    return warn;
+  }
+
   BrewDefaultsSettings copyWith({
     double? defaultDoseG,
     double? defaultGrindSetting,
@@ -67,6 +101,9 @@ class BrewDefaultsSettings {
     bool? useDefaultGrind,
     bool? useDefaultCoffeejack,
     bool? useDefaultTargetBrew,
+    double? targetYieldG,
+    double? yieldWarnAtG,
+    bool? yieldAlertEnabled,
   }) {
     return BrewDefaultsSettings(
       defaultDoseG: defaultDoseG ?? this.defaultDoseG,
@@ -75,6 +112,9 @@ class BrewDefaultsSettings {
       useDefaultGrind: useDefaultGrind ?? this.useDefaultGrind,
       useDefaultCoffeejack: useDefaultCoffeejack ?? this.useDefaultCoffeejack,
       useDefaultTargetBrew: useDefaultTargetBrew ?? this.useDefaultTargetBrew,
+      targetYieldG: targetYieldG ?? this.targetYieldG,
+      yieldWarnAtG: yieldWarnAtG ?? this.yieldWarnAtG,
+      yieldAlertEnabled: yieldAlertEnabled ?? this.yieldAlertEnabled,
     );
   }
 }
@@ -112,6 +152,11 @@ class BrewDefaultsSettingsStore {
         useDefaultGrind: decoded['useDefaultGrind'] as bool? ?? true,
         useDefaultCoffeejack: decoded['useDefaultCoffeejack'] as bool? ?? true,
         useDefaultTargetBrew: decoded['useDefaultTargetBrew'] as bool? ?? true,
+        targetYieldG:
+            (decoded['targetYieldG'] as num?)?.toDouble() ?? kDefaultTargetYieldG,
+        yieldWarnAtG:
+            (decoded['yieldWarnAtG'] as num?)?.toDouble() ?? kDefaultYieldWarnAtG,
+        yieldAlertEnabled: decoded['yieldAlertEnabled'] as bool? ?? true,
       );
     } catch (_) {
       return const BrewDefaultsSettings();
@@ -129,6 +174,9 @@ class BrewDefaultsSettingsStore {
         'useDefaultGrind': settings.useDefaultGrind,
         'useDefaultCoffeejack': settings.useDefaultCoffeejack,
         'useDefaultTargetBrew': settings.useDefaultTargetBrew,
+        'targetYieldG': settings.targetYieldG,
+        'yieldWarnAtG': settings.yieldWarnAtG,
+        'yieldAlertEnabled': settings.yieldAlertEnabled,
       }),
     );
   }

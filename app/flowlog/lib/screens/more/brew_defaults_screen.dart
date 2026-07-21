@@ -107,6 +107,24 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
     await _brewDefaultsStore.save(updated);
   }
 
+  Future<void> _updateTargetYield(double grams) async {
+    final updated = _brewDefaults.copyWith(targetYieldG: grams);
+    setState(() => _brewDefaults = updated);
+    await _brewDefaultsStore.save(updated);
+  }
+
+  Future<void> _updateYieldWarnAt(double grams) async {
+    final updated = _brewDefaults.copyWith(yieldWarnAtG: grams);
+    setState(() => _brewDefaults = updated);
+    await _brewDefaultsStore.save(updated);
+  }
+
+  Future<void> _updateYieldAlertEnabled(bool enabled) async {
+    final updated = _brewDefaults.copyWith(yieldAlertEnabled: enabled);
+    setState(() => _brewDefaults = updated);
+    await _brewDefaultsStore.save(updated);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -167,6 +185,67 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
                       onDoseChanged: _updateDose,
                       onGrindChanged: _updateGrind,
                       onCoffeejackChanged: _updateCoffeejack,
+                    ),
+                    const SizedBox(height: 32),
+                    Text(
+                      'Cup weight (scale)',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Use a lower Coffeejack rewind for more water, and stop '
+                      'the lever when the app alerts near your target yield. '
+                      'Default warn is a few grams early so you can wind back '
+                      'and finish on target.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    SwitchListTile(
+                      key: const Key('brew_defaults_yield_alert_switch'),
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Early-stop yield alert'),
+                      subtitle: const Text(
+                        'Sound + banner when cup weight hits the warn level',
+                      ),
+                      value: _brewDefaults.yieldAlertEnabled,
+                      onChanged: _updateYieldAlertEnabled,
+                    ),
+                    Text(
+                      'Target yield: ${_brewDefaults.targetYieldG.toStringAsFixed(0)} g',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    Slider(
+                      key: const Key('brew_defaults_target_yield'),
+                      value: _brewDefaults.targetYieldG.clamp(
+                        kBrewYieldMinG,
+                        kBrewYieldMaxG,
+                      ),
+                      min: kBrewYieldMinG,
+                      max: kBrewYieldMaxG,
+                      divisions: (kBrewYieldMaxG - kBrewYieldMinG).round(),
+                      label:
+                          '${_brewDefaults.targetYieldG.toStringAsFixed(0)} g',
+                      onChanged: _updateTargetYield,
+                    ),
+                    Text(
+                      'Warn at: ${_brewDefaults.effectiveYieldWarnAtG.toStringAsFixed(0)} g '
+                      '(wind back / start finish)',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    Slider(
+                      key: const Key('brew_defaults_yield_warn'),
+                      value: _brewDefaults.yieldWarnAtG.clamp(
+                        kBrewYieldMinG,
+                        kBrewYieldMaxG,
+                      ),
+                      min: kBrewYieldMinG,
+                      max: kBrewYieldMaxG,
+                      divisions: (kBrewYieldMaxG - kBrewYieldMinG).round(),
+                      label:
+                          '${_brewDefaults.yieldWarnAtG.toStringAsFixed(0)} g',
+                      onChanged: _updateYieldWarnAt,
                     ),
                     const SizedBox(height: 32),
                     Text(

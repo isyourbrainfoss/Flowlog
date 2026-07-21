@@ -4,7 +4,10 @@ import 'dart:io';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 
 /// Default lever turns wound back before filling the boiler.
-const int kDefaultCoffeejackRewindTurns = 8;
+///
+/// Lower than the old 8 so more water remains for the pull; use the live
+/// yield warning (brew defaults) to time the stop instead of a long rewind.
+const int kDefaultCoffeejackRewindTurns = 5;
 
 /// Default slow turns used for pre-infusion.
 const int kDefaultCoffeejackPreinfusionTurns = 8;

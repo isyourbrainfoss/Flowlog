@@ -12,6 +12,7 @@ import 'package:flowlog/screens/live/feedback.dart';
 import 'package:flowlog/screens/live/fullscreen_chart.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
 import 'package:flowlog/screens/live/live_pressure_bar.dart';
+import 'package:flowlog/screens/live/live_yield_bar.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
@@ -135,6 +136,9 @@ class _LiveScreenState extends State<LiveScreen> {
   ConnectionState? _lastPressensorState;
   ActiveBrewNotifier? _activeBrewNotifier;
   ShotEventsNotifier? _shotEventsNotifier;
+  /// Fires once per brew when cup weight crosses the early-stop warn level.
+  bool _yieldWarnFired = false;
+  bool _showYieldWarnBanner = false;
 
   late final ValueNotifier<double?> _livePressureNotifier;
   late final ValueNotifier<DateTime?> _livePressureLastUpdate;
@@ -321,6 +325,36 @@ class _LiveScreenState extends State<LiveScreen> {
     }
 
     _checkAutoStop(controller);
+    _maybeFireYieldWarn(controller);
+  }
+
+  void _maybeFireYieldWarn(LiveShotController controller) {
+    if (!controller.isBrewing || _yieldWarnFired) {
+      return;
+    }
+    final defaults = _brewDefaults;
+    if (defaults == null || !defaults.yieldAlertEnabled) {
+      return;
+    }
+    final samples = controller.samples;
+    if (samples.isEmpty) {
+      return;
+    }
+    final weight = samples.last.weightG;
+    if (!shouldFireYieldWarn(
+      weightG: weight,
+      warnAtG: defaults.effectiveYieldWarnAtG,
+      targetYieldG: defaults.targetYieldG,
+      alreadyFired: _yieldWarnFired,
+    )) {
+      return;
+    }
+
+    _yieldWarnFired = true;
+    if (mounted) {
+      setState(() => _showYieldWarnBanner = true);
+    }
+    unawaited(playYieldWarnCue());
   }
 
   void _checkAutoStop(LiveShotController controller) {
@@ -505,7 +539,17 @@ class _LiveScreenState extends State<LiveScreen> {
     if (brewing && !_wasBrewing) {
       _autoSavedCurrent = false;
       _lastAutoSavedShotId = null;
+      _yieldWarnFired = false;
+      _showYieldWarnBanner = false;
       _chartInteractionController.resetViewport();
+      // Reload brew defaults so yield target/warn edits apply to this shot.
+      unawaited(_brewDefaultsStore.load().then((d) {
+        if (mounted) setState(() => _brewDefaults = d);
+      }));
+    }
+    if (!brewing && _wasBrewing) {
+      // Keep banner briefly after stop is fine; clear when leaving brew UI noise.
+      // Banner stays until next brew start.
     }
     _wasBrewing = brewing;
   }
@@ -805,7 +849,6 @@ class _LiveScreenState extends State<LiveScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        RecordingBeanFillIndicator(controller: controller),
                         if (demoModeActive)
                           DemoModeBanner(onDismiss: _onDismissDemoMode),
                         if (demoModeActive) const SizedBox(height: 8),
@@ -890,7 +933,18 @@ class _LiveScreenState extends State<LiveScreen> {
                             sample: latestSample,
                             previousSample: previousSample,
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 8),
+                          LiveYieldProgress(
+                            weightG: latestSample.weightG,
+                            targetYieldG:
+                                _brewDefaults?.targetYieldG ?? kDefaultTargetYieldG,
+                            warnAtG: _brewDefaults?.effectiveYieldWarnAtG ??
+                                kDefaultYieldWarnAtG,
+                            showWarnBanner: _showYieldWarnBanner &&
+                                (state == ShotSessionState.recording ||
+                                    state == ShotSessionState.paused),
+                          ),
+                          const SizedBox(height: 6),
                           LivePressureDeviationBar(
                             currentPressure: latestSample.pressureBar,
                             targetPressure: _targetPressureAtElapsed(latestSample.elapsedMs),

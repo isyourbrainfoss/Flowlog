@@ -2,11 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
+import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
-/// Default target yield used to normalize bean fill progress.
-const double kDefaultTargetYieldG = 36.0;
+export 'package:flowlog/settings/brew_defaults_store.dart' show kDefaultTargetYieldG;
 
 /// Returns bean fill progress in `[0, 1]` from current yield and elapsed time.
 ///
