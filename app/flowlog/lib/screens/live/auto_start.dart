@@ -352,6 +352,10 @@ class _LiveAutoStartListenerState extends State<LiveAutoStartListener> {
       if (!_wantMonitor || !mounted) {
         return;
       }
+      // Skip work while Live tab is offstage (History etc.) to reduce jank.
+      if (!TickerMode.valuesOf(context).enabled) {
+        return;
+      }
       final now = DateTime.now();
       final last = widget.pressureLastUpdateNotifier?.value;
       final hubConnected =

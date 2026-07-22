@@ -107,8 +107,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final shotRepository = await _ensureShotRepository();
     final tagRepository = await _ensureTagRepository();
     final results = await Future.wait([
+      // sparklineOnly: one batched sample query + downsample (no per-shot
+      // N+1 queries that froze History with many brews).
       shotRepository.listShots(
-        includeSamples: true,
+        sparklineOnly: true,
         filters: _filters,
       ),
       tagRepository.listTags(),

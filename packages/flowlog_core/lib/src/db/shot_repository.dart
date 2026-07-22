@@ -82,14 +82,19 @@ class ShotRepository {
     return _shotFromRow(row, samples: const [], annotations: const [], targetPressureSamples: const []);
   }
 
+  /// Max points per shot for history list sparklines (keeps list loads light).
+  static const int kHistorySparklineMaxSamples = 48;
+
   /// Returns shots ordered by [models.Shot.startedAt] descending.
   ///
   /// When [includeSamples] is true, each shot includes samples ordered by
-  /// elapsed time (useful for history sparklines).
+  /// elapsed time. Prefer [sparklineOnly] for history lists: one batched sample
+  /// query, no annotations/targets, downsampled for sparklines (avoids UI hangs).
   ///
   /// Optional [filters] narrow results by bean, date, taste, and peak pressure.
   Future<List<models.Shot>> listShots({
     bool includeSamples = false,
+    bool sparklineOnly = false,
     ShotListFilters filters = ShotListFilters.empty,
   }) async {
     final query = _db.select(_db.shots);
@@ -98,42 +103,103 @@ class ShotRepository {
 
     final rows = await query.get();
 
-    if (!includeSamples) {
+    if (!includeSamples && !sparklineOnly) {
       return rows
           .map((row) => _shotFromRow(row, samples: const [], annotations: const [], targetPressureSamples: const []))
           .toList();
     }
 
-    final shots = <models.Shot>[];
-    for (final row in rows) {
-      final sampleRows = await (_db.select(_db.shotSamples)
-            ..where((sample) => sample.shotId.equals(row.id))
-            ..orderBy([(sample) => OrderingTerm.asc(sample.elapsedMs)]))
-          .get();
+    if (rows.isEmpty) {
+      return const [];
+    }
 
-      final annotationRows = await (_db.select(_db.shotAnnotations)
-            ..where((annotation) => annotation.shotId.equals(row.id))
+    // History list path: one query for all samples, downsample per shot.
+    if (sparklineOnly || includeSamples) {
+      final ids = rows.map((r) => r.id).toList();
+      final allSampleRows = await (_db.select(_db.shotSamples)
+            ..where((sample) => sample.shotId.isIn(ids))
             ..orderBy([
-              (annotation) => OrderingTerm.asc(annotation.elapsedMs),
-              (annotation) => OrderingTerm.asc(annotation.id),
+              (sample) => OrderingTerm.asc(sample.shotId),
+              (sample) => OrderingTerm.asc(sample.elapsedMs),
             ]))
           .get();
 
-      final targetSampleRows = await (_db.select(_db.shotTargetSamples)
-            ..where((sample) => sample.shotId.equals(row.id))
-            ..orderBy([(sample) => OrderingTerm.asc(sample.elapsedMs)]))
-          .get();
+      final byShot = <String, List<models.ShotSample>>{};
+      for (final sampleRow in allSampleRows) {
+        final list = byShot.putIfAbsent(sampleRow.shotId, () => []);
+        list.add(_sampleFromRow(sampleRow));
+      }
 
-      shots.add(
-        _shotFromRow(
-          row,
-          samples: sampleRows.map(_sampleFromRow).toList(),
-          annotations: annotationRows.map(_annotationFromRow).toList(),
-          targetPressureSamples: targetSampleRows.map(_targetSampleFromRow).toList(),
-        ),
-      );
+      if (sparklineOnly) {
+        return [
+          for (final row in rows)
+            _shotFromRow(
+              row,
+              samples: _downsampleSamples(
+                byShot[row.id] ?? const [],
+                kHistorySparklineMaxSamples,
+              ),
+              annotations: const [],
+              targetPressureSamples: const [],
+            ),
+        ];
+      }
+
+      // Full includeSamples (sync/export): still batch samples; load
+      // annotations/targets only when needed (detail uses getShotWithSamples).
+      final shots = <models.Shot>[];
+      for (final row in rows) {
+        final annotationRows = await (_db.select(_db.shotAnnotations)
+              ..where((annotation) => annotation.shotId.equals(row.id))
+              ..orderBy([
+                (annotation) => OrderingTerm.asc(annotation.elapsedMs),
+                (annotation) => OrderingTerm.asc(annotation.id),
+              ]))
+            .get();
+
+        final targetSampleRows = await (_db.select(_db.shotTargetSamples)
+              ..where((sample) => sample.shotId.equals(row.id))
+              ..orderBy([(sample) => OrderingTerm.asc(sample.elapsedMs)]))
+            .get();
+
+        shots.add(
+          _shotFromRow(
+            row,
+            samples: byShot[row.id] ?? const [],
+            annotations: annotationRows.map(_annotationFromRow).toList(),
+            targetPressureSamples:
+                targetSampleRows.map(_targetSampleFromRow).toList(),
+          ),
+        );
+      }
+      return shots;
     }
-    return shots;
+
+    return const [];
+  }
+
+  /// Evenly spaced sample subset for sparklines (always keeps first/last).
+  static List<models.ShotSample> _downsampleSamples(
+    List<models.ShotSample> samples,
+    int maxPoints,
+  ) {
+    if (samples.length <= maxPoints || maxPoints < 3) {
+      return samples;
+    }
+    final result = <models.ShotSample>[samples.first];
+    final inner = maxPoints - 2;
+    final lastIndex = samples.length - 1;
+    for (var i = 1; i <= inner; i++) {
+      final index = ((i * lastIndex) / (inner + 1)).round().clamp(1, lastIndex - 1);
+      final sample = samples[index];
+      if (result.last.elapsedMs != sample.elapsedMs) {
+        result.add(sample);
+      }
+    }
+    if (result.last.elapsedMs != samples.last.elapsedMs) {
+      result.add(samples.last);
+    }
+    return result;
   }
 
   Future<void> _applyShotListFilters(

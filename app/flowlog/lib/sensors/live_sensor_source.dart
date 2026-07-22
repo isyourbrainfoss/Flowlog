@@ -199,6 +199,9 @@ class LiveSensorSource {
   }
 
   /// Tares the connected scale before a session when one is available.
+  ///
+  /// Also re-sends LED-on so DIY / Decent-compatible scales resume the weight
+  /// notify stream (some firmwares only stream after LED-on / app mode).
   Future<void> onTare() async {
     if (_demoMode) {
       return;
@@ -206,6 +209,13 @@ class LiveSensorSource {
 
     final hubScale = hub.activeAdapterFor(SensorKind.scale);
     if (hubScale is DecentScaleBleAdapter) {
+      // Order: LED-on (start stream) then tare — critical after a long idle
+      // when heartbeat may have stopped notifies but hub still says connected.
+      try {
+        await hubScale.ledOn();
+      } on Object {
+        // continue to tare
+      }
       await hubScale.tare();
       return;
     }
@@ -220,7 +230,13 @@ class LiveSensorSource {
       return;
     }
 
-    await factory(scaleDevice).tare();
+    final adapter = factory(scaleDevice);
+    try {
+      await adapter.ledOn();
+    } on Object {
+      // ignore
+    }
+    await adapter.tare();
   }
 
   SensorAdapter? _resolvePressureAdapter() {

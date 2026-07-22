@@ -1257,10 +1257,16 @@ class _IdleSensorStatusState extends State<_IdleSensorStatus> {
   @override
   void initState() {
     super.initState();
-    // Rebuild periodically so a leftover post-shot reading flips from
-    // "ready" to "not ready" as soon as it becomes stale.
+    // Only tick while this route is animated (Live tab visible). Avoids
+    // rebuilding Live every second while the user is on History / Library.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (!mounted) {
+        return;
+      }
+      if (!TickerMode.valuesOf(context).enabled) {
+        return;
+      }
+      setState(() {});
     });
   }
 
