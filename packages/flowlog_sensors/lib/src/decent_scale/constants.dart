@@ -15,8 +15,9 @@ abstract final class DecentScaleConstants {
   /// Minimum spacing between outbound commands (firmware may drop bursts).
   static const minCommandSpacing = Duration(milliseconds: 200);
 
-  /// Half Decent Scale requires a heartbeat at least every 5 seconds.
-  static const heartbeatInterval = Duration(seconds: 5);
+  /// Heartbeat period while connected. Must be comfortably under the scale's
+  /// disconnect timeout (Flowlog DIY uses 15 s; real HDS is ~5 s).
+  static const heartbeatInterval = Duration(seconds: 2);
 
   /// FFF4 type bytes for weight notifications.
   static const weightStableType = 0xCE;

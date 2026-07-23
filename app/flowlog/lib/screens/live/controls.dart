@@ -89,15 +89,10 @@ class LiveShotController extends ChangeNotifier {
 
       _autoStartPressureBar = autoStartPressureBar;
 
-      try {
-        await _onTare().timeout(const Duration(seconds: 5));
-      } on Object {
-        // Scale tare is best-effort; still allow recording pressure.
-      }
-
       _sessionStartedAt = DateTime.now().toUtc();
       _sessionEndedAt = null;
-      // Subscribe before connect so instant replay samples are not missed.
+      // Subscribe before connect so the first post-connect samples are not
+      // missed (including weight after LED-on / tare).
       _session.start(
         _sampleAdapter.samples.map((sample) => sample.toShotSample()),
       );
@@ -121,6 +116,14 @@ class LiveShotController extends ChangeNotifier {
         }
         await _recoverToIdle();
         return;
+      }
+
+      // Tare *after* the merge stream is listening so weight packets update
+      // the session (and yield bar) from ~0 g. Best-effort: pressure-only OK.
+      try {
+        await _onTare().timeout(const Duration(seconds: 6));
+      } on Object {
+        // Scale tare failed — keep recording pressure.
       }
     } finally {
       _startInFlight = false;

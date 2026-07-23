@@ -198,10 +198,11 @@ class LiveSensorSource {
     );
   }
 
-  /// Tares the connected scale before a session when one is available.
+  /// Re-arms the weight stream and tares before a brew.
   ///
-  /// Also re-sends LED-on so DIY / Decent-compatible scales resume the weight
-  /// notify stream (some firmwares only stream after LED-on / app mode).
+  /// Call after the session sample merge is already listening so the first
+  /// post-tare packets are not dropped. LED-on then tare matches Decent /
+  /// Flowlog DIY scale expectations.
   Future<void> onTare() async {
     if (_demoMode) {
       return;
@@ -209,14 +210,7 @@ class LiveSensorSource {
 
     final hubScale = hub.activeAdapterFor(SensorKind.scale);
     if (hubScale is DecentScaleBleAdapter) {
-      // Order: LED-on (start stream) then tare — critical after a long idle
-      // when heartbeat may have stopped notifies but hub still says connected.
-      try {
-        await hubScale.ledOn();
-      } on Object {
-        // continue to tare
-      }
-      await hubScale.tare();
+      await _prepareDecentScale(hubScale);
       return;
     }
 
@@ -230,13 +224,25 @@ class LiveSensorSource {
       return;
     }
 
-    final adapter = factory(scaleDevice);
-    try {
-      await adapter.ledOn();
-    } on Object {
-      // ignore
+    await _prepareDecentScale(factory(scaleDevice));
+  }
+
+  Future<void> _prepareDecentScale(DecentScaleBleAdapter scale) async {
+    // LED-on restarts the notify stream; tare zeros the cup for yield alerts.
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        await scale.ledOn();
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        await scale.tare();
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        return;
+      } on Object {
+        if (attempt == 1) {
+          rethrow;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
     }
-    await adapter.tare();
   }
 
   SensorAdapter? _resolvePressureAdapter() {

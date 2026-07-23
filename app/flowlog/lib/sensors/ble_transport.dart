@@ -525,7 +525,13 @@ class FlutterBlueDecentScaleTransport implements DecentScaleTransport {
     if (characteristic == null) {
       throw StateError('Decent Scale write characteristic is unavailable.');
     }
-    await characteristic.write(command);
+    // Prefer write-without-response (36F5 is WRITE_NR on DIY firmware); fall
+    // back to write-with-response if the characteristic only supports that.
+    final withoutResponse = characteristic.properties.writeWithoutResponse;
+    await characteristic.write(
+      command,
+      withoutResponse: withoutResponse,
+    );
   }
 
   @override

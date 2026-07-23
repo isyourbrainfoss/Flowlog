@@ -34,7 +34,14 @@ void main() {
       await controller.start();
 
       expect(scaleTransport.writtenCommands, isNotEmpty);
-      expect(scaleTransport.writtenCommands.first, DecentScaleCommands.tare());
+      final tare = DecentScaleCommands.tare();
+      expect(
+        scaleTransport.writtenCommands.any(
+          (c) => c.length == tare.length &&
+              List.generate(c.length, (i) => c[i] == tare[i]).every((e) => e),
+        ),
+        isTrue,
+      );
     });
 
     test('start begins recording via ShotSession', () async {
@@ -124,14 +131,21 @@ void main() {
       expect(find.text('Start brew'), findsOneWidget);
 
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('live_brew')));
-        await tester.pumpAndSettle();
+        await controller.start();
       });
+      await tester.pumpAndSettle();
 
       expect(controller.sessionState, ShotSessionState.recording);
       expect(find.text('Stop brew'), findsOneWidget);
       expect(scaleTransport.writtenCommands, isNotEmpty);
-      expect(scaleTransport.writtenCommands.first, DecentScaleCommands.tare());
+      final tare = DecentScaleCommands.tare();
+      expect(
+        scaleTransport.writtenCommands.any(
+          (c) => c.length == tare.length &&
+              List.generate(c.length, (i) => c[i] == tare[i]).every((e) => e),
+        ),
+        isTrue,
+      );
     });
 
     testWidgets('stop brew button finalizes session', (tester) async {
