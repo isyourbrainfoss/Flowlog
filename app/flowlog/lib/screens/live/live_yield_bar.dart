@@ -37,6 +37,7 @@ class LiveYieldProgress extends StatelessWidget {
     required this.warnAtG,
     this.showWarnBanner = false,
     this.height = 12,
+    this.compact = false,
     super.key,
   });
 
@@ -45,6 +46,9 @@ class LiveYieldProgress extends StatelessWidget {
   final double warnAtG;
   final bool showWarnBanner;
   final double height;
+
+  /// Denser layout for immersive brew (still large digits, less padding).
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -107,9 +111,13 @@ class LiveYieldProgress extends StatelessWidget {
             Text(
               weight == null ? '— g' : '${weight.toStringAsFixed(1)} g',
               key: const Key('live_yield_weight_digit'),
-              style: theme.textTheme.headlineMedium?.copyWith(
+              style: (compact
+                      ? theme.textTheme.headlineSmall
+                      : theme.textTheme.headlineMedium)
+                  ?.copyWith(
                 fontFeatures: const [FontFeature.tabularFigures()],
                 fontWeight: FontWeight.w700,
+                height: 1.0,
                 color: atWarn ? cs.secondary : cs.onSurface,
               ),
             ),

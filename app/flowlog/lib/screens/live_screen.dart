@@ -18,6 +18,7 @@ import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog/settings/brew_location_store.dart';
+import 'package:flowlog/settings/scale_settings_store.dart';
 import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog/screens/more/sensors_screen.dart';
 import 'package:flowlog/sensors/live_sensor_source.dart';
@@ -245,7 +246,31 @@ class _LiveScreenState extends State<LiveScreen> {
           resolve: _sensorSource!.resolveSampleAdapter,
         ),
         onTare: _sensorSource!.onTare,
+        onPhoneBrewStart: _sensorSource!.onPhoneBrewStart,
+        onPhoneBrewEnd: _sensorSource!.onPhoneBrewEnd,
+        onForwardPressure: _sensorSource!.forwardPressure,
+        onPushScaleConfig: _pushScaleConfigToDevice,
       ),
+    );
+  }
+
+  Future<void> _pushScaleConfigToDevice() async {
+    final source = _sensorSource;
+    if (source == null) {
+      return;
+    }
+    final scaleSettings = await ScaleSettingsStore().load();
+    final brew = _brewDefaults;
+    // Prefer dedicated scale settings; fall back to brew defaults for yield.
+    final target = scaleSettings.targetYieldG;
+    final warn = scaleSettings.warnAtG > 0
+        ? scaleSettings.warnAtG
+        : (brew?.effectiveYieldWarnAtG ?? kDefaultYieldWarnAtG);
+    await source.pushScaleDisplayConfig(
+      targetYieldG: target.round(),
+      warnAtG: warn.round(),
+      pressureMinBar: scaleSettings.pressureMinBar.round(),
+      pressureMaxBar: scaleSettings.pressureMaxBar.round(),
     );
   }
 
@@ -843,9 +868,87 @@ class _LiveScreenState extends State<LiveScreen> {
                     constraints.maxHeight < ShellBreakpoints.minRailHeight;
                 final horizontalPadding = useCompactLayout ? 8.0 : 24.0;
                 final chartHeight = _liveChartHeight(constraints);
+                final isBrewing = controller.isBrewing;
+                final targetYield =
+                    _brewDefaults?.targetYieldG ?? kDefaultTargetYieldG;
+                final warnAt =
+                    _brewDefaults?.effectiveYieldWarnAtG ?? kDefaultYieldWarnAtG;
+                final targetP = latestSample == null
+                    ? null
+                    : _targetPressureAtElapsed(latestSample.elapsedMs);
 
+                // Active brew: immersive high-focus layout (shell hides tabs).
+                // Only plot + live digits + cup/pressure bars + stop control.
+                final Widget body;
+                if (isBrewing) {
+                  body = Column(
+                    key: const ValueKey('live-brew-layout'),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                          child: LayoutBuilder(
+                            builder: (context, chartConstraints) {
+                              final h = chartConstraints.maxHeight.isFinite
+                                  ? chartConstraints.maxHeight
+                                  : chartHeight;
+                              return DualCurveChart(
+                                height: h,
+                                samplesNotifier: _samplesNotifier,
+                                annotationsNotifier: _annotationsNotifier,
+                                interactionController:
+                                    _chartInteractionController,
+                                denseTimeAxis: true,
+                                targetPressureSamples: chartTargetSamples,
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      Material(
+                        elevation: 2,
+                        color: Theme.of(context).colorScheme.surface,
+                        child: SafeArea(
+                          top: false,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                LiveYieldProgress(
+                                  weightG: latestSample?.weightG,
+                                  targetYieldG: targetYield,
+                                  warnAtG: warnAt,
+                                  showWarnBanner: false,
+                                  compact: true,
+                                  height: 10,
+                                ),
+                                const SizedBox(height: 6),
+                                LivePressureDeviationBar(
+                                  currentPressure: latestSample?.pressureBar,
+                                  targetPressure: targetP,
+                                  compact: true,
+                                  height: 10,
+                                ),
+                                const SizedBox(height: 8),
+                                LiveControls(
+                                  controller: controller,
+                                  prominent: true,
+                                  compact: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                } else {
                   final chartSection = Padding(
-                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: horizontalPadding),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -858,7 +961,7 @@ class _LiveScreenState extends State<LiveScreen> {
                             onDismiss: _repeatShotController!.clear,
                           ),
                         if (repeatPrefill != null) const SizedBox(height: 8),
-                        if (_lastBrewSummary != null && !controller.isBrewing) ...[
+                        if (_lastBrewSummary != null) ...[
                           BrewCompleteBanner(
                             summary: _lastBrewSummary!,
                             onDismiss: () =>
@@ -869,30 +972,28 @@ class _LiveScreenState extends State<LiveScreen> {
                           ),
                           const SizedBox(height: 8),
                         ],
-                        // Prominent sensor readiness shown with the plot after a shot,
-                        // so it's obvious whether pressensor is still connected and
-                        // ready for the next brew (was clear on first shot, now reinforced).
-                        if ((state == ShotSessionState.idle || state == ShotSessionState.stopped) &&
-                            !controller.isBrewing)
+                        if (state == ShotSessionState.idle ||
+                            state == ShotSessionState.stopped)
                           _IdleSensorStatus(
                             pressureBarNotifier: _livePressureNotifier,
                             lastUpdateNotifier: _livePressureLastUpdate,
                             pressensorPaired: SensorHubScope.maybeOf(context)
                                     ?.hasKind(SensorKind.pressensor) ??
                                 false,
-                            pressensorLinkState: SensorHubScope.maybeOf(context)
-                                    ?.pressensorState ??
-                                ConnectionState.disconnected,
+                            pressensorLinkState:
+                                SensorHubScope.maybeOf(context)
+                                        ?.pressensorState ??
+                                    ConnectionState.disconnected,
                             onReconnect: _onReconnectSensors,
                             onPair: _onPairSensors,
-                            autoStartEnabled: _resolvedAutoStartController.settings.enabled,
-                            autoStartThreshold: _resolvedAutoStartController.settings.startThresholdBar,
+                            autoStartEnabled: _resolvedAutoStartController
+                                .settings.enabled,
+                            autoStartThreshold: _resolvedAutoStartController
+                                .settings.startThresholdBar,
                           ),
-                        if ((state == ShotSessionState.idle || state == ShotSessionState.stopped) &&
-                            !controller.isBrewing)
+                        if (state == ShotSessionState.idle ||
+                            state == ShotSessionState.stopped)
                           const SizedBox(height: 8),
-                        // Fullscreen control sits on the chart (lower-right) so
-                        // the plot keeps full width/height.
                         Stack(
                           clipBehavior: Clip.none,
                           children: [
@@ -928,7 +1029,8 @@ class _LiveScreenState extends State<LiveScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if ((state == ShotSessionState.recording || state == ShotSessionState.paused || state == ShotSessionState.stopped) && latestSample != null) ...[
+                        if ((state == ShotSessionState.stopped) &&
+                            latestSample != null) ...[
                           LiveMetricsRow(
                             sample: latestSample,
                             previousSample: previousSample,
@@ -936,62 +1038,57 @@ class _LiveScreenState extends State<LiveScreen> {
                           const SizedBox(height: 8),
                           LiveYieldProgress(
                             weightG: latestSample.weightG,
-                            targetYieldG:
-                                _brewDefaults?.targetYieldG ?? kDefaultTargetYieldG,
-                            warnAtG: _brewDefaults?.effectiveYieldWarnAtG ??
-                                kDefaultYieldWarnAtG,
-                            showWarnBanner: _showYieldWarnBanner &&
-                                (state == ShotSessionState.recording ||
-                                    state == ShotSessionState.paused),
+                            targetYieldG: targetYield,
+                            warnAtG: warnAt,
+                            showWarnBanner: false,
                           ),
                           const SizedBox(height: 6),
                           LivePressureDeviationBar(
                             currentPressure: latestSample.pressureBar,
-                            targetPressure: _targetPressureAtElapsed(latestSample.elapsedMs),
+                            targetPressure: targetP,
                           ),
                           if (chartTargetSamples.isNotEmpty) ...[
                             const SizedBox(height: 4),
                             _LiveTargetGamification(
-                              closeness: liveGamif['closenessPercent'] as double?,
-                              maxStreakSec: liveGamif['maxStreakSeconds'] as int? ?? 0,
-                              currentStreakSec: liveGamif['currentStreakSeconds'] as int? ?? 0,
-                              penaltyCount: liveGamif['penaltyCount'] as int? ?? 0,
+                              closeness:
+                                  liveGamif['closenessPercent'] as double?,
+                              maxStreakSec:
+                                  liveGamif['maxStreakSeconds'] as int? ?? 0,
+                              currentStreakSec:
+                                  liveGamif['currentStreakSeconds'] as int? ??
+                                      0,
+                              penaltyCount:
+                                  liveGamif['penaltyCount'] as int? ?? 0,
                               score: liveGamif['score'] as double?,
                             ),
                           ],
-                        ] else if (state == ShotSessionState.idle || state == ShotSessionState.stopped) ...[
-                          // (sensor readiness and auto-start info is now shown prominently
-                          // above the chart via _IdleSensorStatus for consistency before/after shots)
-                        ] else
-                          const LiveMetricsRow(
-                            metrics: LiveMetrics(elapsedMs: 0),
-                          ),
+                        ],
                         const SizedBox(height: 8),
                         Text(
                           '${controller.sampleCount} samples',
                           style: Theme.of(context).textTheme.bodySmall,
                           textAlign: TextAlign.center,
                         ),
-                        if (!controller.isBrewing) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            'Session: ${state.name}',
-                            style: Theme.of(context).textTheme.titleMedium,
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+                        const SizedBox(height: 8),
+                        Text(
+                          'Session: ${state.name}',
+                          style: Theme.of(context).textTheme.titleMedium,
+                          textAlign: TextAlign.center,
+                        ),
                         if (controller.canSaveShot) ...[
                           Align(
                             alignment: Alignment.center,
                             child: RepeatShotButton(
-                              onPressed: () => unawaited(_onRepeatShotPressed()),
+                              onPressed: () =>
+                                  unawaited(_onRepeatShotPressed()),
                             ),
                           ),
                           if (!_autoSavedCurrent) ...[
                             const SizedBox(height: 8),
                             FilledButton.icon(
                               key: const Key('save_current_shot_button'),
-                              onPressed: () => unawaited(_saveCurrentSession()),
+                              onPressed: () =>
+                                  unawaited(_saveCurrentSession()),
                               icon: const Icon(Icons.save),
                               label: const Text('Save shot'),
                             ),
@@ -1005,7 +1102,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   final pinChart = constraints.maxHeight.isFinite &&
                       constraints.maxHeight >= 360;
 
-                  final body = pinChart
+                  body = pinChart
                       ? Column(
                           key: const ValueKey('live-pinned-layout'),
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1034,23 +1131,28 @@ class _LiveScreenState extends State<LiveScreen> {
                             ],
                           ),
                         );
+                }
 
                   return Scaffold(
                     primary: false,
-                    bottomNavigationBar: SafeArea(
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          horizontalPadding,
-                          8,
-                          horizontalPadding,
-                          useCompactLayout ? 8 : 12,
-                        ),
-                        child: LiveControls(
-                          controller: controller,
-                          prominent: useCompactLayout,
-                        ),
-                      ),
-                    ),
+                    // During brew the stop control is embedded in the HUD so
+                    // the shell can go fully immersive (no bottom tab bar).
+                    bottomNavigationBar: isBrewing
+                        ? null
+                        : SafeArea(
+                            child: Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                horizontalPadding,
+                                8,
+                                horizontalPadding,
+                                useCompactLayout ? 8 : 12,
+                              ),
+                              child: LiveControls(
+                                controller: controller,
+                                prominent: useCompactLayout,
+                              ),
+                            ),
+                          ),
                     body: body,
                   );
                 },

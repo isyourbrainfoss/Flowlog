@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-/// A live horizontal deviation bar for pressure vs target.
+/// Live pressure vs target: large digit + horizontal deviation bar.
 ///
-/// Center (green) represents the target pressure.
-/// Red on left = too low, red on right = too high.
-/// The marker shows the current pressure position.
+/// Center (green) on the bar is the target. Left/right red = too low / high.
 class LivePressureDeviationBar extends StatelessWidget {
   const LivePressureDeviationBar({
     required this.currentPressure,
     required this.targetPressure,
     this.range = 2.5, // ± range around target
     this.height = 10.0,
+    this.showReadout = true,
+    this.compact = false,
     super.key,
   });
 
@@ -22,24 +22,36 @@ class LivePressureDeviationBar extends StatelessWidget {
 
   final double height;
 
+  /// When true, shows "Pressure" label and a large live bar digit above the bar.
+  final bool showReadout;
+
+  /// Denser layout for immersive brew.
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final hasCurrent = currentPressure != null;
     final current = currentPressure ?? 0.0;
     final target = targetPressure ?? 9.0;
 
     final deviation = current - target;
     final normalized = ((deviation + range) / (2 * range)).clamp(0.0, 1.0);
 
-    final isDeviating = deviation.abs() > 0.5;
-    final markerColor = isDeviating ? Colors.red : Colors.black;
+    final isDeviating = hasCurrent && deviation.abs() > 0.5;
+    final markerColor = !hasCurrent
+        ? cs.outline
+        : isDeviating
+            ? Colors.red
+            : Colors.black;
 
-    return SizedBox(
+    final bar = SizedBox(
+      key: const Key('live_pressure_deviation_bar'),
       height: height + 4,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Background bar with gradient
           Container(
             height: height,
             decoration: BoxDecoration(
@@ -54,10 +66,11 @@ class LivePressureDeviationBar extends StatelessWidget {
                 ],
                 stops: [0.0, 0.35, 0.5, 0.65, 1.0],
               ),
-              border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+              border: Border.all(
+                color: cs.outline.withValues(alpha: 0.3),
+              ),
             ),
           ),
-          // Center target marker (thin green line)
           Container(
             height: height,
             width: 2,
@@ -66,7 +79,6 @@ class LivePressureDeviationBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(1),
             ),
           ),
-          // Current value marker
           Align(
             alignment: Alignment((normalized * 2 - 1).toDouble(), 0),
             child: Container(
@@ -87,6 +99,56 @@ class LivePressureDeviationBar extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    if (!showReadout) {
+      return bar;
+    }
+
+    return Column(
+      key: const Key('live_pressure_progress'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              'Pressure',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              hasCurrent ? '${current.toStringAsFixed(1)} bar' : '— bar',
+              key: const Key('live_pressure_digit'),
+              style: (compact
+                      ? theme.textTheme.headlineSmall
+                      : theme.textTheme.headlineMedium)
+                  ?.copyWith(
+                fontFeatures: const [FontFeature.tabularFigures()],
+                fontWeight: FontWeight.w700,
+                height: 1.0,
+                color: isDeviating ? Colors.red.shade700 : cs.onSurface,
+              ),
+            ),
+            if (targetPressure != null) ...[
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '/ ${targetPressure!.toStringAsFixed(1)}',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 6),
+        bar,
+      ],
     );
   }
 }

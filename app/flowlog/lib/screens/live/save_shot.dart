@@ -306,19 +306,36 @@ ShotMetadata applyShotMetadataDefaults(
 /// Minimum end weight (g) treated as a real scale yield (avoids tare noise).
 const double kMinScaleYieldG = 1.0;
 
-/// Yield from the last scale sample when weight looks like a real beverage.
+/// Yield from scale samples when weight looks like a real beverage.
 ///
-/// Returns null when there is no weight stream or the cup is still empty /
-/// only noise after tare.
+/// Prefers the **last** weight (end of pour). If that collapsed near zero
+/// after a mid-shot re-tare/reset, falls back to the **peak** weight seen
+/// during the brew so yield is not lost as -0.1 g noise.
+///
+/// Returns null when there is no weight stream or the cup stayed empty.
 double? yieldFromScaleSamples(List<ShotSample> samples) {
   if (samples.isEmpty) {
     return null;
   }
-  final weight = samples.last.weightG;
-  if (weight == null || weight < kMinScaleYieldG) {
-    return null;
+  double? last;
+  double? peak;
+  for (final sample in samples) {
+    final w = sample.weightG;
+    if (w == null) {
+      continue;
+    }
+    last = w;
+    if (peak == null || w > peak) {
+      peak = w;
+    }
   }
-  return weight;
+  if (last != null && last >= kMinScaleYieldG) {
+    return last;
+  }
+  if (peak != null && peak >= kMinScaleYieldG) {
+    return peak;
+  }
+  return null;
 }
 
 /// Returns the explicit yieldG stored on the shot if present.

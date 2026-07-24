@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flowlog/location/brew_gps.dart';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/metadata_sheet.dart';
+import 'package:flowlog/screens/live/metrics_row.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog/screens/live_screen.dart';
 import 'package:flowlog/settings/brew_defaults_store.dart';
@@ -124,6 +125,17 @@ void main() {
       expect(yieldFromScaleSamples(const [
         ShotSample(elapsedMs: 0, weightG: 0),
       ]), isNull);
+    });
+
+    test('falls back to peak weight when last sample re-tared near zero', () {
+      expect(
+        yieldFromScaleSamples(const [
+          ShotSample(elapsedMs: 0, weightG: 0),
+          ShotSample(elapsedMs: 10000, weightG: 28.5),
+          ShotSample(elapsedMs: 20000, weightG: -0.1),
+        ]),
+        28.5,
+      );
     });
 
     test('uses default grind when no prior brew exists', () async {
@@ -365,14 +377,20 @@ void main() {
       expect(chart.samplesNotifier, isNotNull);
     });
 
-    testWidgets('wires LiveMetricsRow to latest sample', (tester) async {
+    testWidgets('brew layout shows chart and cup/pressure bars only', (
+      tester,
+    ) async {
       final harness = await _pumpLiveScreen(tester);
 
       await _startSession(tester, harness.controller);
 
-      final latest = harness.controller.samples.last;
-      expect(find.textContaining('bar'), findsWidgets);
-      expect(find.text(_formatElapsed(latest.elapsedMs)), findsOneWidget);
+      expect(find.byType(DualCurveChart), findsOneWidget);
+      expect(find.byKey(const Key('live_yield_progress')), findsOneWidget);
+      expect(find.byKey(const Key('live_pressure_progress')), findsOneWidget);
+      expect(find.byKey(const Key('live_pressure_digit')), findsOneWidget);
+      // No metrics strip / sample counter / banners while brewing.
+      expect(find.byType(LiveMetricsRow), findsNothing);
+      expect(find.textContaining('samples'), findsNothing);
     });
 
     testWidgets('preserves samples when resizing across layout breakpoints', (
@@ -394,7 +412,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(harness.controller.sampleCount, samplesBefore);
-      expect(find.text('$samplesBefore samples'), findsOneWidget);
+      // Brew layout stays pinned (no scroll-only sample counter).
+      expect(find.byKey(const ValueKey('live-brew-layout')), findsOneWidget);
+      expect(find.byType(DualCurveChart), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

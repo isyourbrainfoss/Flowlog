@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flowlog/persistence/flowlog_storage.dart';
+import 'package:flowlog/screens/history/import_scale_shot.dart';
 import 'package:flowlog/screens/live/auto_start.dart';
 import 'package:flowlog/screens/more/brew_defaults_screen.dart';
 import 'package:flowlog/screens/more/equipment_screen.dart';
@@ -7,10 +9,14 @@ import 'package:flowlog/screens/more/brew_location_screen.dart';
 import 'package:flowlog/screens/more/target_brew_screen.dart';
 
 import 'package:flowlog/screens/more/diagnostics.dart';
+import 'package:flowlog/screens/more/scale_settings_screen.dart';
 import 'package:flowlog/screens/more/sensors_screen.dart';
 import 'package:flowlog/settings/brew_location_store.dart';
+import 'package:flowlog/shell/shot_events.dart';
 import 'package:flowlog/shell/shortcuts.dart';
+import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
+import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
 class MoreScreen extends StatefulWidget {
@@ -35,6 +41,37 @@ class _MoreScreenState extends State<MoreScreen> {
     if (mounted) {
       setState(() => _brewLocation = location);
     }
+  }
+
+  Future<void> _importFromScale() async {
+    if (!mounted) return;
+    final shot = await showImportScaleShotDialog(context);
+    if (shot == null || !mounted) return;
+
+    final database = await openFlowlogDatabase();
+    final repo = ShotRepository(database);
+    var toSave = shot;
+    final existing = await repo.getShotById(shot.id);
+    if (existing != null) {
+      toSave = shot.copyWith(
+        id: 'shot-scale-${DateTime.now().toUtc().millisecondsSinceEpoch}',
+        lastModifiedAt: DateTime.now().toUtc(),
+      );
+    } else {
+      toSave = shot.copyWith(lastModifiedAt: DateTime.now().toUtc());
+    }
+    await repo.insertShot(toSave);
+    unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
+    if (!mounted) return;
+    ShotEventsScope.maybeOf(context)?.notifyShotsChanged();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Imported scale shot (${toSave.samples.length} samples) — see History',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _openBrewLocationScreen() async {
@@ -172,6 +209,35 @@ class _MoreScreenState extends State<MoreScreen> {
           subtitle: const Text('Batch CSV export and share'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => openExportScreen(context),
+        ),
+        ListTile(
+          key: const Key('more_import_scale_tile'),
+          leading: const Icon(Icons.scale_outlined),
+          title: const Text('Import from scale'),
+          subtitle: const Text(
+            'Last phone-free shot via half-decent.local /shot.json',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => unawaited(_importFromScale()),
+        ),
+        ListTile(
+          key: const Key('more_scale_settings_tile'),
+          leading: const Icon(Icons.tune),
+          title: const Text('Scale display'),
+          subtitle: const Text(
+            'Target / warn weight and pressure bar range on the DIY scale',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => Scaffold(
+                  appBar: AppBar(title: const Text('Scale display')),
+                  body: const ScaleSettingsScreen(),
+                ),
+              ),
+            );
+          },
         ),
         ListTile(
           key: const Key('more_sensors_tile'),

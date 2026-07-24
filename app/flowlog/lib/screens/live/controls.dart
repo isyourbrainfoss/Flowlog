@@ -12,16 +12,28 @@ class LiveShotController extends ChangeNotifier {
   LiveShotController({
     required SensorAdapter sampleAdapter,
     required Future<void> Function() onTare,
+    Future<void> Function()? onPhoneBrewStart,
+    Future<void> Function()? onPhoneBrewEnd,
+    Future<void> Function(double pressureBar)? onForwardPressure,
+    Future<void> Function()? onPushScaleConfig,
     ShotSession? session,
   })  : _sampleAdapter = sampleAdapter,
         _onTare = onTare,
+        _onPhoneBrewStart = onPhoneBrewStart,
+        _onPhoneBrewEnd = onPhoneBrewEnd,
+        _onForwardPressure = onForwardPressure,
+        _onPushScaleConfig = onPushScaleConfig,
         _session = session ?? ShotSession() {
     _stateSub = _session.stateChanges.listen((_) => _notify());
-    _sampleBatchSub = _session.sampleBatches.listen((_) => _notify());
+    _sampleBatchSub = _session.sampleBatches.listen(_onSampleBatch);
   }
 
   final SensorAdapter _sampleAdapter;
   final Future<void> Function() _onTare;
+  final Future<void> Function()? _onPhoneBrewStart;
+  final Future<void> Function()? _onPhoneBrewEnd;
+  final Future<void> Function(double pressureBar)? _onForwardPressure;
+  final Future<void> Function()? _onPushScaleConfig;
   ShotSession _session;
   StreamSubscription<ShotSessionState>? _stateSub;
   StreamSubscription<List<ShotSample>>? _sampleBatchSub;
@@ -30,6 +42,26 @@ class LiveShotController extends ChangeNotifier {
   bool _disposed = false;
   bool _startInFlight = false;
   bool _stopInFlight = false;
+
+  void _onSampleBatch(List<ShotSample> batch) {
+    _notify();
+    final forward = _onForwardPressure;
+    if (forward == null || batch.isEmpty) {
+      return;
+    }
+    if (sessionState != ShotSessionState.recording &&
+        sessionState != ShotSessionState.paused) {
+      return;
+    }
+    // Prefer the newest sample that carries pressure.
+    for (var i = batch.length - 1; i >= 0; i--) {
+      final p = batch[i].pressureBar;
+      if (p != null) {
+        unawaited(forward(p));
+        break;
+      }
+    }
+  }
 
   ShotSession get session => _session;
 
@@ -125,6 +157,24 @@ class LiveShotController extends ChangeNotifier {
       } on Object {
         // Scale tare failed — keep recording pressure.
       }
+
+      // Push OLED config then notify DIY scale (app owns PRS).
+      final pushCfg = _onPushScaleConfig;
+      if (pushCfg != null) {
+        try {
+          await pushCfg().timeout(const Duration(seconds: 3));
+        } on Object {
+          // Best-effort.
+        }
+      }
+      final brewStart = _onPhoneBrewStart;
+      if (brewStart != null) {
+        try {
+          await brewStart().timeout(const Duration(seconds: 3));
+        } on Object {
+          // Best-effort.
+        }
+      }
     } finally {
       _startInFlight = false;
       _notify();
@@ -161,6 +211,16 @@ class LiveShotController extends ChangeNotifier {
         _session.stop();
       }
       _sessionEndedAt = DateTime.now().toUtc();
+
+      final brewEnd = _onPhoneBrewEnd;
+      if (brewEnd != null) {
+        try {
+          await brewEnd().timeout(const Duration(seconds: 3));
+        } on Object {
+          // Best-effort.
+        }
+      }
+
       try {
         await _sampleAdapter.disconnect().timeout(const Duration(seconds: 8));
       } on Object {
@@ -221,7 +281,7 @@ class LiveShotController extends ChangeNotifier {
     _sessionStartedAt = null;
     _sessionEndedAt = null;
     _stateSub = _session.stateChanges.listen((_) => _notify());
-    _sampleBatchSub = _session.sampleBatches.listen((_) => _notify());
+    _sampleBatchSub = _session.sampleBatches.listen(_onSampleBatch);
   }
 }
 

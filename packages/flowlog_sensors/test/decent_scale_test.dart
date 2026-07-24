@@ -28,6 +28,29 @@ void main() {
         DecentScaleCommands.heartbeat(),
         [0x03, 0x0A, 0x03, 0xFF, 0xFF, 0x00, 0x0A],
       );
+      // 9.0 bar = 9000 mbar = 0x2328
+      expect(
+        DecentScaleCommands.phonePressure(9.0),
+        [0x03, 0xF0, 0x23, 0x28, 0x00, 0x00, 0xF8],
+      );
+      expect(
+        DecentScaleCommands.phoneBrewStart(),
+        [0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0xF2],
+      );
+      expect(
+        DecentScaleCommands.phoneBrewEnd(),
+        [0x03, 0xF2, 0x00, 0x00, 0x00, 0x00, 0xF1],
+      );
+      // 36, 34, 5, 10 → XOR of 03 F3 24 22 05 0A
+      expect(
+        DecentScaleCommands.scaleDisplayConfig(
+          targetYieldG: 36,
+          warnAtG: 34,
+          pressureMinBar: 5,
+          pressureMaxBar: 10,
+        ),
+        [0x03, 0xF3, 0x24, 0x22, 0x05, 0x0A, 0xF9],
+      );
     });
 
     test('xorChecksum matches first six bytes', () {

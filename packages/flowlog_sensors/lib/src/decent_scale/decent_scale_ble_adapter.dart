@@ -49,6 +49,9 @@ class DecentScaleBleAdapter implements SensorAdapter {
   Timer? _heartbeatTimer;
   int? _streamStartMs;
   int _lastCommandSentMs = 0;
+  /// Serializes outbound writes so heartbeat + pressure forward cannot race.
+  Future<void> _writeQueue = Future<void>.value();
+  bool _writeInFlight = false;
 
   @override
   Stream<ConnectionState> get state => _stateController.stream;
@@ -103,6 +106,45 @@ class DecentScaleBleAdapter implements SensorAdapter {
     await _writeCommand(DecentScaleCommands.ledOff());
   }
 
+  /// Mirrors live pressensor pressure onto the Flowlog DIY scale OLED.
+  ///
+  /// Use while the phone owns the PRS BLE link so the scale can still show bar.
+  /// Drops the write if another command is already in flight so weight notify
+  /// traffic is not starved by a pressure-forward backlog.
+  Future<void> sendPhonePressure(double pressureBar) async {
+    await _writeCommand(
+      DecentScaleCommands.phonePressure(pressureBar),
+      dropIfBusy: true,
+    );
+  }
+
+  /// Notifies the scale that an app-driven brew started.
+  Future<void> sendPhoneBrewStart() async {
+    await _writeCommand(DecentScaleCommands.phoneBrewStart());
+  }
+
+  /// Notifies the scale that an app-driven brew ended.
+  Future<void> sendPhoneBrewEnd() async {
+    await _writeCommand(DecentScaleCommands.phoneBrewEnd());
+  }
+
+  /// Pushes OLED target/warn grams and pressure-bar window to the DIY scale.
+  Future<void> sendScaleDisplayConfig({
+    required int targetYieldG,
+    required int warnAtG,
+    required int pressureMinBar,
+    required int pressureMaxBar,
+  }) async {
+    await _writeCommand(
+      DecentScaleCommands.scaleDisplayConfig(
+        targetYieldG: targetYieldG,
+        warnAtG: warnAtG,
+        pressureMinBar: pressureMinBar,
+        pressureMaxBar: pressureMaxBar,
+      ),
+    );
+  }
+
   @override
   Future<void> disconnect() async {
     _heartbeatTimer?.cancel();
@@ -123,16 +165,52 @@ class DecentScaleBleAdapter implements SensorAdapter {
     });
   }
 
-  Future<void> _writeCommand(List<int> command) async {
-    final now = _monotonicClock();
-    final elapsed = now - _lastCommandSentMs;
-    if (_lastCommandSentMs != 0 && elapsed < _minCommandSpacing.inMilliseconds) {
-      await Future<void>.delayed(
-        Duration(milliseconds: _minCommandSpacing.inMilliseconds - elapsed),
-      );
+  Future<void> _writeCommand(
+    List<int> command, {
+    bool dropIfBusy = false,
+  }) {
+    if (dropIfBusy && _writeInFlight) {
+      return Future<void>.value();
     }
-    await _transport.writeCommand(command);
-    _lastCommandSentMs = _monotonicClock();
+
+    final done = Completer<void>();
+    _writeQueue = _writeQueue.then((_) async {
+      if (dropIfBusy && _writeInFlight) {
+        if (!done.isCompleted) {
+          done.complete();
+        }
+        return;
+      }
+      _writeInFlight = true;
+      try {
+        final now = _monotonicClock();
+        final elapsed = now - _lastCommandSentMs;
+        if (_lastCommandSentMs != 0 &&
+            elapsed < _minCommandSpacing.inMilliseconds) {
+          await Future<void>.delayed(
+            Duration(
+              milliseconds: _minCommandSpacing.inMilliseconds - elapsed,
+            ),
+          );
+        }
+        await _transport.writeCommand(command);
+        _lastCommandSentMs = _monotonicClock();
+        if (!done.isCompleted) {
+          done.complete();
+        }
+      } on Object catch (error, stackTrace) {
+        if (!done.isCompleted) {
+          done.completeError(error, stackTrace);
+        }
+      } finally {
+        _writeInFlight = false;
+      }
+    }).catchError((Object error, StackTrace stackTrace) {
+      if (!done.isCompleted) {
+        done.completeError(error, stackTrace);
+      }
+    });
+    return done.future;
   }
 
   void _onNotification(List<int> data) {

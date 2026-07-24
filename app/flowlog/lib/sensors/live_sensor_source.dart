@@ -245,6 +245,89 @@ class LiveSensorSource {
     }
   }
 
+  DecentScaleBleAdapter? _connectedScaleAdapter() {
+    if (_demoMode) {
+      return null;
+    }
+    final hubScale = hub.activeAdapterFor(SensorKind.scale);
+    if (hubScale is DecentScaleBleAdapter) {
+      return hubScale;
+    }
+    return null;
+  }
+
+  /// Pushes OLED display config (target/warn/pressure window) to the DIY scale.
+  Future<void> pushScaleDisplayConfig({
+    required int targetYieldG,
+    required int warnAtG,
+    required int pressureMinBar,
+    required int pressureMaxBar,
+  }) async {
+    final scale = _connectedScaleAdapter();
+    if (scale == null) {
+      return;
+    }
+    try {
+      await scale.sendScaleDisplayConfig(
+        targetYieldG: targetYieldG,
+        warnAtG: warnAtG,
+        pressureMinBar: pressureMinBar,
+        pressureMaxBar: pressureMaxBar,
+      );
+    } on Object {
+      // Best-effort — older firmwares ignore 0xF3.
+    }
+  }
+
+  /// Tells the DIY scale an app brew started (frees PRS, shows phone pressure).
+  Future<void> onPhoneBrewStart() async {
+    final scale = _connectedScaleAdapter();
+    if (scale == null) {
+      return;
+    }
+    try {
+      await scale.sendPhoneBrewStart();
+    } on Object {
+      // Best-effort — older firmwares ignore 0xF1.
+    }
+  }
+
+  /// Tells the DIY scale the app brew ended.
+  Future<void> onPhoneBrewEnd() async {
+    final scale = _connectedScaleAdapter();
+    if (scale == null) {
+      return;
+    }
+    try {
+      await scale.sendPhoneBrewEnd();
+    } on Object {
+      // Best-effort.
+    }
+  }
+
+  int _lastPressureForwardMs = 0;
+
+  /// Forwards live pressensor bar to the scale OLED (throttled ~2 Hz).
+  ///
+  /// Kept well below the weight notify rate so BLE writes never crowd out
+  /// FFF4 weight packets mid-brew.
+  Future<void> forwardPressure(double pressureBar) async {
+    final scale = _connectedScaleAdapter();
+    if (scale == null) {
+      return;
+    }
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastPressureForwardMs < 500) {
+      return;
+    }
+    _lastPressureForwardMs = now;
+    try {
+      await scale.sendPhonePressure(pressureBar);
+    } on Object {
+      // Best-effort.
+    }
+  }
+
   SensorAdapter? _resolvePressureAdapter() {
     final hubAdapter = hub.activeAdapterFor(SensorKind.pressensor);
     if (hubAdapter != null) {

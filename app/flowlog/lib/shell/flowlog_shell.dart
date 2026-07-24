@@ -15,6 +15,7 @@ import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog/shell/top_bar.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Adaptive app shell: bottom bar when narrow/short, labeled sidebar when wide.
 class FlowlogShell extends StatefulWidget {
@@ -120,6 +121,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
 
   @override
   void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     if (_ownsRepeatShotController) {
       _repeatShotController.dispose();
     }
@@ -234,6 +236,18 @@ class _FlowlogShellState extends State<FlowlogShell> {
         constraints.maxHeight < ShellBreakpoints.minRailHeight;
   }
 
+  void _syncImmersiveBrewUi(bool brewing) {
+    if (brewing) {
+      // High-focus brew: hide status/nav chrome; Live tab owns the screen.
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      if (_selectedIndex != 0) {
+        setState(() => _selectedIndex = 0);
+      }
+    } else {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final destination = appDestinations[_selectedIndex];
@@ -241,75 +255,6 @@ class _FlowlogShellState extends State<FlowlogShell> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final useBottomNav = _useBottomNav(constraints);
-        // Keep a stable body tree so tab screens (e.g. Live) survive resize.
-        final shell = Scaffold(
-          body: Row(
-            children: [
-              if (!useBottomNav) ...[
-                ListenableBuilder(
-                  listenable: _activeBrewNotifier,
-                  builder: (context, _) {
-                    return NavigationRail(
-                      selectedIndex: _selectedIndex,
-                      onDestinationSelected: _onDestinationSelected,
-                      extended: true,
-                      minExtendedWidth: 200,
-                      labelType: NavigationRailLabelType.none,
-                      destinations: [
-                        for (final item in appDestinations)
-                          NavigationRailDestination(
-                            icon: _TabIcon(
-                              icon: item.icon,
-                              showRecordingBadge: item.tab == AppTab.live &&
-                                  _activeBrewNotifier.isBrewing,
-                            ),
-                            selectedIcon: _TabIcon(
-                              icon: item.icon,
-                              showRecordingBadge: item.tab == AppTab.live &&
-                                  _activeBrewNotifier.isBrewing,
-                            ),
-                            label: Semantics(
-                              label: item.semanticsLabel,
-                              child: ExcludeSemantics(
-                                child: Text(item.label),
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                ),
-                const VerticalDivider(width: 1),
-              ],
-              Expanded(
-                key: const ValueKey('shell-main-panel'),
-                child: _ShellContent(
-                  beanName: _beanName,
-                  beanId: _beanId,
-                  loadBeans: () => _ensureBeanRepository().then(
-                    (repository) => repository.listBeansByRecentUse(),
-                  ),
-                  onActiveBeanChanged: (name, {beanId}) => unawaited(
-                    _handleActiveBeanChanged(name, beanId: beanId),
-                  ),
-                  child: _PersistentTabStack(
-                    index: _selectedIndex,
-                    children: [
-                      for (final item in appDestinations) item.screen,
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          bottomNavigationBar: useBottomNav
-              ? _FlowlogBottomBar(
-                  selectedIndex: _selectedIndex,
-                  activeBrewNotifier: _activeBrewNotifier,
-                  onDestinationSelected: _onDestinationSelected,
-                )
-              : null,
-        );
 
         return ShotEventsScope(
           notifier: _shotEventsNotifier,
@@ -326,7 +271,107 @@ class _FlowlogShellState extends State<FlowlogShell> {
                     child: FlowlogShortcuts(
                       registry: _shortcutRegistry,
                       currentTab: destination.tab,
-                      child: shell,
+                      child: ListenableBuilder(
+                        listenable: _activeBrewNotifier,
+                        builder: (context, _) {
+                          final brewImmersive = _activeBrewNotifier.isBrewing;
+                          // Defer system chrome changes to after this frame.
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _syncImmersiveBrewUi(brewImmersive);
+                          });
+
+                          // Keep a stable body tree so Live survives resize.
+                          final tabStack = _PersistentTabStack(
+                            // Always show Live while brewing (high-focus mode).
+                            index: brewImmersive ? 0 : _selectedIndex,
+                            children: [
+                              for (final item in appDestinations) item.screen,
+                            ],
+                          );
+
+                          if (brewImmersive) {
+                            return Scaffold(
+                              key: const ValueKey('shell-brew-immersive'),
+                              body: SafeArea(
+                                // Edge-to-edge plot; stop control uses its own pad.
+                                top: true,
+                                bottom: false,
+                                child: tabStack,
+                              ),
+                            );
+                          }
+
+                          return Scaffold(
+                            key: const ValueKey('shell-normal'),
+                            body: Row(
+                              children: [
+                                if (!useBottomNav) ...[
+                                  NavigationRail(
+                                    selectedIndex: _selectedIndex,
+                                    onDestinationSelected:
+                                        _onDestinationSelected,
+                                    extended: true,
+                                    minExtendedWidth: 200,
+                                    labelType: NavigationRailLabelType.none,
+                                    destinations: [
+                                      for (final item in appDestinations)
+                                        NavigationRailDestination(
+                                          icon: _TabIcon(
+                                            icon: item.icon,
+                                            showRecordingBadge:
+                                                item.tab == AppTab.live &&
+                                                    brewImmersive,
+                                          ),
+                                          selectedIcon: _TabIcon(
+                                            icon: item.icon,
+                                            showRecordingBadge:
+                                                item.tab == AppTab.live &&
+                                                    brewImmersive,
+                                          ),
+                                          label: Semantics(
+                                            label: item.semanticsLabel,
+                                            child: ExcludeSemantics(
+                                              child: Text(item.label),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const VerticalDivider(width: 1),
+                                ],
+                                Expanded(
+                                  key: const ValueKey('shell-main-panel'),
+                                  child: _ShellContent(
+                                    beanName: _beanName,
+                                    beanId: _beanId,
+                                    loadBeans: () =>
+                                        _ensureBeanRepository().then(
+                                      (repository) =>
+                                          repository.listBeansByRecentUse(),
+                                    ),
+                                    onActiveBeanChanged:
+                                        (name, {beanId}) => unawaited(
+                                      _handleActiveBeanChanged(
+                                        name,
+                                        beanId: beanId,
+                                      ),
+                                    ),
+                                    child: tabStack,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            bottomNavigationBar: useBottomNav
+                                ? _FlowlogBottomBar(
+                                    selectedIndex: _selectedIndex,
+                                    activeBrewNotifier: _activeBrewNotifier,
+                                    onDestinationSelected:
+                                        _onDestinationSelected,
+                                  )
+                                : null,
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flowlog/screens/history/filters.dart';
 import 'package:flowlog/screens/history/history_shot_card.dart';
+import 'package:flowlog/screens/history/import_scale_shot.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/history/shot_detail.dart';
 import 'package:flowlog/shell/shot_events.dart';
@@ -158,6 +159,45 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  Future<void> _importFromScale() async {
+    if (!mounted) return;
+    final shot = await showImportScaleShotDialog(context);
+    if (shot == null || !mounted) return;
+
+    final shotRepository = await _ensureShotRepository();
+    // Ensure a unique id if this shot was already imported.
+    var toSave = shot;
+    final existing = await shotRepository.getShotById(shot.id);
+    if (existing != null) {
+      toSave = shot.copyWith(
+        id: 'shot-scale-${DateTime.now().toUtc().millisecondsSinceEpoch}',
+        lastModifiedAt: DateTime.now().toUtc(),
+      );
+    } else {
+      toSave = shot.copyWith(lastModifiedAt: DateTime.now().toUtc());
+    }
+    await shotRepository.insertShot(toSave);
+
+    if (widget.shotRepository == null) {
+      final database = await _ensureDatabase();
+      unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
+    }
+
+    ShotEventsScope.maybeOf(context)?.notifyShotsChanged();
+    if (!mounted) return;
+    await _refresh();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        key: const Key('import_scale_shot_snackbar'),
+        content: Text(
+          'Imported scale shot (${toSave.samples.length} samples)',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<bool> _confirmDeleteShot(Shot shot) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -276,6 +316,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
               tags: data.tags,
               onChanged: _onFiltersChanged,
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: FilledButton.tonalIcon(
+                key: const Key('history_import_scale_shot'),
+                onPressed: _importFromScale,
+                icon: const Icon(Icons.scale_outlined),
+                label: const Text('Import last shot from scale'),
+              ),
+            ),
             if (data.topScores.isNotEmpty) ...[
               _LeaderboardSection(
                 topScores: data.topScores,
@@ -292,6 +341,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 onDeleteShot: _deleteShot,
                 onDeleteShotConfirmed: _deleteShotConfirmed,
                 confirmDeleteShot: _confirmDeleteShot,
+                onImportFromScale: _importFromScale,
               ),
             ),
           ],
@@ -322,6 +372,7 @@ class _HistoryShotList extends StatelessWidget {
     required this.onDeleteShot,
     required this.onDeleteShotConfirmed,
     required this.confirmDeleteShot,
+    this.onImportFromScale,
   });
 
   final List<Shot> shots;
@@ -331,39 +382,53 @@ class _HistoryShotList extends StatelessWidget {
   final Future<void> Function(Shot shot) onDeleteShot;
   final Future<void> Function(Shot shot) onDeleteShotConfirmed;
   final Future<bool> Function(Shot shot) confirmDeleteShot;
+  final Future<void> Function()? onImportFromScale;
 
   @override
   Widget build(BuildContext context) {
     if (shots.isEmpty) {
       final theme = Theme.of(context);
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              filters.isActive ? Icons.filter_alt_off : Icons.coffee_outlined,
-              size: 48,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              filters.isActive
-                  ? 'No shots match your filters'
-                  : 'No saved shots yet',
-              style: theme.textTheme.titleMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              filters.isActive
-                  ? 'Try clearing some filters to see more results.'
-                  : 'Start a brew on the Live tab to record your first shot.',
-              style: theme.textTheme.bodyMedium?.copyWith(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                filters.isActive ? Icons.filter_alt_off : Icons.coffee_outlined,
+                size: 48,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                filters.isActive
+                    ? 'No shots match your filters'
+                    : 'No saved shots yet',
+                style: theme.textTheme.titleMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                filters.isActive
+                    ? 'Try clearing some filters to see more results.'
+                    : 'Start a brew on the Live tab, or import a phone-free '
+                        'shot from the Flowlog scale (Wi‑Fi).',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (!filters.isActive && onImportFromScale != null) ...[
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  key: const Key('history_empty_import_scale'),
+                  onPressed: () => unawaited(onImportFromScale!()),
+                  icon: const Icon(Icons.scale_outlined),
+                  label: const Text('Import from scale'),
+                ),
+              ],
+            ],
+          ),
         ),
       );
     }

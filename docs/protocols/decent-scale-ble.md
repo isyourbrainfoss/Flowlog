@@ -102,10 +102,26 @@ final grams = raw / 10.0;
 
 ---
 
+## Flowlog DIY scale extensions (type `0xF0+`)
+
+Used by the **espresso-scale** companion firmware. Official Decent / HDS ignore unknown types.
+
+| Type | Name | Data bytes | Meaning |
+|------|------|------------|---------|
+| `0xF0` | Phone pressure | mbar big-endian int16 in `[2..3]` | Phone → scale OLED pressure mirror during app brew |
+| `0xF1` | Phone brew start | zeros | App owns PRS; scale frees its PRS central link |
+| `0xF2` | Phone brew end | zeros | Stop phone-pressure display |
+| `0xF3` | Scale display config | `target_g`, `warn_g`, `p_min_bar`, `p_max_bar` (uint8 each) | OLED cup target, wind-back chirp, pressure bar window |
+
+Example: 9.0 bar → 9000 mbar → `03 F0 23 28 00 00 F8`.
+
+Phone-free brews: scale is BLE central to Pressensor (`PRS*`), records weight+pressure, exports **HTTP GET `/shot.json`** (Flowlog History → Import from scale). Optional Nextcloud WebDAV PUT after brew.
+
 ## Integration notes
 
 - Connect → subscribe **FFF4** → send **LED on** or **tare** to start weight stream.
-- Flowlog: Half Decent Scale heartbeat every 5 s (`03 0a 03 ff ff 00 0a`).
+- Flowlog: Half Decent Scale heartbeat every 2 s (`03 0a 03 ff ff 00 0a`); DIY firmware timeout 15 s.
+- During app brew, Flowlog forwards live pressure via `0xF0` so the scale OLED shows bar without stealing PRS.
 - Merge weight samples on **host receive time**, not device timestamp (see `docs/AGENT_GUIDE.md`).
 - Max weight **2000 g**; implement smoothing in software if needed.
 
