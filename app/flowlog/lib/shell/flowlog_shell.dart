@@ -58,6 +58,9 @@ class _FlowlogShellState extends State<FlowlogShell> {
   late final ActiveBrewNotifier _activeBrewNotifier;
   late final ShotEventsNotifier _shotEventsNotifier;
 
+  /// Keeps Live (and other tabs) mounted across immersive chrome toggles.
+  final GlobalKey _tabStackKey = GlobalKey(debugLabel: 'shell-tab-stack');
+
   @override
   void initState() {
     super.initState();
@@ -284,39 +287,53 @@ class _FlowlogShellState extends State<FlowlogShell> {
                           final tabIndex =
                               brewImmersive ? 0 : _selectedIndex;
 
+                          // CRITICAL: do not change the Element path of the tab
+                          // stack when brewImmersive flips (no conditional
+                          // NavigationRail/Column layouts that remount Live).
+                          // A remount disposes LiveShotController after the
+                          // scale already received "App brew".
                           return Scaffold(
                             body: Row(
                               children: [
-                                if (!brewImmersive && !useBottomNav) ...[
-                                  NavigationRail(
-                                    selectedIndex: _selectedIndex,
-                                    onDestinationSelected:
-                                        _onDestinationSelected,
-                                    extended: true,
-                                    minExtendedWidth: 200,
-                                    labelType: NavigationRailLabelType.none,
-                                    destinations: [
-                                      for (final item in appDestinations)
-                                        NavigationRailDestination(
-                                          icon: _TabIcon(
-                                            icon: item.icon,
-                                            showRecordingBadge: false,
-                                          ),
-                                          selectedIcon: _TabIcon(
-                                            icon: item.icon,
-                                            showRecordingBadge: false,
-                                          ),
-                                          label: Semantics(
-                                            label: item.semanticsLabel,
-                                            child: ExcludeSemantics(
-                                              child: Text(item.label),
-                                            ),
-                                          ),
+                                if (!useBottomNav)
+                                  Offstage(
+                                    offstage: brewImmersive,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        NavigationRail(
+                                          selectedIndex: _selectedIndex,
+                                          onDestinationSelected:
+                                              _onDestinationSelected,
+                                          extended: true,
+                                          minExtendedWidth: 200,
+                                          labelType:
+                                              NavigationRailLabelType.none,
+                                          destinations: [
+                                            for (final item
+                                                in appDestinations)
+                                              NavigationRailDestination(
+                                                icon: _TabIcon(
+                                                  icon: item.icon,
+                                                  showRecordingBadge: false,
+                                                ),
+                                                selectedIcon: _TabIcon(
+                                                  icon: item.icon,
+                                                  showRecordingBadge: false,
+                                                ),
+                                                label: Semantics(
+                                                  label: item.semanticsLabel,
+                                                  child: ExcludeSemantics(
+                                                    child: Text(item.label),
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
                                         ),
-                                    ],
+                                        const VerticalDivider(width: 1),
+                                      ],
+                                    ),
                                   ),
-                                  const VerticalDivider(width: 1),
-                                ],
                                 Expanded(
                                   key: const ValueKey('shell-main-panel'),
                                   child: _ShellContent(
@@ -336,6 +353,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
                                       ),
                                     ),
                                     child: _PersistentTabStack(
+                                      key: _tabStackKey,
                                       index: tabIndex,
                                       children: [
                                         for (final item in appDestinations)
@@ -346,16 +364,18 @@ class _FlowlogShellState extends State<FlowlogShell> {
                                 ),
                               ],
                             ),
-                            bottomNavigationBar:
-                                (!brewImmersive && useBottomNav)
-                                    ? _FlowlogBottomBar(
-                                        selectedIndex: _selectedIndex,
-                                        activeBrewNotifier:
-                                            _activeBrewNotifier,
-                                        onDestinationSelected:
-                                            _onDestinationSelected,
-                                      )
-                                    : null,
+                            // Keep the bar in the tree so Scaffold geometry is
+                            // stable; hide with Offstage-like height via
+                            // NavigationBar visibility when brewing.
+                            bottomNavigationBar: useBottomNav
+                                ? _FlowlogBottomBar(
+                                    selectedIndex: _selectedIndex,
+                                    activeBrewNotifier: _activeBrewNotifier,
+                                    onDestinationSelected:
+                                        _onDestinationSelected,
+                                    visible: !brewImmersive,
+                                  )
+                                : null,
                           );
                         },
                       ),
@@ -434,22 +454,20 @@ class _ShellContent extends StatelessWidget {
   final void Function(String name, {String? beanId}) onActiveBeanChanged;
   final Widget child;
 
-  /// Immersive brew: no top bar (tabs already hidden by shell).
+  /// Immersive brew: collapse top bar without remounting [child].
   final bool hideChrome;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final showTopBar = !hideChrome &&
+        final wantTopBar = !hideChrome &&
             constraints.maxHeight >= ShellBreakpoints.minHeightForAppBar;
-
-        if (!showTopBar) {
-          return ClipRect(child: child);
-        }
 
         final hub = SensorHubScope.of(context);
 
+        // Always Column → Expanded(body). Toggling ClipRect-only vs Column
+        // remounted Live and aborted the session after "App brew" on the scale.
         return ActiveBeanScope(
           name: beanName,
           beanId: beanId,
@@ -457,20 +475,29 @@ class _ShellContent extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ListenableBuilder(
-                listenable: hub,
-                builder: (context, _) {
-                  return FlowlogTopBar(
-                    beanName: beanName,
-                    loadBeans: loadBeans,
-                    onActiveBeanChanged: onActiveBeanChanged,
-                    pressensorState: hub.pressensorState,
-                    scaleState: hub.scaleState,
-                    pressensorBatteryPercent: hub.pressensorBatteryPercent,
-                  );
-                },
+              Visibility(
+                visible: wantTopBar,
+                maintainState: true,
+                maintainAnimation: true,
+                maintainSize: false,
+                child: ListenableBuilder(
+                  listenable: hub,
+                  builder: (context, _) {
+                    return FlowlogTopBar(
+                      beanName: beanName,
+                      loadBeans: loadBeans,
+                      onActiveBeanChanged: onActiveBeanChanged,
+                      pressensorState: hub.pressensorState,
+                      scaleState: hub.scaleState,
+                      pressensorBatteryPercent: hub.pressensorBatteryPercent,
+                    );
+                  },
+                ),
               ),
-              Expanded(child: ClipRect(child: child)),
+              Expanded(
+                key: const ValueKey('shell-body-expanded'),
+                child: ClipRect(child: child),
+              ),
             ],
           ),
         );
@@ -485,18 +512,22 @@ class _FlowlogBottomBar extends StatelessWidget {
     required this.selectedIndex,
     required this.activeBrewNotifier,
     required this.onDestinationSelected,
+    this.visible = true,
   });
 
   final int selectedIndex;
   final ActiveBrewNotifier activeBrewNotifier;
   final ValueChanged<int> onDestinationSelected;
 
+  /// When false (immersive brew), collapse without removing Scaffold slot.
+  final bool visible;
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: activeBrewNotifier,
       builder: (context, _) {
-        return NavigationBar(
+        final bar = NavigationBar(
           selectedIndex: selectedIndex,
           onDestinationSelected: onDestinationSelected,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
@@ -518,6 +549,11 @@ class _FlowlogBottomBar extends StatelessWidget {
               ),
           ],
         );
+        // Prefer zero-height collapse so Scaffold body keeps the same parent.
+        if (!visible) {
+          return const SizedBox.shrink();
+        }
+        return bar;
       },
     );
   }
