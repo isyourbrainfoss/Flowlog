@@ -271,41 +271,23 @@ class _FlowlogShellState extends State<FlowlogShell> {
                     child: FlowlogShortcuts(
                       registry: _shortcutRegistry,
                       currentTab: destination.tab,
+                      // Single Scaffold + stable tab stack. Switching Scaffold
+                      // keys used to remount Live mid-start and abort the brew.
                       child: ListenableBuilder(
                         listenable: _activeBrewNotifier,
                         builder: (context, _) {
                           final brewImmersive = _activeBrewNotifier.isBrewing;
-                          // Defer system chrome changes to after this frame.
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             _syncImmersiveBrewUi(brewImmersive);
                           });
 
-                          // Keep a stable body tree so Live survives resize.
-                          final tabStack = _PersistentTabStack(
-                            // Always show Live while brewing (high-focus mode).
-                            index: brewImmersive ? 0 : _selectedIndex,
-                            children: [
-                              for (final item in appDestinations) item.screen,
-                            ],
-                          );
-
-                          if (brewImmersive) {
-                            return Scaffold(
-                              key: const ValueKey('shell-brew-immersive'),
-                              body: SafeArea(
-                                // Edge-to-edge plot; stop control uses its own pad.
-                                top: true,
-                                bottom: false,
-                                child: tabStack,
-                              ),
-                            );
-                          }
+                          final tabIndex =
+                              brewImmersive ? 0 : _selectedIndex;
 
                           return Scaffold(
-                            key: const ValueKey('shell-normal'),
                             body: Row(
                               children: [
-                                if (!useBottomNav) ...[
+                                if (!brewImmersive && !useBottomNav) ...[
                                   NavigationRail(
                                     selectedIndex: _selectedIndex,
                                     onDestinationSelected:
@@ -318,15 +300,11 @@ class _FlowlogShellState extends State<FlowlogShell> {
                                         NavigationRailDestination(
                                           icon: _TabIcon(
                                             icon: item.icon,
-                                            showRecordingBadge:
-                                                item.tab == AppTab.live &&
-                                                    brewImmersive,
+                                            showRecordingBadge: false,
                                           ),
                                           selectedIcon: _TabIcon(
                                             icon: item.icon,
-                                            showRecordingBadge:
-                                                item.tab == AppTab.live &&
-                                                    brewImmersive,
+                                            showRecordingBadge: false,
                                           ),
                                           label: Semantics(
                                             label: item.semanticsLabel,
@@ -342,6 +320,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
                                 Expanded(
                                   key: const ValueKey('shell-main-panel'),
                                   child: _ShellContent(
+                                    hideChrome: brewImmersive,
                                     beanName: _beanName,
                                     beanId: _beanId,
                                     loadBeans: () =>
@@ -356,19 +335,27 @@ class _FlowlogShellState extends State<FlowlogShell> {
                                         beanId: beanId,
                                       ),
                                     ),
-                                    child: tabStack,
+                                    child: _PersistentTabStack(
+                                      index: tabIndex,
+                                      children: [
+                                        for (final item in appDestinations)
+                                          item.screen,
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                            bottomNavigationBar: useBottomNav
-                                ? _FlowlogBottomBar(
-                                    selectedIndex: _selectedIndex,
-                                    activeBrewNotifier: _activeBrewNotifier,
-                                    onDestinationSelected:
-                                        _onDestinationSelected,
-                                  )
-                                : null,
+                            bottomNavigationBar:
+                                (!brewImmersive && useBottomNav)
+                                    ? _FlowlogBottomBar(
+                                        selectedIndex: _selectedIndex,
+                                        activeBrewNotifier:
+                                            _activeBrewNotifier,
+                                        onDestinationSelected:
+                                            _onDestinationSelected,
+                                      )
+                                    : null,
                           );
                         },
                       ),
@@ -438,6 +425,7 @@ class _ShellContent extends StatelessWidget {
     required this.loadBeans,
     required this.onActiveBeanChanged,
     required this.child,
+    this.hideChrome = false,
   });
 
   final String beanName;
@@ -446,15 +434,17 @@ class _ShellContent extends StatelessWidget {
   final void Function(String name, {String? beanId}) onActiveBeanChanged;
   final Widget child;
 
+  /// Immersive brew: no top bar (tabs already hidden by shell).
+  final bool hideChrome;
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final showTopBar =
+        final showTopBar = !hideChrome &&
             constraints.maxHeight >= ShellBreakpoints.minHeightForAppBar;
 
         if (!showTopBar) {
-          // Ultra-compact: bottom nav ate most of the height — skip the top bar.
           return ClipRect(child: child);
         }
 

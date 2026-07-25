@@ -42,6 +42,10 @@ class LiveShotController extends ChangeNotifier {
   bool _disposed = false;
   bool _startInFlight = false;
   bool _stopInFlight = false;
+  String? _lastStartError;
+
+  /// Cleared on successful start; set when connect fails (UI can show snackbar).
+  String? get lastStartError => _lastStartError;
 
   void _onSampleBatch(List<ShotSample> batch) {
     _notify();
@@ -108,6 +112,7 @@ class LiveShotController extends ChangeNotifier {
     }
 
     _startInFlight = true;
+    _lastStartError = null;
     _notify();
     try {
       if (sessionState == ShotSessionState.stopped) {
@@ -131,8 +136,9 @@ class LiveShotController extends ChangeNotifier {
 
       try {
         await _sampleAdapter.connect().timeout(const Duration(seconds: 12));
-      } on Object {
+      } on Object catch (error) {
         // Roll back to idle so Start works again without killing the app.
+        _lastStartError = 'Could not start sensors: $error';
         try {
           if (_session.state == ShotSessionState.recording ||
               _session.state == ShotSessionState.paused) {
@@ -351,6 +357,15 @@ class LiveControls extends StatelessWidget {
                   await controller.recoverIfStuck();
                 }
                 await controller.start();
+                final err = controller.lastStartError;
+                if (err != null && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(err),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
               },
               customBorder: const StadiumBorder(),
               child: SizedBox(
@@ -402,6 +417,15 @@ class LiveControls extends StatelessWidget {
                       await controller.stop();
                     } else {
                       await controller.start();
+                      final err = controller.lastStartError;
+                      if (err != null && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(err),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
                     }
                   }
                 : null,

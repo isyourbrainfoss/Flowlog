@@ -59,14 +59,21 @@ class ScaleDisplaySettings {
 
 /// File-backed scale display preferences.
 class ScaleSettingsStore {
-  ScaleSettingsStore({String? settingsPath})
-      : _settingsPathOverride = settingsPath;
+  ScaleSettingsStore({String? settingsPath, String? importHostPath})
+      : _settingsPathOverride = settingsPath,
+        _importHostPathOverride = importHostPath;
 
   final String? _settingsPathOverride;
+  final String? _importHostPathOverride;
 
   Future<String> _resolvePath() async {
     return _settingsPathOverride ??
         FlowlogStorage.shared.filePath('flowlog_scale_settings.json');
+  }
+
+  Future<String> _resolveImportHostPath() async {
+    return _importHostPathOverride ??
+        FlowlogStorage.shared.filePath('flowlog_scale_import_host.txt');
   }
 
   Future<ScaleDisplaySettings> load() async {
@@ -91,5 +98,29 @@ class ScaleSettingsStore {
     await file.writeAsString(
       const JsonEncoder.withIndent('  ').convert(settings.toJson()),
     );
+  }
+
+  /// Last successful import host/IP (phones often cannot resolve mDNS).
+  Future<String?> loadImportHost() async {
+    try {
+      final file = File(await _resolveImportHostPath());
+      if (!await file.exists()) {
+        return null;
+      }
+      final host = (await file.readAsString()).trim();
+      return host.isEmpty ? null : host;
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<void> saveImportHost(String host) async {
+    final trimmed = host.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    final file = File(await _resolveImportHostPath());
+    await file.parent.create(recursive: true);
+    await file.writeAsString(trimmed);
   }
 }
