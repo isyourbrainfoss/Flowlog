@@ -229,19 +229,17 @@ class LiveSensorSource {
   }
 
   Future<void> _prepareDecentScale(DecentScaleBleAdapter scale) async {
-    // LED-on restarts the notify stream; tare zeros the cup for yield alerts.
-    for (var attempt = 0; attempt < 2; attempt++) {
+    // One tare only — LED-on + retries made the DIY scale beep several times
+    // and felt like "the scale started a brew" instead of the phone.
+    try {
+      await scale.tare();
+    } on Object {
       try {
         await scale.ledOn();
-        await Future<void>.delayed(const Duration(milliseconds: 150));
+        await Future<void>.delayed(const Duration(milliseconds: 120));
         await scale.tare();
-        await Future<void>.delayed(const Duration(milliseconds: 150));
-        return;
       } on Object {
-        if (attempt == 1) {
-          rethrow;
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 300));
+        rethrow;
       }
     }
   }

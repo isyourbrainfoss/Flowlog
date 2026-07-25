@@ -184,6 +184,7 @@ class LiveShotController extends ChangeNotifier {
       }
 
       // Best-effort scale prep — never abort an active brew for these.
+      var phoneNotified = false;
       try {
         await _onTare().timeout(const Duration(seconds: 4));
       } on Object {
@@ -202,12 +203,33 @@ class LiveShotController extends ChangeNotifier {
       if (brewStart != null) {
         try {
           await brewStart().timeout(const Duration(seconds: 2));
+          phoneNotified = true;
         } on Object {
           // Best-effort.
         }
       }
+
+      // If we somehow rolled back after notifying the scale, clear mirror mode.
+      if (phoneNotified && !isBrewing) {
+        final brewEnd = _onPhoneBrewEnd;
+        if (brewEnd != null) {
+          try {
+            await brewEnd().timeout(const Duration(seconds: 2));
+          } on Object {
+            // ignore
+          }
+        }
+      }
     } on Object catch (error) {
       _lastStartError = 'Start brew failed: $error';
+      final brewEnd = _onPhoneBrewEnd;
+      if (brewEnd != null) {
+        try {
+          await brewEnd().timeout(const Duration(seconds: 2));
+        } on Object {
+          // ignore
+        }
+      }
       await _safeDisconnect();
       try {
         await _hardResetToIdle();
