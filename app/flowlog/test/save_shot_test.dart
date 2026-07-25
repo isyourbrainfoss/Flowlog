@@ -520,9 +520,3 @@ Future<void> _startAndStopSession(
   await pumpUntilFound(tester, find.byKey(const Key('shot_saved_snackbar')));
 }
 
-String _formatElapsed(int elapsedMs) {
-  final totalSeconds = elapsedMs ~/ 1000;
-  final minutes = totalSeconds ~/ 60;
-  final seconds = totalSeconds % 60;
-  return '${minutes.toString()}:${seconds.toString().padLeft(2, '0')}';
-}

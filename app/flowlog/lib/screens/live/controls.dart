@@ -336,8 +336,6 @@ class LiveShotController extends ChangeNotifier {
     _notify();
   }
 
-  Future<void> _recoverToIdle() => _hardResetToIdle();
-
   void _notify() {
     if (!_disposed) {
       notifyListeners();

@@ -118,18 +118,22 @@ class LivePressureDeviationBar extends StatelessWidget {
                 color: cs.onSurfaceVariant,
               ),
             ),
-            const Spacer(),
-            Text(
-              hasCurrent ? '${current.toStringAsFixed(1)} bar' : '— bar',
-              key: const Key('live_pressure_digit'),
-              style: (compact
-                      ? theme.textTheme.headlineSmall
-                      : theme.textTheme.headlineMedium)
-                  ?.copyWith(
-                fontFeatures: const [FontFeature.tabularFigures()],
-                fontWeight: FontWeight.w700,
-                height: 1.0,
-                color: isDeviating ? Colors.red.shade700 : cs.onSurface,
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                hasCurrent ? '${current.toStringAsFixed(1)} bar' : '— bar',
+                key: const Key('live_pressure_digit'),
+                textAlign: TextAlign.end,
+                overflow: TextOverflow.ellipsis,
+                style: (compact
+                        ? theme.textTheme.headlineSmall
+                        : theme.textTheme.headlineMedium)
+                    ?.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  fontWeight: FontWeight.w700,
+                  height: 1.0,
+                  color: isDeviating ? Colors.red.shade700 : cs.onSurface,
+                ),
               ),
             ),
             if (targetPressure != null) ...[

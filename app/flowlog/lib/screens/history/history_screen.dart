@@ -183,8 +183,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
     }
 
-    ShotEventsScope.maybeOf(context)?.notifyShotsChanged();
     if (!mounted) return;
+    ShotEventsScope.maybeOf(context)?.notifyShotsChanged();
     await _refresh();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

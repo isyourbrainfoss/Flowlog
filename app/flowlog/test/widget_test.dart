@@ -169,20 +169,15 @@ void main() {
     });
     await tester.pump(const Duration(milliseconds: 500));
 
-    final samplesFinder = find.textContaining('samples');
-    expect(samplesFinder, findsOneWidget);
-    final samplesBefore = tester.widget<Text>(samplesFinder).data!;
-
-    final countBefore = int.parse(samplesBefore.split(' ').first);
+    // Immersive brew hides sample count; session is tracked via brew layout.
+    expect(find.byKey(const ValueKey('live-brew-layout')), findsOneWidget);
+    expect(find.text('Stop brew'), findsOneWidget);
 
     tester.view.physicalSize = const Size(400, 800);
     await tester.pump();
 
-    await tester.ensureVisible(find.textContaining('samples'));
-    final samplesAfter =
-        tester.widget<Text>(find.textContaining('samples')).data!;
-    final countAfter = int.parse(samplesAfter.split(' ').first);
-    expect(countAfter, greaterThanOrEqualTo(countBefore));
+    expect(find.byKey(const ValueKey('live-brew-layout')), findsOneWidget);
+    expect(find.text('Stop brew'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

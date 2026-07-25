@@ -396,6 +396,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
 /// The Live tab (index 0) is always retained even before it is first shown.
 class _PersistentTabStack extends StatefulWidget {
   const _PersistentTabStack({
+    super.key,
     required this.index,
     required this.children,
   });

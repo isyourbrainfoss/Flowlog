@@ -139,7 +139,6 @@ class _LiveScreenState extends State<LiveScreen> {
   ShotEventsNotifier? _shotEventsNotifier;
   /// Fires once per brew when cup weight crosses the early-stop warn level.
   bool _yieldWarnFired = false;
-  bool _showYieldWarnBanner = false;
 
   late final ValueNotifier<double?> _livePressureNotifier;
   late final ValueNotifier<DateTime?> _livePressureLastUpdate;
@@ -377,7 +376,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
     _yieldWarnFired = true;
     if (mounted) {
-      setState(() => _showYieldWarnBanner = true);
+      // Banner UI disabled in immersive brew; haptic/sound still fire above.
     }
     unawaited(playYieldWarnCue());
   }
@@ -565,7 +564,6 @@ class _LiveScreenState extends State<LiveScreen> {
       _autoSavedCurrent = false;
       _lastAutoSavedShotId = null;
       _yieldWarnFired = false;
-      _showYieldWarnBanner = false;
       _chartInteractionController.resetViewport();
       // Reload brew defaults so yield target/warn edits apply to this shot.
       unawaited(_brewDefaultsStore.load().then((d) {
