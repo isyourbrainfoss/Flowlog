@@ -117,13 +117,14 @@ class SessionSensorAdapter implements SensorAdapter {
     _samplesSub = null;
     if (delegate != null) {
       try {
-        await delegate.disconnect();
+        // Bound BLE teardown so Start cannot hang forever.
+        await delegate.disconnect().timeout(const Duration(seconds: 2));
       } on Object {
         // ignore adapter disconnect errors so start recovery can continue
       }
       if (delegate is MergedSampleStreamAdapter) {
         try {
-          await delegate.dispose();
+          await delegate.dispose().timeout(const Duration(seconds: 1));
         } on Object {
           // ignore
         }

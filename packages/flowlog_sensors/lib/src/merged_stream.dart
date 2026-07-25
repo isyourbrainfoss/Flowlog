@@ -102,13 +102,18 @@ class MergedSampleStream {
     _weightSub = null;
 
     if (manageAdapterLifecycle) {
-      final disconnects = <Future<void>>[];
-      if (_pressure != null) {
-        disconnects.add(_pressure!.disconnect());
-      }
-      if (_weight != null) {
-        disconnects.add(_weight!.disconnect());
-      }
+      final disconnects = <Future<void>>[
+        if (_pressure != null)
+          _pressure!.disconnect().timeout(
+                const Duration(seconds: 2),
+                onTimeout: () {},
+              ),
+        if (_weight != null)
+          _weight!.disconnect().timeout(
+                const Duration(seconds: 2),
+                onTimeout: () {},
+              ),
+      ];
       await Future.wait(disconnects);
     }
 

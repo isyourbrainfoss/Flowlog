@@ -115,10 +115,10 @@ class ShotSession {
   }
 
   void _onStreamError(Object error, StackTrace stackTrace) {
+    // Do not end the shot on a sensor stream glitch — Live may still be
+    // reconnecting BLE. Drop the bad subscription; host can re-feed samples.
     _subscription?.cancel();
     _subscription = null;
-    _emitPendingBatch();
-    _setState(ShotSessionState.stopped);
   }
 
   final List<ShotSample> _pendingBatch = [];

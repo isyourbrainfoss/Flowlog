@@ -104,11 +104,33 @@ class LiveShotController extends ChangeNotifier {
 
   /// Tares the scale, connects [sampleAdapter], and begins [ShotSession].
   ///
-  /// Safe to call repeatedly: concurrent starts are ignored, and a failed
-  /// connect/tare recovers to a state where [canStart] is true again.
+  /// Safe to call repeatedly. A stuck prior start (BLE disconnect hang) is
+  /// force-cleared so Start never silently no-ops.
   Future<void> start({double? autoStartPressureBar}) async {
-    if (!canStart || _startInFlight) {
-      return;
+    if (_startInFlight) {
+      // Previous attempt hung (often BLE disconnect). Force clear and continue.
+      _startInFlight = false;
+      try {
+        await _hardResetToIdle();
+      } on Object {
+        // continue into a fresh start attempt
+      }
+    }
+
+    if (!canStart) {
+      try {
+        await _hardResetToIdle();
+      } on Object catch (error) {
+        _lastStartError = 'Cannot start brew: $error';
+        _notify();
+        return;
+      }
+      if (!canStart) {
+        _lastStartError =
+            'Cannot start brew (session is ${sessionState.name}). Tap again.';
+        _notify();
+        return;
+      }
     }
 
     _startInFlight = true;
@@ -116,59 +138,62 @@ class LiveShotController extends ChangeNotifier {
     _notify();
     try {
       if (sessionState == ShotSessionState.stopped) {
-        await _replaceSession();
+        await _replaceSession().timeout(const Duration(seconds: 3));
       }
-
-      // Half-failed prior start can leave non-idle state without canStop.
       if (sessionState != ShotSessionState.idle) {
-        await _recoverToIdle();
+        await _hardResetToIdle();
       }
 
       _autoStartPressureBar = autoStartPressureBar;
-
       _sessionStartedAt = DateTime.now().toUtc();
       _sessionEndedAt = null;
-      // Subscribe before connect so the first post-connect samples are not
-      // missed (including weight after LED-on / tare).
-      _session.start(
-        _sampleAdapter.samples.map((sample) => sample.toShotSample()),
-      );
 
+      // Subscribe *before* connect so the first post-connect samples are not
+      // dropped (replay adapters and BLE both emit on connect).
       try {
-        await _sampleAdapter.connect().timeout(const Duration(seconds: 12));
+        _session.start(
+          _sampleAdapter.samples.map((sample) => sample.toShotSample()),
+        );
       } on Object catch (error) {
-        // Roll back to idle so Start works again without killing the app.
-        _lastStartError = 'Could not start sensors: $error';
-        try {
-          if (_session.state == ShotSessionState.recording ||
-              _session.state == ShotSessionState.paused) {
-            _session.stop();
-          }
-        } on Object {
-          // ignore
-        }
-        try {
-          await _sampleAdapter.disconnect();
-        } on Object {
-          // ignore
-        }
-        await _recoverToIdle();
+        _lastStartError = 'Could not start session: $error';
+        await _hardResetToIdle();
         return;
       }
+      // Focus mode as soon as the session is recording (don't wait on BLE).
+      _notify();
 
-      // Tare *after* the merge stream is listening so weight packets update
-      // the session (and yield bar) from ~0 g. Best-effort: pressure-only OK.
       try {
-        await _onTare().timeout(const Duration(seconds: 6));
+        await _sampleAdapter.connect().timeout(const Duration(seconds: 10));
+      } on Object catch (error) {
+        // Keep recording if the session already has samples; otherwise roll back.
+        if (_session.samples.isEmpty) {
+          _lastStartError =
+              'Could not start sensors: $error. Check Bluetooth / Sensors tab.';
+          try {
+            if (_session.state == ShotSessionState.recording ||
+                _session.state == ShotSessionState.paused) {
+              _session.stop();
+            }
+          } on Object {
+            // ignore
+          }
+          await _safeDisconnect();
+          await _hardResetToIdle();
+          return;
+        }
+      }
+
+      // Best-effort scale prep — never abort an active brew for these.
+      try {
+        await _onTare().timeout(const Duration(seconds: 4));
       } on Object {
         // Scale tare failed — keep recording pressure.
       }
 
-      // Push OLED config then notify DIY scale (app owns PRS).
       final pushCfg = _onPushScaleConfig;
       if (pushCfg != null) {
         try {
-          await pushCfg().timeout(const Duration(seconds: 3));
+          await pushCfg().timeout(const Duration(seconds: 2));
         } on Object {
           // Best-effort.
         }
@@ -176,10 +201,18 @@ class LiveShotController extends ChangeNotifier {
       final brewStart = _onPhoneBrewStart;
       if (brewStart != null) {
         try {
-          await brewStart().timeout(const Duration(seconds: 3));
+          await brewStart().timeout(const Duration(seconds: 2));
         } on Object {
           // Best-effort.
         }
+      }
+    } on Object catch (error) {
+      _lastStartError = 'Start brew failed: $error';
+      await _safeDisconnect();
+      try {
+        await _hardResetToIdle();
+      } on Object {
+        // ignore
       }
     } finally {
       _startInFlight = false;
@@ -205,7 +238,12 @@ class LiveShotController extends ChangeNotifier {
 
   /// Ends recording and disconnects the sample adapter.
   Future<void> stop() async {
-    if (!canStop || _stopInFlight) {
+    if (_stopInFlight) {
+      return;
+    }
+    if (!canStop) {
+      // Still force teardown if start left things half-open.
+      await _hardResetToIdle();
       return;
     }
 
@@ -221,47 +259,62 @@ class LiveShotController extends ChangeNotifier {
       final brewEnd = _onPhoneBrewEnd;
       if (brewEnd != null) {
         try {
-          await brewEnd().timeout(const Duration(seconds: 3));
+          await brewEnd().timeout(const Duration(seconds: 2));
         } on Object {
           // Best-effort.
         }
       }
 
-      try {
-        await _sampleAdapter.disconnect().timeout(const Duration(seconds: 8));
-      } on Object {
-        try {
-          await _sampleAdapter.disconnect();
-        } on Object {
-          // ignore
-        }
-      }
+      await _safeDisconnect();
     } finally {
       _stopInFlight = false;
+      _startInFlight = false;
       _notify();
     }
   }
 
   /// Forces a fresh idle session after a stuck or failed lifecycle.
   Future<void> recoverIfStuck() async {
-    if (_startInFlight || _stopInFlight) {
+    _startInFlight = false;
+    _stopInFlight = false;
+    // Active brew: do not tear down.
+    if (canStop) {
       return;
     }
-    if (canStart || canStop) {
+    // Already able to start.
+    if (canStart) {
       return;
     }
-    await _recoverToIdle();
+    await _hardResetToIdle();
   }
 
-  Future<void> _recoverToIdle() async {
+  Future<void> _safeDisconnect() async {
     try {
-      await _sampleAdapter.disconnect();
+      await _sampleAdapter.disconnect().timeout(const Duration(seconds: 2));
     } on Object {
-      // ignore
+      // BLE stacks sometimes hang on disconnect — do not block Start forever.
     }
-    await _replaceSession();
+  }
+
+  Future<void> _hardResetToIdle() async {
+    await _safeDisconnect();
+    try {
+      await _replaceSession().timeout(const Duration(seconds: 2));
+    } on Object {
+      // Last resort: drop listeners and allocate a new session without awaiting
+      // a stuck dispose.
+      _stateSub?.cancel();
+      _sampleBatchSub?.cancel();
+      _session = ShotSession();
+      _sessionStartedAt = null;
+      _sessionEndedAt = null;
+      _stateSub = _session.stateChanges.listen((_) => _notify());
+      _sampleBatchSub = _session.sampleBatches.listen(_onSampleBatch);
+    }
     _notify();
   }
+
+  Future<void> _recoverToIdle() => _hardResetToIdle();
 
   void _notify() {
     if (!_disposed) {
@@ -314,9 +367,8 @@ class LiveControls extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         final brewing = controller.isBrewing;
-        final enabled = brewing ? controller.canStop : controller.canStart;
-        // Stuck after a failed connect: no start/stop — recover on next tap.
-        final needsRecover = !enabled && !brewing && !controller.canStart;
+        final starting = controller.sessionState == ShotSessionState.idle &&
+            !brewing; // visual only
 
         final baseStyle = compact
             ? FilledButton.styleFrom(
@@ -339,7 +391,27 @@ class LiveControls extends StatelessWidget {
                   )
                 : null;
 
-        final isIdleProminent = !brewing && prominent && enabled;
+        Future<void> onBrewPressed() async {
+          // Always try recover first so a stuck start never leaves the button dead.
+          await controller.recoverIfStuck();
+          if (controller.isBrewing) {
+            await controller.stop();
+            return;
+          }
+          await controller.start();
+          final err = controller.lastStartError;
+          if (err != null && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(err),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 5),
+              ),
+            );
+          }
+        }
+
+        final isIdleProminent = !brewing && prominent;
 
         late final Widget button;
 
@@ -352,21 +424,7 @@ class LiveControls extends StatelessWidget {
             shape: const StadiumBorder(),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: () async {
-                if (needsRecover) {
-                  await controller.recoverIfStuck();
-                }
-                await controller.start();
-                final err = controller.lastStartError;
-                if (err != null && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(err),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              },
+              onTap: onBrewPressed,
               customBorder: const StadiumBorder(),
               child: SizedBox(
                 height: 64,
@@ -378,7 +436,7 @@ class LiveControls extends StatelessWidget {
                     ),
                     // Text centered over the liquid.
                     Text(
-                      'Start brew',
+                      starting ? 'Start brew' : 'Start brew',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: const Color(0xFFF5F0E8), // light crema for contrast
@@ -396,8 +454,6 @@ class LiveControls extends StatelessWidget {
             ),
           );
         } else {
-          Widget buttonChild = Text(brewing ? 'Stop brew' : 'Start brew');
-
           button = FilledButton(
             key: const Key('live_brew'),
             style: brewing
@@ -408,34 +464,14 @@ class LiveControls extends StatelessWidget {
                     ),
                   )
                 : baseStyle,
-            onPressed: (enabled || needsRecover)
-                ? () async {
-                    if (needsRecover) {
-                      await controller.recoverIfStuck();
-                    }
-                    if (controller.isBrewing) {
-                      await controller.stop();
-                    } else {
-                      await controller.start();
-                      final err = controller.lastStartError;
-                      if (err != null && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(err),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                    }
-                  }
-                : null,
-            child: buttonChild,
+            onPressed: onBrewPressed,
+            child: Text(brewing ? 'Stop brew' : 'Start brew'),
           );
         }
 
         return Semantics(
           button: true,
-          enabled: enabled || needsRecover,
+          enabled: true,
           label: brewing ? 'Stop brew' : 'Start brew',
           child: ExcludeSemantics(child: button),
         );
