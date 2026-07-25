@@ -26,5 +26,22 @@ void main() {
         'Shot saved · 28.5 s · 9.2 bar peak',
       );
     });
+
+    test('plateau average ignores depressurization tail', () {
+      const samples = [
+        ShotSample(elapsedMs: 0, pressureBar: 0.5),
+        ShotSample(elapsedMs: 5000, pressureBar: 8.8),
+        ShotSample(elapsedMs: 10000, pressureBar: 9.0),
+        ShotSample(elapsedMs: 15000, pressureBar: 9.1),
+        ShotSample(elapsedMs: 20000, pressureBar: 8.9),
+        ShotSample(elapsedMs: 25000, pressureBar: 0.2),
+        ShotSample(elapsedMs: 28000, pressureBar: 0.0),
+      ];
+      final hold = plateauAveragePressureBar(samples);
+      expect(hold, isNotNull);
+      expect(hold!, greaterThan(8.5));
+      expect(hold, lessThan(9.5));
+      expect(samples.last.pressureBar, 0.0);
+    });
   });
 }

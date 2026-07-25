@@ -160,9 +160,15 @@ class ChartInteractionController extends ChangeNotifier {
   bool _didZoom = false;
   ShotSample? _probeSample;
 
+  /// When true (default during live brew), the chart auto-scrolls to follow
+  /// the latest sample. Set false after stop so the full shot stays in view.
+  bool _followLive = true;
+
   ChartViewMode get viewMode => _viewMode;
 
   ShotSample? get probeSample => _probeSample;
+
+  bool get followLive => _followLive;
 
   ChartViewport get viewport {
     return _viewport ??
@@ -210,7 +216,7 @@ class ChartInteractionController extends ChangeNotifier {
     _viewport ??= ChartViewport(totalDurationMs: totalDurationMs);
     _viewport!.setTotalDuration(totalDurationMs);
 
-    if (followEndWhenZoomedOut) {
+    if (followEndWhenZoomedOut && _followLive) {
       bool shouldFollowLive = wasFullyZoomedOut;
 
       if (!shouldFollowLive && liveProgressMs != null && _viewport != null) {
@@ -260,7 +266,20 @@ class ChartInteractionController extends ChangeNotifier {
   }
 
   void resetViewport() {
+    _followLive = true;
     _viewport?.reset();
+    notifyListeners();
+  }
+
+  /// Zoom out to the full shot duration (post-brew review).
+  ///
+  /// Disables live follow until [resetViewport] so a stopped session is not
+  /// re-clipped to the last ~30s window on the next layout pass.
+  void fitFullShot() {
+    _followLive = false;
+    if (_viewport != null) {
+      _viewport!.reset();
+    }
     notifyListeners();
   }
 

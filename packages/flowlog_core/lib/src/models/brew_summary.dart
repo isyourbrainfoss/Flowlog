@@ -110,6 +110,36 @@ double? peakPressureBarFromSamples(Iterable<ShotSample> samples) {
   return peak;
 }
 
+/// Average pressure over the "hold" / plateau of a pull.
+///
+/// Uses samples at ≥ [fractionOfPeak] of peak pressure (default 70%), so the
+/// depressurization tail does not drag the average toward 0 bar.
+double? plateauAveragePressureBar(
+  Iterable<ShotSample> samples, {
+  double fractionOfPeak = 0.7,
+  double minAbsoluteBar = 3.0,
+}) {
+  final peak = peakPressureBarFromSamples(samples);
+  if (peak == null || peak <= 0) {
+    return null;
+  }
+  final threshold = math.max(minAbsoluteBar, peak * fractionOfPeak);
+  var sum = 0.0;
+  var count = 0;
+  for (final sample in samples) {
+    final p = sample.pressureBar;
+    if (p == null || p < threshold) {
+      continue;
+    }
+    sum += p;
+    count++;
+  }
+  if (count == 0) {
+    return peak;
+  }
+  return sum / count;
+}
+
 /// Time (ms) from start of samples until pressure first reaches [threshold].
 /// Returns null if never reached.
 int? preInfusionDurationMs(

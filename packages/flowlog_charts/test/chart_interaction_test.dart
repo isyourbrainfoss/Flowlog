@@ -213,6 +213,21 @@ void main() {
       );
     });
 
+    test('fitFullShot disables live follow and shows full duration', () {
+      final controller = ChartInteractionController();
+      controller.syncTotalDuration(40000, followEndWhenZoomedOut: true, liveProgressMs: 40000);
+      expect(controller.followLive, isTrue);
+      expect(controller.viewport.visibleDurationMs, lessThan(40000));
+
+      controller.fitFullShot();
+      expect(controller.followLive, isFalse);
+      expect(controller.viewport.visibleStartMs, 0);
+      expect(controller.viewport.visibleDurationMs, 40000);
+
+      controller.resetViewport();
+      expect(controller.followLive, isTrue);
+    });
+
     testWidgets('view mode chips switch layout', (tester) async {
       final controller = ChartInteractionController();
       await pumpChart(tester, controller: controller);

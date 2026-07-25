@@ -133,6 +133,8 @@ class _LiveScreenState extends State<LiveScreen> {
   late final BrewLocationStore _brewLocationStore;
   late final BrewGpsCapture _brewGpsCapture;
   BrewSummary? _lastBrewSummary;
+  Timer? _brewCompleteDismissTimer;
+  static const _brewCompleteAutoDismiss = Duration(seconds: 45);
   SensorHub? _sensorHub;
   ConnectionState? _lastPressensorState;
   ActiveBrewNotifier? _activeBrewNotifier;
@@ -321,10 +323,30 @@ class _LiveScreenState extends State<LiveScreen> {
     _ownedAutoStartController.dispose();
     _samplesNotifier.dispose();
     _autoStopTimer?.cancel();
+    _brewCompleteDismissTimer?.cancel();
     if (_ownsController) {
       _controller?.dispose();
     }
     super.dispose();
+  }
+
+  void _dismissBrewCompleteBanner() {
+    _brewCompleteDismissTimer?.cancel();
+    _brewCompleteDismissTimer = null;
+    if (_lastBrewSummary != null && mounted) {
+      setState(() => _lastBrewSummary = null);
+    } else {
+      _lastBrewSummary = null;
+    }
+  }
+
+  void _scheduleBrewCompleteDismiss() {
+    _brewCompleteDismissTimer?.cancel();
+    _brewCompleteDismissTimer = Timer(_brewCompleteAutoDismiss, () {
+      if (mounted) {
+        setState(() => _lastBrewSummary = null);
+      }
+    });
   }
 
   void _syncSamples() {
@@ -548,7 +570,7 @@ class _LiveScreenState extends State<LiveScreen> {
     final brewing = controller.isBrewing;
     _activeBrewNotifier?.setBrewing(brewing);
     if (brewing && _lastBrewSummary != null) {
-      setState(() => _lastBrewSummary = null);
+      _dismissBrewCompleteBanner();
     }
     // Trigger auto-save on stop transition (covers both manual stop and auto-stop).
     if (_wasBrewing && !brewing && controller.canSaveShot && !_autoSavedCurrent) {
@@ -564,6 +586,7 @@ class _LiveScreenState extends State<LiveScreen> {
       _autoSavedCurrent = false;
       _lastAutoSavedShotId = null;
       _yieldWarnFired = false;
+      // Re-enable live follow for the new pull.
       _chartInteractionController.resetViewport();
       // Reload brew defaults so yield target/warn edits apply to this shot.
       unawaited(_brewDefaultsStore.load().then((d) {
@@ -571,8 +594,8 @@ class _LiveScreenState extends State<LiveScreen> {
       }));
     }
     if (!brewing && _wasBrewing) {
-      // Keep banner briefly after stop is fine; clear when leaving brew UI noise.
-      // Banner stays until next brew start.
+      // Show the whole pull after stop (not the live last-~30s window).
+      _chartInteractionController.fitFullShot();
     }
     _wasBrewing = brewing;
   }
@@ -648,6 +671,7 @@ class _LiveScreenState extends State<LiveScreen> {
         if (mounted) {
           setState(() => _lastBrewSummary = BrewSummary.fromShot(shot));
           _autoSavedCurrent = true;
+          _scheduleBrewCompleteDismiss();
         }
         _shotEventsNotifier?.notifyShotsChanged();
         final database = await _ensureDatabase();
@@ -682,6 +706,11 @@ class _LiveScreenState extends State<LiveScreen> {
     );
 
     if (updated != null) {
+      // Edit done — drop the Live "Edit" banner; History still has full edit.
+      if (_lastAutoSavedShotId == shot.id ||
+          _lastAutoSavedShotId == updated.id) {
+        _dismissBrewCompleteBanner();
+      }
       _shotEventsNotifier?.notifyShotsChanged();
       await celebratePersonalBestTasteScore(
         repository: repository,
@@ -831,8 +860,6 @@ class _LiveScreenState extends State<LiveScreen> {
         final samples = controller.samples;
         final demoModeActive = _sensorSource?.isDemoMode ?? false;
         final latestSample = samples.isEmpty ? null : samples.last;
-        final previousSample =
-            samples.length < 2 ? null : samples[samples.length - 2];
         final repeatPrefill = _repeatShotController?.prefill;
         final chartTargetSamples = _chartTargetPressureSamples();
         final autoStartSettings = _resolvedAutoStartController.settings;
@@ -962,8 +989,7 @@ class _LiveScreenState extends State<LiveScreen> {
                         if (_lastBrewSummary != null) ...[
                           BrewCompleteBanner(
                             summary: _lastBrewSummary!,
-                            onDismiss: () =>
-                                setState(() => _lastBrewSummary = null),
+                            onDismiss: _dismissBrewCompleteBanner,
                             onEdit: _lastAutoSavedShotId != null
                                 ? () => unawaited(_editLastSavedShot())
                                 : null,
@@ -1030,8 +1056,9 @@ class _LiveScreenState extends State<LiveScreen> {
                         if ((state == ShotSessionState.stopped) &&
                             latestSample != null) ...[
                           LiveMetricsRow(
-                            sample: latestSample,
-                            previousSample: previousSample,
+                            metrics: LiveMetrics.fromStoppedSession(
+                              controller.samples,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           LiveYieldProgress(

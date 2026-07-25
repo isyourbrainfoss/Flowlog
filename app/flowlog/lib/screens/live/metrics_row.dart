@@ -14,11 +14,14 @@ enum MetricTrend {
 class LiveMetrics {
   const LiveMetrics({
     this.pressureBar,
+    this.pressureLabel = 'Pressure',
     this.weightG,
+    this.weightLabel = 'Weight',
     this.flowGs,
     this.tempC,
     required this.elapsedMs,
     this.projectedYieldG,
+    this.projectedYieldLabel = 'Proj. yield',
     this.pressureTrend = MetricTrend.neutral,
     this.weightTrend = MetricTrend.neutral,
     this.flowTrend = MetricTrend.neutral,
@@ -30,11 +33,16 @@ class LiveMetrics {
   static const defaultTargetDurationMs = 30000;
 
   final double? pressureBar;
+
+  /// Tile label for pressure (e.g. live "Pressure" vs post-brew "Hold avg").
+  final String pressureLabel;
   final double? weightG;
+  final String weightLabel;
   final double? flowGs;
   final double? tempC;
   final int elapsedMs;
   final double? projectedYieldG;
+  final String projectedYieldLabel;
   final MetricTrend pressureTrend;
   final MetricTrend weightTrend;
   final MetricTrend flowTrend;
@@ -88,6 +96,43 @@ class LiveMetrics {
         prior?.elapsedMs.toDouble(),
       ),
       projectedYieldTrend: _trend(projectedYieldG, previousProjectedYieldG),
+    );
+  }
+
+  /// Post-brew summary: hold-average pressure (not the 0 bar tail), final weight.
+  factory LiveMetrics.fromStoppedSession(List<ShotSample> samples) {
+    if (samples.isEmpty) {
+      return const LiveMetrics(elapsedMs: 0);
+    }
+    final last = samples.last;
+    final hold = plateauAveragePressureBar(samples);
+    final peak = peakPressureBarFromSamples(samples);
+    // Mean flow over samples that still have espresso flowing.
+    var flowSum = 0.0;
+    var flowCount = 0;
+    for (final s in samples) {
+      final f = s.flowGs;
+      if (f != null && f > 0.2) {
+        flowSum += f;
+        flowCount++;
+      }
+    }
+    return LiveMetrics(
+      pressureBar: hold ?? peak,
+      pressureLabel: hold != null ? 'Hold avg' : 'Peak',
+      weightG: last.weightG,
+      weightLabel: 'Yield',
+      flowGs: flowCount > 0 ? flowSum / flowCount : last.flowGs,
+      tempC: last.tempC,
+      elapsedMs: last.elapsedMs,
+      projectedYieldG: last.weightG,
+      projectedYieldLabel: 'Yield',
+      pressureTrend: MetricTrend.neutral,
+      weightTrend: MetricTrend.neutral,
+      flowTrend: MetricTrend.neutral,
+      tempTrend: MetricTrend.neutral,
+      elapsedTrend: MetricTrend.neutral,
+      projectedYieldTrend: MetricTrend.neutral,
     );
   }
 
@@ -178,7 +223,8 @@ class LiveMetricsRow extends StatelessWidget {
 
     final tiles = <Widget>[
       _MetricTile(
-        label: 'Pressure',
+        key: const Key('live_metric_pressure'),
+        label: resolved.pressureLabel,
         value: _formatPressure(resolved.pressureBar),
         trend: resolved.pressureTrend,
         labelStyle: labelStyle,
@@ -186,7 +232,7 @@ class LiveMetricsRow extends StatelessWidget {
       ),
       _MetricTile(
         key: const Key('live_metric_weight'),
-        label: 'Weight',
+        label: resolved.weightLabel,
         value: _formatWeight(resolved.weightG),
         trend: resolved.weightTrend,
         labelStyle: labelStyle,
@@ -214,7 +260,7 @@ class LiveMetricsRow extends StatelessWidget {
         valueStyle: valueStyle,
       ),
       _MetricTile(
-        label: 'Proj. yield',
+        label: resolved.projectedYieldLabel,
         value: _formatYield(resolved.projectedYieldG),
         trend: resolved.projectedYieldTrend,
         labelStyle: labelStyle,
