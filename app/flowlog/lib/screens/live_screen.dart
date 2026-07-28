@@ -481,23 +481,69 @@ class _LiveScreenState extends State<LiveScreen> {
     setState(() {});
   }
 
-  void _onReconnectSensors() {
+  Future<void> _onReconnectSensors() async {
     // Clear leftover post-shot readings so the status banner does not keep
     // showing a stale "last" value while reconnect is in progress.
     _livePressureNotifier.value = null;
     _livePressureLastUpdate.value = null;
 
     final hub = SensorHubScope.maybeOf(context);
-    if (hub != null) {
-      unawaited(hub.reconnectPairedDevices());
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Reconnecting paired sensors...'),
-            duration: Duration(seconds: 2),
+    if (hub == null) {
+      return;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Reconnecting paired sensors...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+
+    await hub.reconnectPairedDevices();
+    if (!mounted) {
+      return;
+    }
+
+    final pairedWithBle = hub.devices
+        .where((d) => d.bleRemoteId != null && d.bleRemoteId!.isNotEmpty)
+        .toList(growable: false);
+    final connected = pairedWithBle
+        .where((d) => d.state == ConnectionState.connected)
+        .length;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    if (pairedWithBle.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No paired sensors with a BLE id. Pair sensors first.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } else if (connected == pairedWithBle.length) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            connected == 1
+                ? 'Sensor reconnected.'
+                : 'All $connected sensors reconnected.',
           ),
-        );
-      }
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      final err = hub.lastError;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            err != null && err.isNotEmpty
+                ? 'Reconnect incomplete: $err'
+                : 'Reconnect incomplete ($connected/${pairedWithBle.length}).',
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 

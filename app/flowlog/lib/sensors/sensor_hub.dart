@@ -234,14 +234,26 @@ class SensorHub extends ChangeNotifier {
   }
 
   /// Reconnects paired sensors that already have a saved BLE id.
+  ///
+  /// Always tears down any existing adapter first, even when the hub still
+  /// reports [ConnectionState.connected] or [ConnectionState.connecting].
+  /// Stale "connected" state with a dead GATT link is the common reason the
+  /// in-app Reconnect button used to do nothing while a cold app start worked.
   Future<void> reconnectPairedDevices() async {
     for (final device in List<PairedSensorEntry>.from(devices)) {
       final bleRemoteId = device.bleRemoteId;
-      if (bleRemoteId == null ||
-          bleRemoteId.isEmpty ||
-          device.state == ConnectionState.connected ||
-          device.state == ConnectionState.connecting) {
+      if (bleRemoteId == null || bleRemoteId.isEmpty) {
         continue;
+      }
+      // Force a clean session: disconnect first, then connect.
+      final wasLinked = device.state == ConnectionState.connected ||
+          device.state == ConnectionState.connecting ||
+          _activeAdapters.containsKey(device.id);
+      await disconnect(device.id);
+      if (wasLinked) {
+        // Give the Android BLE stack a beat after tear-down; connecting
+        // immediately after disconnect often fails or returns a zombie link.
+        await Future<void>.delayed(const Duration(milliseconds: 350));
       }
       await connect(device.id);
     }
@@ -370,7 +382,14 @@ class SensorHub extends ChangeNotifier {
 
     try {
       await _adapterStateSubs.remove(id)?.cancel();
-      await _activeAdapters.remove(id)?.disconnect();
+      final previous = _activeAdapters.remove(id);
+      if (previous != null) {
+        try {
+          await previous.disconnect().timeout(const Duration(seconds: 3));
+        } on Object {
+          // Teardown races must not block a new connect attempt.
+        }
+      }
 
       final adapter = await _bleBackend.createAdapter(
         kind: device.kind,
@@ -381,7 +400,14 @@ class SensorHub extends ChangeNotifier {
         _onAdapterStateChanged(id, state);
       });
 
-      await adapter.connect();
+      await adapter.connect().timeout(
+        const Duration(seconds: 35),
+        onTimeout: () {
+          throw TimeoutException(
+            'BLE connect timed out after 35s for $bleRemoteId',
+          );
+        },
+      );
       if (device.kind == SensorKind.pressensor &&
           adapter is PressensorBleAdapter) {
         _batteryByDevice[id] = adapter.batteryPercent;
@@ -403,9 +429,21 @@ class SensorHub extends ChangeNotifier {
       notifyListeners();
     } on Object catch (error) {
       final message = 'BLE connect failed: $error';
-      await _failConnect(index, device, message);
+      final currentIndex = _devices.indexWhere((entry) => entry.id == id);
+      await _failConnect(
+        currentIndex >= 0 ? currentIndex : index,
+        device,
+        message,
+      );
       await _adapterStateSubs.remove(id)?.cancel();
-      await _activeAdapters.remove(id)?.disconnect();
+      final failed = _activeAdapters.remove(id);
+      if (failed != null) {
+        try {
+          await failed.disconnect().timeout(const Duration(seconds: 2));
+        } on Object {
+          // ignore
+        }
+      }
     }
   }
 

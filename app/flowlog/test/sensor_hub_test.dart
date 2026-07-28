@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart'
-    show ConnectionState, SensorAdapter;
+    show ConnectionState, SensorAdapter, SensorSample;
 import 'package:flutter_test/flutter_test.dart';
 
 class _ReadyBleBackend extends BleConnectionBackend {
@@ -94,4 +96,109 @@ void main() {
       expect(hub.devices, isEmpty);
     });
   });
+
+  group('SensorHub reconnectPairedDevices', () {
+    test('force-reconnects even when hub still reports connected', () async {
+      final backend = _CountingConnectBackend();
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+
+      hub.addDevice(SensorKind.pressensor);
+      hub.assignBleRemoteId(
+        SensorKind.pressensor,
+        bleRemoteId: 'AA:BB:CC:DD:EE:FF',
+        name: 'PRS-test',
+      );
+      final deviceId = hub.devices.first.id;
+
+      await hub.connect(deviceId);
+      expect(hub.devices.first.state, ConnectionState.connected);
+      expect(backend.connectCalls, 1);
+
+      // Simulate a zombie "connected" link: hub still says connected, user
+      // taps Reconnect. Old code skipped; new code must tear down + reconnect.
+      await hub.reconnectPairedDevices();
+
+      expect(backend.connectCalls, 2);
+      expect(hub.devices.first.state, ConnectionState.connected);
+      expect(
+        hub.reconnectLog.where((e) => e.outcome == ReconnectOutcome.connected),
+        hasLength(2),
+      );
+    });
+
+    test('reconnects when currently disconnected', () async {
+      final backend = _CountingConnectBackend();
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+
+      hub.addDevice(SensorKind.pressensor);
+      hub.assignBleRemoteId(
+        SensorKind.pressensor,
+        bleRemoteId: '11:22:33:44:55:66',
+        name: 'PRS-idle',
+      );
+
+      expect(hub.devices.first.state, ConnectionState.disconnected);
+      await hub.reconnectPairedDevices();
+      expect(backend.connectCalls, 1);
+      expect(hub.devices.first.state, ConnectionState.connected);
+    });
+
+    test('skips devices without a BLE remote id', () async {
+      final backend = _CountingConnectBackend();
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+
+      hub.addDevice(SensorKind.pressensor);
+      await hub.reconnectPairedDevices();
+      expect(backend.connectCalls, 0);
+    });
+  });
+}
+
+class _CountingConnectBackend implements BleConnectionBackend {
+  int connectCalls = 0;
+
+  @override
+  Future<String?> ensureReady() async => null;
+
+  @override
+  Future<List<BleDiscoveredDevice>> scan(
+    SensorKind kind, {
+    Duration timeout = const Duration(seconds: 8),
+  }) async =>
+      const [];
+
+  @override
+  Future<SensorAdapter> createAdapter({
+    required SensorKind kind,
+    required String bleRemoteId,
+  }) async {
+    connectCalls += 1;
+    return _AlwaysConnectAdapter();
+  }
+}
+
+class _AlwaysConnectAdapter implements SensorAdapter {
+  final _state = StreamController<ConnectionState>.broadcast();
+  final _samples = StreamController<SensorSample>.broadcast();
+
+  @override
+  Stream<ConnectionState> get state => _state.stream;
+
+  @override
+  Stream<SensorSample> get samples => _samples.stream;
+
+  @override
+  Future<void> connect() async {
+    _state.add(ConnectionState.connected);
+  }
+
+  @override
+  Future<void> disconnect() async {
+    if (!_state.isClosed) {
+      _state.add(ConnectionState.disconnected);
+    }
+  }
 }

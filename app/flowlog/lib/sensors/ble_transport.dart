@@ -350,9 +350,47 @@ class FlutterBluePressensorTransport implements PressensorBleTransport {
       throw StateError('Pressensor device id is required to connect.');
     }
 
-    _device = BluetoothDevice.fromId(targetId);
-    await _device!.connect(license: License.nonprofit);
-    await _discoverCharacteristics();
+    await _pressureSubscription?.cancel();
+    _pressureSubscription = null;
+
+    final device = BluetoothDevice.fromId(targetId);
+    _device = device;
+
+    // Drop any half-open OS link before connecting. Without this, in-session
+    // reconnect often fails while a cold app start (clean BLE stack) works.
+    await _forceClearLink(device);
+
+    Object? lastError;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (attempt > 0) {
+          await _forceClearLink(device);
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+        }
+        await device.connect(
+          license: License.nonprofit,
+          autoConnect: false,
+          timeout: const Duration(seconds: 20),
+        );
+        await _discoverCharacteristics();
+        // Arm CCCD before the adapter reports connected so the first
+        // pressure packets are not lost after in-session reconnect.
+        await _enablePressureNotify();
+        return;
+      } on Object catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError ?? StateError('Pressensor connect failed.');
+  }
+
+  /// Best-effort disconnect so the next [BluetoothDevice.connect] is clean.
+  static Future<void> _forceClearLink(BluetoothDevice device) async {
+    try {
+      await device.disconnect(timeout: 5);
+    } on Object {
+      // Already disconnected or platform race — safe to ignore.
+    }
   }
 
   Future<void> _discoverCharacteristics() async {
@@ -399,6 +437,21 @@ class FlutterBluePressensorTransport implements PressensorBleTransport {
     _batteryCharacteristic = battery;
   }
 
+  Future<void> _enablePressureNotify() async {
+    final characteristic = _pressureCharacteristic;
+    if (characteristic == null) {
+      return;
+    }
+    try {
+      await characteristic.setNotifyValue(true);
+    } on Object {
+      // Retry once — Android sometimes drops the first setNotifyValue after a
+      // fresh reconnect.
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await characteristic.setNotifyValue(true);
+    }
+  }
+
   @override
   Stream<List<int>> subscribePressure() {
     final characteristic = _pressureCharacteristic;
@@ -407,13 +460,26 @@ class FlutterBluePressensorTransport implements PressensorBleTransport {
       throw StateError('Pressensor is not connected.');
     }
 
+    if (_pressureController.isClosed) {
+      throw StateError('Pressensor transport was disconnected.');
+    }
+
     unawaited(_pressureSubscription?.cancel());
     _pressureSubscription = characteristic.onValueReceived.listen(
-      _pressureController.add,
-      onError: _pressureController.addError,
+      (value) {
+        if (!_pressureController.isClosed) {
+          _pressureController.add(value);
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!_pressureController.isClosed) {
+          _pressureController.addError(error, stackTrace);
+        }
+      },
     );
     device.cancelWhenDisconnected(_pressureSubscription!);
-    unawaited(characteristic.setNotifyValue(true));
+    // Notify should already be armed in connect(); re-assert best-effort.
+    unawaited(_enablePressureNotify());
     return _pressureController.stream;
   }
 
@@ -442,14 +508,20 @@ class FlutterBluePressensorTransport implements PressensorBleTransport {
   Future<void> disconnect() async {
     await _pressureSubscription?.cancel();
     _pressureSubscription = null;
-    await _pressureController.close();
+    if (!_pressureController.isClosed) {
+      await _pressureController.close();
+    }
     final device = _device;
     _device = null;
     _pressureCharacteristic = null;
     _zeroCharacteristic = null;
     _batteryCharacteristic = null;
     if (device != null) {
-      await device.disconnect();
+      try {
+        await device.disconnect(timeout: 5);
+      } on Object {
+        // Ignore disconnect races during force-reconnect.
+      }
     }
   }
 }
@@ -470,9 +542,40 @@ class FlutterBlueDecentScaleTransport implements DecentScaleTransport {
 
   @override
   Future<void> connect() async {
-    _device = BluetoothDevice.fromId(remoteId);
-    await _device!.connect(license: License.nonprofit);
-    await _discoverCharacteristics();
+    final device = BluetoothDevice.fromId(remoteId);
+    _device = device;
+
+    // Same clean-link pattern as Pressensor: in-session reconnect needs a
+    // forced disconnect of any half-open GATT session first.
+    try {
+      await device.disconnect(timeout: 5);
+    } on Object {
+      // ignore
+    }
+
+    Object? lastError;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (attempt > 0) {
+          try {
+            await device.disconnect(timeout: 5);
+          } on Object {
+            // ignore
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+        }
+        await device.connect(
+          license: License.nonprofit,
+          autoConnect: false,
+          timeout: const Duration(seconds: 20),
+        );
+        await _discoverCharacteristics();
+        return;
+      } on Object catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError ?? StateError('Decent Scale connect failed.');
   }
 
   Future<void> _discoverCharacteristics() async {
