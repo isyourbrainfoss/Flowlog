@@ -35,10 +35,15 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   ShotRepository? _shotRepository;
   TagRepository? _tagRepository;
+  BeanRepository? _beanRepository;
   FlowlogDatabase? _database;
 
   late ShotListFilters _filters;
   late Future<_HistoryData> _historyFuture;
+  /// Last successful load — keeps the filter bar mounted while a reload runs
+  /// so the soft keyboard is not dismissed on every keystroke.
+  _HistoryData? _lastData;
+  List<Bean> _beanSuggestions = const [];
   ShotEventsNotifier? _shotEventsNotifier;
   Timer? _deleteSnackBarTimer;
   int _pendingDeleteSnackBarCount = 0;
@@ -48,6 +53,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     super.initState();
     _filters = widget.initialFilters;
     _historyFuture = _loadHistory();
+    unawaited(_loadBeanSuggestions());
   }
 
   @override
@@ -104,6 +110,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return _tagRepository!;
   }
 
+  Future<BeanRepository> _ensureBeanRepository() async {
+    if (_beanRepository != null) {
+      return _beanRepository!;
+    }
+    final database = await _ensureDatabase();
+    _beanRepository = BeanRepository(database);
+    return _beanRepository!;
+  }
+
+  Future<void> _loadBeanSuggestions() async {
+    // Injected-repo tests don't open the app database.
+    if (widget.shotRepository != null) {
+      return;
+    }
+    try {
+      final beans = await (await _ensureBeanRepository()).listBeansByRecentUse();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _beanSuggestions = beans);
+    } on Object {
+      // Autocomplete is optional; history still works without it.
+    }
+  }
+
   Future<_HistoryData> _loadHistory() async {
     final shotRepository = await _ensureShotRepository();
     final tagRepository = await _ensureTagRepository();
@@ -118,14 +149,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
       shotRepository.topTargetScores(limit: 5),
     ]);
 
-    return _HistoryData(
+    final data = _HistoryData(
       shots: results[0] as List<Shot>,
       tags: results[1] as List<Tag>,
       topScores: results[2] as List<Shot>,
     );
+    _lastData = data;
+    return data;
   }
 
   void _onFiltersChanged(ShotListFilters filters) {
+    if (filters == _filters) {
+      return;
+    }
     setState(() {
       _filters = filters;
       _historyFuture = _loadHistory();
@@ -295,25 +331,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return FutureBuilder<_HistoryData>(
       future: _historyFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
+        // Prefer completed data; while reloading keep the previous list so the
+        // filter TextField stays mounted and the soft keyboard does not dismiss.
+        final data = snapshot.data ?? _lastData;
+        final isInitialLoad =
+            data == null && snapshot.connectionState != ConnectionState.done;
 
-        if (snapshot.hasError) {
+        if (snapshot.hasError && data == null) {
           return Center(
             child: Text('Failed to load history: ${snapshot.error}'),
           );
         }
 
-        final data = snapshot.data!;
-        final shots = data.shots;
+        final tags = data?.tags ?? const <Tag>[];
+        final shots = data?.shots ?? const <Shot>[];
+        final topScores = data?.topScores ?? const <Shot>[];
+        final listLoading = isInitialLoad ||
+            (snapshot.connectionState != ConnectionState.done && data != null);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             HistoryFiltersPanel(
               filters: _filters,
-              tags: data.tags,
+              tags: tags,
+              beanSuggestions: _beanSuggestions,
               onChanged: _onFiltersChanged,
             ),
             Padding(
@@ -325,25 +367,41 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 label: const Text('Import last shot from scale'),
               ),
             ),
-            if (data.topScores.isNotEmpty) ...[
+            if (topScores.isNotEmpty) ...[
               _LeaderboardSection(
-                topScores: data.topScores,
+                topScores: topScores,
                 onOpenShot: _openShotDetail,
               ),
               const SizedBox(height: 8),
             ],
-            Expanded(
-              child: _HistoryShotList(
-                shots: shots,
-                filters: _filters,
-                onRefresh: _refresh,
-                onOpenShot: _openShotDetail,
-                onDeleteShot: _deleteShot,
-                onDeleteShotConfirmed: _deleteShotConfirmed,
-                confirmDeleteShot: _confirmDeleteShot,
-                onImportFromScale: _importFromScale,
+            if (listLoading && data == null)
+              const Expanded(
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else
+              Expanded(
+                child: Stack(
+                  children: [
+                    _HistoryShotList(
+                      shots: shots,
+                      filters: _filters,
+                      onRefresh: _refresh,
+                      onOpenShot: _openShotDetail,
+                      onDeleteShot: _deleteShot,
+                      onDeleteShotConfirmed: _deleteShotConfirmed,
+                      confirmDeleteShot: _confirmDeleteShot,
+                      onImportFromScale: _importFromScale,
+                    ),
+                    if (listLoading)
+                      const Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: LinearProgressIndicator(minHeight: 2),
+                      ),
+                  ],
+                ),
               ),
-            ),
           ],
         );
       },

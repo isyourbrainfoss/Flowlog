@@ -246,14 +246,42 @@ class ShotRepository {
       );
     }
 
-    if (filters.minPeakPressureBar != null) {
-      final shotIds =
-          await _shotIdsWithMinPeakPressure(filters.minPeakPressureBar!);
+    if (filters.minPeakPressureBar != null ||
+        filters.maxPeakPressureBar != null) {
+      final shotIds = await _shotIdsWithPeakPressureRange(
+        minBar: filters.minPeakPressureBar,
+        maxBar: filters.maxPeakPressureBar,
+      );
       if (shotIds.isEmpty) {
         query.where((shot) => const Constant(false));
       } else {
         query.where((shot) => shot.id.isIn(shotIds));
       }
+    }
+
+    if (filters.minDurationMs != null || filters.maxDurationMs != null) {
+      final shotIds = await _shotIdsInDurationRange(
+        minMs: filters.minDurationMs,
+        maxMs: filters.maxDurationMs,
+      );
+      if (shotIds.isEmpty) {
+        query.where((shot) => const Constant(false));
+      } else {
+        query.where((shot) => shot.id.isIn(shotIds));
+      }
+    }
+
+    if (filters.minGrindSetting != null) {
+      query.where(
+        (shot) => shot.grindSetting
+            .isBiggerOrEqualValue(filters.minGrindSetting!),
+      );
+    }
+    if (filters.maxGrindSetting != null) {
+      query.where(
+        (shot) => shot.grindSetting
+            .isSmallerOrEqualValue(filters.maxGrindSetting!),
+      );
     }
 
     if (filters.tagIds.isNotEmpty) {
@@ -277,19 +305,75 @@ class ShotRepository {
     return rows.toSet().toList();
   }
 
-  Future<List<String>> _shotIdsWithMinPeakPressure(double minBar) async {
+  Future<List<String>> _shotIdsWithPeakPressureRange({
+    double? minBar,
+    double? maxBar,
+  }) async {
+    final clauses = <String>[];
+    final variables = <Variable<Object>>[];
+    if (minBar != null) {
+      clauses.add('MAX(pressure_bar) >= ?');
+      variables.add(Variable.withReal(minBar));
+    }
+    if (maxBar != null) {
+      clauses.add('MAX(pressure_bar) <= ?');
+      variables.add(Variable.withReal(maxBar));
+    }
+    if (clauses.isEmpty) {
+      return const [];
+    }
+
     final rows = await _db.customSelect(
       '''
       SELECT shot_id
       FROM shot_samples
       GROUP BY shot_id
-      HAVING MAX(pressure_bar) >= ?
+      HAVING ${clauses.join(' AND ')}
       ''',
-      variables: [Variable.withReal(minBar)],
+      variables: variables,
       readsFrom: {_db.shotSamples},
     ).get();
 
     return rows.map((row) => row.read<String>('shot_id')).toList();
+  }
+
+  /// Brews whose [Shot.endedAt] − [Shot.startedAt] falls in the given range.
+  Future<List<String>> _shotIdsInDurationRange({
+    int? minMs,
+    int? maxMs,
+  }) async {
+    final clauses = <String>[
+      'ended_at IS NOT NULL',
+    ];
+    final variables = <Variable<Object>>[];
+    // ISO-8601 timestamps compare lexicographically when stored consistently.
+    // Duration via unix epoch seconds (SQLite strftime).
+    if (minMs != null) {
+      clauses.add(
+        "(CAST(strftime('%s', ended_at) AS INTEGER) - "
+        "CAST(strftime('%s', started_at) AS INTEGER)) * 1000 >= ?",
+      );
+      variables.add(Variable.withInt(minMs));
+    }
+    if (maxMs != null) {
+      clauses.add(
+        "(CAST(strftime('%s', ended_at) AS INTEGER) - "
+        "CAST(strftime('%s', started_at) AS INTEGER)) * 1000 <= ?",
+      );
+      variables.add(Variable.withInt(maxMs));
+    }
+
+    final rows = await _db.customSelect(
+      '''
+      SELECT id
+      FROM shots
+      WHERE ${clauses.join(' AND ')}
+      ''',
+      variables: variables,
+      readsFrom: {_db.shots},
+    ).get();
+
+    return rows.map((row) => row.read<String>('id')).toList();
   }
 
   /// Returns the grind setting from the most recently saved shot, if any.

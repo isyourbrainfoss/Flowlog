@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flowlog/screens/library/simulator.dart';
 import 'package:flowlog/screens/library_screen.dart';
@@ -98,6 +99,24 @@ void main() {
       expect(suggestSimulatorTimelineDuration(28000), 30000);
       expect(suggestSimulatorTimelineDuration(31000), 45000);
       expect(suggestSimulatorTimelineDuration(130000), 135000);
+    });
+
+    test('extractPressureKeyframesFromSamples keeps start peak and end', () {
+      final samples = [
+        const ShotSample(elapsedMs: 0, pressureBar: 0),
+        const ShotSample(elapsedMs: 2000, pressureBar: 2),
+        const ShotSample(elapsedMs: 5000, pressureBar: 9),
+        const ShotSample(elapsedMs: 8000, pressureBar: 9),
+        const ShotSample(elapsedMs: 12000, pressureBar: 4),
+        const ShotSample(elapsedMs: 20000, pressureBar: 0),
+      ];
+      final kfs = extractPressureKeyframesFromSamples(
+        samples,
+        durationMs: 30000,
+      );
+      expect(kfs.length, greaterThanOrEqualTo(2));
+      expect(kfs.first.elapsedMs, 0);
+      expect(kfs.map((k) => k.pressureBar).reduce(math.max), closeTo(9, 0.01));
     });
 
     test('clampKeyframesToTimeline keeps points inside duration', () {

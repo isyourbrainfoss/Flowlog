@@ -9,6 +9,11 @@ class ShotListFilters {
     this.startedOnOrBefore,
     this.minTasteScore,
     this.minPeakPressureBar,
+    this.maxPeakPressureBar,
+    this.minDurationMs,
+    this.maxDurationMs,
+    this.minGrindSetting,
+    this.maxGrindSetting,
     this.tagIds = const {},
   });
 
@@ -29,6 +34,21 @@ class ShotListFilters {
   /// Minimum peak sample pressure in bar; shots without samples are excluded.
   final double? minPeakPressureBar;
 
+  /// Maximum peak sample pressure in bar; shots without samples are excluded.
+  final double? maxPeakPressureBar;
+
+  /// Minimum brew duration in ms (from [Shot.endedAt] − [Shot.startedAt]).
+  final int? minDurationMs;
+
+  /// Maximum brew duration in ms (from [Shot.endedAt] − [Shot.startedAt]).
+  final int? maxDurationMs;
+
+  /// Inclusive lower bound on [Shot.grindSetting].
+  final double? minGrindSetting;
+
+  /// Inclusive upper bound on [Shot.grindSetting].
+  final double? maxGrindSetting;
+
   /// When non-empty, keeps shots linked to any selected tag id.
   final Set<String> tagIds;
 
@@ -38,6 +58,11 @@ class ShotListFilters {
       startedOnOrBefore != null ||
       minTasteScore != null ||
       minPeakPressureBar != null ||
+      maxPeakPressureBar != null ||
+      minDurationMs != null ||
+      maxDurationMs != null ||
+      minGrindSetting != null ||
+      maxGrindSetting != null ||
       tagIds.isNotEmpty;
 
   ShotListFilters copyWith({
@@ -50,6 +75,16 @@ class ShotListFilters {
     bool clearMinTasteScore = false,
     double? minPeakPressureBar,
     bool clearMinPeakPressureBar = false,
+    double? maxPeakPressureBar,
+    bool clearMaxPeakPressureBar = false,
+    int? minDurationMs,
+    bool clearMinDurationMs = false,
+    int? maxDurationMs,
+    bool clearMaxDurationMs = false,
+    double? minGrindSetting,
+    bool clearMinGrindSetting = false,
+    double? maxGrindSetting,
+    bool clearMaxGrindSetting = false,
     Set<String>? tagIds,
     bool clearTagIds = false,
   }) {
@@ -66,6 +101,19 @@ class ShotListFilters {
       minPeakPressureBar: clearMinPeakPressureBar
           ? null
           : (minPeakPressureBar ?? this.minPeakPressureBar),
+      maxPeakPressureBar: clearMaxPeakPressureBar
+          ? null
+          : (maxPeakPressureBar ?? this.maxPeakPressureBar),
+      minDurationMs:
+          clearMinDurationMs ? null : (minDurationMs ?? this.minDurationMs),
+      maxDurationMs:
+          clearMaxDurationMs ? null : (maxDurationMs ?? this.maxDurationMs),
+      minGrindSetting: clearMinGrindSetting
+          ? null
+          : (minGrindSetting ?? this.minGrindSetting),
+      maxGrindSetting: clearMaxGrindSetting
+          ? null
+          : (maxGrindSetting ?? this.maxGrindSetting),
       tagIds: clearTagIds ? const {} : (tagIds ?? this.tagIds),
     );
   }
@@ -90,6 +138,11 @@ class ShotListFilters {
             startedOnOrBefore == other.startedOnOrBefore &&
             minTasteScore == other.minTasteScore &&
             minPeakPressureBar == other.minPeakPressureBar &&
+            maxPeakPressureBar == other.maxPeakPressureBar &&
+            minDurationMs == other.minDurationMs &&
+            maxDurationMs == other.maxDurationMs &&
+            minGrindSetting == other.minGrindSetting &&
+            maxGrindSetting == other.maxGrindSetting &&
             _setEquals(tagIds, other.tagIds);
   }
 
@@ -100,6 +153,11 @@ class ShotListFilters {
         startedOnOrBefore,
         minTasteScore,
         minPeakPressureBar,
+        maxPeakPressureBar,
+        minDurationMs,
+        maxDurationMs,
+        minGrindSetting,
+        maxGrindSetting,
         Object.hashAllUnordered(tagIds),
       );
 }

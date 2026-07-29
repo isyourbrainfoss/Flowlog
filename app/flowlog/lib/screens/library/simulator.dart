@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
+import 'package:flowlog/settings/target_brew_store.dart';
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog/widgets/fullscreen_plot.dart';
@@ -226,12 +227,46 @@ double? pressureAtElapsedMs(int elapsedMs, List<ShotSample> samples) {
 }
 
 /// Builds editable keyframes from a saved profile or shot samples.
+///
+/// When [keyframeTimes] is null, picks shape-preserving points (start, end,
+/// local extrema) from [samples] so load-target / load-simulation keep the
+/// curve instead of only sampling fixed fractions of the timeline.
 List<PressureKeyframe> keyframesFromPressureSamples(
   List<ShotSample> samples, {
   int durationMs = kSimulatorDefaultDurationMs,
   List<int>? keyframeTimes,
+  int maxKeyframes = 12,
 }) {
-  final times = keyframeTimes ?? simulatorKeyframeTimesForDuration(durationMs);
+  if (samples.isEmpty) {
+    final times = keyframeTimes ?? simulatorKeyframeTimesForDuration(durationMs);
+    return [
+      for (final elapsedMs in times)
+        PressureKeyframe(elapsedMs: elapsedMs, pressureBar: 0),
+    ];
+  }
+
+  if (keyframeTimes != null) {
+    return [
+      for (final elapsedMs in keyframeTimes)
+        PressureKeyframe(
+          elapsedMs: elapsedMs.clamp(0, durationMs),
+          pressureBar: (pressureAtElapsedMs(elapsedMs, samples) ?? 0)
+              .clamp(0, 12)
+              .toDouble(),
+        ),
+    ];
+  }
+
+  final adaptive = extractPressureKeyframesFromSamples(
+    samples,
+    durationMs: durationMs,
+    maxKeyframes: maxKeyframes,
+  );
+  if (adaptive.length >= 2) {
+    return adaptive;
+  }
+
+  final times = simulatorKeyframeTimesForDuration(durationMs);
   return [
     for (final elapsedMs in times)
       PressureKeyframe(
@@ -241,6 +276,121 @@ List<PressureKeyframe> keyframesFromPressureSamples(
             .toDouble(),
       ),
   ];
+}
+
+/// Reduces a dense pressure curve to editable control points.
+List<PressureKeyframe> extractPressureKeyframesFromSamples(
+  List<ShotSample> samples, {
+  required int durationMs,
+  int maxKeyframes = 12,
+  double minPressureDeltaBar = 0.35,
+}) {
+  if (samples.isEmpty) {
+    return const [];
+  }
+
+  final withPressure = <PressureKeyframe>[
+    for (final s in samples)
+      if (s.pressureBar != null)
+        PressureKeyframe(
+          elapsedMs: s.elapsedMs.clamp(0, durationMs),
+          pressureBar: s.pressureBar!.clamp(0, 12).toDouble(),
+        ),
+  ];
+  if (withPressure.isEmpty) {
+    return const [];
+  }
+  if (withPressure.length == 1) {
+    final only = withPressure.first;
+    return [
+      PressureKeyframe(elapsedMs: 0, pressureBar: only.pressureBar),
+      PressureKeyframe(
+        elapsedMs: math.max(kSimulatorMinKeyframeSpacingMs, durationMs ~/ 2)
+            .clamp(0, durationMs),
+        pressureBar: only.pressureBar,
+      ),
+    ];
+  }
+
+  // Index set: start, end, global max, local extrema (incl. plateau edges).
+  final keepIdx = <int>{0, withPressure.length - 1};
+  var maxIdx = 0;
+  for (var i = 1; i < withPressure.length; i++) {
+    if (withPressure[i].pressureBar > withPressure[maxIdx].pressureBar) {
+      maxIdx = i;
+    }
+  }
+  keepIdx.add(maxIdx);
+
+  for (var i = 1; i < withPressure.length - 1; i++) {
+    final prev = withPressure[i - 1].pressureBar;
+    final cur = withPressure[i].pressureBar;
+    final next = withPressure[i + 1].pressureBar;
+    final rising = cur > prev + 1e-6;
+    final falling = cur < prev - 1e-6;
+    final nextFalling = next < cur - 1e-6;
+    final nextRising = next > cur + 1e-6;
+    // Peak: was rising (or flat after rise) then falls; valley inverse.
+    final isPeak = (rising || (cur >= prev && nextFalling)) && nextFalling;
+    final isValley = (falling || (cur <= prev && nextRising)) && nextRising;
+    if ((isPeak || isValley) &&
+        (cur - prev).abs() >= minPressureDeltaBar * 0.25) {
+      keepIdx.add(i);
+    }
+  }
+
+  final ordered = keepIdx.toList()..sort();
+  var spaced = <PressureKeyframe>[
+    for (final i in ordered) withPressure[i],
+  ];
+
+  // Drop middle points that are too close unless they hold the global max.
+  final maxBar = withPressure[maxIdx].pressureBar;
+  final compacted = <PressureKeyframe>[spaced.first];
+  for (var i = 1; i < spaced.length; i++) {
+    final c = spaced[i];
+    final isLast = i == spaced.length - 1;
+    final isMax = (c.pressureBar - maxBar).abs() < 1e-6;
+    final farEnough =
+        c.elapsedMs >= compacted.last.elapsedMs + kSimulatorMinKeyframeSpacingMs;
+    if (isLast || isMax || farEnough) {
+      if (!farEnough &&
+          !isMax &&
+          isLast &&
+          compacted.length > 1 &&
+          c.elapsedMs < compacted.last.elapsedMs + kSimulatorMinKeyframeSpacingMs) {
+        compacted[compacted.length - 1] = c;
+      } else {
+        compacted.add(c);
+      }
+    } else if ((c.pressureBar - compacted.last.pressureBar).abs() >
+        minPressureDeltaBar) {
+      compacted.add(c);
+    }
+  }
+  spaced = compacted;
+
+  if (spaced.length > maxKeyframes) {
+    final result = <PressureKeyframe>[spaced.first];
+    final middle = spaced.sublist(1, spaced.length - 1);
+    // Prefer keeping the max-pressure middle point.
+    middle.sort((a, b) => b.pressureBar.compareTo(a.pressureBar));
+    final chosen = middle.take(maxKeyframes - 2).toList()
+      ..sort((a, b) => a.elapsedMs.compareTo(b.elapsedMs));
+    result.addAll(chosen);
+    if (result.last.elapsedMs != spaced.last.elapsedMs) {
+      result.add(spaced.last);
+    }
+    spaced = result;
+  }
+
+  if (spaced.first.elapsedMs != 0) {
+    spaced = [
+      PressureKeyframe(elapsedMs: 0, pressureBar: spaced.first.pressureBar),
+      ...spaced,
+    ];
+  }
+  return spaced;
 }
 
 /// Expands keyframes into a dense pressure profile for charting.
@@ -1076,6 +1226,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
   SavedProfile? _profile;
   bool _initialized = false;
   bool _profileEditorActive = false;
+  /// Bumped on load so [PressureProfileEditor] remounts with the new curve.
+  int _selectedEditorEpoch = 0;
 
   @override
   void initState() {
@@ -1199,24 +1351,15 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       return;
     }
 
-    final contentMs = math.max(
-      BrewSummary.fromShot(shot).durationMs,
-      shot.samples.isEmpty ? 0 : shot.samples.last.elapsedMs,
-    );
-    final timelineDurationMs = suggestSimulatorTimelineDuration(contentMs);
-
-    setState(() {
-      _profile = SavedProfile.fromShot(
+    _applyLoadedCurve(
+      samples: shot.samples,
+      profile: SavedProfile.fromShot(
         shot,
         id: _profile?.id ?? 'simulator-draft',
         name: shot.id,
-      );
-      _timelineDurationMs = timelineDurationMs;
-      _keyframes = keyframesFromPressureSamples(
-        shot.samples,
-        durationMs: timelineDurationMs,
-      );
-    });
+      ),
+      snackbarLabel: 'Imported shot curve',
+    );
   }
 
   Future<void> _onLoadSavedSimulation() async {
@@ -1225,7 +1368,8 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       return;
     }
 
-    final profiles = await repository.listProfiles(includeSamples: true);
+    // Metadata first (fast). Samples are loaded for the chosen profile only.
+    final profiles = await repository.listProfiles(includeSamples: false);
     if (!mounted || profiles.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1235,13 +1379,15 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       return;
     }
 
-    final selected = await showDialog<SavedProfile>(
+    final selectedMeta = await showDialog<SavedProfile>(
       context: context,
       builder: (ctx) => SimpleDialog(
+        key: const Key('simulator_load_simulation_dialog'),
         title: const Text('Load simulation'),
         children: [
           for (final p in profiles)
             SimpleDialogOption(
+              key: Key('simulator_load_profile_${p.id}'),
               onPressed: () => Navigator.pop(ctx, p),
               child: Text(p.name),
             ),
@@ -1249,38 +1395,134 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       ),
     );
 
-    if (selected != null && mounted) {
-      final samples = selected.pressureSamples;
-      final contentMs = samples.isEmpty ? _timelineDurationMs : samples.last.elapsedMs;
-      final dur = suggestSimulatorTimelineDuration(contentMs);
-      final kfs = keyframesFromPressureSamples(samples, durationMs: dur);
-      setState(() {
-        _profile = selected;
-        _keyframes = kfs;
-        _timelineDurationMs = dur;
-      });
+    if (selectedMeta == null || !mounted) {
+      return;
     }
+
+    final selected =
+        await repository.getProfileWithSamples(selectedMeta.id) ?? selectedMeta;
+    if (!mounted) {
+      return;
+    }
+
+    final samples = selected.pressureSamples;
+    if (samples.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('“${selected.name}” has no pressure samples'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    _applyLoadedCurve(
+      samples: samples,
+      profile: selected,
+      snackbarLabel: 'Loaded ${selected.name}',
+    );
   }
 
   Future<void> _onLoadCurrentTarget() async {
     final target = TargetBrewScope.maybeOf(context);
-    if (target == null || !target.hasTarget || target.pressureSamples.isEmpty || !mounted) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No current target brew set')),
-        );
+    var samples = target?.pressureSamples ?? const <ShotSample>[];
+    var profileName = target?.profileName;
+    var profileId = target?.profileId;
+
+    // In-memory samples can be empty when the target was set by id only or
+    // failed to hydrate — reload from the profile repository.
+    if (samples.isEmpty && profileId != null && profileId.isNotEmpty) {
+      final repository = await _ensureProfileRepository();
+      final profile = await repository.getProfileWithSamples(profileId);
+      if (profile != null && profile.pressureSamples.isNotEmpty) {
+        samples = profile.pressureSamples;
+        profileName = profile.name;
+        // Refresh controller so Live/target stay in sync.
+        if (mounted) {
+          await target?.setProfile(profile, profileRepository: repository);
+        }
       }
+    }
+
+    // Last resort: read persisted default target settings.
+    if (samples.isEmpty) {
+      final settings = await TargetBrewSettingsStore().load();
+      if (settings.hasTarget) {
+        final repository = await _ensureProfileRepository();
+        final profile =
+            await repository.getProfileWithSamples(settings.profileId!);
+        if (profile != null && profile.pressureSamples.isNotEmpty) {
+          samples = profile.pressureSamples;
+          profileName = profile.name;
+          profileId = profile.id;
+          if (mounted) {
+            await TargetBrewScope.maybeOf(context)?.setProfile(
+              profile,
+              profileRepository: repository,
+            );
+          }
+        }
+      }
+    }
+
+    if (!mounted) {
       return;
     }
-    final samples = target.pressureSamples;
-    final contentMs = samples.last.elapsedMs;
+
+    if (samples.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No current target brew set'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    _applyLoadedCurve(
+      samples: samples,
+      profile: profileId == null
+          ? null
+          : SavedProfile(
+              id: profileId,
+              name: profileName ?? 'Target brew',
+              createdAt: DateTime.now().toUtc(),
+              pressureSamples: samples,
+            ),
+      snackbarLabel: 'Loaded target${profileName != null ? ' — $profileName' : ''}',
+    );
+  }
+
+  /// Applies a pressure curve to the editor (load simulation / target / import).
+  void _applyLoadedCurve({
+    required List<ShotSample> samples,
+    SavedProfile? profile,
+    String? snackbarLabel,
+  }) {
+    final contentMs = samples.isEmpty
+        ? _timelineDurationMs
+        : math.max(samples.last.elapsedMs, samples.first.elapsedMs);
     final dur = suggestSimulatorTimelineDuration(contentMs);
-    final kfs = keyframesFromPressureSamples(samples, durationMs: dur);
+    final kfs = clampKeyframesToTimeline(
+      keyframesFromPressureSamples(samples, durationMs: dur),
+      dur,
+    );
     setState(() {
-      _profile = null;
+      _profile = profile;
       _keyframes = kfs;
       _timelineDurationMs = dur;
+      _selectedEditorEpoch += 1;
     });
+    if (snackbarLabel != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          key: const Key('simulator_load_snackbar'),
+          content: Text(snackbarLabel),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _onExportProfilePressed() async {
@@ -1573,6 +1815,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
                 ),
               ),
               PressureProfileEditor(
+                key: ValueKey('sim_editor_$_selectedEditorEpoch'),
                 keyframes: _keyframes,
                 durationMs: durationMs,
                 height: 220,

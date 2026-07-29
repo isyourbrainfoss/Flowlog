@@ -71,6 +71,37 @@ void main() {
       expect(shots.map((shot) => shot.id).toList(), ['shot-ethiopia']);
     });
 
+    test('filters by maximum peak pressure', () async {
+      final shots = await shotRepository.listShots(
+        includeSamples: true,
+        filters: const ShotListFilters(maxPeakPressureBar: 8.0),
+      );
+
+      expect(shots.map((shot) => shot.id).toList(), ['shot-house']);
+    });
+
+    test('filters by grind setting range', () async {
+      final shots = await shotRepository.listShots(
+        filters: const ShotListFilters(
+          minGrindSetting: 3.0,
+          maxGrindSetting: 3.5,
+        ),
+      );
+
+      expect(shots.map((shot) => shot.id).toList(), ['shot-ethiopia']);
+    });
+
+    test('filters by brew duration range', () async {
+      final shots = await shotRepository.listShots(
+        filters: const ShotListFilters(
+          minDurationMs: 25000,
+          maxDurationMs: 35000,
+        ),
+      );
+
+      expect(shots.map((shot) => shot.id).toList(), ['shot-ethiopia']);
+    });
+
     test('combines multiple filters', () async {
       final shots = await shotRepository.listShots(
         includeSamples: true,
@@ -150,6 +181,8 @@ void main() {
         find.byKey(const Key('history_filter_bean')),
         'ethiopia',
       );
+      // Debounced text filters need a short settle past the debounce window.
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('history_shot_card_shot-ethiopia')), findsOneWidget);
@@ -187,6 +220,7 @@ void main() {
         find.byKey(const Key('history_filter_peak_min')),
         '8.5',
       );
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('history_shot_card_shot-ethiopia')), findsOneWidget);
@@ -207,6 +241,7 @@ void main() {
         find.byKey(const Key('history_filter_bean')),
         'missing-bean',
       );
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.pumpAndSettle();
 
       expect(find.text('No shots match your filters'), findsOneWidget);
@@ -225,6 +260,7 @@ void main() {
         find.byKey(const Key('history_filter_bean')),
         'ethiopia',
       );
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.pumpAndSettle();
       expect(find.byType(HistoryShotCard), findsOneWidget);
 
@@ -269,8 +305,10 @@ Future<void> _seedFilterFixtures({
     Shot(
       id: 'shot-ethiopia',
       startedAt: DateTime.utc(2026, 6, 29, 10),
+      endedAt: DateTime.utc(2026, 6, 29, 10, 0, 30),
       beanId: 'bean-ethiopia',
       tasteScore: 9,
+      grindSetting: 3.2,
       samples: const [
         ShotSample(elapsedMs: 0, pressureBar: 0),
         ShotSample(elapsedMs: 15000, pressureBar: 9.2),
@@ -283,8 +321,10 @@ Future<void> _seedFilterFixtures({
     Shot(
       id: 'shot-house',
       startedAt: DateTime.utc(2026, 6, 28, 8),
+      endedAt: DateTime.utc(2026, 6, 28, 8, 0, 20),
       beanId: 'bean-house',
       tasteScore: 6,
+      grindSetting: 5.0,
       samples: const [
         ShotSample(elapsedMs: 0, pressureBar: 0),
         ShotSample(elapsedMs: 15000, pressureBar: 7.5),
