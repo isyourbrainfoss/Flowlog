@@ -45,29 +45,36 @@ class _MoreScreenState extends State<MoreScreen> {
 
   Future<void> _importFromScale() async {
     if (!mounted) return;
-    final shot = await showImportScaleShotDialog(context);
-    if (shot == null || !mounted) return;
+    final shots = await showImportScaleShotDialog(context);
+    if (shots == null || shots.isEmpty || !mounted) return;
 
     final database = await openFlowlogDatabase();
     final repo = ShotRepository(database);
-    var toSave = shot;
-    final existing = await repo.getShotById(shot.id);
-    if (existing != null) {
-      toSave = shot.copyWith(
-        id: 'shot-scale-${DateTime.now().toUtc().millisecondsSinceEpoch}',
-        lastModifiedAt: DateTime.now().toUtc(),
-      );
-    } else {
-      toSave = shot.copyWith(lastModifiedAt: DateTime.now().toUtc());
+    var imported = 0;
+    for (final shot in shots) {
+      var toSave = shot;
+      final existing = await repo.getShotById(shot.id);
+      if (existing != null) {
+        toSave = shot.copyWith(
+          id:
+              'shot-scale-${DateTime.now().toUtc().millisecondsSinceEpoch}-$imported',
+          lastModifiedAt: DateTime.now().toUtc(),
+        );
+      } else {
+        toSave = shot.copyWith(lastModifiedAt: DateTime.now().toUtc());
+      }
+      await repo.insertShot(toSave);
+      imported += 1;
     }
-    await repo.insertShot(toSave);
     unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
     if (!mounted) return;
     ShotEventsScope.maybeOf(context)?.notifyShotsChanged();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Imported scale shot (${toSave.samples.length} samples) — see History',
+          imported == 1
+              ? 'Imported 1 scale shot — see History'
+              : 'Imported $imported scale shots — see History',
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -215,7 +222,7 @@ class _MoreScreenState extends State<MoreScreen> {
           leading: const Icon(Icons.scale_outlined),
           title: const Text('Import from scale'),
           subtitle: const Text(
-            'Last phone-free shot via half-decent.local /shot.json',
+            'Last 3 phone-free shots — Wi‑Fi IP or Bluetooth',
           ),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => unawaited(_importFromScale()),

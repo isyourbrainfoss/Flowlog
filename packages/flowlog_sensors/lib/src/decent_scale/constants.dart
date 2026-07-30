@@ -3,6 +3,9 @@ abstract final class DecentScaleConstants {
   /// Advertised BLE device name.
   static const deviceName = 'Decent Scale';
 
+  /// FFF0 primary service.
+  static const serviceUuid = '0000fff0-0000-1000-8000-00805f9b34fb';
+
   /// FFF4 — weight, button, and command acknowledgements (notify).
   static const notifyUuid = '0000fff4-0000-1000-8000-00805f9b34fb';
 

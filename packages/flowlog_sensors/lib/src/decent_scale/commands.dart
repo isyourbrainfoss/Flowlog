@@ -90,4 +90,17 @@ abstract final class DecentScaleCommands {
       clampU8(pressureMaxBar),
     ]);
   }
+
+  // --- Shot export over BLE (DIY scale firmware ≥1.6) ---
+  // Write 0xF4; scale replies on FFF4 with 0xF4 list, 0xF5 chunks, or 0xF6 status.
+
+  /// Request sizes of stored shots (up to 3). Reply type `0xF4`.
+  static List<int> shotExportList() => _build(0xF4, [0x00, 0x00, 0x00, 0x00]);
+
+  /// Request full JSON transfer for shot [age] (0 = newest). Chunks type `0xF5`.
+  static List<int> shotExportGet({int age = 0}) =>
+      _build(0xF4, [0x01, age.clamp(0, 2), 0x00, 0x00]);
+
+  /// Request Wi‑Fi IP / status string. Reply type `0xF6`.
+  static List<int> shotExportStatus() => _build(0xF4, [0x02, 0x00, 0x00, 0x00]);
 }

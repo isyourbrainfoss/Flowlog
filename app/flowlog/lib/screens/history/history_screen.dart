@@ -197,22 +197,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _importFromScale() async {
     if (!mounted) return;
-    final shot = await showImportScaleShotDialog(context);
-    if (shot == null || !mounted) return;
+    final shots = await showImportScaleShotDialog(context);
+    if (shots == null || shots.isEmpty || !mounted) return;
 
     final shotRepository = await _ensureShotRepository();
-    // Ensure a unique id if this shot was already imported.
-    var toSave = shot;
-    final existing = await shotRepository.getShotById(shot.id);
-    if (existing != null) {
-      toSave = shot.copyWith(
-        id: 'shot-scale-${DateTime.now().toUtc().millisecondsSinceEpoch}',
-        lastModifiedAt: DateTime.now().toUtc(),
-      );
-    } else {
-      toSave = shot.copyWith(lastModifiedAt: DateTime.now().toUtc());
+    var imported = 0;
+    for (final shot in shots) {
+      var toSave = shot;
+      final existing = await shotRepository.getShotById(shot.id);
+      if (existing != null) {
+        toSave = shot.copyWith(
+          id:
+              'shot-scale-${DateTime.now().toUtc().millisecondsSinceEpoch}-$imported',
+          lastModifiedAt: DateTime.now().toUtc(),
+        );
+      } else {
+        toSave = shot.copyWith(lastModifiedAt: DateTime.now().toUtc());
+      }
+      await shotRepository.insertShot(toSave);
+      imported += 1;
     }
-    await shotRepository.insertShot(toSave);
 
     if (widget.shotRepository == null) {
       final database = await _ensureDatabase();
@@ -227,7 +231,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
       SnackBar(
         key: const Key('import_scale_shot_snackbar'),
         content: Text(
-          'Imported scale shot (${toSave.samples.length} samples)',
+          imported == 1
+              ? 'Imported 1 scale shot'
+              : 'Imported $imported scale shots',
         ),
         behavior: SnackBarBehavior.floating,
       ),
