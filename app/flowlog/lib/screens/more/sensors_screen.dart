@@ -6,7 +6,11 @@ import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart'
-    show ConnectionState, isPressensorLowBattery, pressensorLowBatteryWarning;
+    show
+        ConnectionState,
+        DecentScaleBleAdapter,
+        isPressensorLowBattery,
+        pressensorLowBatteryWarning;
 import 'package:flutter/material.dart' hide ConnectionState;
 
 /// Sensors pairing and connection management.
@@ -117,6 +121,19 @@ Future<String> _connectMessage({
   required SensorHub hub,
   required PairedSensorEntry device,
 }) async {
+  if (device.kind == SensorKind.scale &&
+      device.state == ConnectionState.connected) {
+    final adapter = hub.activeAdapterFor(SensorKind.scale);
+    if (adapter is DecentScaleBleAdapter) {
+      // Give the first weight packet a moment after connect/LED-on.
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      final rx = adapter.lastWeightReceiveMs;
+      if (rx == null) {
+        return 'Scale BLE connected, but no weight packets yet. '
+            'Stay on Live and wait for grams — or reconnect if it stays blank.';
+      }
+    }
+  }
   return switch (device.state) {
     ConnectionState.connected => device.kind == SensorKind.pressensor
         ? _pressensorConnectedMessage(device.name, hub)
@@ -539,7 +556,10 @@ class _PairedDeviceCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                ConnectionStateChip(state: device.state),
+                ConnectionStateChip(
+                  state: device.state,
+                  detail: _scaleStreamDetail(hub, device),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -551,6 +571,34 @@ class _PairedDeviceCard extends StatelessWidget {
                     ),
               ),
               const SizedBox(height: 8),
+            ],
+            if (device.kind == SensorKind.scale &&
+                device.state == ConnectionState.connected) ...[
+              Builder(
+                builder: (context) {
+                  final detail = _scaleStreamDetail(hub, device);
+                  if (detail == null) {
+                    return const SizedBox.shrink();
+                  }
+                  final warn = detail.contains('no weight');
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      detail,
+                      key: Key('scale_stream_status_${device.id}'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: warn
+                                ? Theme.of(context).colorScheme.error
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                            fontWeight:
+                                warn ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                    ),
+                  );
+                },
+              ),
             ],
             if (batteryPercent != null &&
                 device.state == ConnectionState.connected) ...[
@@ -601,18 +649,53 @@ class _PairedDeviceCard extends StatelessWidget {
   }
 }
 
+String? _scaleStreamDetail(SensorHub hub, PairedSensorEntry device) {
+  if (device.kind != SensorKind.scale ||
+      device.state != ConnectionState.connected) {
+    return null;
+  }
+  final adapter = hub.activeAdapterFor(SensorKind.scale);
+  if (adapter is! DecentScaleBleAdapter) {
+    return 'Connected — waiting for weight stream';
+  }
+  final rx = adapter.lastWeightReceiveMs;
+  if (rx == null) {
+    return 'Connected but no weight packets yet';
+  }
+  final ageMs = DateTime.now().millisecondsSinceEpoch - rx;
+  if (ageMs > 2500) {
+    return 'Connected but no weight for ${(ageMs / 1000).toStringAsFixed(0)}s — stream silent';
+  }
+  return 'Weight stream live';
+}
+
 /// Compact chip showing a sensor [ConnectionState] with Flowlog palette tokens.
 class ConnectionStateChip extends StatelessWidget {
-  const ConnectionStateChip({super.key, required this.state});
+  const ConnectionStateChip({
+    super.key,
+    required this.state,
+    this.detail,
+  });
 
   final ConnectionState state;
+
+  /// Optional scale stream hint; when it mentions "no weight", chip turns warning.
+  final String? detail;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final (label, background, foreground) = _styleForState(scheme, state);
+    final silent = detail != null && detail!.contains('no weight');
+    final (label, background, foreground) = silent
+        ? (
+            'No weight',
+            scheme.errorContainer,
+            scheme.onErrorContainer,
+          )
+        : _styleForState(scheme, state);
 
     return Container(
+      key: silent ? const Key('connection_chip_no_weight') : null,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: background,

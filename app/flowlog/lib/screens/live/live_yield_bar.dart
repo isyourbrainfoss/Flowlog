@@ -26,6 +26,21 @@ Future<void> playYieldWarnCue({
   await (onHaptic ?? HapticFeedback.mediumImpact)();
 }
 
+/// Whether cup weight is live, silent while scale is linked, or not expected.
+enum WeightStreamHealth {
+  /// Recent weight sample.
+  live,
+
+  /// Scale BLE says connected but no fresh weight packets.
+  linkedNoWeight,
+
+  /// Scale paired but BLE not connected.
+  disconnected,
+
+  /// No scale paired — missing weight is normal.
+  notExpected,
+}
+
 /// Live cup weight with a fill bar toward the target yield.
 ///
 /// Shows a large gram readout, progress toward [targetYieldG], a mark at the
@@ -38,6 +53,8 @@ class LiveYieldProgress extends StatelessWidget {
     this.showWarnBanner = false,
     this.height = 12,
     this.compact = false,
+    this.weightHealth = WeightStreamHealth.notExpected,
+    this.onRearmWeight,
     super.key,
   });
 
@@ -50,6 +67,12 @@ class LiveYieldProgress extends StatelessWidget {
   /// Denser layout for immersive brew (still large digits, less padding).
   final bool compact;
 
+  /// When [linkedNoWeight], digits use error styling and a warning row shows.
+  final WeightStreamHealth weightHealth;
+
+  /// Optional recovery action when the stream is silent.
+  final VoidCallback? onRearmWeight;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -60,16 +83,68 @@ class LiveYieldProgress extends StatelessWidget {
     final progress = weight == null ? 0.0 : (weight / target).clamp(0.0, 1.0);
     final atWarn = weight != null && weight >= warn;
     final atTarget = weight != null && weight >= target;
-    final fillColor = atTarget
-        ? cs.tertiary
+    final noStream = weightHealth == WeightStreamHealth.linkedNoWeight;
+    final fillColor = noStream
+        ? cs.error
+        : atTarget
+            ? cs.tertiary
+            : atWarn
+                ? cs.secondary
+                : cs.primary;
+    final digitColor = noStream
+        ? cs.error
         : atWarn
             ? cs.secondary
-            : cs.primary;
+            : cs.onSurface;
+    final weightText = weight != null
+        ? '${weight.toStringAsFixed(1)} g'
+        : noStream
+            ? 'No weight'
+            : weightHealth == WeightStreamHealth.disconnected
+                ? 'Scale off'
+                : '— g';
 
     return Column(
       key: const Key('live_yield_progress'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (noStream) ...[
+          Material(
+            key: const Key('live_yield_no_weight_banner'),
+            color: cs.errorContainer,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(Icons.scale, color: cs.onErrorContainer),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Scale shows connected but is not sending weight.\n'
+                      'Yield will not update until the stream is live again.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: cs.onErrorContainer,
+                        fontWeight: FontWeight.w600,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                  if (onRearmWeight != null)
+                    TextButton(
+                      key: const Key('live_yield_rearm_weight'),
+                      onPressed: onRearmWeight,
+                      style: TextButton.styleFrom(
+                        foregroundColor: cs.onErrorContainer,
+                      ),
+                      child: const Text('Refresh'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (showWarnBanner) ...[
           Material(
             key: const Key('live_yield_warn_banner'),
@@ -109,7 +184,7 @@ class LiveYieldProgress extends StatelessWidget {
             ),
             const Spacer(),
             Text(
-              weight == null ? '— g' : '${weight.toStringAsFixed(1)} g',
+              weightText,
               key: const Key('live_yield_weight_digit'),
               style: (compact
                       ? theme.textTheme.headlineSmall
@@ -118,7 +193,7 @@ class LiveYieldProgress extends StatelessWidget {
                 fontFeatures: const [FontFeature.tabularFigures()],
                 fontWeight: FontWeight.w700,
                 height: 1.0,
-                color: atWarn ? cs.secondary : cs.onSurface,
+                color: digitColor,
               ),
             ),
             const SizedBox(width: 8),

@@ -229,20 +229,50 @@ class LiveSensorSource {
   }
 
   Future<void> _prepareDecentScale(DecentScaleBleAdapter scale) async {
-    // One tare only — LED-on + retries made the DIY scale beep several times
-    // and felt like "the scale started a brew" instead of the phone.
+    // Always re-assert LED-on so FFF4 weight notifies resume. A "connected"
+    // hub link with a quiet notify stream shows "—" weight mid-brew.
     try {
+      await scale.ledOn();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       await scale.tare();
     } on Object {
       try {
         await scale.ledOn();
-        await Future<void>.delayed(const Duration(milliseconds: 120));
+        await Future<void>.delayed(const Duration(milliseconds: 150));
         await scale.tare();
       } on Object {
         rethrow;
       }
     }
   }
+
+  /// Re-sends LED-on so weight packets resume without taring again mid-shot.
+  Future<void> rearmWeightStream() async {
+    if (_demoMode) {
+      return;
+    }
+    final scale = _connectedScaleAdapter();
+    if (scale == null) {
+      return;
+    }
+    try {
+      await scale.ledOn();
+    } on Object {
+      // Best-effort recovery.
+    }
+  }
+
+  /// True when a scale is paired and the hub reports it connected.
+  bool get scaleLinkConnected {
+    if (_demoMode) {
+      return false;
+    }
+    return hub.scaleState == ConnectionState.connected &&
+        hub.hasKind(SensorKind.scale);
+  }
+
+  /// True when a scale is paired (any link state).
+  bool get scalePaired => hub.hasKind(SensorKind.scale);
 
   DecentScaleBleAdapter? _connectedScaleAdapter() {
     if (_demoMode) {

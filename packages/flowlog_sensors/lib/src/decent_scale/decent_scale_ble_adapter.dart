@@ -49,9 +49,14 @@ class DecentScaleBleAdapter implements SensorAdapter {
   Timer? _heartbeatTimer;
   int? _streamStartMs;
   int _lastCommandSentMs = 0;
+  /// Host receive time of the last parsed weight packet (ms since epoch).
+  int? _lastWeightReceiveMs;
   /// Serializes outbound writes so heartbeat + pressure forward cannot race.
   Future<void> _writeQueue = Future<void>.value();
   bool _writeInFlight = false;
+
+  /// Monotonic host ms of the last weight sample, if any this session.
+  int? get lastWeightReceiveMs => _lastWeightReceiveMs;
 
   @override
   Stream<ConnectionState> get state => _stateController.stream;
@@ -218,6 +223,7 @@ class DecentScaleBleAdapter implements SensorAdapter {
     if (reading == null) return;
 
     final receiveMs = _monotonicClock();
+    _lastWeightReceiveMs = receiveMs;
     final startMs = _streamStartMs ?? receiveMs;
     final elapsedMs = receiveMs - startMs;
 

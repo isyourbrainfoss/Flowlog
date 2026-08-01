@@ -144,7 +144,11 @@ class _LiveScreenState extends State<LiveScreen> {
 
   late final ValueNotifier<double?> _livePressureNotifier;
   late final ValueNotifier<DateTime?> _livePressureLastUpdate;
+  late final ValueNotifier<double?> _liveWeightNotifier;
+  late final ValueNotifier<DateTime?> _liveWeightLastUpdate;
   DateTime _lastSamplesUpdate = DateTime.now();
+  /// One automatic weight-stream re-arm per brew when the scale is silent.
+  bool _weightRearmAttempted = false;
 
   @override
   void initState() {
@@ -156,6 +160,8 @@ class _LiveScreenState extends State<LiveScreen> {
     _samplesNotifier = ValueNotifier<List<ShotSample>>(const []);
     _livePressureNotifier = ValueNotifier<double?>(null);
     _livePressureLastUpdate = ValueNotifier<DateTime?>(null);
+    _liveWeightNotifier = ValueNotifier<double?>(null);
+    _liveWeightLastUpdate = ValueNotifier<DateTime?>(null);
     _annotationController = ShotAnnotationController();
     _annotationsNotifier = ValueNotifier<List<ShotAnnotation>>(
       List<ShotAnnotation>.from(_annotationController.annotations),
@@ -322,6 +328,10 @@ class _LiveScreenState extends State<LiveScreen> {
     _annotationsNotifier.dispose();
     _ownedAutoStartController.dispose();
     _samplesNotifier.dispose();
+    _livePressureNotifier.dispose();
+    _livePressureLastUpdate.dispose();
+    _liveWeightNotifier.dispose();
+    _liveWeightLastUpdate.dispose();
     _autoStopTimer?.cancel();
     _brewCompleteDismissTimer?.cancel();
     if (_ownsController) {
@@ -370,8 +380,130 @@ class _LiveScreenState extends State<LiveScreen> {
       _lastSamplesUpdate = now;
     }
 
+    _trackLiveWeight(controller);
     _checkAutoStop(controller);
     _maybeFireYieldWarn(controller);
+  }
+
+  /// How long a weight sample stays "live" before the UI treats the scale as silent.
+  static const _weightFreshWindow = Duration(seconds: 2);
+
+  void _trackLiveWeight(LiveShotController controller) {
+    final samples = controller.samples;
+    if (samples.isEmpty) {
+      _maybeRearmSilentScale(controller);
+      return;
+    }
+    // Prefer the true BLE receive time from the hub scale adapter. Merged
+    // samples carry the last weight on every pressure tick, so sample.weightG
+    // alone cannot prove the scale is still streaming.
+    final hub = _sensorHub ?? SensorHubScope.maybeOf(context);
+    final adapter = hub?.activeAdapterFor(SensorKind.scale);
+    if (adapter is DecentScaleBleAdapter) {
+      final rxMs = adapter.lastWeightReceiveMs;
+      if (rxMs != null) {
+        final age = DateTime.now().millisecondsSinceEpoch - rxMs;
+        if (age <= _weightFreshWindow.inMilliseconds) {
+          // Latest carry-forward weight for display.
+          for (var i = samples.length - 1; i >= 0; i--) {
+            final w = samples[i].weightG;
+            if (w != null) {
+              _liveWeightNotifier.value = w;
+              break;
+            }
+          }
+          _liveWeightLastUpdate.value =
+              DateTime.fromMillisecondsSinceEpoch(rxMs);
+          _weightRearmAttempted = false;
+          return;
+        }
+      }
+    } else {
+      // No hub adapter (tests / factory path): fall back to sample presence.
+      for (var i = samples.length - 1; i >= 0 && i >= samples.length - 3; i--) {
+        final w = samples[i].weightG;
+        if (w != null) {
+          _liveWeightNotifier.value = w;
+          _liveWeightLastUpdate.value = DateTime.now();
+          _weightRearmAttempted = false;
+          _maybeRearmSilentScale(controller);
+          return;
+        }
+      }
+    }
+    _maybeRearmSilentScale(controller);
+  }
+
+  WeightStreamHealth _weightStreamHealth({required bool isBrewing}) {
+    final hub = _sensorHub ?? SensorHubScope.maybeOf(context);
+    final source = _sensorSource;
+    final scalePaired =
+        source?.scalePaired ?? hub?.hasKind(SensorKind.scale) ?? false;
+    if (!scalePaired) {
+      return WeightStreamHealth.notExpected;
+    }
+    final linked = source?.scaleLinkConnected ??
+        (hub?.scaleState == ConnectionState.connected);
+    if (!linked) {
+      return WeightStreamHealth.disconnected;
+    }
+
+    final adapter = hub?.activeAdapterFor(SensorKind.scale);
+    if (adapter is DecentScaleBleAdapter) {
+      final rxMs = adapter.lastWeightReceiveMs;
+      if (rxMs != null) {
+        final age = DateTime.now().millisecondsSinceEpoch - rxMs;
+        if (age <= _weightFreshWindow.inMilliseconds) {
+          return WeightStreamHealth.live;
+        }
+      }
+      // Linked, but no recent FFF4 weight packets.
+      if (isBrewing || rxMs == null) {
+        return WeightStreamHealth.linkedNoWeight;
+      }
+      return WeightStreamHealth.linkedNoWeight;
+    }
+
+    final last = _liveWeightLastUpdate.value;
+    if (last != null &&
+        DateTime.now().difference(last) <= _weightFreshWindow) {
+      return WeightStreamHealth.live;
+    }
+    return isBrewing
+        ? WeightStreamHealth.linkedNoWeight
+        : WeightStreamHealth.linkedNoWeight;
+  }
+
+  void _maybeRearmSilentScale(LiveShotController controller) {
+    if (!controller.isBrewing || _weightRearmAttempted) {
+      return;
+    }
+    if (_weightStreamHealth(isBrewing: true) !=
+        WeightStreamHealth.linkedNoWeight) {
+      return;
+    }
+    // Give the stream a moment after start before treating silence as a fault.
+    final started = controller.sessionStartedAt;
+    if (started != null &&
+        DateTime.now().difference(started) < const Duration(seconds: 2)) {
+      return;
+    }
+    _weightRearmAttempted = true;
+    unawaited(_sensorSource?.rearmWeightStream());
+  }
+
+  Future<void> _onRearmWeightPressed() async {
+    await _sensorSource?.rearmWeightStream();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          key: Key('weight_stream_rearm_snackbar'),
+          content: Text('Refreshing scale weight stream…'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _maybeFireYieldWarn(LiveShotController controller) {
@@ -486,6 +618,8 @@ class _LiveScreenState extends State<LiveScreen> {
     // showing a stale "last" value while reconnect is in progress.
     _livePressureNotifier.value = null;
     _livePressureLastUpdate.value = null;
+    _liveWeightNotifier.value = null;
+    _liveWeightLastUpdate.value = null;
 
     final hub = SensorHubScope.maybeOf(context);
     if (hub == null) {
@@ -632,6 +766,9 @@ class _LiveScreenState extends State<LiveScreen> {
       _autoSavedCurrent = false;
       _lastAutoSavedShotId = null;
       _yieldWarnFired = false;
+      _weightRearmAttempted = false;
+      _liveWeightNotifier.value = null;
+      _liveWeightLastUpdate.value = null;
       // Re-enable live follow for the new pull.
       _chartInteractionController.resetViewport();
       // Reload brew defaults so yield target/warn edits apply to this shot.
@@ -989,12 +1126,18 @@ class _LiveScreenState extends State<LiveScreen> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 LiveYieldProgress(
-                                  weightG: latestSample?.weightG,
+                                  weightG: latestSample?.weightG ??
+                                      _liveWeightNotifier.value,
                                   targetYieldG: targetYield,
                                   warnAtG: warnAt,
                                   showWarnBanner: false,
                                   compact: true,
                                   height: 10,
+                                  weightHealth: _weightStreamHealth(
+                                    isBrewing: true,
+                                  ),
+                                  onRearmWeight: () =>
+                                      unawaited(_onRearmWeightPressed()),
                                 ),
                                 const SizedBox(height: 6),
                                 LivePressureDeviationBar(
@@ -1108,10 +1251,18 @@ class _LiveScreenState extends State<LiveScreen> {
                           ),
                           const SizedBox(height: 8),
                           LiveYieldProgress(
-                            weightG: latestSample.weightG,
+                            weightG: latestSample.weightG ??
+                                _liveWeightNotifier.value,
                             targetYieldG: targetYield,
                             warnAtG: warnAt,
                             showWarnBanner: false,
+                            weightHealth: _weightStreamHealth(
+                              isBrewing:
+                                  state == ShotSessionState.recording ||
+                                      state == ShotSessionState.paused,
+                            ),
+                            onRearmWeight: () =>
+                                unawaited(_onRearmWeightPressed()),
                           ),
                           const SizedBox(height: 6),
                           LivePressureDeviationBar(
