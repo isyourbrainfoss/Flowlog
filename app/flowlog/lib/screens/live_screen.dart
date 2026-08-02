@@ -518,7 +518,18 @@ class _LiveScreenState extends State<LiveScreen> {
     if (samples.isEmpty) {
       return;
     }
-    final weight = samples.last.weightG;
+    // Prefer freshest known weight (merged samples may end on a pressure-only
+    // tick with null weight if the scale stream is flaky).
+    double? weight = samples.last.weightG ?? _liveWeightNotifier.value;
+    if (weight == null) {
+      for (var i = samples.length - 1; i >= 0 && i >= samples.length - 12; i--) {
+        final w = samples[i].weightG;
+        if (w != null) {
+          weight = w;
+          break;
+        }
+      }
+    }
     if (!shouldFireYieldWarn(
       weightG: weight,
       warnAtG: defaults.effectiveYieldWarnAtG,
@@ -529,10 +540,21 @@ class _LiveScreenState extends State<LiveScreen> {
     }
 
     _yieldWarnFired = true;
-    if (mounted) {
-      // Banner UI disabled in immersive brew; haptic/sound still fire above.
-    }
     unawaited(playYieldWarnCue());
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          key: const Key('yield_warn_snackbar'),
+          content: Text(
+            'Near target — wind back now '
+            '(${weight!.toStringAsFixed(0)} g / '
+            '${defaults.targetYieldG.toStringAsFixed(0)} g)',
+          ),
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _checkAutoStop(LiveShotController controller) {

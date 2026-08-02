@@ -18,12 +18,36 @@ bool shouldFireYieldWarn({
 }
 
 /// Plays a short pleasant cue for the yield early-stop heads-up.
+///
+/// Uses strong haptics first — [SystemSound] alone is often silent on Android
+/// when media/ring volume is low or the device is in vibrate mode.
 Future<void> playYieldWarnCue({
   Future<void> Function()? onSound,
   Future<void> Function()? onHaptic,
 }) async {
-  await (onSound ?? () => SystemSound.play(SystemSoundType.alert))();
-  await (onHaptic ?? HapticFeedback.mediumImpact)();
+  if (onHaptic != null) {
+    await onHaptic();
+  } else {
+    await HapticFeedback.heavyImpact();
+    await Future<void>.delayed(const Duration(milliseconds: 60));
+    await HapticFeedback.mediumImpact();
+  }
+  if (onSound != null) {
+    await onSound();
+    return;
+  }
+  // Two system clicks are more likely to be audible than a single alert.
+  try {
+    await SystemSound.play(SystemSoundType.alert);
+  } on Object {
+    // ignore platform sound failures
+  }
+  try {
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+    await SystemSound.play(SystemSoundType.click);
+  } on Object {
+    // ignore
+  }
 }
 
 /// Whether cup weight is live, silent while scale is linked, or not expected.
