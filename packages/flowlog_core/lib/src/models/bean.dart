@@ -2,84 +2,124 @@ import 'dart:convert';
 
 import 'package:meta/meta.dart';
 
-/// Repairs common UTF-8 mojibake in user-entered text (e.g. from AI/clipboard).
-/// Handles repeated patterns like "ÃÂ..." from mis-encoded Norwegian/special chars.
+/// Repairs UTF-8 mojibake in user-entered text (AI/clipboard/sync).
+///
+/// Typical corruption path (can repeat many times):
+///   "ø" → UTF-8 bytes C3 B8 read as Latin-1 → "Ã¸" → re-encoded again…
+/// after N rounds the string is thousands of `ÃÂ…` chars (see Flatpak DB
+/// beans like "Oslo Mørkbrent" / "José Espinoza").
+///
+/// Strategy:
+/// 1. Prefer repeated latin1→utf8 decoding while the string shrinks / gets
+///    cleaner (this undoes multi-layer double-encoding losslessly).
+/// 2. Only then apply phrase-level fixes for known Norwegian words.
+/// 3. Never blindly strip every Ã/Â or map them all to ø (that turns
+///    "MÃ¸rkbrent" into "M¸rkbrent" and destroys recoverable data).
 String? repairMojibake(String? text) {
   if (text == null || text.isEmpty) return text;
 
-  String current = text;
+  var current = text;
 
-  // Fast exit only if no obvious mojibake markers at all
-  final hasMarkers = current.contains('\u00c3') ||
-      current.contains('\u00c2') ||
-      current.contains('\uFFFD') ||
-      current.contains('Ã') ||
-      current.contains('Â');
-  if (!hasMarkers) {
+  // Phrase fixes first (cheap, safe) for cases where ø was destroyed to ¸.
+  current = _applyPhraseFixes(current);
+
+  if (!_looksLikeMojibake(current)) {
     return current;
   }
 
-  // Strong context-specific fix for the "kaffebønner" (and similar) pattern FIRST,
-  // using the mojibake markers in the regex to identify and replace the junk section.
-  if (current.toLowerCase().contains('kaffeb') && current.toLowerCase().contains('nner')) {
-    current = current.replaceAllMapped(
-      RegExp(r'(kaffeb)[\p{L}\p{M}\u00c3\u00c2\u00f8\u00e6\u00e5ÃÂ\uFFFD\W_]+(nner)', caseSensitive: false, unicode: true),
-      (m) => '${m[1]}ø${m[2]}',
-    );
-  }
-
-  // Remove replacement chars and raw mojibake byte markers aggressively (after phrase fixes)
-  current = current.replaceAll('\uFFFD', '');
-  current = current.replaceAll(RegExp(r'[\u00c3\u00c2ÃÂ]{1,}'), '');
-
-  // Direct collapse of repeated mojibake sequences to ø (common for ø)
-  current = current.replaceAll(RegExp(r'(\u00c3\u00c2|ÃÂ|ÃÂ¸|Ãø)+', caseSensitive: false), 'ø');
-
-  // Common explicit mojibake replacements (order matters)
-  current = current
-      .replaceAll(RegExp(r'Ãø|ÃÂ¸|\u00c3\u00f8|\u00c3\u00c2\u00b8', caseSensitive: false), 'ø')
-      .replaceAll(RegExp(r'Ãæ|\u00c3\u00e6', caseSensitive: false), 'æ')
-      .replaceAll(RegExp(r'Ãå|\u00c3\u00e5', caseSensitive: false), 'å')
-      .replaceAll(RegExp(r'Ã|Â', caseSensitive: false), 'ø');
-
-  // Multiple latin1->utf8 roundtrips, always prefer cleaner result (fewer mojibake markers, more high chars)
-  String best = current;
-  int bestBadCount = _countMojibakeMarkers(best);
-  for (var i = 0; i < 4; i++) {
+  // 1) Undo multi-layer "UTF-8 bytes as Latin-1" corruption.
+  var best = current;
+  var bestScore = _mojibakeScore(best);
+  for (var i = 0; i < 16; i++) {
     try {
       final bytes = latin1.encode(current);
       final repaired = utf8.decode(bytes, allowMalformed: true);
-      if (repaired != current) {
-        final repairedBad = _countMojibakeMarkers(repaired);
-        if (repairedBad < bestBadCount ||
-            (repairedBad == bestBadCount && repaired.runes.where((r) => r > 127).length > best.runes.where((r) => r > 127).length)) {
-          best = repaired;
-          bestBadCount = repairedBad;
-        }
-        current = repaired;
+      if (repaired == current) {
+        break;
       }
-    } catch (_) {
+      final score = _mojibakeScore(repaired);
+      // Prefer fewer markers; on ties prefer shorter (layer peel) then more
+      // legitimate high-bit letters.
+      if (score < bestScore ||
+          (score == bestScore && repaired.length < best.length) ||
+          (score == bestScore &&
+              repaired.length == best.length &&
+              _countLettersAbove127(repaired) > _countLettersAbove127(best))) {
+        best = repaired;
+        bestScore = score;
+      }
+      current = repaired;
+      if (!_looksLikeMojibake(current)) {
+        break;
+      }
+    } on ArgumentError {
+      // latin1.encode throws if any code unit > 255.
+      break;
+    } on Object {
       break;
     }
   }
   current = best;
 
-  // Final sweep: remove any leftover bad sequences
-  current = current.replaceAll(RegExp(r'[\u00c3\u00c2\uFFFDÃÂ]{2,}'), '');
-
-  // One last phrase fix in case anything survived
-  if (current.toLowerCase().contains('kaffeb') && current.toLowerCase().contains('nner')) {
-    current = current.replaceAllMapped(
-      RegExp(r'kaffeb[\p{L}\p{M}\u00c3\u00c2\uFFFDÃÂ\W]+nner', caseSensitive: false, unicode: true),
-      (_) => 'kaffebønner',
-    );
+  // 2) Replacement-char only gaps (clipboard dropped bytes).
+  if (current.contains('\uFFFD')) {
+    current = current.replaceAll('\uFFFD', '');
   }
 
+  // 3) Phrase fixes again after peeling layers.
+  current = _applyPhraseFixes(current);
+
+  // 4) If still a long run of mojibake markers between letters, drop the run.
+  current = current.replaceAll(
+    RegExp(r'[\u00c3\u00c2ÃÂ]{4,}'),
+    '',
+  );
+
+  // Collapse whitespace left by stripping.
+  current = current.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
   return current;
+}
+
+String _applyPhraseFixes(String current) {
+  return current
+      .replaceAll(RegExp(r'M[\u00b8]rkbrent', caseSensitive: false), 'Mørkbrent')
+      .replaceAll(
+        RegExp(r'kaffeb[\u00b8]?nner', caseSensitive: false),
+        'kaffebønner',
+      );
+}
+
+bool _looksLikeMojibake(String s) {
+  if (s.contains('\uFFFD')) return true;
+  // Multi-layer growth leaves many U+00C3 (Ã) / U+00C2 (Â).
+  final markers = _countMojibakeMarkers(s);
+  if (markers >= 2) return true;
+  // Single-layer classic: "Ã¸" "Ã©" etc.
+  if (s.contains('Ã') || s.contains('Â')) return true;
+  return false;
+}
+
+int _mojibakeScore(String s) {
+  // Weighted: long marker runs are much worse than a single accented letter.
+  final markers = _countMojibakeMarkers(s);
+  final runBonus = RegExp(r'[\u00c3\u00c2ÃÂ]{3,}')
+      .allMatches(s)
+      .fold<int>(0, (sum, m) => sum + m.group(0)!.length);
+  return markers * 2 + runBonus * 3 + (s.length > 80 ? s.length ~/ 10 : 0);
 }
 
 int _countMojibakeMarkers(String s) {
   return RegExp(r'[\u00c3\u00c2\uFFFDÃÂ]').allMatches(s).length;
+}
+
+int _countLettersAbove127(String s) {
+  var n = 0;
+  for (final r in s.runes) {
+    if (r > 127 && r != 0xC2 && r != 0xC3 && r != 0xFFFD) {
+      n++;
+    }
+  }
+  return n;
 }
 
 /// Coffee processing methods for bean inventory.
@@ -128,15 +168,15 @@ class Bean {
   factory Bean.fromJson(Map<String, dynamic> json) {
     return Bean(
       id: json['id'] as String,
-      name: json['name'] as String,
-      brand: json['brand'] as String?,
-      origin: json['origin'] as String?,
+      name: repairMojibake(json['name'] as String?) ?? '',
+      brand: repairMojibake(json['brand'] as String?),
+      origin: repairMojibake(json['origin'] as String?),
       roastLevel: json['roastLevel'] as String?,
       roastDate: json['roastDate'] == null
           ? null
           : DateTime.parse(json['roastDate'] as String).toUtc(),
       process: json['process'] as String?,
-      variety: json['variety'] as String?,
+      variety: repairMojibake(json['variety'] as String?),
       stockG: (json['stockG'] as num?)?.toDouble(),
       notes: repairMojibake(json['notes'] as String?),
     );
@@ -183,6 +223,22 @@ class Bean {
     );
   }
 
+  /// Returns a copy with [repairMojibake] applied to all free-text fields.
+  Bean repaired() {
+    return Bean(
+      id: id,
+      name: repairMojibake(name) ?? name,
+      brand: repairMojibake(brand),
+      origin: repairMojibake(origin),
+      roastLevel: roastLevel,
+      roastDate: roastDate,
+      process: process,
+      variety: repairMojibake(variety),
+      stockG: stockG,
+      notes: repairMojibake(notes),
+    );
+  }
+
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
@@ -214,8 +270,5 @@ class Bean {
       );
 
   @override
-  String toString() =>
-      'Bean(id: $id, name: $name, brand: $brand, origin: $origin, roastLevel: $roastLevel, '
-      'roastDate: $roastDate, process: $process, variety: $variety, '
-      'stockG: $stockG, notes: $notes)';
+  String toString() => 'Bean(id: $id, name: $name, brand: $brand)';
 }

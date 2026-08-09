@@ -3,7 +3,6 @@ import 'package:meta/meta.dart';
 
 import '../models/bean.dart' as models;
 import '../models/bean.dart' show repairMojibake;
-import '../models/bean.dart' show repairMojibake;
 import 'flowlog_database.dart';
 
 /// Bean with the number of shots linked via [models.Bean.id].
@@ -24,15 +23,17 @@ class BeanRepository {
 
   final FlowlogDatabase _db;
 
-  /// Inserts or replaces a bean.
+  /// Inserts or replaces a bean (text fields are mojibake-repaired first).
   Future<void> upsertBean(models.Bean bean) async {
-    await _db.into(_db.beans).insertOnConflictUpdate(_beanToCompanion(bean));
+    final clean = bean.repaired();
+    await _db.into(_db.beans).insertOnConflictUpdate(_beanToCompanion(clean));
   }
 
-  /// Updates an existing bean.
+  /// Updates an existing bean (text fields are mojibake-repaired first).
   Future<void> updateBean(models.Bean bean) async {
-    await (_db.update(_db.beans)..where((row) => row.id.equals(bean.id)))
-        .write(_beanToCompanion(bean));
+    final clean = bean.repaired();
+    await (_db.update(_db.beans)..where((row) => row.id.equals(clean.id)))
+        .write(_beanToCompanion(clean));
   }
 
   /// Deletes a bean by id.
@@ -97,15 +98,15 @@ class BeanRepository {
 
     final bean = models.Bean(
       id: 'bean-${DateTime.now().toUtc().millisecondsSinceEpoch}',
-      name: trimmed,
-      brand: brand,
+      name: repairMojibake(trimmed) ?? trimmed,
+      brand: repairMojibake(brand),
       roastDate: roastDate,
-      origin: origin,
+      origin: repairMojibake(origin),
       roastLevel: roastLevel,
       process: process,
-      variety: variety,
+      variety: repairMojibake(variety),
       stockG: stockG,
-      notes: notes,
+      notes: repairMojibake(notes),
     );
     await upsertBean(bean);
     return bean;
@@ -224,13 +225,13 @@ class BeanRepository {
   models.Bean _beanFromRow(BeanRow row) {
     return models.Bean(
       id: row.id,
-      name: row.name,
-      brand: row.brand,
-      origin: row.origin,
+      name: repairMojibake(row.name) ?? row.name,
+      brand: repairMojibake(row.brand),
+      origin: repairMojibake(row.origin),
       roastLevel: row.roastLevel,
       roastDate: row.roastDate,
       process: row.process,
-      variety: row.variety,
+      variety: repairMojibake(row.variety),
       stockG: row.stockG,
       notes: repairMojibake(row.notes),
     );

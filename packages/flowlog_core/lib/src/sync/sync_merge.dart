@@ -103,13 +103,27 @@ Future<SyncMergeResult> mergeSyncPayloadFromRemote({
 
   for (final bean in payload.beans) {
     final local = await beanRepository.getBeanById(bean.id);
-    if (local == null ||
-        remoteExportedAt.isAfter(
-          local.roastDate ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
-        )) {
-      // Merge notes intelligently to protect local fixes from remote mojibake
-      final mergedNotes = _mergeBeanNotes(local?.notes, bean.notes);
-      await beanRepository.upsertBean(bean.copyWith(notes: mergedNotes));
+    final remote = bean.repaired();
+    if (local == null) {
+      await beanRepository.upsertBean(remote);
+      beansMerged++;
+      continue;
+    }
+    // Prefer the cleaner free-text fields so remote multi-layer mojibake
+    // cannot overwrite a fixed local name (or vice versa).
+    final merged = local.copyWith(
+      name: _preferCleanerText(local.name, remote.name) ?? local.name,
+      brand: _preferCleanerText(local.brand, remote.brand),
+      origin: _preferCleanerText(local.origin, remote.origin),
+      variety: _preferCleanerText(local.variety, remote.variety),
+      notes: _mergeBeanNotes(local.notes, remote.notes),
+      roastLevel: remote.roastLevel ?? local.roastLevel,
+      roastDate: remote.roastDate ?? local.roastDate,
+      process: remote.process ?? local.process,
+      stockG: remote.stockG ?? local.stockG,
+    );
+    if (merged != local) {
+      await beanRepository.upsertBean(merged);
       beansMerged++;
     }
   }
@@ -338,6 +352,24 @@ String? _mergeText(String? primary, String? secondary) {
     return b;
   }
   return null;
+}
+
+/// Prefer the string with fewer mojibake markers; ties keep [local].
+String? _preferCleanerText(String? local, String? remote) {
+  final l = repairMojibake(local?.trim());
+  final r = repairMojibake(remote?.trim());
+  final lEmpty = l == null || l.isEmpty;
+  final rEmpty = r == null || r.isEmpty;
+  if (lEmpty && rEmpty) return null;
+  if (lEmpty) return r;
+  if (rEmpty) return l;
+  final lBad = RegExp(r'[\u00c3\u00c2\uFFFDÃÂ]').allMatches(l!).length;
+  final rBad = RegExp(r'[\u00c3\u00c2\uFFFDÃÂ]').allMatches(r!).length;
+  if (rBad < lBad) return r;
+  if (lBad < rBad) return l;
+  // Same cleanliness: prefer shorter (less double-encoded growth).
+  if (r!.length < l!.length) return r;
+  return l;
 }
 
 /// For bean notes, prefer the version that is non-empty and does not contain

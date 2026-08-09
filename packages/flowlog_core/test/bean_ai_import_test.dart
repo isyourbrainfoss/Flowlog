@@ -97,33 +97,42 @@ Here is the bean info:
   });
 
   group('repairMojibake', () {
-    test('fixes the reported kaffebønner mojibake pattern', () {
-      // Construct using bytes to simulate exact stored mojibake regardless of source encoding
-      final mojibakeSeq = [0xC3, 0xC2]; // bytes for ÃÂ in latin1 view
-      final badBytes = utf8.encode('En blanding av sesongens beste kaffeb') +
-          List<int>.generate(30 * 2, (i) => mojibakeSeq[i % 2]) +
-          utf8.encode('nner brent til espresso. Floral og fruktig.');
-      final bad = utf8.decode(badBytes, allowMalformed: true);
-      final fixed = repairMojibake(bad);
-      expect(fixed, contains('kaffeb\u00f8nner'));
-      expect(fixed, isNot(contains('\u00c3')));
-    });
-
-    test('is idempotent on clean text', () {
-      const clean = 'kaffeb\u00f8nner with special chars';
+    test('is idempotent on clean Norwegian text', () {
+      const clean = 'Oslo Mørkbrent · kaffebønner · José';
       final fixed = repairMojibake(clean);
       expect(fixed, clean);
-      expect(fixed, isNot(contains('\u00c3')));
     });
 
-    test('strips heavy replacement char mojibake and fixes kaffebønner', () {
-      final bad = 'En blanding av sesongens beste kaffeb' +
-          '\uFFFD\uFFFD\uFFFD\uFFFD\uFFFD' * 20 +
-          'nner brent til espresso. Floral og fruktig espresso med god fylde.';
+    test('undoes multi-layer double-encoding of Mørkbrent (7 rounds)', () {
+      // Exactly the corruption found in the Flatpak DB for KAFFA Oslo Mørkbrent.
+      var bad = 'Oslo Mørkbrent';
+      for (var i = 0; i < 7; i++) {
+        bad = latin1.decode(utf8.encode(bad));
+      }
+      expect(bad.length, 141);
       final fixed = repairMojibake(bad);
-      expect(fixed, contains('kaffeb\u00f8nner'));
-      expect(fixed, isNot(contains('\uFFFD')));
-      expect(fixed, isNot(contains('\u00c3')));
+      expect(fixed, 'Oslo Mørkbrent');
+    });
+
+    test('undoes multi-layer double-encoding of José Espinoza', () {
+      var bad = 'José Espinoza, Huila';
+      for (var i = 0; i < 11; i++) {
+        bad = latin1.decode(utf8.encode(bad));
+      }
+      expect(bad.length, greaterThan(1000));
+      final fixed = repairMojibake(bad);
+      expect(fixed, 'José Espinoza, Huila');
+    });
+
+    test('fixes single-layer Ã¸ style mojibake', () {
+      final fixed = repairMojibake('Oslo MÃ¸rkbrent');
+      expect(fixed, 'Oslo Mørkbrent');
+    });
+
+    test('repairs notes that had ø stripped to ¸', () {
+      final fixed = repairMojibake('M¸rkbrent / Espresso. kaffeb¸nner mix.');
+      expect(fixed, contains('Mørkbrent'));
+      expect(fixed, contains('kaffebønner'));
     });
 
     test('returns empty when input is only mojibake garbage', () {
