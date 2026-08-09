@@ -10,7 +10,7 @@ import 'encrypted_sync_blob.dart';
 import 'sync_config.dart';
 
 /// Current [SyncPayload] schema version (embedded in exported backups).
-const syncPayloadVersion = 3;
+const syncPayloadVersion = 4;
 
 /// Oldest [SyncPayload.version] this app can import.
 const minSyncPayloadVersion = 1;
@@ -30,6 +30,7 @@ class SyncPayload {
     this.beans = const [],
     this.tags = const [],
     this.shotTagLinks = const [],
+    this.deletedShots = const [],
   });
 
   final int version;
@@ -40,6 +41,9 @@ class SyncPayload {
   final List<Bean> beans;
   final List<Tag> tags;
   final List<ShotTagLink> shotTagLinks;
+
+  /// Shot ids intentionally removed (so peers do not re-import them).
+  final List<DeletedShotRef> deletedShots;
 
   factory SyncPayload.fromJson(Map<String, dynamic> json) {
     final version = json['version'] as int;
@@ -84,6 +88,15 @@ class SyncPayload {
                   .toList() ??
               const []
           : const [],
+      deletedShots: version >= 4
+          ? (json['deletedShots'] as List<dynamic>?)
+                  ?.map(
+                    (entry) =>
+                        DeletedShotRef.fromJson(entry as Map<String, dynamic>),
+                  )
+                  .toList() ??
+              const []
+          : const [],
     );
   }
 
@@ -100,6 +113,9 @@ class SyncPayload {
         'tags': tags.map((tag) => tag.toJson()).toList(),
         'shotTagLinks': shotTagLinks.map((link) => link.toJson()).toList(),
       },
+      if (version >= 4)
+        'deletedShots':
+            deletedShots.map((entry) => entry.toJson()).toList(),
     };
   }
 
@@ -114,7 +130,8 @@ class SyncPayload {
             _listEquals(profiles, other.profiles) &&
             _listEquals(beans, other.beans) &&
             _listEquals(tags, other.tags) &&
-            _listEquals(shotTagLinks, other.shotTagLinks);
+            _listEquals(shotTagLinks, other.shotTagLinks) &&
+            _listEquals(deletedShots, other.deletedShots);
   }
 
   @override
@@ -127,7 +144,43 @@ class SyncPayload {
         Object.hashAll(beans),
         Object.hashAll(tags),
         Object.hashAll(shotTagLinks),
+        Object.hashAll(deletedShots),
       );
+}
+
+/// A shot intentionally deleted by a device (sync tombstone).
+@immutable
+class DeletedShotRef {
+  const DeletedShotRef({
+    required this.shotId,
+    required this.deletedAt,
+  });
+
+  final String shotId;
+  final DateTime deletedAt;
+
+  factory DeletedShotRef.fromJson(Map<String, dynamic> json) {
+    return DeletedShotRef(
+      shotId: json['shotId'] as String? ?? json['id'] as String,
+      deletedAt: DateTime.parse(json['deletedAt'] as String).toUtc(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'shotId': shotId,
+        'deletedAt': deletedAt.toUtc().toIso8601String(),
+      };
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is DeletedShotRef &&
+            shotId == other.shotId &&
+            deletedAt == other.deletedAt;
+  }
+
+  @override
+  int get hashCode => Object.hash(shotId, deletedAt);
 }
 
 /// Serializes [shots] and [profiles] to JSON and wraps them in a stub

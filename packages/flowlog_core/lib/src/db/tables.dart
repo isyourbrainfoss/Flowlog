@@ -83,6 +83,17 @@ class ShotTags extends Table {
   Set<Column<Object>> get primaryKey => {shotId, tagId};
 }
 
+/// Tombstones for deleted shots so Nextcloud sync does not resurrect them.
+@DataClassName('DeletedShotRow')
+class DeletedShots extends Table {
+  TextColumn get shotId => text()();
+  TextColumn get deletedAt =>
+      text().map(const UtcIso8601Converter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {shotId};
+}
+
 /// Chart markers (channel marks and notes) for a shot.
 @DataClassName('ShotAnnotationRow')
 class ShotAnnotations extends Table {

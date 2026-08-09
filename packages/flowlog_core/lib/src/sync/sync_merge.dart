@@ -144,9 +144,38 @@ Future<SyncMergeResult> mergeSyncPayloadFromRemote({
     }
   }
 
+  // Apply remote deletion tombstones first so we never re-import a shot that
+  // another device intentionally removed.
+  for (final tombstone in payload.deletedShots) {
+    final stillThere = await shotRepository.getShotWithSamples(tombstone.shotId);
+    if (stillThere != null) {
+      await shotRepository.deleteShot(tombstone.shotId);
+      // deleteShot records a tombstone with "now"; keep the earlier remote time.
+      await shotRepository.recordShotDeleted(
+        tombstone.shotId,
+        deletedAt: tombstone.deletedAt,
+      );
+      shotsMerged++;
+    } else {
+      await shotRepository.recordShotDeleted(
+        tombstone.shotId,
+        deletedAt: tombstone.deletedAt,
+      );
+    }
+  }
+
+  final localDeletedIds = {
+    for (final t in await shotRepository.listDeletedShots()) t.shotId,
+  };
+
   final remoteLinksByShotId = _groupShotTagLinks(payload.shotTagLinks);
 
   for (final remoteShot in payload.shots) {
+    // Skip shots we (or a peer) have deleted — otherwise Nextcloud re-adds them.
+    if (localDeletedIds.contains(remoteShot.id)) {
+      continue;
+    }
+
     final local = await shotRepository.getShotWithSamples(remoteShot.id);
     if (!_shouldMergeShot(
       local: local,
@@ -452,6 +481,8 @@ Future<SyncPayload> buildSyncPayloadFromDatabase(
   final beans = await beanRepository.listBeans();
   final tags = await tagRepository.listTags();
   final shotTagLinks = await tagRepository.listAllShotTagLinks();
+  await shotRepository.pruneDeletedShots();
+  final deleted = await shotRepository.listDeletedShots();
 
   return SyncPayload(
     version: syncPayloadVersion,
@@ -462,5 +493,9 @@ Future<SyncPayload> buildSyncPayloadFromDatabase(
     beans: beans,
     tags: tags,
     shotTagLinks: shotTagLinks,
+    deletedShots: [
+      for (final t in deleted)
+        DeletedShotRef(shotId: t.shotId, deletedAt: t.deletedAt),
+    ],
   );
 }

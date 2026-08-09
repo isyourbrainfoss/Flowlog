@@ -18,6 +18,7 @@ part 'flowlog_database.g.dart';
     Beans,
     Tags,
     ShotTags,
+    DeletedShots,
     SavedProfiles,
     SavedProfileSamples,
     ShotTargetSamples,
@@ -27,7 +28,7 @@ class FlowlogDatabase extends _$FlowlogDatabase {
   FlowlogDatabase(super.executor);
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -205,6 +206,9 @@ class FlowlogDatabase extends _$FlowlogDatabase {
           }
           if (from < 17) {
             await m.createTable(shotTargetSamples);
+          }
+          if (from < 18) {
+            await m.createTable(deletedShots);
           }
         },
       );

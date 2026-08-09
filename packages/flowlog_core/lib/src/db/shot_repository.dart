@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:meta/meta.dart';
 
 import '../models/flavour_intensities.dart';
 import '../models/shot.dart' as models;
@@ -10,6 +11,30 @@ import '../models/shot_sample.dart' as models;
 import 'flowlog_database.dart';
 import 'shot_list_filters.dart';
 import 'type_converters.dart';
+
+/// A recorded local (or synced) shot deletion used to prevent resurrection.
+@immutable
+class DeletedShotTombstone {
+  const DeletedShotTombstone({
+    required this.shotId,
+    required this.deletedAt,
+  });
+
+  final String shotId;
+  final DateTime deletedAt;
+
+  factory DeletedShotTombstone.fromJson(Map<String, dynamic> json) {
+    return DeletedShotTombstone(
+      shotId: json['shotId'] as String? ?? json['id'] as String,
+      deletedAt: DateTime.parse(json['deletedAt'] as String).toUtc(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'shotId': shotId,
+        'deletedAt': deletedAt.toUtc().toIso8601String(),
+      };
+}
 
 /// Persists and loads [models.Shot] records with optional samples.
 class ShotRepository {
@@ -405,6 +430,9 @@ class ShotRepository {
   }
 
   /// Deletes a shot and its related samples, annotations, and tag links.
+  ///
+  /// Records a tombstone so Nextcloud sync will not re-import the shot and
+  /// other devices can drop it when they pull the backup.
   Future<void> deleteShot(String id) async {
     await _db.transaction(() async {
       await (_db.delete(_db.shotSamples)
@@ -415,8 +443,61 @@ class ShotRepository {
           .go();
       await (_db.delete(_db.shotTags)..where((row) => row.shotId.equals(id)))
           .go();
+      await (_db.delete(_db.shotTargetSamples)
+            ..where((row) => row.shotId.equals(id)))
+          .go();
       await (_db.delete(_db.shots)..where((shot) => shot.id.equals(id))).go();
+      await _db.into(_db.deletedShots).insertOnConflictUpdate(
+            DeletedShotsCompanion.insert(
+              shotId: id,
+              deletedAt: DateTime.now().toUtc(),
+            ),
+          );
     });
+  }
+
+  /// Whether [id] is in the local deletion tombstone list.
+  Future<bool> isShotDeleted(String id) async {
+    final row = await (_db.select(_db.deletedShots)
+          ..where((t) => t.shotId.equals(id)))
+        .getSingleOrNull();
+    return row != null;
+  }
+
+  /// All known deleted shot ids (for sync export).
+  Future<List<DeletedShotTombstone>> listDeletedShots() async {
+    final rows = await _db.select(_db.deletedShots).get();
+    return [
+      for (final row in rows)
+        DeletedShotTombstone(shotId: row.shotId, deletedAt: row.deletedAt),
+    ];
+  }
+
+  /// Records a tombstone without requiring the shot to still exist.
+  Future<void> recordShotDeleted(
+    String id, {
+    DateTime? deletedAt,
+  }) async {
+    await _db.into(_db.deletedShots).insertOnConflictUpdate(
+          DeletedShotsCompanion.insert(
+            shotId: id,
+            deletedAt: deletedAt ?? DateTime.now().toUtc(),
+          ),
+        );
+  }
+
+  /// Drops tombstones older than [maxAge] (default 180 days).
+  Future<int> pruneDeletedShots({
+    Duration maxAge = const Duration(days: 180),
+  }) async {
+    final cutoffIso =
+        const UtcIso8601Converter().toSql(DateTime.now().toUtc().subtract(maxAge));
+    // ISO-8601 UTC strings compare lexicographically by time.
+    await _db.customStatement(
+      'DELETE FROM deleted_shots WHERE deleted_at < ?',
+      [cutoffIso],
+    );
+    return 0;
   }
 
   /// Returns a shot with its samples ordered by elapsed time.

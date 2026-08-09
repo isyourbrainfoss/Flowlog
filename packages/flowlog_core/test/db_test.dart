@@ -7,11 +7,11 @@ import 'package:test/test.dart';
 
 void main() {
   group('schema', () {
-    test('schema version is 17', () async {
+    test('schema version is 18', () async {
       final db = FlowlogDatabase.inMemory();
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 17);
+      expect(db.schemaVersion, 18);
     });
 
     test(
@@ -154,6 +154,9 @@ void main() {
 
       expect(await repository.getShotById(shot.id), isNull);
       expect(await repository.getShotWithSamples(shot.id), isNull);
+      expect(await repository.isShotDeleted(shot.id), isTrue);
+      final tombstones = await repository.listDeletedShots();
+      expect(tombstones.map((t) => t.shotId), contains(shot.id));
     });
 
     test('re-insert replaces samples for the same shot id', () async {
@@ -384,13 +387,13 @@ void main() {
         final shot = _loadFixtureShot('shots/minimal_shot.json');
 
         await writerRepo.insertShot(shot);
-        expect(writer.schemaVersion, 17);
+        expect(writer.schemaVersion, 18);
         await writer.close();
 
         final reader = FlowlogDatabase.openFile(dbPath);
         final readerRepo = ShotRepository(reader);
 
-        expect(reader.schemaVersion, 17);
+        expect(reader.schemaVersion, 18);
         expect(await readerRepo.getShotWithSamples(shot.id), shot);
 
         await reader.close();
@@ -440,7 +443,7 @@ void main() {
         final migrated = FlowlogDatabase.openFile(dbPath);
         addTearDown(migrated.close);
 
-        expect(migrated.schemaVersion, 17);
+        expect(migrated.schemaVersion, 18);
 
         final tables = await migrated
             .customSelect(
@@ -530,7 +533,7 @@ void main() {
         final migrated = FlowlogDatabase.openFile(dbPath);
         addTearDown(migrated.close);
 
-        expect(migrated.schemaVersion, 17);
+        expect(migrated.schemaVersion, 18);
 
         final tables = await migrated
             .customSelect(

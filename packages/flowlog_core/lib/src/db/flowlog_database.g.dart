@@ -3362,6 +3362,223 @@ class ShotTagsCompanion extends UpdateCompanion<ShotTagRow> {
   }
 }
 
+class $DeletedShotsTable extends DeletedShots
+    with TableInfo<$DeletedShotsTable, DeletedShotRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DeletedShotsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _shotIdMeta = const VerificationMeta('shotId');
+  @override
+  late final GeneratedColumn<String> shotId = GeneratedColumn<String>(
+    'shot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, String> deletedAt =
+      GeneratedColumn<String>(
+        'deleted_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($DeletedShotsTable.$converterdeletedAt);
+  @override
+  List<GeneratedColumn> get $columns => [shotId, deletedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'deleted_shots';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DeletedShotRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('shot_id')) {
+      context.handle(
+        _shotIdMeta,
+        shotId.isAcceptableOrUnknown(data['shot_id']!, _shotIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_shotIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {shotId};
+  @override
+  DeletedShotRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DeletedShotRow(
+      shotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shot_id'],
+      )!,
+      deletedAt: $DeletedShotsTable.$converterdeletedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}deleted_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $DeletedShotsTable createAlias(String alias) {
+    return $DeletedShotsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, String> $converterdeletedAt =
+      const UtcIso8601Converter();
+}
+
+class DeletedShotRow extends DataClass implements Insertable<DeletedShotRow> {
+  final String shotId;
+  final DateTime deletedAt;
+  const DeletedShotRow({required this.shotId, required this.deletedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['shot_id'] = Variable<String>(shotId);
+    {
+      map['deleted_at'] = Variable<String>(
+        $DeletedShotsTable.$converterdeletedAt.toSql(deletedAt),
+      );
+    }
+    return map;
+  }
+
+  DeletedShotsCompanion toCompanion(bool nullToAbsent) {
+    return DeletedShotsCompanion(
+      shotId: Value(shotId),
+      deletedAt: Value(deletedAt),
+    );
+  }
+
+  factory DeletedShotRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DeletedShotRow(
+      shotId: serializer.fromJson<String>(json['shotId']),
+      deletedAt: serializer.fromJson<DateTime>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'shotId': serializer.toJson<String>(shotId),
+      'deletedAt': serializer.toJson<DateTime>(deletedAt),
+    };
+  }
+
+  DeletedShotRow copyWith({String? shotId, DateTime? deletedAt}) =>
+      DeletedShotRow(
+        shotId: shotId ?? this.shotId,
+        deletedAt: deletedAt ?? this.deletedAt,
+      );
+  DeletedShotRow copyWithCompanion(DeletedShotsCompanion data) {
+    return DeletedShotRow(
+      shotId: data.shotId.present ? data.shotId.value : this.shotId,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeletedShotRow(')
+          ..write('shotId: $shotId, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(shotId, deletedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DeletedShotRow &&
+          other.shotId == this.shotId &&
+          other.deletedAt == this.deletedAt);
+}
+
+class DeletedShotsCompanion extends UpdateCompanion<DeletedShotRow> {
+  final Value<String> shotId;
+  final Value<DateTime> deletedAt;
+  final Value<int> rowid;
+  const DeletedShotsCompanion({
+    this.shotId = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DeletedShotsCompanion.insert({
+    required String shotId,
+    required DateTime deletedAt,
+    this.rowid = const Value.absent(),
+  }) : shotId = Value(shotId),
+       deletedAt = Value(deletedAt);
+  static Insertable<DeletedShotRow> custom({
+    Expression<String>? shotId,
+    Expression<String>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (shotId != null) 'shot_id': shotId,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DeletedShotsCompanion copyWith({
+    Value<String>? shotId,
+    Value<DateTime>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return DeletedShotsCompanion(
+      shotId: shotId ?? this.shotId,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (shotId.present) {
+      map['shot_id'] = Variable<String>(shotId.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<String>(
+        $DeletedShotsTable.$converterdeletedAt.toSql(deletedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeletedShotsCompanion(')
+          ..write('shotId: $shotId, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SavedProfilesTable extends SavedProfiles
     with TableInfo<$SavedProfilesTable, SavedProfileRow> {
   @override
@@ -4565,6 +4782,7 @@ abstract class _$FlowlogDatabase extends GeneratedDatabase {
   late final $BeansTable beans = $BeansTable(this);
   late final $TagsTable tags = $TagsTable(this);
   late final $ShotTagsTable shotTags = $ShotTagsTable(this);
+  late final $DeletedShotsTable deletedShots = $DeletedShotsTable(this);
   late final $SavedProfilesTable savedProfiles = $SavedProfilesTable(this);
   late final $SavedProfileSamplesTable savedProfileSamples =
       $SavedProfileSamplesTable(this);
@@ -4581,6 +4799,7 @@ abstract class _$FlowlogDatabase extends GeneratedDatabase {
     beans,
     tags,
     shotTags,
+    deletedShots,
     savedProfiles,
     savedProfileSamples,
     shotTargetSamples,
@@ -7214,6 +7433,156 @@ typedef $$ShotTagsTableProcessedTableManager =
       ShotTagRow,
       PrefetchHooks Function({bool shotId, bool tagId})
     >;
+typedef $$DeletedShotsTableCreateCompanionBuilder =
+    DeletedShotsCompanion Function({
+      required String shotId,
+      required DateTime deletedAt,
+      Value<int> rowid,
+    });
+typedef $$DeletedShotsTableUpdateCompanionBuilder =
+    DeletedShotsCompanion Function({
+      Value<String> shotId,
+      Value<DateTime> deletedAt,
+      Value<int> rowid,
+    });
+
+class $$DeletedShotsTableFilterComposer
+    extends Composer<_$FlowlogDatabase, $DeletedShotsTable> {
+  $$DeletedShotsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get shotId => $composableBuilder(
+    column: $table.shotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, String> get deletedAt =>
+      $composableBuilder(
+        column: $table.deletedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$DeletedShotsTableOrderingComposer
+    extends Composer<_$FlowlogDatabase, $DeletedShotsTable> {
+  $$DeletedShotsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get shotId => $composableBuilder(
+    column: $table.shotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DeletedShotsTableAnnotationComposer
+    extends Composer<_$FlowlogDatabase, $DeletedShotsTable> {
+  $$DeletedShotsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get shotId =>
+      $composableBuilder(column: $table.shotId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, String> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+}
+
+class $$DeletedShotsTableTableManager
+    extends
+        RootTableManager<
+          _$FlowlogDatabase,
+          $DeletedShotsTable,
+          DeletedShotRow,
+          $$DeletedShotsTableFilterComposer,
+          $$DeletedShotsTableOrderingComposer,
+          $$DeletedShotsTableAnnotationComposer,
+          $$DeletedShotsTableCreateCompanionBuilder,
+          $$DeletedShotsTableUpdateCompanionBuilder,
+          (
+            DeletedShotRow,
+            BaseReferences<
+              _$FlowlogDatabase,
+              $DeletedShotsTable,
+              DeletedShotRow
+            >,
+          ),
+          DeletedShotRow,
+          PrefetchHooks Function()
+        > {
+  $$DeletedShotsTableTableManager(
+    _$FlowlogDatabase db,
+    $DeletedShotsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DeletedShotsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DeletedShotsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DeletedShotsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> shotId = const Value.absent(),
+                Value<DateTime> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DeletedShotsCompanion(
+                shotId: shotId,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String shotId,
+                required DateTime deletedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => DeletedShotsCompanion.insert(
+                shotId: shotId,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DeletedShotsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$FlowlogDatabase,
+      $DeletedShotsTable,
+      DeletedShotRow,
+      $$DeletedShotsTableFilterComposer,
+      $$DeletedShotsTableOrderingComposer,
+      $$DeletedShotsTableAnnotationComposer,
+      $$DeletedShotsTableCreateCompanionBuilder,
+      $$DeletedShotsTableUpdateCompanionBuilder,
+      (
+        DeletedShotRow,
+        BaseReferences<_$FlowlogDatabase, $DeletedShotsTable, DeletedShotRow>,
+      ),
+      DeletedShotRow,
+      PrefetchHooks Function()
+    >;
 typedef $$SavedProfilesTableCreateCompanionBuilder =
     SavedProfilesCompanion Function({
       required String id,
@@ -8257,6 +8626,8 @@ class $FlowlogDatabaseManager {
   $$TagsTableTableManager get tags => $$TagsTableTableManager(_db, _db.tags);
   $$ShotTagsTableTableManager get shotTags =>
       $$ShotTagsTableTableManager(_db, _db.shotTags);
+  $$DeletedShotsTableTableManager get deletedShots =>
+      $$DeletedShotsTableTableManager(_db, _db.deletedShots);
   $$SavedProfilesTableTableManager get savedProfiles =>
       $$SavedProfilesTableTableManager(_db, _db.savedProfiles);
   $$SavedProfileSamplesTableTableManager get savedProfileSamples =>

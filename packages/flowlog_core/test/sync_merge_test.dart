@@ -123,6 +123,72 @@ void main() {
       final stored = await ShotRepository(db).getShotById(shot.id);
       expect(stored?.notes, 'Updated notes');
     });
+
+    test('local delete tombstone prevents remote shot from resurrecting', () async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      final repo = ShotRepository(db);
+      await repo.insertShot(shot);
+      await repo.deleteShot(shot.id);
+      expect(await repo.getShotById(shot.id), isNull);
+
+      await mergeSyncPayloadFromRemote(
+        database: db,
+        payload: SyncPayload(
+          version: syncPayloadVersion,
+          exportedAt: DateTime.utc(2026, 8, 9),
+          config: const SyncConfig(),
+          shots: [shot],
+          profiles: const [],
+          beans: const [],
+        ),
+        remoteExportedAt: DateTime.utc(2026, 8, 9),
+      );
+
+      expect(await repo.getShotById(shot.id), isNull);
+      expect(await repo.isShotDeleted(shot.id), isTrue);
+    });
+
+    test('remote tombstone deletes a local shot', () async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      final repo = ShotRepository(db);
+      await repo.insertShot(shot);
+
+      await mergeSyncPayloadFromRemote(
+        database: db,
+        payload: SyncPayload(
+          version: syncPayloadVersion,
+          exportedAt: DateTime.utc(2026, 8, 9),
+          config: const SyncConfig(),
+          shots: const [],
+          profiles: const [],
+          beans: const [],
+          deletedShots: [
+            DeletedShotRef(
+              shotId: shot.id,
+              deletedAt: DateTime.utc(2026, 8, 9, 10),
+            ),
+          ],
+        ),
+        remoteExportedAt: DateTime.utc(2026, 8, 9),
+      );
+
+      expect(await repo.getShotById(shot.id), isNull);
+      expect(await repo.isShotDeleted(shot.id), isTrue);
+    });
+
+    test('export includes deletedShots after local delete', () async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      final repo = ShotRepository(db);
+      await repo.insertShot(shot);
+      await repo.deleteShot(shot.id);
+
+      final payload = await buildSyncPayloadFromDatabase(db);
+      expect(payload.shots.map((s) => s.id), isNot(contains(shot.id)));
+      expect(
+        payload.deletedShots.map((d) => d.shotId),
+        contains(shot.id),
+      );
+    });
   });
 
   group('buildSyncPayloadFromDatabase / parseSyncBackup', () {
