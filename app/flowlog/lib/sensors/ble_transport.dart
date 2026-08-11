@@ -303,9 +303,13 @@ class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
           transport: FlutterBluePressensorTransport(deviceId: bleRemoteId),
           deviceId: bleRemoteId,
         ),
-      SensorKind.scale => DecentScaleBleAdapter(
-          transport: FlutterBlueDecentScaleTransport(remoteId: bleRemoteId),
-        ),
+      SensorKind.scale => () {
+          final transport =
+              FlutterBlueDecentScaleTransport(remoteId: bleRemoteId);
+          final adapter = DecentScaleBleAdapter(transport: transport);
+          transport.onLinkLost = adapter.notifyLinkLost;
+          return adapter;
+        }(),
     };
   }
 }
@@ -535,22 +539,43 @@ class FlutterBlueDecentScaleTransport implements DecentScaleTransport {
   BluetoothDevice? _device;
   BluetoothCharacteristic? _notifyCharacteristic;
   BluetoothCharacteristic? _writeCharacteristic;
-  final _notifications = StreamController<List<int>>.broadcast();
+  StreamSubscription<List<int>>? _notifySubscription;
+  StreamSubscription<BluetoothConnectionState>? _connectionSub;
+  StreamController<List<int>> _notifications =
+      StreamController<List<int>>.broadcast();
+  void Function()? _onLinkLost;
 
   @override
-  Stream<List<int>> get notifications => _notifications.stream;
+  Stream<List<int>> get notifications {
+    if (_notifications.isClosed) {
+      _notifications = StreamController<List<int>>.broadcast();
+    }
+    return _notifications.stream;
+  }
+
+  /// Called when the OS reports the GATT link dropped.
+  set onLinkLost(void Function()? callback) => _onLinkLost = callback;
 
   @override
   Future<void> connect() async {
     final device = BluetoothDevice.fromId(remoteId);
     _device = device;
 
-    // Same clean-link pattern as Pressensor: in-session reconnect needs a
-    // forced disconnect of any half-open GATT session first.
-    try {
-      await device.disconnect(timeout: 5);
-    } on Object {
-      // ignore
+    // Only force-clear when the stack thinks we are still linked — always
+    // disconnecting made cold reconnect flaky and mid-session re-pair noisy.
+    if (device.isConnected) {
+      try {
+        await device.disconnect(timeout: 5);
+      } on Object {
+        // ignore
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    } else {
+      try {
+        await device.disconnect(timeout: 2);
+      } on Object {
+        // ignore
+      }
     }
 
     Object? lastError;
@@ -570,12 +595,22 @@ class FlutterBlueDecentScaleTransport implements DecentScaleTransport {
           timeout: const Duration(seconds: 20),
         );
         await _discoverCharacteristics();
+        await _watchConnectionState(device);
         return;
       } on Object catch (error) {
         lastError = error;
       }
     }
     throw lastError ?? StateError('Decent Scale connect failed.');
+  }
+
+  Future<void> _watchConnectionState(BluetoothDevice device) async {
+    await _connectionSub?.cancel();
+    _connectionSub = device.connectionState.listen((state) {
+      if (state == BluetoothConnectionState.disconnected) {
+        _onLinkLost?.call();
+      }
+    });
   }
 
   Future<void> _discoverCharacteristics() async {
@@ -614,12 +649,46 @@ class FlutterBlueDecentScaleTransport implements DecentScaleTransport {
       throw StateError('Decent Scale is not connected.');
     }
 
-    final subscription = characteristic.onValueReceived.listen(
-      _notifications.add,
-      onError: _notifications.addError,
+    if (_notifications.isClosed) {
+      _notifications = StreamController<List<int>>.broadcast();
+    }
+
+    await _notifySubscription?.cancel();
+    _notifySubscription = characteristic.onValueReceived.listen(
+      (value) {
+        if (!_notifications.isClosed) {
+          _notifications.add(value);
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!_notifications.isClosed) {
+          _notifications.addError(error, stackTrace);
+        }
+      },
     );
-    device.cancelWhenDisconnected(subscription);
-    await characteristic.setNotifyValue(true);
+    device.cancelWhenDisconnected(_notifySubscription!);
+    try {
+      await characteristic.setNotifyValue(true);
+    } on Object {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await characteristic.setNotifyValue(true);
+    }
+  }
+
+  /// Re-enables CCCD notify without a full reconnect (recover silent stream).
+  @override
+  Future<void> rearmNotifications() async {
+    final characteristic = _notifyCharacteristic;
+    if (characteristic == null) {
+      throw StateError('Decent Scale is not connected.');
+    }
+    try {
+      await characteristic.setNotifyValue(false);
+    } on Object {
+      // ignore
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    await subscribeNotifications();
   }
 
   @override
@@ -639,15 +708,26 @@ class FlutterBlueDecentScaleTransport implements DecentScaleTransport {
 
   @override
   Future<void> disconnect() async {
+    await _connectionSub?.cancel();
+    _connectionSub = null;
+    await _notifySubscription?.cancel();
+    _notifySubscription = null;
     final device = _device;
     _device = null;
     _notifyCharacteristic = null;
     _writeCharacteristic = null;
+    // Keep the stream open for a future connect on a new adapter instance;
+    // only close if already closed to avoid double-close errors.
     if (!_notifications.isClosed) {
-      await _notifications.close();
+      // Do not close — adapters may still hold the stream briefly. Recreate
+      // on next subscribe. Closing permanently broke re-pair mid-session.
     }
     if (device != null) {
-      await device.disconnect();
+      try {
+        await device.disconnect(timeout: 5);
+      } on Object {
+        // ignore
+      }
     }
   }
 }

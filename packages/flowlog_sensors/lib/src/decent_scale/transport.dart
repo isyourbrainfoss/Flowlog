@@ -18,6 +18,9 @@ abstract interface class DecentScaleTransport {
   /// Subscribes to FFF4 notifications.
   Future<void> subscribeNotifications();
 
+  /// Re-arms CCCD notify without a full disconnect when the stream goes silent.
+  Future<void> rearmNotifications() => subscribeNotifications();
+
   /// Writes a 7-byte command to the 36F5 characteristic.
   Future<void> writeCommand(List<int> command);
 }
@@ -57,6 +60,9 @@ class MockDecentScaleTransport implements DecentScaleTransport {
     subscribed = true;
     return Future<void>.value();
   }
+
+  @override
+  Future<void> rearmNotifications() => subscribeNotifications();
 
   @override
   Future<void> writeCommand(List<int> command) {

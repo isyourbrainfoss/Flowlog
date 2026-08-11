@@ -4,7 +4,11 @@ import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_kind.dart';
 import 'package:flowlog/settings/paired_sensors_store.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart'
-    show ConnectionState, PressensorBleAdapter, SensorAdapter;
+    show
+        ConnectionState,
+        DecentScaleBleAdapter,
+        PressensorBleAdapter,
+        SensorAdapter;
 import 'package:flutter/material.dart' hide ConnectionState;
 
 export 'package:flowlog/sensors/sensor_kind.dart';
@@ -87,6 +91,8 @@ class SensorHub extends ChangeNotifier {
   final BleConnectionBackend _bleBackend;
   int _idCounter = 0;
   String? _lastError;
+  Timer? _scaleHealthTimer;
+  final Set<String> _scaleRecoverInFlight = {};
 
   List<PairedSensorEntry> get devices => List.unmodifiable(_devices);
 
@@ -235,27 +241,105 @@ class SensorHub extends ChangeNotifier {
 
   /// Reconnects paired sensors that already have a saved BLE id.
   ///
-  /// Always tears down any existing adapter first, even when the hub still
-  /// reports [ConnectionState.connected] or [ConnectionState.connecting].
-  /// Stale "connected" state with a dead GATT link is the common reason the
-  /// in-app Reconnect button used to do nothing while a cold app start worked.
+  /// Skips scales that are already streaming weight (avoids needless
+  /// disconnect storms). Otherwise tears down and reconnects so a zombie
+  /// "connected" link is cleared.
   Future<void> reconnectPairedDevices() async {
     for (final device in List<PairedSensorEntry>.from(devices)) {
       final bleRemoteId = device.bleRemoteId;
       if (bleRemoteId == null || bleRemoteId.isEmpty) {
         continue;
       }
-      // Force a clean session: disconnect first, then connect.
+
+      final adapter = _activeAdapters[device.id];
+      if (device.kind == SensorKind.scale &&
+          device.state == ConnectionState.connected &&
+          adapter is DecentScaleBleAdapter &&
+          !adapter.isWeightStreamSilent(
+            silentFor: const Duration(seconds: 3),
+          )) {
+        // Healthy weight stream — leave it alone.
+        continue;
+      }
+
       final wasLinked = device.state == ConnectionState.connected ||
           device.state == ConnectionState.connecting ||
           _activeAdapters.containsKey(device.id);
       await disconnect(device.id);
       if (wasLinked) {
-        // Give the Android BLE stack a beat after tear-down; connecting
-        // immediately after disconnect often fails or returns a zombie link.
         await Future<void>.delayed(const Duration(milliseconds: 350));
       }
       await connect(device.id);
+      // Stagger multi-device reconnect so the BLE stack stays responsive.
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+  }
+
+  void _ensureScaleHealthWatchdog() {
+    if (_scaleHealthTimer != null) {
+      return;
+    }
+    _scaleHealthTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      unawaited(_recoverSilentScales());
+    });
+  }
+
+  void _stopScaleHealthWatchdogIfIdle() {
+    final anyScaleUp = _devices.any(
+      (d) =>
+          d.kind == SensorKind.scale &&
+          (d.state == ConnectionState.connected ||
+              d.state == ConnectionState.connecting ||
+              d.state == ConnectionState.error),
+    );
+    if (!anyScaleUp) {
+      _scaleHealthTimer?.cancel();
+      _scaleHealthTimer = null;
+    }
+  }
+
+  Future<void> _recoverSilentScales() async {
+    for (final device in List<PairedSensorEntry>.from(_devices)) {
+      if (device.kind != SensorKind.scale) {
+        continue;
+      }
+      if (device.state != ConnectionState.connected &&
+          device.state != ConnectionState.error) {
+        continue;
+      }
+      final adapter = _activeAdapters[device.id];
+      if (adapter is! DecentScaleBleAdapter) {
+        continue;
+      }
+      if (!adapter.isWeightStreamSilent(
+        silentFor: const Duration(seconds: 6),
+      )) {
+        continue;
+      }
+      if (_scaleRecoverInFlight.contains(device.id)) {
+        continue;
+      }
+      _scaleRecoverInFlight.add(device.id);
+      try {
+        // Soft rearm first.
+        try {
+          await adapter.rearmStream().timeout(const Duration(seconds: 3));
+        } on Object {
+          // Fall through to hard reconnect.
+        }
+        await Future<void>.delayed(const Duration(seconds: 2));
+        if (!adapter.isWeightStreamSilent(
+          silentFor: const Duration(seconds: 3),
+        )) {
+          continue;
+        }
+        // Hard reconnect this scale only.
+        await disconnect(device.id);
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        await connect(device.id);
+      } finally {
+        _scaleRecoverInFlight.remove(device.id);
+      }
     }
   }
 
@@ -421,6 +505,9 @@ class SensorHub extends ChangeNotifier {
       _devices[currentIndex] =
           _devices[currentIndex].copyWith(state: ConnectionState.connected);
       setLastError(null);
+      if (device.kind == SensorKind.scale) {
+        _ensureScaleHealthWatchdog();
+      }
       recordReconnect(
         deviceId: id,
         deviceName: device.name,
@@ -477,9 +564,21 @@ class SensorHub extends ChangeNotifier {
       }
     } else if (state == ConnectionState.disconnected) {
       _batteryByDevice.remove(id);
+      _stopScaleHealthWatchdogIfIdle();
     }
     if (state == ConnectionState.error) {
       setLastError('Sensor link error ($id).');
+      final device = _devices[index];
+      if (device.kind == SensorKind.scale &&
+          !_scaleRecoverInFlight.contains(id)) {
+        // Scale watchdog escalated — full reconnect.
+        _ensureScaleHealthWatchdog();
+        unawaited(_recoverSilentScales());
+      }
+    }
+    if (state == ConnectionState.connected &&
+        _devices[index].kind == SensorKind.scale) {
+      _ensureScaleHealthWatchdog();
     }
     notifyListeners();
   }
@@ -503,6 +602,8 @@ class SensorHub extends ChangeNotifier {
 
   @override
   void dispose() {
+    _scaleHealthTimer?.cancel();
+    _scaleHealthTimer = null;
     for (final subscription in _adapterStateSubs.values) {
       unawaited(subscription.cancel());
     }

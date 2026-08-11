@@ -57,6 +57,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
   late final bool _ownsAutoStartController;
   late final ActiveBrewNotifier _activeBrewNotifier;
   late final ShotEventsNotifier _shotEventsNotifier;
+  Timer? _deferredSyncTimer;
 
   /// Keeps Live (and other tabs) mounted across immersive chrome toggles.
   final GlobalKey _tabStackKey = GlobalKey(debugLabel: 'shell-tab-stack');
@@ -89,7 +90,14 @@ class _FlowlogShellState extends State<FlowlogShell> {
     await _loadActiveBean();
     final database = _database;
     if (database != null) {
-      unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
+      // Defer Nextcloud until the first frames are interactive — sync was
+      // competing with BLE reconnect and History open on cold start.
+      _deferredSyncTimer?.cancel();
+      _deferredSyncTimer = Timer(const Duration(seconds: 3), () {
+        unawaited(
+          FlowlogSyncCoordinator.syncIfEnabled(database: database),
+        );
+      });
     }
   }
 
@@ -124,6 +132,8 @@ class _FlowlogShellState extends State<FlowlogShell> {
 
   @override
   void dispose() {
+    _deferredSyncTimer?.cancel();
+    _deferredSyncTimer = null;
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     if (_ownsRepeatShotController) {
       _repeatShotController.dispose();
@@ -211,7 +221,8 @@ class _FlowlogShellState extends State<FlowlogShell> {
     }
 
     setState(() => _selectedIndex = index);
-    _notifyHistoryRefreshIfNeeded(index);
+    // Do not force a History reload on every tab switch — that re-queries all
+    // shots/sparklines and freezes the UI. Shot save already notifies History.
   }
 
   void _switchTab(AppTab tab) {
@@ -221,13 +232,6 @@ class _FlowlogShellState extends State<FlowlogShell> {
       return;
     }
     setState(() => _selectedIndex = index);
-    _notifyHistoryRefreshIfNeeded(index);
-  }
-
-  void _notifyHistoryRefreshIfNeeded(int index) {
-    if (appDestinations[index].tab == AppTab.history) {
-      _shotEventsNotifier.notifyShotsChanged();
-    }
   }
 
   bool _useBottomNav(BoxConstraints constraints) {

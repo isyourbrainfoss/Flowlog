@@ -51,6 +51,7 @@ class _FlowlogAppState extends State<FlowlogApp> {
   late final bool _ownsSensorHub;
   late final AppearanceSettingsStore _appearanceSettingsStore;
   late final PairedSensorsStore _pairedSensorsStore;
+  Timer? _autoReconnectTimer;
 
   @override
   void initState() {
@@ -89,11 +90,12 @@ class _FlowlogAppState extends State<FlowlogApp> {
         _sensorHub.restoreDevice(SensorHub.entryFromRecord(record));
       }
       if (widget.autoReconnectSensors && mounted) {
-        unawaited(
-          Future<void>.delayed(
-            const Duration(milliseconds: 600),
-            _sensorHub.reconnectPairedDevices,
-          ),
+        _autoReconnectTimer?.cancel();
+        _autoReconnectTimer = Timer(
+          const Duration(milliseconds: 600),
+          () {
+            unawaited(_sensorHub.reconnectPairedDevices());
+          },
         );
       }
     }
@@ -101,6 +103,8 @@ class _FlowlogAppState extends State<FlowlogApp> {
 
   @override
   void dispose() {
+    _autoReconnectTimer?.cancel();
+    _autoReconnectTimer = null;
     if (_ownsController) {
       _themeController.dispose();
     }

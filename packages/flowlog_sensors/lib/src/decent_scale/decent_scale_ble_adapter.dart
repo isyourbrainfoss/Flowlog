@@ -47,16 +47,29 @@ class DecentScaleBleAdapter implements SensorAdapter {
 
   StreamSubscription<List<int>>? _notificationSub;
   Timer? _heartbeatTimer;
+  Timer? _weightWatchdog;
   int? _streamStartMs;
   int _lastCommandSentMs = 0;
   /// Host receive time of the last parsed weight packet (ms since epoch).
   int? _lastWeightReceiveMs;
+  int _silentRearmAttempts = 0;
   /// Serializes outbound writes so heartbeat + pressure forward cannot race.
   Future<void> _writeQueue = Future<void>.value();
   bool _writeInFlight = false;
 
   /// Monotonic host ms of the last weight sample, if any this session.
   int? get lastWeightReceiveMs => _lastWeightReceiveMs;
+
+  /// True when connected but no weight packet for [silentFor].
+  bool isWeightStreamSilent({
+    Duration silentFor = const Duration(seconds: 4),
+  }) {
+    final last = _lastWeightReceiveMs;
+    if (last == null) {
+      return true;
+    }
+    return _monotonicClock() - last >= silentFor.inMilliseconds;
+  }
 
   @override
   Stream<ConnectionState> get state => _stateController.stream;
@@ -79,6 +92,7 @@ class DecentScaleBleAdapter implements SensorAdapter {
 
     _stateController.add(ConnectionState.connecting);
     try {
+      await _notificationSub?.cancel();
       await _transport.connect();
       await _transport.subscribeNotifications();
       _notificationSub = _transport.notifications.listen(
@@ -87,11 +101,30 @@ class DecentScaleBleAdapter implements SensorAdapter {
       );
       await _writeCommand(DecentScaleCommands.ledOnGrams());
       _streamStartMs = _monotonicClock();
+      _lastWeightReceiveMs = null;
+      _silentRearmAttempts = 0;
       _startHeartbeatTimer();
+      _startWeightWatchdog();
       _stateController.add(ConnectionState.connected);
     } on Object catch (error, stackTrace) {
       _stateController.add(ConnectionState.error);
       Zone.current.handleUncaughtError(error, stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Re-enables weight notifications and LED-on without a full disconnect.
+  Future<void> rearmStream() async {
+    try {
+      await _transport.rearmNotifications();
+      await _notificationSub?.cancel();
+      _notificationSub = _transport.notifications.listen(
+        _onNotification,
+        onError: _onError,
+      );
+      await _writeCommand(DecentScaleCommands.ledOnGrams());
+    } on Object {
+      // Caller may escalate to full reconnect.
       rethrow;
     }
   }
@@ -154,9 +187,12 @@ class DecentScaleBleAdapter implements SensorAdapter {
   Future<void> disconnect() async {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
+    _weightWatchdog?.cancel();
+    _weightWatchdog = null;
     await _notificationSub?.cancel();
     _notificationSub = null;
     _streamStartMs = null;
+    _lastWeightReceiveMs = null;
     await _transport.disconnect();
     if (!_stateController.isClosed) {
       _stateController.add(ConnectionState.disconnected);
@@ -167,6 +203,35 @@ class DecentScaleBleAdapter implements SensorAdapter {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(heartbeatInterval, (_) {
       unawaited(_writeCommand(DecentScaleCommands.heartbeat()));
+    });
+  }
+
+  void _startWeightWatchdog() {
+    _weightWatchdog?.cancel();
+    // Soft recover silent FFF4 streams (common after phone sleep / brew end).
+    _weightWatchdog = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (_stateController.isClosed) {
+        return;
+      }
+      if (!isWeightStreamSilent(silentFor: const Duration(seconds: 5))) {
+        _silentRearmAttempts = 0;
+        return;
+      }
+      if (_silentRearmAttempts >= 2) {
+        // Escalate: mark error so SensorHub can reconnect the scale.
+        if (!_stateController.isClosed) {
+          _stateController.add(ConnectionState.error);
+        }
+        return;
+      }
+      _silentRearmAttempts += 1;
+      unawaited(() async {
+        try {
+          await rearmStream();
+        } on Object {
+          // Next watchdog tick may escalate to error/reconnect.
+        }
+      }());
     });
   }
 
@@ -224,6 +289,7 @@ class DecentScaleBleAdapter implements SensorAdapter {
 
     final receiveMs = _monotonicClock();
     _lastWeightReceiveMs = receiveMs;
+    _silentRearmAttempts = 0;
     final startMs = _streamStartMs ?? receiveMs;
     final elapsedMs = receiveMs - startMs;
 
@@ -233,6 +299,17 @@ class DecentScaleBleAdapter implements SensorAdapter {
         weightG: reading.grams,
       ),
     );
+  }
+
+  /// Called by the transport when the OS drops the GATT link.
+  void notifyLinkLost() {
+    _weightWatchdog?.cancel();
+    _weightWatchdog = null;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    if (!_stateController.isClosed) {
+      _stateController.add(ConnectionState.disconnected);
+    }
   }
 
   void _onError(Object error, StackTrace stackTrace) {

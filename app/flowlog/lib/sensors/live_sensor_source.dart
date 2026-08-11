@@ -246,19 +246,32 @@ class LiveSensorSource {
     }
   }
 
-  /// Re-sends LED-on so weight packets resume without taring again mid-shot.
+  /// Re-arms weight notifications (and LED-on) without taring mid-shot.
   Future<void> rearmWeightStream() async {
     if (_demoMode) {
       return;
     }
     final scale = _connectedScaleAdapter();
     if (scale == null) {
+      // Try hub-level reconnect of the paired scale only.
+      for (final device in hub.devices) {
+        if (device.kind == SensorKind.scale &&
+            device.bleRemoteId != null &&
+            device.bleRemoteId!.isNotEmpty) {
+          unawaited(hub.connect(device.id));
+          break;
+        }
+      }
       return;
     }
     try {
-      await scale.ledOn();
+      await scale.rearmStream();
     } on Object {
-      // Best-effort recovery.
+      try {
+        await scale.ledOn();
+      } on Object {
+        // Best-effort.
+      }
     }
   }
 

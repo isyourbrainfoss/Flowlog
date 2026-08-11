@@ -20,7 +20,10 @@ abstract final class DecentScaleConstants {
 
   /// Heartbeat period while connected. Must be comfortably under the scale's
   /// disconnect timeout (Flowlog DIY uses 15 s; real HDS is ~5 s).
-  static const heartbeatInterval = Duration(seconds: 2);
+  ///
+  /// Keep well above [minCommandSpacing] and leave headroom for pressure
+  /// forward writes so FFF4 weight traffic is not starved.
+  static const heartbeatInterval = Duration(seconds: 3);
 
   /// FFF4 type bytes for weight notifications.
   static const weightStableType = 0xCE;
