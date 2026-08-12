@@ -138,8 +138,25 @@ class ShotRepository {
       return const [];
     }
 
-    // History list path: one query for all samples, downsample per shot.
-    if (sparklineOnly || includeSamples) {
+    if (sparklineOnly) {
+      final byShot = await _loadSparklineSamples(rows.map((r) => r.id).toList());
+      return [
+        for (final row in rows)
+          _shotFromRow(
+            row,
+            samples: _downsampleSamples(
+              byShot[row.id] ?? const [],
+              kHistorySparklineMaxSamples,
+            ),
+            annotations: const [],
+            targetPressureSamples: const [],
+          ),
+      ];
+    }
+
+    // Full includeSamples (sync/export): batch samples; load
+    // annotations/targets only when needed (detail uses getShotWithSamples).
+    if (includeSamples) {
       final ids = rows.map((r) => r.id).toList();
       final allSampleRows = await (_db.select(_db.shotSamples)
             ..where((sample) => sample.shotId.isIn(ids))
@@ -153,21 +170,6 @@ class ShotRepository {
       for (final sampleRow in allSampleRows) {
         final list = byShot.putIfAbsent(sampleRow.shotId, () => []);
         list.add(_sampleFromRow(sampleRow));
-      }
-
-      if (sparklineOnly) {
-        return [
-          for (final row in rows)
-            _shotFromRow(
-              row,
-              samples: _downsampleSamples(
-                byShot[row.id] ?? const [],
-                kHistorySparklineMaxSamples,
-              ),
-              annotations: const [],
-              targetPressureSamples: const [],
-            ),
-        ];
       }
 
       // Full includeSamples (sync/export): still batch samples; load
@@ -201,6 +203,58 @@ class ShotRepository {
     }
 
     return const [];
+  }
+
+  /// Loads at most [kHistorySparklineMaxSamples] points per shot in SQL so
+  /// History does not materialize every sample row into Dart.
+  Future<Map<String, List<models.ShotSample>>> _loadSparklineSamples(
+    List<String> ids,
+  ) async {
+    if (ids.isEmpty) {
+      return const {};
+    }
+
+    final placeholders = List.filled(ids.length, '?').join(', ');
+    final maxPoints = kHistorySparklineMaxSamples;
+    final inner = maxPoints - 1;
+    final queryRows = await _db.customSelect(
+      '''
+      SELECT shot_id, elapsed_ms, pressure_bar, weight_g, flow_gs, temp_c
+      FROM (
+        SELECT shot_id, elapsed_ms, pressure_bar, weight_g, flow_gs, temp_c,
+               ROW_NUMBER() OVER (PARTITION BY shot_id ORDER BY elapsed_ms) AS rn,
+               COUNT(*) OVER (PARTITION BY shot_id) AS cnt
+        FROM shot_samples
+        WHERE shot_id IN ($placeholders)
+      )
+      WHERE cnt <= ?
+         OR rn = 1
+         OR rn = cnt
+         OR ((rn - 1) % MAX(1, (cnt - 1) / ?)) = 0
+      ORDER BY shot_id, elapsed_ms
+      ''',
+      variables: [
+        for (final id in ids) Variable.withString(id),
+        Variable.withInt(maxPoints),
+        Variable.withInt(inner),
+      ],
+      readsFrom: {_db.shotSamples},
+    ).get();
+
+    final byShot = <String, List<models.ShotSample>>{};
+    for (final row in queryRows) {
+      final shotId = row.read<String>('shot_id');
+      byShot.putIfAbsent(shotId, () => []).add(
+            models.ShotSample(
+              elapsedMs: row.read<int>('elapsed_ms'),
+              pressureBar: row.readNullable<double>('pressure_bar'),
+              weightG: row.readNullable<double>('weight_g'),
+              flowGs: row.readNullable<double>('flow_gs'),
+              tempC: row.readNullable<double>('temp_c'),
+            ),
+          );
+    }
+    return byShot;
   }
 
   /// Evenly spaced sample subset for sparklines (always keeps first/last).
@@ -493,11 +547,19 @@ class ShotRepository {
     final cutoffIso =
         const UtcIso8601Converter().toSql(DateTime.now().toUtc().subtract(maxAge));
     // ISO-8601 UTC strings compare lexicographically by time.
-    await _db.customStatement(
-      'DELETE FROM deleted_shots WHERE deleted_at < ?',
-      [cutoffIso],
-    );
-    return 0;
+    final countRow = await _db.customSelect(
+      'SELECT COUNT(*) AS n FROM deleted_shots WHERE deleted_at < ?',
+      variables: [Variable.withString(cutoffIso)],
+      readsFrom: {_db.deletedShots},
+    ).getSingle();
+    final n = countRow.read<int>('n');
+    if (n > 0) {
+      await _db.customStatement(
+        'DELETE FROM deleted_shots WHERE deleted_at < ?',
+        [cutoffIso],
+      );
+    }
+    return n;
   }
 
   /// Returns a shot with its samples ordered by elapsed time.

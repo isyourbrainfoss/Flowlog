@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:test/test.dart';
 
@@ -102,6 +104,19 @@ void main() {
         formatBeanDisplayLabel(natural, allBeans: [washed, natural]),
         'Ethiopia · Natural',
       );
+    });
+
+    test('repairs multi-layer name mojibake at the display edge', () {
+      var name = 'Oslo Mørkbrent';
+      for (var i = 0; i < 7; i++) {
+        name = latin1.decode(utf8.encode(name));
+      }
+      final bean = Bean(
+        id: 'bean-mojibake',
+        name: name,
+        brand: 'KAFFA',
+      );
+      expect(formatBeanDisplayLabel(bean), 'KAFFA · Oslo Mørkbrent');
     });
   });
 }

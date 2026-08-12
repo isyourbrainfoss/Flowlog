@@ -27,28 +27,31 @@ String _beanNameWithBrand(Bean bean) {
 /// [Bean.name], disambiguates with roast date, process, variety, origin, or
 /// a fallback hint.
 String formatBeanDisplayLabel(Bean bean, {List<Bean>? allBeans}) {
-  final displayName = _beanNameWithBrand(bean);
+  // Repair at the display edge so a raw/synced bean cannot paint mojibake
+  // even if a caller skipped BeanRepository.
+  final cleaned = bean.repaired();
+  final displayName = _beanNameWithBrand(cleaned);
   final duplicates =
-      allBeans != null && _sameNameCount(bean, allBeans) > 1;
+      allBeans != null && _sameNameCount(cleaned, allBeans) > 1;
 
   if (!duplicates) {
     return displayName;
   }
 
-  if (bean.roastDate != null) {
-    return '$displayName · ${formatBeanRoastDate(bean.roastDate!)}';
+  if (cleaned.roastDate != null) {
+    return '$displayName · ${formatBeanRoastDate(cleaned.roastDate!)}';
   }
 
-  if (bean.process != null && bean.process!.trim().isNotEmpty) {
-    return '$displayName · ${bean.process!.trim()}';
+  if (cleaned.process != null && cleaned.process!.trim().isNotEmpty) {
+    return '$displayName · ${cleaned.process!.trim()}';
   }
 
-  if (bean.variety != null && bean.variety!.trim().isNotEmpty) {
-    return '$displayName · ${bean.variety!.trim()}';
+  if (cleaned.variety != null && cleaned.variety!.trim().isNotEmpty) {
+    return '$displayName · ${cleaned.variety!.trim()}';
   }
 
-  if (bean.origin != null && bean.origin!.trim().isNotEmpty) {
-    return '$displayName · ${bean.origin!.trim()}';
+  if (cleaned.origin != null && cleaned.origin!.trim().isNotEmpty) {
+    return '$displayName · ${cleaned.origin!.trim()}';
   }
 
   return '$displayName · no roast date';

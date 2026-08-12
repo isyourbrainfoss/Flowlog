@@ -181,6 +181,35 @@ void main() {
       final listed = await repository.listShots();
       expect(listed.map((shot) => shot.id).toList(), ['shot-newer', 'shot-older']);
     });
+
+    test('sparklineOnly keeps first/last and caps sample count', () async {
+      const total = 240;
+      final samples = [
+        for (var i = 0; i < total; i++)
+          ShotSample(
+            elapsedMs: i * 100,
+            pressureBar: i / 20,
+            weightG: i / 10,
+          ),
+      ];
+      await repository.insertShot(
+        Shot(
+          id: 'shot-dense',
+          startedAt: DateTime.utc(2026, 8, 11, 10),
+          samples: samples,
+        ),
+      );
+
+      final listed = await repository.listShots(sparklineOnly: true);
+      expect(listed, hasLength(1));
+      final spark = listed.single.samples;
+      expect(spark.length, lessThanOrEqualTo(ShotRepository.kHistorySparklineMaxSamples));
+      expect(spark.length, greaterThan(2));
+      expect(spark.first.elapsedMs, 0);
+      expect(spark.last.elapsedMs, (total - 1) * 100);
+      expect(spark.first.pressureBar, 0);
+      expect(spark.last.pressureBar, closeTo((total - 1) / 20, 0.001));
+    });
   });
 }
 
