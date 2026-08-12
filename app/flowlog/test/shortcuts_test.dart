@@ -29,12 +29,14 @@ void main() {
     expect(find.text('Session: idle'), findsOneWidget);
 
     await sendShortcut(tester, key: LogicalKeyboardKey.space);
-    await pumpForAsync(tester);
+    // start() bounds scale-config / BLE work with 2s timeouts that stay
+    // pending in FakeAsync if file I/O never completes.
+    await tester.pump(const Duration(seconds: 3));
 
     expect(find.text('Stop brew'), findsOneWidget);
 
     await sendShortcut(tester, key: LogicalKeyboardKey.space);
-    await pumpForAsync(tester);
+    await tester.pump(const Duration(seconds: 3));
 
     expect(find.text('Session: stopped'), findsOneWidget);
     expect(find.text('Start brew'), findsOneWidget);

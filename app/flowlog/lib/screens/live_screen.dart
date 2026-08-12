@@ -801,6 +801,11 @@ class _LiveScreenState extends State<LiveScreen> {
     if (!brewing && _wasBrewing) {
       // Show the whole pull after stop (not the live last-~30s window).
       _chartInteractionController.fitFullShot();
+      // In-brew "wind back" cue is stale once recording ends, and it sits
+      // on top of Repeat / save actions on a phone-sized screen.
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+      }
     }
     _wasBrewing = brewing;
   }

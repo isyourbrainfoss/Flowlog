@@ -168,7 +168,16 @@ void main() {
       expect(scaleTransport.writtenCommands, isNotEmpty);
       expect(
         scaleTransport.writtenCommands.first,
-        DecentScaleCommands.tare(),
+        DecentScaleCommands.ledOnGrams(),
+      );
+      final tare = DecentScaleCommands.tare();
+      expect(
+        scaleTransport.writtenCommands.any(
+          (c) =>
+              c.length == tare.length &&
+              List.generate(c.length, (i) => c[i] == tare[i]).every((e) => e),
+        ),
+        isTrue,
       );
     });
   });

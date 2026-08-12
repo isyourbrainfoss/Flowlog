@@ -182,9 +182,19 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(liveController.canSaveShot, isTrue);
-      await tester.ensureVisible(find.byKey(const Key('repeat_shot_button')));
+
+      // Yield-warn / auto-save snackbars sit over the bottom Repeat button.
+      final messenger = ScaffoldMessenger.maybeOf(
+        tester.element(find.byType(LiveScreen)),
+      );
+      messenger?.clearSnackBars();
+      await tester.pumpAndSettle();
+
+      final repeatButton = find.byKey(const Key('repeat_shot_button'));
+      await tester.ensureVisible(repeatButton);
+      await tester.pumpAndSettle();
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('repeat_shot_button')));
+        await tester.tap(repeatButton);
         await Future<void>.delayed(const Duration(milliseconds: 500));
       });
       await tester.pump();
