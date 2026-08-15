@@ -43,12 +43,16 @@ class LiveShotController extends ChangeNotifier {
   bool _startInFlight = false;
   bool _stopInFlight = false;
   String? _lastStartError;
+  DateTime? _lastUiNotify;
+  Timer? _uiNotifyTimer;
 
   /// Cleared on successful start; set when connect fails (UI can show snackbar).
   String? get lastStartError => _lastStartError;
 
   void _onSampleBatch(List<ShotSample> batch) {
-    _notify();
+    // Full-tree Live rebuilds at 10–20 Hz plus a snackbar overlay is what
+    // made the brew UI hitch. Chart already has its own ~30 fps notifier.
+    _scheduleUiNotify();
     final forward = _onForwardPressure;
     if (forward == null || batch.isEmpty) {
       return;
@@ -65,6 +69,25 @@ class LiveShotController extends ChangeNotifier {
         break;
       }
     }
+  }
+
+  static const _uiNotifyMinInterval = Duration(milliseconds: 50);
+
+  void _scheduleUiNotify() {
+    final now = DateTime.now();
+    final last = _lastUiNotify;
+    if (last == null || now.difference(last) >= _uiNotifyMinInterval) {
+      _uiNotifyTimer?.cancel();
+      _uiNotifyTimer = null;
+      _lastUiNotify = now;
+      _notify();
+      return;
+    }
+    _uiNotifyTimer ??= Timer(_uiNotifyMinInterval - now.difference(last), () {
+      _uiNotifyTimer = null;
+      _lastUiNotify = DateTime.now();
+      _notify();
+    });
   }
 
   ShotSession get session => _session;
@@ -345,6 +368,7 @@ class LiveShotController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _uiNotifyTimer?.cancel();
     _stateSub?.cancel();
     _sampleBatchSub?.cancel();
     unawaited(_session.dispose());

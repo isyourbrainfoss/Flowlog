@@ -200,6 +200,11 @@ class _LiveScreenState extends State<LiveScreen> {
     final previous = _lastPressensorState;
     _lastPressensorState = current;
 
+    // Snackbars during a pull hitch the brew UI and sit on the stop control.
+    if (_controller?.isBrewing ?? false) {
+      return;
+    }
+
     if (previous != null &&
         previous != ConnectionState.connected &&
         current == ConnectionState.connected &&
@@ -334,6 +339,7 @@ class _LiveScreenState extends State<LiveScreen> {
     _liveWeightLastUpdate.dispose();
     _autoStopTimer?.cancel();
     _brewCompleteDismissTimer?.cancel();
+    _sensorHub?.setScaleRecoveryEnabled(true);
     if (_ownsController) {
       _controller?.dispose();
     }
@@ -385,9 +391,6 @@ class _LiveScreenState extends State<LiveScreen> {
     _maybeFireYieldWarn(controller);
   }
 
-  /// How long a weight sample stays "live" before the UI treats the scale as silent.
-  static const _weightFreshWindow = Duration(seconds: 2);
-
   void _trackLiveWeight(LiveShotController controller) {
     final samples = controller.samples;
     if (samples.isEmpty) {
@@ -403,7 +406,7 @@ class _LiveScreenState extends State<LiveScreen> {
       final rxMs = adapter.lastWeightReceiveMs;
       if (rxMs != null) {
         final age = DateTime.now().millisecondsSinceEpoch - rxMs;
-        if (age <= _weightFreshWindow.inMilliseconds) {
+        if (age <= kWeightStreamFreshWindow.inMilliseconds) {
           // Latest carry-forward weight for display.
           for (var i = samples.length - 1; i >= 0; i--) {
             final w = samples[i].weightG;
@@ -439,39 +442,27 @@ class _LiveScreenState extends State<LiveScreen> {
     final source = _sensorSource;
     final scalePaired =
         source?.scalePaired ?? hub?.hasKind(SensorKind.scale) ?? false;
-    if (!scalePaired) {
-      return WeightStreamHealth.notExpected;
-    }
     final linked = source?.scaleLinkConnected ??
         (hub?.scaleState == ConnectionState.connected);
-    if (!linked) {
-      return WeightStreamHealth.disconnected;
-    }
-
     final adapter = hub?.activeAdapterFor(SensorKind.scale);
+    int? rxMs;
     if (adapter is DecentScaleBleAdapter) {
-      final rxMs = adapter.lastWeightReceiveMs;
-      if (rxMs != null) {
-        final age = DateTime.now().millisecondsSinceEpoch - rxMs;
-        if (age <= _weightFreshWindow.inMilliseconds) {
-          return WeightStreamHealth.live;
-        }
-      }
-      // Linked, but no recent FFF4 weight packets.
-      if (isBrewing || rxMs == null) {
-        return WeightStreamHealth.linkedNoWeight;
-      }
-      return WeightStreamHealth.linkedNoWeight;
+      rxMs = adapter.lastWeightReceiveMs;
+    } else {
+      final last = _liveWeightLastUpdate.value;
+      rxMs = last?.millisecondsSinceEpoch;
     }
-
-    final last = _liveWeightLastUpdate.value;
-    if (last != null &&
-        DateTime.now().difference(last) <= _weightFreshWindow) {
-      return WeightStreamHealth.live;
-    }
-    return isBrewing
-        ? WeightStreamHealth.linkedNoWeight
-        : WeightStreamHealth.linkedNoWeight;
+    final started = _controller?.sessionStartedAt;
+    return resolveWeightStreamHealth(
+      scalePaired: scalePaired,
+      scaleLinked: linked,
+      isBrewing: isBrewing,
+      shotHasWeight: (_controller?.samples ?? const <ShotSample>[])
+          .any((s) => s.weightG != null),
+      lastWeightReceiveMs: rxMs,
+      brewElapsed:
+          started == null ? null : DateTime.now().difference(started),
+    );
   }
 
   void _maybeRearmSilentScale(LiveShotController controller) {
@@ -485,7 +476,7 @@ class _LiveScreenState extends State<LiveScreen> {
     // Give the stream a moment after start before treating silence as a fault.
     final started = controller.sessionStartedAt;
     if (started != null &&
-        DateTime.now().difference(started) < const Duration(seconds: 2)) {
+        DateTime.now().difference(started) < const Duration(seconds: 8)) {
       return;
     }
     _weightRearmAttempted = true;
@@ -494,16 +485,17 @@ class _LiveScreenState extends State<LiveScreen> {
 
   Future<void> _onRearmWeightPressed() async {
     await _sensorSource?.rearmWeightStream();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          key: Key('weight_stream_rearm_snackbar'),
-          content: Text('Refreshing scale weight stream…'),
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    if (!mounted || (_controller?.isBrewing ?? false)) {
+      return;
     }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        key: Key('weight_stream_rearm_snackbar'),
+        content: Text('Refreshing scale weight stream…'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _maybeFireYieldWarn(LiveShotController controller) {
@@ -566,6 +558,20 @@ class _LiveScreenState extends State<LiveScreen> {
 
     final samples = controller.samples;
     if (samples.length < 8) return; // need some history (~0.8s at 100ms)
+
+    // A frozen BLE stream (scale watchdog / radio stall) stops new samples.
+    // Do not treat leftover ticks as "pump off" and kill the brew.
+    final started = controller.sessionStartedAt;
+    if (started != null) {
+      final lastAge = DateTime.now().difference(
+        started.add(Duration(milliseconds: samples.last.elapsedMs)),
+      );
+      if (lastAge > const Duration(milliseconds: 800)) {
+        _autoStopTimer?.cancel();
+        _autoStopTimer = null;
+        return;
+      }
+    }
 
     // Look at last ~8 samples (~800ms). If pressure has been near zero after
     // we have seen meaningful pressure, auto-stop so forgotten brews don't
@@ -791,6 +797,7 @@ class _LiveScreenState extends State<LiveScreen> {
       _weightRearmAttempted = false;
       _liveWeightNotifier.value = null;
       _liveWeightLastUpdate.value = null;
+      _sensorHub?.setScaleRecoveryEnabled(false);
       // Re-enable live follow for the new pull.
       _chartInteractionController.resetViewport();
       // Reload brew defaults so yield target/warn edits apply to this shot.
@@ -799,6 +806,7 @@ class _LiveScreenState extends State<LiveScreen> {
       }));
     }
     if (!brewing && _wasBrewing) {
+      _sensorHub?.setScaleRecoveryEnabled(true);
       // Show the whole pull after stop (not the live last-~30s window).
       _chartInteractionController.fitFullShot();
       // In-brew "wind back" cue is stale once recording ends, and it sits
@@ -1058,10 +1066,9 @@ class _LiveScreenState extends State<LiveScreen> {
       listenables.add(_targetBrewController!);
     }
     listenables.add(_resolvedAutoStartController);
-    final sensorHub = SensorHubScope.maybeOf(context);
-    if (sensorHub != null) {
-      listenables.add(sensorHub);
-    }
+    // Do not merge SensorHub here. BLE connect / reconnect notifies several
+    // times a second and was rebuilding the whole brew tree (and fighting
+    // any snackbar overlay). Idle chrome listens to the hub locally.
 
     return ListenableBuilder(
       listenable: Listenable.merge(listenables),
@@ -1214,23 +1221,47 @@ class _LiveScreenState extends State<LiveScreen> {
                         ],
                         if (state == ShotSessionState.idle ||
                             state == ShotSessionState.stopped)
-                          _IdleSensorStatus(
-                            pressureBarNotifier: _livePressureNotifier,
-                            lastUpdateNotifier: _livePressureLastUpdate,
-                            pressensorPaired: SensorHubScope.maybeOf(context)
-                                    ?.hasKind(SensorKind.pressensor) ??
-                                false,
-                            pressensorLinkState:
-                                SensorHubScope.maybeOf(context)
-                                        ?.pressensorState ??
-                                    ConnectionState.disconnected,
-                            onReconnect: _onReconnectSensors,
-                            onPair: _onPairSensors,
-                            autoStartEnabled: _resolvedAutoStartController
-                                .settings.enabled,
-                            autoStartThreshold: _resolvedAutoStartController
-                                .settings.startThresholdBar,
-                          ),
+                          _sensorHub == null
+                              ? _IdleSensorStatus(
+                                  pressureBarNotifier: _livePressureNotifier,
+                                  lastUpdateNotifier: _livePressureLastUpdate,
+                                  pressensorPaired: false,
+                                  pressensorLinkState:
+                                      ConnectionState.disconnected,
+                                  onReconnect: _onReconnectSensors,
+                                  onPair: _onPairSensors,
+                                  autoStartEnabled:
+                                      _resolvedAutoStartController
+                                          .settings.enabled,
+                                  autoStartThreshold:
+                                      _resolvedAutoStartController
+                                          .settings.startThresholdBar,
+                                )
+                              : ListenableBuilder(
+                                  listenable: _sensorHub!,
+                                  builder: (context, _) {
+                                    final hub = _sensorHub!;
+                                    return _IdleSensorStatus(
+                                      pressureBarNotifier:
+                                          _livePressureNotifier,
+                                      lastUpdateNotifier:
+                                          _livePressureLastUpdate,
+                                      pressensorPaired: hub.hasKind(
+                                        SensorKind.pressensor,
+                                      ),
+                                      pressensorLinkState:
+                                          hub.pressensorState,
+                                      onReconnect: _onReconnectSensors,
+                                      onPair: _onPairSensors,
+                                      autoStartEnabled:
+                                          _resolvedAutoStartController
+                                              .settings.enabled,
+                                      autoStartThreshold:
+                                          _resolvedAutoStartController
+                                              .settings.startThresholdBar,
+                                    );
+                                  },
+                                ),
                         if (state == ShotSessionState.idle ||
                             state == ShotSessionState.stopped)
                           const SizedBox(height: 8),

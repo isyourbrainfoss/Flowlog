@@ -349,7 +349,7 @@ class LiveSensorSource {
 
   int _lastPressureForwardMs = 0;
 
-  /// Forwards live pressensor bar to the scale OLED (throttled ~2 Hz).
+  /// Forwards live pressensor bar to the scale OLED (throttled ~1 Hz).
   ///
   /// Kept well below the weight notify rate so BLE writes never crowd out
   /// FFF4 weight packets mid-brew.
@@ -359,7 +359,7 @@ class LiveSensorSource {
       return;
     }
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastPressureForwardMs < 500) {
+    if (now - _lastPressureForwardMs < 1000) {
       return;
     }
     _lastPressureForwardMs = now;

@@ -93,6 +93,28 @@ class SensorHub extends ChangeNotifier {
   String? _lastError;
   Timer? _scaleHealthTimer;
   final Set<String> _scaleRecoverInFlight = {};
+  bool _scaleRecoveryEnabled = true;
+
+  /// When false, silent-scale recovery must not disconnect/reconnect.
+  /// Live turns this off for the duration of a brew so a brief FFF4 gap
+  /// cannot freeze the DIY scale or drop the pressensor on the same radio.
+  bool get scaleRecoveryEnabled => _scaleRecoveryEnabled;
+
+  void setScaleRecoveryEnabled(bool enabled) {
+    if (_scaleRecoveryEnabled == enabled) {
+      return;
+    }
+    _scaleRecoveryEnabled = enabled;
+    _applyScaleRecoveryPolicy();
+  }
+
+  void _applyScaleRecoveryPolicy() {
+    for (final adapter in _activeAdapters.values) {
+      if (adapter is DecentScaleBleAdapter) {
+        adapter.allowHardRecovery = _scaleRecoveryEnabled;
+      }
+    }
+  }
 
   List<PairedSensorEntry> get devices => List.unmodifiable(_devices);
 
@@ -299,6 +321,9 @@ class SensorHub extends ChangeNotifier {
   }
 
   Future<void> _recoverSilentScales() async {
+    if (!_scaleRecoveryEnabled) {
+      return;
+    }
     for (final device in List<PairedSensorEntry>.from(_devices)) {
       if (device.kind != SensorKind.scale) {
         continue;
@@ -480,6 +505,9 @@ class SensorHub extends ChangeNotifier {
         bleRemoteId: bleRemoteId,
       );
       _activeAdapters[id] = adapter;
+      if (adapter is DecentScaleBleAdapter) {
+        adapter.allowHardRecovery = _scaleRecoveryEnabled;
+      }
       _adapterStateSubs[id] = adapter.state.listen((state) {
         _onAdapterStateChanged(id, state);
       });
@@ -570,6 +598,7 @@ class SensorHub extends ChangeNotifier {
       setLastError('Sensor link error ($id).');
       final device = _devices[index];
       if (device.kind == SensorKind.scale &&
+          _scaleRecoveryEnabled &&
           !_scaleRecoverInFlight.contains(id)) {
         // Scale watchdog escalated — full reconnect.
         _ensureScaleHealthWatchdog();

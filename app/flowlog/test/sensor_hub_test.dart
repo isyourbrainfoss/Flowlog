@@ -145,6 +145,17 @@ void main() {
       expect(hub.devices.first.state, ConnectionState.connected);
     });
 
+    test('setScaleRecoveryEnabled is off during brew policy', () {
+      final hub = SensorHub();
+      addTearDown(hub.dispose);
+
+      expect(hub.scaleRecoveryEnabled, isTrue);
+      hub.setScaleRecoveryEnabled(false);
+      expect(hub.scaleRecoveryEnabled, isFalse);
+      hub.setScaleRecoveryEnabled(true);
+      expect(hub.scaleRecoveryEnabled, isTrue);
+    });
+
     test('skips devices without a BLE remote id', () async {
       final backend = _CountingConnectBackend();
       final hub = SensorHub(bleBackend: backend);

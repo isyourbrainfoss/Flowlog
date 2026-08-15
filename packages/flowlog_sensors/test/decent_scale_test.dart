@@ -204,6 +204,36 @@ void main() {
       expect(heartbeats, greaterThanOrEqualTo(2));
     });
 
+    test('isWeightStreamSilent waits for grace after connect', () async {
+      await adapter.connect();
+
+      clockMs = 1_000 + 1_500;
+      expect(
+        adapter.isWeightStreamSilent(silentFor: const Duration(seconds: 4)),
+        isFalse,
+      );
+
+      clockMs = 1_000 + 5_000;
+      expect(
+        adapter.isWeightStreamSilent(silentFor: const Duration(seconds: 4)),
+        isTrue,
+      );
+
+      clockMs = 8_000;
+      transport.emitNotification([0x03, 0xCE, 0x00, 0x65, 0x00, 0x00, 0xA8]);
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        adapter.isWeightStreamSilent(silentFor: const Duration(seconds: 4)),
+        isFalse,
+      );
+
+      clockMs = 13_000;
+      expect(
+        adapter.isWeightStreamSilent(silentFor: const Duration(seconds: 4)),
+        isTrue,
+      );
+    });
+
     test('disconnect stops heartbeat and emits disconnected', () async {
       final states = <ConnectionState>[];
       final sub = adapter.state.listen(states.add);

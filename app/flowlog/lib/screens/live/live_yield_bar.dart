@@ -65,6 +65,51 @@ enum WeightStreamHealth {
   notExpected,
 }
 
+/// How long a weight packet stays "fresh" before the live UI treats the
+/// stream as silent. 2s was too tight: merged samples carry last weight
+/// forward, so the cup digits stayed live while this window expired.
+const Duration kWeightStreamFreshWindow = Duration(seconds: 6);
+
+/// Resolves cup-weight stream health for Live.
+///
+/// After the pull ([isBrewing] false), sample weights already on the shot
+/// are the record — do not show a "not sending weight" fault.
+WeightStreamHealth resolveWeightStreamHealth({
+  required bool scalePaired,
+  required bool scaleLinked,
+  required bool isBrewing,
+  required bool shotHasWeight,
+  int? lastWeightReceiveMs,
+  int? nowMs,
+  Duration? brewElapsed,
+  Duration freshWindow = kWeightStreamFreshWindow,
+}) {
+  if (!scalePaired) {
+    return WeightStreamHealth.notExpected;
+  }
+  if (!scaleLinked) {
+    return WeightStreamHealth.disconnected;
+  }
+  if (!isBrewing) {
+    return shotHasWeight
+        ? WeightStreamHealth.live
+        : WeightStreamHealth.notExpected;
+  }
+
+  final now = nowMs ?? DateTime.now().millisecondsSinceEpoch;
+  if (lastWeightReceiveMs != null &&
+      now - lastWeightReceiveMs <= freshWindow.inMilliseconds) {
+    return WeightStreamHealth.live;
+  }
+  // Link just came up / brew just started — wait before alarming.
+  if (lastWeightReceiveMs == null &&
+      brewElapsed != null &&
+      brewElapsed < freshWindow) {
+    return WeightStreamHealth.live;
+  }
+  return WeightStreamHealth.linkedNoWeight;
+}
+
 /// Live cup weight with a fill bar toward the target yield.
 ///
 /// Shows a large gram readout, progress toward [targetYieldG], a mark at the
@@ -107,7 +152,10 @@ class LiveYieldProgress extends StatelessWidget {
     final progress = weight == null ? 0.0 : (weight / target).clamp(0.0, 1.0);
     final atWarn = weight != null && weight >= warn;
     final atTarget = weight != null && weight >= target;
-    final noStream = weightHealth == WeightStreamHealth.linkedNoWeight;
+    // Only fault when there is no cup reading at all. A last-known weight
+    // mid-brew is still valid even if FFF4 has gone quiet for a few seconds.
+    final noStream =
+        weightHealth == WeightStreamHealth.linkedNoWeight && weight == null;
     final fillColor = noStream
         ? cs.error
         : atTarget

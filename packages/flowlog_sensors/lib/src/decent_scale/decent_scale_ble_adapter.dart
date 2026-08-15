@@ -60,15 +60,29 @@ class DecentScaleBleAdapter implements SensorAdapter {
   /// Monotonic host ms of the last weight sample, if any this session.
   int? get lastWeightReceiveMs => _lastWeightReceiveMs;
 
+  /// When false, the silent-stream watchdog only soft-rearms (LED-on). It
+  /// never marks [ConnectionState.error], which would make SensorHub drop
+  /// the GATT link mid-brew and often freeze the DIY scale.
+  bool allowHardRecovery = true;
+
   /// True when connected but no weight packet for [silentFor].
+  ///
+  /// A brand-new link ([lastWeightReceiveMs] null) is not silent until
+  /// [silentFor] has elapsed since connect — otherwise reconnect loops
+  /// immediately after `connect()` clears the last-receive stamp.
   bool isWeightStreamSilent({
     Duration silentFor = const Duration(seconds: 4),
   }) {
+    final now = _monotonicClock();
     final last = _lastWeightReceiveMs;
-    if (last == null) {
+    if (last != null) {
+      return now - last >= silentFor.inMilliseconds;
+    }
+    final start = _streamStartMs;
+    if (start == null) {
       return true;
     }
-    return _monotonicClock() - last >= silentFor.inMilliseconds;
+    return now - start >= silentFor.inMilliseconds;
   }
 
   @override
@@ -215,6 +229,20 @@ class DecentScaleBleAdapter implements SensorAdapter {
       }
       if (!isWeightStreamSilent(silentFor: const Duration(seconds: 5))) {
         _silentRearmAttempts = 0;
+        return;
+      }
+      if (!allowHardRecovery) {
+        // Mid-brew: one LED-on, never tear down the link.
+        if (_silentRearmAttempts == 0) {
+          _silentRearmAttempts = 1;
+          unawaited(() async {
+            try {
+              await ledOn();
+            } on Object {
+              // Best-effort.
+            }
+          }());
+        }
         return;
       }
       if (_silentRearmAttempts >= 2) {
