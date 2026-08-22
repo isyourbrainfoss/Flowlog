@@ -6,6 +6,7 @@ import 'package:flowlog/screens/history/import_scale_shot.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/history/shot_detail.dart';
 import 'package:flowlog/shell/shot_events.dart';
+import 'package:flowlog/shell/shell_breakpoints.dart';
 import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -355,6 +356,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
         final listLoading = isInitialLoad ||
             (snapshot.connectionState != ConnectionState.done && data != null);
 
+        final size = MediaQuery.sizeOf(context);
+        final compactHistory = size.width < ShellBreakpoints.sidebar ||
+            size.height < ShellBreakpoints.minRailHeight;
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -364,16 +369,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
               beanSuggestions: _beanSuggestions,
               onChanged: _onFiltersChanged,
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              child: FilledButton.tonalIcon(
-                key: const Key('history_import_scale_shot'),
-                onPressed: _importFromScale,
-                icon: const Icon(Icons.scale_outlined),
-                label: const Text('Import last shot from scale'),
+            // Phone: keep the list of brews. Import lives on More; high
+            // scores still show on each card. Wide layouts keep the extras.
+            if (!compactHistory)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: FilledButton.tonalIcon(
+                  key: const Key('history_import_scale_shot'),
+                  onPressed: _importFromScale,
+                  icon: const Icon(Icons.scale_outlined),
+                  label: const Text('Import last shot from scale'),
+                ),
               ),
-            ),
-            if (topScores.isNotEmpty) ...[
+            if (!compactHistory && topScores.isNotEmpty) ...[
               _LeaderboardSection(
                 topScores: topScores,
                 onOpenShot: _openShotDetail,

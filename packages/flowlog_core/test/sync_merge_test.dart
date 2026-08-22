@@ -176,6 +176,39 @@ void main() {
       expect(await repo.isShotDeleted(shot.id), isTrue);
     });
 
+    test('keeps local bean edit when a later blob re-exports the old shot',
+        () async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json');
+      final repo = ShotRepository(db);
+      final edited = shot.copyWith(
+        beanId: 'bean-oslo',
+        lastModifiedAt: DateTime.utc(2026, 8, 12, 10),
+      );
+      await repo.insertShot(edited);
+
+      final staleRemote = shot.copyWith(
+        beanId: 'bean-house-blend',
+        lastModifiedAt: DateTime.utc(2026, 8, 12, 8),
+      );
+
+      await mergeSyncPayloadFromRemote(
+        database: db,
+        payload: SyncPayload(
+          version: syncPayloadVersion,
+          exportedAt: DateTime.utc(2026, 8, 12, 11),
+          config: const SyncConfig(),
+          shots: [staleRemote],
+          profiles: const [],
+          beans: const [],
+        ),
+        remoteExportedAt: DateTime.utc(2026, 8, 12, 11),
+      );
+
+      final stored = await repo.getShotById(shot.id);
+      expect(stored?.beanId, 'bean-oslo');
+      expect(stored?.lastModifiedAt, DateTime.utc(2026, 8, 12, 10));
+    });
+
     test('export includes deletedShots after local delete', () async {
       final shot = _loadFixtureShot('shots/minimal_shot.json');
       final repo = ShotRepository(db);

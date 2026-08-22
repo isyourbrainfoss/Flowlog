@@ -43,6 +43,42 @@ void main() {
       expect(shots.map((shot) => shot.id).toList(), ['shot-house']);
     });
 
+    test('filters by unicode bean name regardless of ø case', () async {
+      await _seedKaffaOslo(
+        shotRepository: shotRepository,
+        beanRepository: beanRepository,
+      );
+      final shots = await shotRepository.listShots(
+        filters: const ShotListFilters(beanQuery: 'mørkbrent'),
+      );
+
+      expect(shots.map((shot) => shot.id).toList(), ['shot-oslo']);
+    });
+
+    test('filters by folded ascii for ø (morkbrent)', () async {
+      await _seedKaffaOslo(
+        shotRepository: shotRepository,
+        beanRepository: beanRepository,
+      );
+      final shots = await shotRepository.listShots(
+        filters: const ShotListFilters(beanQuery: 'morkbrent'),
+      );
+
+      expect(shots.map((shot) => shot.id).toList(), ['shot-oslo']);
+    });
+
+    test('filters by roaster brand KAFFA', () async {
+      await _seedKaffaOslo(
+        shotRepository: shotRepository,
+        beanRepository: beanRepository,
+      );
+      final shots = await shotRepository.listShots(
+        filters: const ShotListFilters(beanQuery: 'KAFFA'),
+      );
+
+      expect(shots.map((shot) => shot.id).toList(), ['shot-oslo']);
+    });
+
     test('filters by date range', () async {
       final shots = await shotRepository.listShots(
         filters: ShotListFilters(
@@ -270,6 +306,29 @@ void main() {
       expect(find.byType(HistoryShotCard), findsNWidgets(2));
     });
 
+    testWidgets('bean search clear X empties the query', (tester) async {
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: shotRepository,
+        tagRepository: tagRepository,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('history_filter_bean')),
+        'ethiopia',
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      expect(find.byType(HistoryShotCard), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('history_filter_bean_clear')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HistoryShotCard), findsNWidgets(2));
+      expect(find.text('ethiopia'), findsNothing);
+    });
+
     testWidgets('tag filter updates visible history cards', (tester) async {
       await _pumpHistoryScreen(
         tester,
@@ -332,6 +391,34 @@ Future<void> _seedFilterFixtures({
     ),
   );
   await tagRepository.setTagsForShot('shot-house', ['tag-dial-in']);
+}
+
+Future<void> _seedKaffaOslo({
+  required ShotRepository shotRepository,
+  required BeanRepository beanRepository,
+}) async {
+  await beanRepository.upsertBean(
+    const Bean(
+      id: 'bean-oslo',
+      name: 'Oslo Mørkbrent',
+      brand: 'KAFFA',
+      origin: 'Colombia',
+    ),
+  );
+  await shotRepository.insertShot(
+    Shot(
+      id: 'shot-oslo',
+      startedAt: DateTime.utc(2026, 6, 27, 9),
+      endedAt: DateTime.utc(2026, 6, 27, 9, 0, 20),
+      beanId: 'bean-oslo',
+      tasteScore: 7,
+      grindSetting: 4.0,
+      samples: const [
+        ShotSample(elapsedMs: 0, pressureBar: 0),
+        ShotSample(elapsedMs: 15000, pressureBar: 8.1),
+      ],
+    ),
+  );
 }
 
 Future<void> _pumpHistoryScreen(

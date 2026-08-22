@@ -19,7 +19,8 @@ class ShotListFilters {
 
   static const empty = ShotListFilters();
 
-  /// Case-insensitive substring matched against bean id and linked bean name.
+  /// Case-insensitive substring matched against bean id, name, brand, origin,
+  /// variety, process, and notes (Unicode-aware; not SQLite LIKE).
   final String beanQuery;
 
   /// Inclusive lower bound on [Shot.startedAt].

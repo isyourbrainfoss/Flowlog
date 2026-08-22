@@ -112,6 +112,68 @@ int _countMojibakeMarkers(String s) {
   return RegExp(r'[\u00c3\u00c2\uFFFDÃÂ]').allMatches(s).length;
 }
 
+/// Case-folds and strips diacritics for cross-platform bean search.
+///
+/// Android SQLite `LIKE` / `lower()` only fold ASCII, so "mørkbrent" never
+/// matched "Mørkbrent". Dart search is Unicode-aware and also repairs
+/// mojibake so a synced dirty name still matches what the UI shows.
+String foldForSearch(String input) {
+  final repaired = repairMojibake(input) ?? input;
+  final buf = StringBuffer();
+  for (final r in repaired.toLowerCase().runes) {
+    if (r >= 0x300 && r <= 0x36F) {
+      continue;
+    }
+    buf.write(_searchFoldMap[r] ?? String.fromCharCode(r));
+  }
+  return buf.toString();
+}
+
+const Map<int, String> _searchFoldMap = {
+  0xE5: 'a', // å
+  0xE4: 'a', // ä
+  0xE1: 'a',
+  0xE0: 'a',
+  0xE6: 'ae', // æ
+  0xE9: 'e',
+  0xE8: 'e',
+  0xEA: 'e',
+  0xEB: 'e',
+  0xED: 'i',
+  0xEC: 'i',
+  0xEF: 'i',
+  0xF8: 'o', // ø
+  0xF6: 'o', // ö
+  0xF3: 'o',
+  0xF2: 'o',
+  0xFA: 'u',
+  0xF9: 'u',
+  0xFC: 'u',
+  0xF1: 'n',
+  0xE7: 'c',
+};
+
+/// True when [query] matches [bean] id, name, brand, origin, variety, or notes.
+bool beanMatchesQuery(Bean bean, String query) {
+  final q = foldForSearch(query).trim();
+  if (q.isEmpty) {
+    return true;
+  }
+  final cleaned = bean.repaired();
+  final haystack = foldForSearch(
+    [
+      cleaned.id,
+      cleaned.name,
+      cleaned.brand,
+      cleaned.origin,
+      cleaned.variety,
+      cleaned.process,
+      cleaned.notes,
+    ].whereType<String>().join(' '),
+  );
+  return haystack.contains(q);
+}
+
 int _countLettersAbove127(String s) {
   var n = 0;
   for (final r in s.runes) {

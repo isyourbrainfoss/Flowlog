@@ -119,4 +119,42 @@ void main() {
       expect(formatBeanDisplayLabel(bean), 'KAFFA · Oslo Mørkbrent');
     });
   });
+
+  group('beanMatchesQuery', () {
+    const bean = Bean(
+      id: 'bean-oslo',
+      name: 'Oslo Mørkbrent',
+      brand: 'KAFFA',
+      origin: 'Colombia',
+    );
+
+    test('matches name ignoring ø case', () {
+      expect(beanMatchesQuery(bean, 'mørkbrent'), isTrue);
+      expect(beanMatchesQuery(bean, 'MORKBRENT'), isTrue);
+      expect(beanMatchesQuery(bean, 'oslo'), isTrue);
+    });
+
+    test('matches roaster brand KAFFA', () {
+      expect(beanMatchesQuery(bean, 'kaffa'), isTrue);
+      expect(beanMatchesQuery(bean, 'KAFFA'), isTrue);
+    });
+
+    test('matches origin', () {
+      expect(beanMatchesQuery(bean, 'colombia'), isTrue);
+    });
+
+    test('matches mojibake stored names to the repaired query', () {
+      var name = 'Oslo Mørkbrent';
+      for (var i = 0; i < 7; i++) {
+        name = latin1.decode(utf8.encode(name));
+      }
+      final dirty = Bean(id: 'bean-dirty', name: name, brand: 'KAFFA');
+      expect(beanMatchesQuery(dirty, 'mørkbrent'), isTrue);
+      expect(beanMatchesQuery(dirty, 'kaffa'), isTrue);
+    });
+
+    test('rejects unrelated queries', () {
+      expect(beanMatchesQuery(bean, 'yirgacheffe'), isFalse);
+    });
+  });
 }

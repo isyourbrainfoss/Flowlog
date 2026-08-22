@@ -5,7 +5,8 @@ import 'package:meta/meta.dart';
 
 import '../models/flavour_intensities.dart';
 import '../models/shot.dart' as models;
-import '../models/bean.dart' show repairMojibake;
+import '../models/bean.dart' show beanMatchesQuery, foldForSearch, repairMojibake;
+import 'bean_repository.dart';
 import '../models/shot_annotation.dart' as models;
 import '../models/shot_sample.dart' as models;
 import 'flowlog_database.dart';
@@ -287,22 +288,25 @@ class ShotRepository {
   ) async {
     final beanQuery = filters.beanQuery.trim();
     if (beanQuery.isNotEmpty) {
-      final normalized = beanQuery.toLowerCase();
-      final beanIds = await (_db.select(_db.beans)
-            ..where(
-              (bean) =>
-                  bean.name.lower().like('%$normalized%') |
-                  bean.id.lower().like('%$normalized%'),
-            ))
-          .map((row) => row.id)
-          .get();
+      // Match in Dart (Unicode + brand/origin). SQLite LIKE is ASCII-only
+      // on Android, so "mørkbrent" never hit "Mørkbrent" there.
+      final beans = await BeanRepository(_db).listBeans();
+      final beanIds = [
+        for (final bean in beans)
+          if (beanMatchesQuery(bean, beanQuery)) bean.id,
+      ];
+      final folded = foldForSearch(beanQuery).trim();
+      final idNeedle = _safeLikeNeedle(folded);
 
       query.where((shot) {
-        final idMatch = shot.beanId.lower().like('%$normalized%');
-        if (beanIds.isEmpty) {
-          return idMatch;
+        Expression<bool> pred = const Constant(false);
+        if (beanIds.isNotEmpty) {
+          pred = pred | shot.beanId.isIn(beanIds);
         }
-        return idMatch | shot.beanId.isIn(beanIds);
+        if (idNeedle != null) {
+          pred = pred | shot.beanId.lower().like('%$idNeedle%');
+        }
+        return pred;
       });
     }
 
@@ -371,6 +375,18 @@ class ShotRepository {
         query.where((shot) => shot.id.isIn(shotIds));
       }
     }
+  }
+
+  /// ASCII id fragment safe to interpolate into LIKE. Null if [folded] has
+  /// wildcards or quotes (those are handled via [beanMatchesQuery] instead).
+  static String? _safeLikeNeedle(String folded) {
+    if (folded.isEmpty) {
+      return null;
+    }
+    if (!RegExp(r'^[a-z0-9._-]+$').hasMatch(folded)) {
+      return null;
+    }
+    return folded;
   }
 
   // Note: the target samples loading for filtered list is handled in listShots when includeSamples.

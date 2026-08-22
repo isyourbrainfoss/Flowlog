@@ -135,18 +135,18 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
   }
 
   List<Bean> _matchingBeans(String query) {
-    final q = query.trim().toLowerCase();
-    if (q.isEmpty) {
+    if (query.trim().isEmpty) {
       return widget.beanSuggestions.take(8).toList(growable: false);
     }
     return widget.beanSuggestions
-        .where(
-          (bean) =>
-              bean.name.toLowerCase().contains(q) ||
-              bean.id.toLowerCase().contains(q),
-        )
+        .where((bean) => beanMatchesQuery(bean, query))
         .take(8)
         .toList(growable: false);
+  }
+
+  void _clearBeanQuery() {
+    _beanController.clear();
+    _emit(widget.filters.copyWith(beanQuery: ''), immediate: true);
   }
 
   @override
@@ -166,7 +166,8 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
               key: const Key('history_filter_bean_autocomplete'),
               textEditingController: _beanController,
               focusNode: _beanFocusNode,
-              displayStringForOption: (bean) => bean.name,
+              displayStringForOption: (bean) =>
+                  formatBeanDisplayLabel(bean, allBeans: widget.beanSuggestions),
               optionsBuilder: (textEditingValue) {
                 return _matchingBeans(textEditingValue.text);
               },
@@ -185,24 +186,37 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
                 focusNode,
                 onFieldSubmitted,
               ) {
-                return TextField(
-                  key: const Key('history_filter_bean'),
-                  controller: controller,
-                  focusNode: focusNode,
-                  decoration: const InputDecoration(
-                    labelText: 'Bean name or id',
-                    hintText: 'Type to search…',
-                    isDense: true,
-                    prefixIcon: Icon(Icons.search, size: 20),
-                  ),
-                  textInputAction: TextInputAction.search,
-                  onChanged: _emitBeanQuery,
-                  onSubmitted: (value) {
-                    _emit(
-                      widget.filters.copyWith(beanQuery: value),
-                      immediate: true,
+                return ListenableBuilder(
+                  listenable: controller,
+                  builder: (context, _) {
+                    return TextField(
+                      key: const Key('history_filter_bean'),
+                      controller: controller,
+                      focusNode: focusNode,
+                      decoration: InputDecoration(
+                        labelText: 'Bean, roaster or origin',
+                        hintText: 'e.g. KAFFA or Oslo',
+                        isDense: true,
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        suffixIcon: controller.text.isEmpty
+                            ? null
+                            : IconButton(
+                                key: const Key('history_filter_bean_clear'),
+                                tooltip: 'Clear search',
+                                icon: const Icon(Icons.close, size: 20),
+                                onPressed: _clearBeanQuery,
+                              ),
+                      ),
+                      textInputAction: TextInputAction.search,
+                      onChanged: _emitBeanQuery,
+                      onSubmitted: (value) {
+                        _emit(
+                          widget.filters.copyWith(beanQuery: value),
+                          immediate: true,
+                        );
+                        onFieldSubmitted();
+                      },
                     );
-                    onFieldSubmitted();
                   },
                 );
               },
@@ -226,12 +240,30 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
                           final bean = options.elementAt(index);
                           return ListTile(
                             dense: true,
-                            title: Text(bean.name),
-                            subtitle: Text(
-                              bean.id,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            title: Text(
+                              formatBeanDisplayLabel(
+                                bean,
+                                allBeans: widget.beanSuggestions,
+                              ),
                             ),
+                            subtitle: () {
+                              final parts = [
+                                if (bean.brand != null &&
+                                    bean.brand!.trim().isNotEmpty)
+                                  bean.brand!.trim(),
+                                if (bean.origin != null &&
+                                    bean.origin!.trim().isNotEmpty)
+                                  bean.origin!.trim(),
+                              ];
+                              if (parts.isEmpty) {
+                                return null;
+                              }
+                              return Text(
+                                parts.join(' · '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              );
+                            }(),
                             onTap: () => onSelected(bean),
                           );
                         },

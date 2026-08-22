@@ -266,45 +266,54 @@ Shot mergeShotRecords({
     return remote;
   }
 
-  // If the local shot has been modified (lastModifiedAt set on edit) after the
-  // remote snapshot was exported, treat local as authoritative: keep its
-  // values (including explicit clears/nulls) so user edits are not lost.
-  // Otherwise fall back to the previous fill logic (local ?? remote) so that
-  // a remote can still supply metadata that the local recording didn't have.
-  final localMod = local.lastModifiedAt;
-  final localIsNewer = localMod != null && remoteExportedAt.isBefore(localMod);
+  // Per-shot lastModifiedAt, not blob exportedAt. A device that is open and
+  // re-exports the whole DB after a peer edited one shot used to look "newer"
+  // and roll bean/notes back to the stale copy.
+  final localWinsMeta =
+      _isNewerRecord(local.lastModifiedAt, remote.lastModifiedAt);
+
+  T? pickMeta<T>(T? localValue, T? remoteValue) {
+    if (localWinsMeta) {
+      return localValue;
+    }
+    return remoteValue ?? localValue;
+  }
 
   return local.copyWith(
     startedAt: local.startedAt,
     endedAt: local.endedAt ?? remote.endedAt,
-    doseG: localIsNewer ? local.doseG : (remote.doseG ?? local.doseG),
-    yieldG: localIsNewer ? local.yieldG : (remote.yieldG ?? local.yieldG),
-    grindSetting: localIsNewer ? local.grindSetting : (remote.grindSetting ?? local.grindSetting),
-    beanId: localIsNewer ? local.beanId : (remote.beanId ?? local.beanId),
-    waterTempC: localIsNewer ? local.waterTempC : (remote.waterTempC ?? local.waterTempC),
-    notes: localIsNewer ? local.notes : (remote.notes ?? local.notes),
-    location: localIsNewer ? local.location : (remote.location ?? local.location),
-    latitude: localIsNewer ? local.latitude : (remote.latitude ?? local.latitude),
-    longitude: localIsNewer ? local.longitude : (remote.longitude ?? local.longitude),
-    tasteScore: localIsNewer ? local.tasteScore : (remote.tasteScore ?? local.tasteScore),
-    coffeejackRewindTurns: localIsNewer
-        ? local.coffeejackRewindTurns
-        : (remote.coffeejackRewindTurns ?? local.coffeejackRewindTurns),
-    coffeejackPreinfusionTurns: localIsNewer
-        ? local.coffeejackPreinfusionTurns
-        : (remote.coffeejackPreinfusionTurns ?? local.coffeejackPreinfusionTurns),
-    grinder: localIsNewer ? local.grinder : (remote.grinder ?? local.grinder),
-    showerScreen: localIsNewer ? local.showerScreen : (remote.showerScreen ?? local.showerScreen),
-    basket: localIsNewer ? local.basket : (remote.basket ?? local.basket),
-    scale: localIsNewer ? local.scale : (remote.scale ?? local.scale),
-    brewer: localIsNewer ? local.brewer : (remote.brewer ?? local.brewer),
-    lastModifiedAt: local.lastModifiedAt ?? remote.lastModifiedAt,
-    flavourTags: localIsNewer
+    doseG: pickMeta(local.doseG, remote.doseG),
+    yieldG: pickMeta(local.yieldG, remote.yieldG),
+    grindSetting: pickMeta(local.grindSetting, remote.grindSetting),
+    beanId: pickMeta(local.beanId, remote.beanId),
+    waterTempC: pickMeta(local.waterTempC, remote.waterTempC),
+    notes: pickMeta(local.notes, remote.notes),
+    location: pickMeta(local.location, remote.location),
+    latitude: pickMeta(local.latitude, remote.latitude),
+    longitude: pickMeta(local.longitude, remote.longitude),
+    tasteScore: pickMeta(local.tasteScore, remote.tasteScore),
+    coffeejackRewindTurns: pickMeta(
+      local.coffeejackRewindTurns,
+      remote.coffeejackRewindTurns,
+    ),
+    coffeejackPreinfusionTurns: pickMeta(
+      local.coffeejackPreinfusionTurns,
+      remote.coffeejackPreinfusionTurns,
+    ),
+    grinder: pickMeta(local.grinder, remote.grinder),
+    showerScreen: pickMeta(local.showerScreen, remote.showerScreen),
+    basket: pickMeta(local.basket, remote.basket),
+    scale: pickMeta(local.scale, remote.scale),
+    brewer: pickMeta(local.brewer, remote.brewer),
+    lastModifiedAt: _laterTimestamp(local.lastModifiedAt, remote.lastModifiedAt),
+    flavourTags: localWinsMeta
         ? local.flavourTags
         : (remote.flavourTags.isNotEmpty ? remote.flavourTags : local.flavourTags),
-    flavourIntensities: localIsNewer
+    flavourIntensities: localWinsMeta
         ? local.flavourIntensities
-        : (remote.flavourIntensities.isNotEmpty ? remote.flavourIntensities : local.flavourIntensities),
+        : (remote.flavourIntensities.isNotEmpty
+            ? remote.flavourIntensities
+            : local.flavourIntensities),
     samples: local.samples.length >= remote.samples.length
         ? local.samples
         : remote.samples,
@@ -447,6 +456,26 @@ Map<String, List<String>> _groupShotTagLinks(List<ShotTagLink> links) {
     grouped.putIfAbsent(link.shotId, () => []).add(link.tagId);
   }
   return grouped;
+}
+
+bool _isNewerRecord(DateTime? candidate, DateTime? other) {
+  if (candidate == null) {
+    return false;
+  }
+  if (other == null) {
+    return true;
+  }
+  return candidate.isAfter(other);
+}
+
+DateTime? _laterTimestamp(DateTime? a, DateTime? b) {
+  if (a == null) {
+    return b;
+  }
+  if (b == null) {
+    return a;
+  }
+  return a.isAfter(b) ? a : b;
 }
 
 DateTime? _shotActivityAt(Shot? shot) {
