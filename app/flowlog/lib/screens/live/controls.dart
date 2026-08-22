@@ -44,7 +44,6 @@ class LiveShotController extends ChangeNotifier {
   bool _stopInFlight = false;
   String? _lastStartError;
   DateTime? _lastUiNotify;
-  Timer? _uiNotifyTimer;
 
   /// Cleared on successful start; set when connect fails (UI can show snackbar).
   String? get lastStartError => _lastStartError;
@@ -76,18 +75,11 @@ class LiveShotController extends ChangeNotifier {
   void _scheduleUiNotify() {
     final now = DateTime.now();
     final last = _lastUiNotify;
-    if (last == null || now.difference(last) >= _uiNotifyMinInterval) {
-      _uiNotifyTimer?.cancel();
-      _uiNotifyTimer = null;
-      _lastUiNotify = now;
-      _notify();
+    if (last != null && now.difference(last) < _uiNotifyMinInterval) {
       return;
     }
-    _uiNotifyTimer ??= Timer(_uiNotifyMinInterval - now.difference(last), () {
-      _uiNotifyTimer = null;
-      _lastUiNotify = DateTime.now();
-      _notify();
-    });
+    _lastUiNotify = now;
+    _notify();
   }
 
   ShotSession get session => _session;
@@ -368,7 +360,6 @@ class LiveShotController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    _uiNotifyTimer?.cancel();
     _stateSub?.cancel();
     _sampleBatchSub?.cancel();
     unawaited(_session.dispose());

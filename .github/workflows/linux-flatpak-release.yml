@@ -130,6 +130,22 @@ jobs:
           touch site/.nojekyll
 
       - name: Deploy Flatpak repo to gh-pages (merge with Android mirror)
+        id: pages_deploy
+        continue-on-error: true
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: site
+          publish_branch: gh-pages
+          keep_files: true
+          enable_jekyll: false
+
+      - name: Retry Flatpak gh-pages deploy
+        if: steps.pages_deploy.outcome == 'failure'
+        run: sleep 20
+
+      - name: Deploy Flatpak repo to gh-pages (retry)
+        if: steps.pages_deploy.outcome == 'failure'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

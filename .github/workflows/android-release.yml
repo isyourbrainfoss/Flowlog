@@ -93,6 +93,22 @@ jobs:
         run: bash tool/prepare_pages_site.sh flowlog-arm64-v8a.apk "$VERSION" "$VERSION_CODE" site
 
       - name: Deploy APK mirror to gh-pages branch
+        id: pages_deploy
+        continue-on-error: true
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: site
+          publish_branch: gh-pages
+          keep_files: true
+          enable_jekyll: false
+
+      - name: Retry APK gh-pages deploy
+        if: steps.pages_deploy.outcome == 'failure'
+        run: sleep 20
+
+      - name: Deploy APK mirror to gh-pages branch (retry)
+        if: steps.pages_deploy.outcome == 'failure'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
