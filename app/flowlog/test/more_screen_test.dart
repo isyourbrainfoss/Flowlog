@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'pump_helpers.dart';
 
 Future<void> _openMoreTab(WidgetTester tester) async {
-  await tester.tap(find.byIcon(Icons.tune));
+  await tester.tap(find.byIcon(Icons.more_horiz));
   await tester.pumpAndSettle();
 }
 

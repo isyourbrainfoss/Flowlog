@@ -27,7 +27,12 @@ enum BleScanAssignOutcome {
   notFound,
   multiple,
   unavailable,
+  cancelled,
 }
+
+/// Extra time to collect additional matches after the first device is seen.
+@visibleForTesting
+const Duration kBleScanExtraMatchWindow = Duration(milliseconds: 400);
 
 /// Result of [BleConnectionBackend.scanAndAssign].
 class BleScanAssignResult {
@@ -66,6 +71,10 @@ class BleScanAssignResult {
       outcome: BleScanAssignOutcome.unavailable,
       message: message,
     );
+  }
+
+  factory BleScanAssignResult.cancelled() {
+    return const BleScanAssignResult._(outcome: BleScanAssignOutcome.cancelled);
   }
 }
 
@@ -107,6 +116,7 @@ abstract class BleConnectionBackend {
   Future<List<BleDiscoveredDevice>> scan(
     SensorKind kind, {
     Duration timeout = const Duration(seconds: 8),
+    Future<void>? abort,
   });
 
   Future<SensorAdapter> createAdapter({
@@ -132,6 +142,7 @@ class UnsupportedBleConnectionBackend implements BleConnectionBackend {
   Future<List<BleDiscoveredDevice>> scan(
     SensorKind kind, {
     Duration timeout = const Duration(seconds: 8),
+    Future<void>? abort,
   }) async {
     return const [];
   }
@@ -193,13 +204,44 @@ class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
   Future<List<BleDiscoveredDevice>> scan(
     SensorKind kind, {
     Duration timeout = const Duration(seconds: 8),
+    Future<void>? abort,
   }) async {
     final readyError = await ensureReady();
     if (readyError != null) {
       return const [];
     }
 
+    var aborted = false;
     final found = <String, BleDiscoveredDevice>{};
+    final finished = Completer<void>();
+    Timer? extraWindowTimer;
+    Timer? safetyTimer;
+    StreamSubscription<bool>? scanningSub;
+
+    void complete() {
+      if (!finished.isCompleted) {
+        finished.complete();
+      }
+    }
+
+    if (abort != null) {
+      unawaited(
+        abort.whenComplete(() {
+          aborted = true;
+          extraWindowTimer?.cancel();
+          unawaited(() async {
+            try {
+              await FlutterBluePlus.stopScan();
+            } catch (_) {}
+            complete();
+          }());
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+      if (aborted) {
+        return const [];
+      }
+    }
 
     final subscription = FlutterBluePlus.onScanResults.listen(
       (results) {
@@ -208,12 +250,18 @@ class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
           if (!matchesSensorKind(name, kind)) {
             continue;
           }
-          found[result.device.remoteId.str] = BleDiscoveredDevice(
-            remoteId: result.device.remoteId.str,
+          final id = result.device.remoteId.str;
+          final isNew = !found.containsKey(id);
+          found[id] = BleDiscoveredDevice(
+            remoteId: id,
             name: name,
             kind: kind,
             rssi: result.rssi,
           );
+          // First match: keep a short window for additional devices, then stop.
+          if (isNew && found.length == 1) {
+            extraWindowTimer ??= Timer(kBleScanExtraMatchWindow, complete);
+          }
         }
       },
       onError: (_) {},
@@ -231,6 +279,10 @@ class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
             .timeout(const Duration(seconds: 5));
       }
 
+      if (aborted) {
+        return const [];
+      }
+
       await FlutterBluePlus.startScan(
         timeout: timeout,
         withNames: kind == SensorKind.scale
@@ -238,22 +290,40 @@ class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
             : const [],
       );
 
-      // After startScan returns, scanning should be true; wait for the timeout-driven stop.
-      // Guard with isScanningNow and a safety timeout so we never hang forever.
-      final scanStopTimeout = timeout + const Duration(seconds: 3);
-      if (FlutterBluePlus.isScanningNow) {
-        await FlutterBluePlus.isScanning
-            .where((scanning) => scanning == false)
-            .first
-            .timeout(scanStopTimeout);
+      if (aborted) {
+        return const [];
       }
+
+      // Stop on first-match extra window, user cancel, or the timeout-driven
+      // scan end. Guard with a safety timer so we never hang forever.
+      if (FlutterBluePlus.isScanningNow) {
+        scanningSub = FlutterBluePlus.isScanning.listen((scanning) {
+          if (!scanning) {
+            complete();
+          }
+        });
+      } else {
+        complete();
+      }
+      safetyTimer = Timer(timeout + const Duration(seconds: 3), complete);
+      await finished.future;
     } catch (_) {
       // Any timeout or platform hiccup during wait: stop and return whatever we collected.
       try {
         await FlutterBluePlus.stopScan();
       } catch (_) {}
     } finally {
+      extraWindowTimer?.cancel();
+      safetyTimer?.cancel();
+      await scanningSub?.cancel();
+      try {
+        await FlutterBluePlus.stopScan();
+      } catch (_) {}
       await subscription.cancel();
+    }
+
+    if (aborted) {
+      return const [];
     }
 
     if (Platform.isLinux) {

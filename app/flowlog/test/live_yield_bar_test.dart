@@ -1,3 +1,4 @@
+import 'package:flowlog/screens/live/live_pressure_bar.dart';
 import 'package:flowlog/screens/live/live_yield_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -48,7 +49,7 @@ void main() {
   });
 
   group('LiveYieldProgress', () {
-    testWidgets('does not show no-weight banner when a reading is on screen',
+    testWidgets('shows stale-stream banner even when last grams are on screen',
         (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
@@ -64,8 +65,8 @@ void main() {
       );
 
       expect(find.text('18.4 g'), findsOneWidget);
-      expect(find.byKey(const Key('live_yield_no_weight_banner')), findsNothing);
-      expect(find.text('No weight'), findsNothing);
+      expect(find.byKey(const Key('live_yield_no_weight_banner')), findsOneWidget);
+      expect(find.textContaining('not updating'), findsOneWidget);
     });
 
     testWidgets('shows no-weight banner only when there is no reading',
@@ -144,6 +145,25 @@ void main() {
         ),
         WeightStreamHealth.live,
       );
+    });
+  });
+
+  group('LivePressureDeviationBar', () {
+    testWidgets('does not treat 9 bar as a target when none is set',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: LivePressureDeviationBar(
+              currentPressure: 6.0,
+              targetPressure: null,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.textContaining('6.0 bar'), findsOneWidget);
+      expect(find.textContaining('/ 9'), findsNothing);
     });
   });
 

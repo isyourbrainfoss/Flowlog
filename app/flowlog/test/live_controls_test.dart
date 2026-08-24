@@ -44,6 +44,26 @@ void main() {
       );
     });
 
+    test('second start while in flight is ignored', () async {
+      var startCount = 0;
+      final hanging = LiveShotController(
+        sampleAdapter: replayAdapter,
+        onTare: () async {
+          startCount += 1;
+          await Future<void>.delayed(const Duration(milliseconds: 80));
+        },
+      );
+      addTearDown(hanging.dispose);
+
+      final first = hanging.start();
+      final second = hanging.start();
+      await Future.wait([first, second]);
+
+      expect(startCount, 1);
+      expect(hanging.sessionState, ShotSessionState.recording);
+      await hanging.stop();
+    });
+
     test('start begins recording via ShotSession', () async {
       await controller.start();
 

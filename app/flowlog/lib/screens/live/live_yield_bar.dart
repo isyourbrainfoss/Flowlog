@@ -152,18 +152,16 @@ class LiveYieldProgress extends StatelessWidget {
     final progress = weight == null ? 0.0 : (weight / target).clamp(0.0, 1.0);
     final atWarn = weight != null && weight >= warn;
     final atTarget = weight != null && weight >= target;
-    // Only fault when there is no cup reading at all. A last-known weight
-    // mid-brew is still valid even if FFF4 has gone quiet for a few seconds.
-    final noStream =
-        weightHealth == WeightStreamHealth.linkedNoWeight && weight == null;
-    final fillColor = noStream
+    final streamSilent = weightHealth == WeightStreamHealth.linkedNoWeight;
+    final noStream = streamSilent && weight == null;
+    final fillColor = streamSilent
         ? cs.error
         : atTarget
             ? cs.tertiary
             : atWarn
                 ? cs.secondary
                 : cs.primary;
-    final digitColor = noStream
+    final digitColor = streamSilent
         ? cs.error
         : atWarn
             ? cs.secondary
@@ -180,21 +178,26 @@ class LiveYieldProgress extends StatelessWidget {
       key: const Key('live_yield_progress'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (noStream) ...[
+        if (streamSilent) ...[
           Material(
             key: const Key('live_yield_no_weight_banner'),
             color: cs.errorContainer,
             borderRadius: BorderRadius.circular(10),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: compact ? 6 : 10,
+              ),
               child: Row(
                 children: [
-                  Icon(Icons.scale, color: cs.onErrorContainer),
+                  Icon(Icons.scale, color: cs.onErrorContainer, size: compact ? 18 : 24),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Scale shows connected but is not sending weight.\n'
-                      'Yield will not update until the stream is live again.',
+                      noStream
+                          ? 'Scale shows connected but is not sending weight.\n'
+                              'Yield will not update until the stream is live again.'
+                          : 'Weight not updating — last ${weight!.toStringAsFixed(1)} g',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: cs.onErrorContainer,
                         fontWeight: FontWeight.w600,

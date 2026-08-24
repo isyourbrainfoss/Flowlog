@@ -111,6 +111,9 @@ class LiveShotController extends ChangeNotifier {
 
   bool get isBrewing => canStop;
 
+  /// True while [start] is still connecting / taring. Ignore extra Start taps.
+  bool get isStarting => _startInFlight;
+
   double? _autoStartPressureBar;
 
   /// The pressure threshold (in bar) that was used to auto-start this brew, if any.
@@ -123,13 +126,8 @@ class LiveShotController extends ChangeNotifier {
   /// force-cleared so Start never silently no-ops.
   Future<void> start({double? autoStartPressureBar}) async {
     if (_startInFlight) {
-      // Previous attempt hung (often BLE disconnect). Force clear and continue.
-      _startInFlight = false;
-      try {
-        await _hardResetToIdle();
-      } on Object {
-        // continue into a fresh start attempt
-      }
+      // A second Start/auto-start must not tear down a brew that is connecting.
+      return;
     }
 
     if (!canStart) {
@@ -402,8 +400,7 @@ class LiveControls extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         final brewing = controller.isBrewing;
-        final starting = controller.sessionState == ShotSessionState.idle &&
-            !brewing; // visual only
+        final starting = controller.isStarting;
 
         final baseStyle = compact
             ? FilledButton.styleFrom(
@@ -427,8 +424,9 @@ class LiveControls extends StatelessWidget {
                 : null;
 
         Future<void> onBrewPressed() async {
-          // Always try recover first so a stuck start never leaves the button dead.
-          await controller.recoverIfStuck();
+          if (controller.isStarting) {
+            return;
+          }
           if (controller.isBrewing) {
             await controller.stop();
             return;
@@ -446,11 +444,18 @@ class LiveControls extends StatelessWidget {
           }
         }
 
-        final isIdleProminent = !brewing && prominent;
+        final isIdleProminent = !brewing && !starting && prominent;
 
         late final Widget button;
 
-        if (isIdleProminent) {
+        if (starting) {
+          button = FilledButton(
+            key: const Key('live_brew'),
+            style: baseStyle,
+            onPressed: null,
+            child: const Text('Starting…'),
+          );
+        } else if (isIdleProminent) {
           // Custom full-bleed button: the whole thing is one solid coffee color
           // that slowly transitions between two shades. No cup/rim.
           button = Material(
@@ -471,7 +476,7 @@ class LiveControls extends StatelessWidget {
                     ),
                     // Text centered over the liquid.
                     Text(
-                      starting ? 'Start brew' : 'Start brew',
+                      'Start brew',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: const Color(0xFFF5F0E8), // light crema for contrast
@@ -507,7 +512,11 @@ class LiveControls extends StatelessWidget {
         return Semantics(
           button: true,
           enabled: true,
-          label: brewing ? 'Stop brew' : 'Start brew',
+          label: starting
+              ? 'Starting brew'
+              : brewing
+                  ? 'Stop brew'
+                  : 'Start brew',
           child: ExcludeSemantics(child: button),
         );
       },

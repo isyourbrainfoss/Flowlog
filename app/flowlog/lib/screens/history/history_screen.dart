@@ -404,7 +404,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       onDeleteShot: _deleteShot,
                       onDeleteShotConfirmed: _deleteShotConfirmed,
                       confirmDeleteShot: _confirmDeleteShot,
-                      onImportFromScale: _importFromScale,
+                      onImportFromScale:
+                          compactHistory ? null : _importFromScale,
                     ),
                     if (listLoading)
                       const Positioned(

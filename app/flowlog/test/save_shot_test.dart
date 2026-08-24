@@ -388,6 +388,8 @@ void main() {
       expect(find.byKey(const Key('live_yield_progress')), findsOneWidget);
       expect(find.byKey(const Key('live_pressure_progress')), findsOneWidget);
       expect(find.byKey(const Key('live_pressure_digit')), findsOneWidget);
+      expect(find.byKey(const Key('live_elapsed_digit')), findsOneWidget);
+      expect(find.byKey(const Key('yield_warn_snackbar')), findsNothing);
       // No metrics strip / sample counter / banners while brewing.
       expect(find.byType(LiveMetricsRow), findsNothing);
       expect(find.textContaining('samples'), findsNothing);

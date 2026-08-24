@@ -23,7 +23,11 @@ class _RecordingBleBackend implements BleConnectionBackend {
   Future<String?> ensureReady() async => readyMessage;
 
   @override
-  Future<List<BleDiscoveredDevice>> scan(SensorKind kind, {Duration timeout = const Duration(seconds: 10)}) async {
+  Future<List<BleDiscoveredDevice>> scan(
+    SensorKind kind, {
+    Duration timeout = const Duration(seconds: 10),
+    Future<void>? abort,
+  }) async {
     scanCalls += 1;
     return discovered;
   }
@@ -138,6 +142,35 @@ void main() {
       expect(result.outcome, BleScanAssignOutcome.assigned);
       expect(hub.devices.first.bleRemoteId, 'AA:BB:CC:DD:EE:FF');
       expect(hub.rssiFor(hub.devices.first.id), -55);
+    });
+
+    test('scanAndAssign abort does not assign a discovered device', () async {
+      final backend = _RecordingBleBackend(
+        discovered: const [
+          BleDiscoveredDevice(
+            remoteId: 'AA:BB:CC:DD:EE:FF',
+            name: 'PRS-CJ2',
+            kind: SensorKind.pressensor,
+            rssi: -55,
+          ),
+        ],
+      );
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+      hub.addDevice(SensorKind.pressensor);
+
+      final abort = Completer<void>()..complete();
+      final result = await hub.scanAndAssign(
+        SensorKind.pressensor,
+        abort: abort.future,
+      );
+
+      expect(result.outcome, BleScanAssignOutcome.cancelled);
+      expect(hub.devices.first.bleRemoteId, isNull);
+    });
+
+    test('extra match window lets scan stop before the full timeout', () {
+      expect(kBleScanExtraMatchWindow, const Duration(milliseconds: 400));
     });
 
     test('connect uses backend adapter when BLE id is assigned', () async {

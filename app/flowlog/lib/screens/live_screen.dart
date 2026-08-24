@@ -534,18 +534,7 @@ class _LiveScreenState extends State<LiveScreen> {
     _yieldWarnFired = true;
     unawaited(playYieldWarnCue());
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          key: const Key('yield_warn_snackbar'),
-          content: Text(
-            'Near target — wind back now '
-            '(${weight!.toStringAsFixed(0)} g / '
-            '${defaults.targetYieldG.toStringAsFixed(0)} g)',
-          ),
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      setState(() {});
     }
   }
 
@@ -642,6 +631,9 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Future<void> _onReconnectSensors() async {
+    if (_controller?.isBrewing ?? false) {
+      return;
+    }
     // Clear leftover post-shot readings so the status banner does not keep
     // showing a stale "last" value while reconnect is in progress.
     _livePressureNotifier.value = null;
@@ -659,6 +651,7 @@ class _LiveScreenState extends State<LiveScreen> {
         const SnackBar(
           content: Text('Reconnecting paired sensors...'),
           duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -681,6 +674,7 @@ class _LiveScreenState extends State<LiveScreen> {
         const SnackBar(
           content: Text('No paired sensors with a BLE id. Pair sensors first.'),
           duration: Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } else if (connected == pairedWithBle.length) {
@@ -692,6 +686,7 @@ class _LiveScreenState extends State<LiveScreen> {
                 : 'All $connected sensors reconnected.',
           ),
           duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } else {
@@ -704,6 +699,7 @@ class _LiveScreenState extends State<LiveScreen> {
                 : 'Reconnect incomplete ($connected/${pairedWithBle.length}).',
           ),
           duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -1164,7 +1160,7 @@ class _LiveScreenState extends State<LiveScreen> {
                                       _liveWeightNotifier.value,
                                   targetYieldG: targetYield,
                                   warnAtG: warnAt,
-                                  showWarnBanner: false,
+                                  showWarnBanner: _yieldWarnFired,
                                   compact: true,
                                   height: 10,
                                   weightHealth: _weightStreamHealth(
@@ -1180,11 +1176,26 @@ class _LiveScreenState extends State<LiveScreen> {
                                   compact: true,
                                   height: 10,
                                 ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _formatBrewElapsed(latestSample?.elapsedMs),
+                                  key: const Key('live_elapsed_digit'),
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                                 const SizedBox(height: 8),
                                 LiveControls(
                                   controller: controller,
                                   prominent: true,
-                                  compact: true,
+                                  compact: false,
                                 ),
                               ],
                             ),
@@ -1472,6 +1483,14 @@ double _liveChartHeight(BoxConstraints constraints) {
   }
 
   return 300;
+}
+
+String _formatBrewElapsed(int? elapsedMs) {
+  final ms = elapsedMs ?? 0;
+  final totalSec = (ms / 1000).floor();
+  final minutes = totalSec ~/ 60;
+  final seconds = totalSec % 60;
+  return '${minutes.toString().padLeft(1, '0')}:${seconds.toString().padLeft(2, '0')}';
 }
 
 /// Compact live gamification strip shown while brewing against a target curve.

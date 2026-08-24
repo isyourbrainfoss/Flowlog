@@ -31,8 +31,8 @@ class SensorsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Pair your Pressensor and scale here. Flowlog scans automatically '
-          'after you add a sensor, then connect when hardware is nearby.',
+          'Pair your Pressensor and scale here. After you add a sensor, '
+          'Flowlog scans and connects when it finds one nearby.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -115,6 +115,43 @@ class SensorsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _connectPairedAfterAssign({
+  required BuildContext context,
+  required ScaffoldMessengerState messenger,
+  required SensorHub hub,
+  required SensorKind kind,
+  required String deviceName,
+}) async {
+  final paired = hub.devices.where((device) => device.kind == kind).firstOrNull;
+  if (paired == null) {
+    return;
+  }
+
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text('Connecting to $deviceName…'),
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
+  await hub.connect(paired.id);
+  if (!context.mounted) {
+    return;
+  }
+
+  final device = hub.devices.firstWhere((entry) => entry.id == paired.id);
+  final message = await _connectMessage(hub: hub, device: device);
+  if (!context.mounted) {
+    return;
+  }
+
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(message),
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
 }
 
 Future<String> _connectMessage({
@@ -268,11 +305,12 @@ Future<void> _runSensorScanFlow(
 
   // Capture a context tied to the progress dialog itself so we can dismiss reliably
   // even if the caller's context unmounts or navigator references drift.
+  final cancel = Completer<void>();
   BuildContext? dialogContext;
   unawaited(
     showDialog<void>(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       builder: (dctx) {
         dialogContext = dctx;
         return AlertDialog(
@@ -290,9 +328,20 @@ Future<void> _runSensorScanFlow(
               ),
             ],
           ),
+          actions: [
+            TextButton(
+              key: const Key('scan_cancel_button'),
+              onPressed: () => Navigator.pop(dctx),
+              child: const Text('Cancel'),
+            ),
+          ],
         );
       },
-    ),
+    ).whenComplete(() {
+      if (!cancel.isCompleted) {
+        cancel.complete();
+      }
+    }),
   );
 
   // Yield once so that even when the subsequent scan is synchronous (as in tests with
@@ -302,7 +351,7 @@ Future<void> _runSensorScanFlow(
 
   BleScanAssignResult result;
   try {
-    result = await hub.scanAndAssign(kind);
+    result = await hub.scanAndAssign(kind, abort: cancel.future);
   } catch (e) {
     hub.setLastError('Scan failed: $e');
     result = BleScanAssignResult.unavailable('Scan error: $e');
@@ -339,14 +388,15 @@ Future<void> _runSensorScanFlow(
   switch (result.outcome) {
     case BleScanAssignOutcome.assigned:
       final device = result.device!;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'Assigned ${device.name} (${device.remoteId}).',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
+      await _connectPairedAfterAssign(
+        context: context,
+        messenger: messenger,
+        hub: hub,
+        kind: kind,
+        deviceName: device.name,
       );
+    case BleScanAssignOutcome.cancelled:
+      break;
     case BleScanAssignOutcome.notFound:
       await showDialog<void>(
         context: dialogNavContext,
@@ -378,16 +428,13 @@ Future<void> _runSensorScanFlow(
           name: selected.name,
           rssi: selected.rssi,
         );
-        if (context.mounted) {
-          messenger.showSnackBar(
-            SnackBar(
-              content: Text(
-                'Assigned ${selected.name} (${selected.remoteId}).',
-              ),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+        await _connectPairedAfterAssign(
+          context: context,
+          messenger: messenger,
+          hub: hub,
+          kind: kind,
+          deviceName: selected.name,
+        );
       }
     case BleScanAssignOutcome.unavailable:
       await showDialog<void>(

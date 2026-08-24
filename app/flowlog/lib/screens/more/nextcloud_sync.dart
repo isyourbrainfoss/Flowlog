@@ -268,6 +268,16 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
     }
   }
 
+  Future<void> _persistSettingsQuietly() async {
+    try {
+      await _saveSettingsInternal();
+    } catch (error) {
+      if (mounted) {
+        setState(() => _statusMessage = 'Save failed: $error');
+      }
+    }
+  }
+
   @override
   void dispose() {
     _loginCancelled = true;
@@ -385,6 +395,7 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
         ),
         const SizedBox(height: 16),
         SwitchListTile(
+          key: const Key('nextcloud_auto_sync_switch'),
           contentPadding: EdgeInsets.zero,
           title: const Text('Auto-sync with Nextcloud'),
           subtitle: const Text('Sync after app launch and when shots are saved'),
@@ -393,6 +404,7 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
               ? null
               : (enabled) {
                   setState(() => _autoSyncEnabled = enabled);
+                  unawaited(_persistSettingsQuietly());
                 },
         ),
         const SizedBox(height: 8),

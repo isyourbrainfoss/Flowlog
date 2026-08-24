@@ -77,7 +77,7 @@ void main() {
         final semantics = tester.getSemantics(
           find.byTooltip(destination.semanticsLabel),
         );
-        expect(semantics.label, contains(destination.semanticsLabel));
+        expect(semantics.label, contains(destination.label));
         // ignore: deprecated_member_use
         expect(semantics.getSemanticsData().hasFlag(SemanticsFlag.isButton), isTrue);
       }

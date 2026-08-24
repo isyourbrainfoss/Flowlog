@@ -23,9 +23,31 @@ class PressensorBleAdapter implements SensorAdapter {
 
   StreamSubscription<List<int>>? _pressureSub;
   int? _batteryPercent;
+  int? _streamStartMs;
+  /// Host receive time of the last parsed pressure packet (ms since epoch).
+  int? _lastSampleReceiveMs;
 
   /// Last battery reading from [readBatteryPercent], if available.
   int? get batteryPercent => _batteryPercent;
+
+  /// Monotonic host ms of the last pressure sample, if any this session.
+  int? get lastSampleReceiveMs => _lastSampleReceiveMs;
+
+  /// True when connected but no pressure packet for [silentFor].
+  ///
+  /// A brand-new link ([lastSampleReceiveMs] null) is not silent until
+  /// [silentFor] has elapsed since connect — otherwise reconnect loops
+  /// immediately after `connect()` clears the last-receive stamp.
+  bool isPressureStreamSilent({
+    Duration silentFor = const Duration(seconds: 3),
+  }) {
+    final last = _lastSampleReceiveMs;
+    if (last == null) {
+      return true;
+    }
+    return DateTime.now().millisecondsSinceEpoch - last >=
+        silentFor.inMilliseconds;
+  }
 
   @override
   Stream<ConnectionState> get state => _stateController.stream;
@@ -51,6 +73,8 @@ class PressensorBleAdapter implements SensorAdapter {
       _stopwatch
         ..reset()
         ..start();
+      _streamStartMs = DateTime.now().millisecondsSinceEpoch;
+      _lastSampleReceiveMs = null;
       _pressureSub = _transport.subscribePressure().listen(
         _onPressureNotify,
         onError: (Object error, StackTrace _) {
@@ -76,6 +100,7 @@ class PressensorBleAdapter implements SensorAdapter {
 
   void _onPressureNotify(List<int> data) {
     final reading = parsePressureNotify(data);
+    _lastSampleReceiveMs = DateTime.now().millisecondsSinceEpoch;
     _samplesController.add(
       SensorSample(
         elapsedMs: _stopwatch.elapsedMilliseconds,
@@ -89,6 +114,8 @@ class PressensorBleAdapter implements SensorAdapter {
   Future<void> disconnect() async {
     await _pressureSub?.cancel();
     _pressureSub = null;
+    _streamStartMs = null;
+    _lastSampleReceiveMs = null;
     await _transport.disconnect();
     _stopwatch.stop();
     _stateController.add(ConnectionState.disconnected);

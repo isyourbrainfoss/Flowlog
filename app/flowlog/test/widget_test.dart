@@ -83,6 +83,12 @@ void main() {
 
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
+    final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+    expect(
+      bar.labelBehavior,
+      NavigationDestinationLabelBehavior.onlyShowSelected,
+    );
+    expect(find.byIcon(Icons.more_horiz), findsOneWidget);
   });
 
   testWidgets('Narrow layout keeps live chart visible', (tester) async {

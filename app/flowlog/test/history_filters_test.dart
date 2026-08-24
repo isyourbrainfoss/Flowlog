@@ -232,6 +232,7 @@ void main() {
         tagRepository: tagRepository,
       );
       await tester.pumpAndSettle();
+      await _revealAdvancedFilters(tester);
 
       await tester.tap(find.byKey(const Key('history_filter_taste_min')));
       await tester.pumpAndSettle();
@@ -251,6 +252,7 @@ void main() {
         tagRepository: tagRepository,
       );
       await tester.pumpAndSettle();
+      await _revealAdvancedFilters(tester);
 
       await tester.enterText(
         find.byKey(const Key('history_filter_peak_min')),
@@ -336,12 +338,85 @@ void main() {
         tagRepository: tagRepository,
       );
       await tester.pumpAndSettle();
+      await _revealAdvancedFilters(tester);
 
       await tester.tap(find.byKey(const Key('history_filter_tag_tag-practice')));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('history_shot_card_shot-ethiopia')), findsOneWidget);
       expect(find.byKey(const Key('history_shot_card_shot-house')), findsNothing);
+    });
+
+    testWidgets('compact layout hides date and taste until Filters expands', (
+      tester,
+    ) async {
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: shotRepository,
+        tagRepository: tagRepository,
+        size: const Size(400, 800),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('history_filter_bean')), findsOneWidget);
+      expect(find.byKey(const Key('history_filter_toggle')), findsOneWidget);
+      expect(find.byKey(const Key('history_filter_taste_min')), findsNothing);
+      expect(find.byKey(const Key('history_filter_date_from')), findsNothing);
+      expect(find.byKey(const Key('history_filter_peak_min')), findsNothing);
+      expect(find.byKey(const Key('history_filter_more_toggle')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('history_filter_toggle')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('history_filter_taste_min')), findsOneWidget);
+      expect(find.byKey(const Key('history_filter_date_from')), findsOneWidget);
+      expect(find.byKey(const Key('history_filter_peak_min')), findsOneWidget);
+      expect(find.byKey(const Key('history_filter_more_toggle')), findsOneWidget);
+    });
+
+    testWidgets('compact layout keeps Clear visible when filters are active', (
+      tester,
+    ) async {
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: shotRepository,
+        tagRepository: tagRepository,
+        size: const Size(400, 800),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('history_filter_bean')),
+        'ethiopia',
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('history_filter_bean')), findsOneWidget);
+      expect(find.byKey(const Key('history_filter_clear')), findsOneWidget);
+      expect(find.byKey(const Key('history_filter_taste_min')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('history_filter_clear')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HistoryShotCard), findsNWidgets(2));
+    });
+
+    testWidgets('compact layout expands when hidden filters are already active', (
+      tester,
+    ) async {
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: shotRepository,
+        tagRepository: tagRepository,
+        size: const Size(400, 800),
+        initialFilters: const ShotListFilters(minTasteScore: 8),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('history_filter_bean')), findsOneWidget);
+      expect(find.byKey(const Key('history_filter_taste_min')), findsOneWidget);
+      expect(find.byKey(const Key('history_filter_clear')), findsOneWidget);
     });
   });
 }
@@ -421,16 +496,33 @@ Future<void> _seedKaffaOslo({
   );
 }
 
+Future<void> _revealAdvancedFilters(WidgetTester tester) async {
+  if (find.byKey(const Key('history_filter_taste_min')).evaluate().isEmpty) {
+    await tester.tap(find.byKey(const Key('history_filter_toggle')));
+    await tester.pumpAndSettle();
+  }
+}
+
 Future<void> _pumpHistoryScreen(
   WidgetTester tester, {
   required ShotRepository shotRepository,
   required TagRepository tagRepository,
+  Size? size,
+  ShotListFilters initialFilters = ShotListFilters.empty,
 }) async {
+  if (size != null) {
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+  }
+
   await tester.pumpWidget(
     MaterialApp(
       home: HistoryScreen(
         shotRepository: shotRepository,
         tagRepository: tagRepository,
+        initialFilters: initialFilters,
       ),
     ),
   );

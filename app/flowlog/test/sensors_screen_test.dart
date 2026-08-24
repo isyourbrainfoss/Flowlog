@@ -1,10 +1,12 @@
+import 'dart:async';
+
 import 'package:flowlog/screens/more/diagnostics.dart';
 import 'package:flowlog/screens/more/sensors_screen.dart';
 import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart'
-    show ConnectionState, SensorAdapter;
+    show ConnectionState, SensorAdapter, SensorSample;
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,6 +18,7 @@ class _ReadyBleBackend extends BleConnectionBackend {
   Future<List<BleDiscoveredDevice>> scan(
     SensorKind kind, {
     Duration timeout = const Duration(seconds: 8),
+    Future<void>? abort,
   }) async =>
       const [];
 
@@ -208,5 +211,176 @@ void main() {
       expect(find.byType(SensorDiagnosticsScreen), findsOneWidget);
       expect(find.text('No errors recorded'), findsOneWidget);
     });
+
+    testWidgets('cancel scan stops without assigning', (tester) async {
+      final hub = SensorHub(bleBackend: _HangingScanBackend());
+      addTearDown(hub.dispose);
+
+      await pumpSensorsScreen(tester, hub: hub);
+
+      await tester.tap(find.byKey(const Key('add_pressensor_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byKey(const Key('scan_progress_pressensor')), findsOneWidget);
+      expect(find.byKey(const Key('scan_cancel_button')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('scan_cancel_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('scan_progress_pressensor')), findsNothing);
+      expect(hub.devices, isNotEmpty);
+      expect(hub.devices.first.bleRemoteId, isNull);
+      expect(find.textContaining('Connecting to'), findsNothing);
+      expect(find.byKey(const Key('scan_not_found_dialog')), findsNothing);
+    });
+
+    testWidgets('connects after assigning a scanned device', (tester) async {
+      final backend = _AssignAndConnectBackend(
+        discovered: const [
+          BleDiscoveredDevice(
+            remoteId: 'AA:BB:CC:DD:EE:FF',
+            name: 'PRS-CJ2',
+            kind: SensorKind.pressensor,
+            rssi: -50,
+          ),
+        ],
+      );
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+
+      await pumpSensorsScreen(tester, hub: hub);
+
+      await tester.tap(find.byKey(const Key('add_pressensor_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add'));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(hub.devices.first.bleRemoteId, 'AA:BB:CC:DD:EE:FF');
+      expect(backend.connectCalls, 1);
+      expect(hub.devices.first.state, ConnectionState.connected);
+      expect(
+        find.textContaining('PRS-CJ2'),
+        findsWidgets,
+      );
+    });
+
+    testWidgets('connects the device chosen from multiple scan matches', (tester) async {
+      final backend = _AssignAndConnectBackend(
+        discovered: const [
+          BleDiscoveredDevice(
+            remoteId: 'AA:BB:CC:DD:EE:01',
+            name: 'PRS-one',
+            kind: SensorKind.pressensor,
+            rssi: -40,
+          ),
+          BleDiscoveredDevice(
+            remoteId: 'AA:BB:CC:DD:EE:02',
+            name: 'PRS-two',
+            kind: SensorKind.pressensor,
+            rssi: -60,
+          ),
+        ],
+      );
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+
+      await pumpSensorsScreen(tester, hub: hub);
+
+      await tester.tap(find.byKey(const Key('add_pressensor_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add'));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Choose sensor'), findsOneWidget);
+      await tester.tap(find.text('PRS-two'));
+      await tester.pumpAndSettle();
+
+      expect(hub.devices.first.bleRemoteId, 'AA:BB:CC:DD:EE:02');
+      expect(backend.connectCalls, 1);
+      expect(hub.devices.first.state, ConnectionState.connected);
+      expect(find.textContaining('PRS-two'), findsWidgets);
+    });
   });
+}
+
+class _HangingScanBackend implements BleConnectionBackend {
+  @override
+  Future<String?> ensureReady() async => null;
+
+  @override
+  Future<List<BleDiscoveredDevice>> scan(
+    SensorKind kind, {
+    Duration timeout = const Duration(seconds: 8),
+    Future<void>? abort,
+  }) async {
+    if (abort != null) {
+      await abort;
+    } else {
+      await Completer<void>().future;
+    }
+    return const [];
+  }
+
+  @override
+  Future<SensorAdapter> createAdapter({
+    required SensorKind kind,
+    required String bleRemoteId,
+  }) {
+    throw UnimplementedError();
+  }
+}
+
+class _AssignAndConnectBackend implements BleConnectionBackend {
+  _AssignAndConnectBackend({required this.discovered});
+
+  final List<BleDiscoveredDevice> discovered;
+  int connectCalls = 0;
+
+  @override
+  Future<String?> ensureReady() async => null;
+
+  @override
+  Future<List<BleDiscoveredDevice>> scan(
+    SensorKind kind, {
+    Duration timeout = const Duration(seconds: 8),
+    Future<void>? abort,
+  }) async =>
+      discovered;
+
+  @override
+  Future<SensorAdapter> createAdapter({
+    required SensorKind kind,
+    required String bleRemoteId,
+  }) async {
+    connectCalls += 1;
+    return _AlwaysConnectAdapter();
+  }
+}
+
+class _AlwaysConnectAdapter implements SensorAdapter {
+  final _state = StreamController<ConnectionState>.broadcast();
+  final _samples = StreamController<SensorSample>.broadcast();
+
+  @override
+  Stream<ConnectionState> get state => _state.stream;
+
+  @override
+  Stream<SensorSample> get samples => _samples.stream;
+
+  @override
+  Future<void> connect() async {
+    _state.add(ConnectionState.connected);
+  }
+
+  @override
+  Future<void> disconnect() async {
+    if (!_state.isClosed) {
+      _state.add(ConnectionState.disconnected);
+    }
+  }
 }

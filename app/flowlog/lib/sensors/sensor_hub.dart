@@ -220,14 +220,32 @@ class SensorHub extends ChangeNotifier {
   }
 
   /// Scans for a sensor of [kind] and auto-assigns when exactly one is found.
-  Future<BleScanAssignResult> scanAndAssign(SensorKind kind) async {
+  ///
+  /// When [abort] completes, the scan is stopped and nothing is assigned.
+  Future<BleScanAssignResult> scanAndAssign(
+    SensorKind kind, {
+    Future<void>? abort,
+  }) async {
+    var aborted = false;
+    if (abort != null) {
+      unawaited(abort.whenComplete(() {
+        aborted = true;
+      }));
+    }
+
     final readyError = await _bleBackend.ensureReady();
     if (readyError != null) {
       setLastError(readyError);
       return BleScanAssignResult.unavailable(readyError);
     }
+    if (aborted) {
+      return BleScanAssignResult.cancelled();
+    }
 
-    final discovered = await _bleBackend.scan(kind);
+    final discovered = await _bleBackend.scan(kind, abort: abort);
+    if (aborted) {
+      return BleScanAssignResult.cancelled();
+    }
     if (discovered.isEmpty) {
       const message = 'No nearby sensor found. Make sure it is powered on.';
       setLastError(message);
@@ -263,9 +281,9 @@ class SensorHub extends ChangeNotifier {
 
   /// Reconnects paired sensors that already have a saved BLE id.
   ///
-  /// Skips scales that are already streaming weight (avoids needless
-  /// disconnect storms). Otherwise tears down and reconnects so a zombie
-  /// "connected" link is cleared.
+  /// Skips scales and pressensors that are already streaming (avoids
+  /// needless disconnect storms). Otherwise tears down and reconnects so a
+  /// zombie "connected" link is cleared.
   Future<void> reconnectPairedDevices() async {
     for (final device in List<PairedSensorEntry>.from(devices)) {
       final bleRemoteId = device.bleRemoteId;
@@ -281,6 +299,15 @@ class SensorHub extends ChangeNotifier {
             silentFor: const Duration(seconds: 3),
           )) {
         // Healthy weight stream — leave it alone.
+        continue;
+      }
+      if (device.kind == SensorKind.pressensor &&
+          device.state == ConnectionState.connected &&
+          adapter is PressensorBleAdapter &&
+          !adapter.isPressureStreamSilent(
+            silentFor: const Duration(seconds: 3),
+          )) {
+        // Healthy pressure stream — leave it alone.
         continue;
       }
 
@@ -305,6 +332,10 @@ class SensorHub extends ChangeNotifier {
       unawaited(_recoverSilentScales());
     });
   }
+
+  /// Test hook for [_recoverSilentScales] (mid-wait recovery-flag race).
+  @visibleForTesting
+  Future<void> recoverSilentScalesForTest() => _recoverSilentScales();
 
   void _stopScaleHealthWatchdogIfIdle() {
     final anyScaleUp = _devices.any(
@@ -353,6 +384,10 @@ class SensorHub extends ChangeNotifier {
           // Fall through to hard reconnect.
         }
         await Future<void>.delayed(const Duration(seconds: 2));
+        // Brew may have started during the wait — do not tear the link.
+        if (!_scaleRecoveryEnabled) {
+          continue;
+        }
         if (!adapter.isWeightStreamSilent(
           silentFor: const Duration(seconds: 3),
         )) {

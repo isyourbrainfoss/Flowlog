@@ -511,7 +511,7 @@ class _ShellContent extends StatelessWidget {
   }
 }
 
-/// Libadwaita-style bottom bar: icons only, easy thumb reach on phone.
+/// Phone bottom bar: icons with a label on the selected destination.
 class _FlowlogBottomBar extends StatelessWidget {
   const _FlowlogBottomBar({
     required this.selectedIndex,
@@ -535,7 +535,7 @@ class _FlowlogBottomBar extends StatelessWidget {
         final bar = NavigationBar(
           selectedIndex: selectedIndex,
           onDestinationSelected: onDestinationSelected,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+          labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
           destinations: [
             for (final item in appDestinations)
               NavigationDestination(
@@ -549,7 +549,7 @@ class _FlowlogBottomBar extends StatelessWidget {
                   showRecordingBadge: item.tab == AppTab.live &&
                       activeBrewNotifier.isBrewing,
                 ),
-                label: item.semanticsLabel,
+                label: item.label,
                 tooltip: item.semanticsLabel,
               ),
           ],

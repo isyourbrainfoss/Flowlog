@@ -36,6 +36,28 @@ void main() {
 
       expect(find.text('No saved shots yet'), findsOneWidget);
       expect(find.byType(HistoryShotCard), findsNothing);
+      expect(
+        find.byKey(const Key('history_empty_import_scale')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('hides empty-state import on compact layout', (tester) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: repository,
+        tagRepository: tagRepository,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('No saved shots yet'), findsOneWidget);
+      expect(find.byKey(const Key('history_empty_import_scale')), findsNothing);
+      expect(find.byKey(const Key('history_import_scale_shot')), findsNothing);
     });
 
     testWidgets('lists seeded fixture shot with sparkline and metrics', (

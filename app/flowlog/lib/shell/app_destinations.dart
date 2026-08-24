@@ -60,7 +60,7 @@ const List<AppDestination> appDestinations = [
     route: '/more',
     label: 'More',
     semanticsLabel: 'More settings',
-    icon: Icons.tune,
+    icon: Icons.more_horiz,
     screen: MoreScreen(key: ValueKey('screen-more')),
   ),
 ];

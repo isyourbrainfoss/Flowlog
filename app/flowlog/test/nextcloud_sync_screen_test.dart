@@ -176,6 +176,24 @@ void main() {
       expect(find.textContaining('Signed in as barista'), findsOneWidget);
     });
 
+    testWidgets('auto-sync toggle persists enabled immediately', (tester) async {
+      await pumpScreen(tester);
+
+      expect(store.stagedSettings, isNull);
+
+      await tester.tap(find.byKey(const Key('nextcloud_auto_sync_switch')));
+      await tester.pump();
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        if (store.stagedSettings != null) {
+          break;
+        }
+      }
+
+      expect(store.stagedSettings?.enabled, isTrue);
+      expect(find.byKey(const Key('nextcloud_save_button')), findsOneWidget);
+    });
+
     testWidgets('save settings persists values through store', (tester) async {
       await pumpScreen(tester);
 

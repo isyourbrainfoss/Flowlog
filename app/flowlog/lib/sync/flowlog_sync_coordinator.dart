@@ -15,6 +15,7 @@ class FlowlogSyncCoordinator {
   static NextcloudSettingsStore _settingsStore = NextcloudSettingsStore();
   static NextcloudSyncRunner _syncRunner = nextcloudSync;
   static DateTime? _lastSyncAttempt;
+  static Future<NextcloudSyncResult?>? _inFlight;
 
   @visibleForTesting
   static void debugOverride({
@@ -34,6 +35,7 @@ class FlowlogSyncCoordinator {
     _settingsStore = NextcloudSettingsStore();
     _syncRunner = nextcloudSync;
     _lastSyncAttempt = null;
+    _inFlight = null;
   }
 
   /// Runs sync when auto-sync is enabled and credentials are configured.
@@ -64,6 +66,11 @@ class FlowlogSyncCoordinator {
     required bool requireEnabled,
     required bool force,
   }) async {
+    final pending = _inFlight;
+    if (pending != null) {
+      return pending;
+    }
+
     if (!force &&
         _lastSyncAttempt != null &&
         DateTime.now().difference(_lastSyncAttempt!) <
@@ -89,33 +96,44 @@ class FlowlogSyncCoordinator {
 
     _lastSyncAttempt = DateTime.now();
 
-    final resolvedDatabase = database ?? await _openDefaultDatabase();
+    final work = () async {
+      final resolvedDatabase = database ?? await _openDefaultDatabase();
 
+      try {
+        final result = await _syncRunner(
+          credentials: WebDavCredentials(
+            serverUrl: serverUrl,
+            username: username,
+            password: password,
+          ),
+          database: resolvedDatabase,
+        );
+
+        final updated = settings.copyWith(
+          lastSyncedAt: DateTime.now().toUtc(),
+          lastSyncMessage: result.message.isNotEmpty
+              ? result.message
+              : (result.error ?? 'Sync finished'),
+        );
+        await _settingsStore.saveSettings(updated);
+
+        return result;
+      } catch (error) {
+        final message = 'Sync failed: $error';
+        final updated = settings.copyWith(lastSyncMessage: message);
+        await _settingsStore.saveSettings(updated);
+
+        return NextcloudSyncResult(success: false, message: message);
+      }
+    }();
+
+    _inFlight = work;
     try {
-      final result = await _syncRunner(
-        credentials: WebDavCredentials(
-          serverUrl: serverUrl,
-          username: username,
-          password: password,
-        ),
-        database: resolvedDatabase,
-      );
-
-      final updated = settings.copyWith(
-        lastSyncedAt: DateTime.now().toUtc(),
-        lastSyncMessage: result.message.isNotEmpty
-            ? result.message
-            : (result.error ?? 'Sync finished'),
-      );
-      await _settingsStore.saveSettings(updated);
-
-      return result;
-    } catch (error) {
-      final message = 'Sync failed: $error';
-      final updated = settings.copyWith(lastSyncMessage: message);
-      await _settingsStore.saveSettings(updated);
-
-      return NextcloudSyncResult(success: false, message: message);
+      return await work;
+    } finally {
+      if (identical(_inFlight, work)) {
+        _inFlight = null;
+      }
     }
   }
 

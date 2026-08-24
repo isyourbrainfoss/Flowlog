@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flowlog/shell/shell_breakpoints.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -42,6 +43,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
 
   Timer? _debounce;
   bool _moreExpanded = false;
+  bool _filtersExpanded = false;
 
   @override
   void initState() {
@@ -71,6 +73,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
         widget.filters.minGrindSetting != null ||
         widget.filters.maxGrindSetting != null ||
         widget.filters.maxPeakPressureBar != null;
+    _filtersExpanded = _hiddenFiltersAreActive(widget.filters);
   }
 
   @override
@@ -152,6 +155,9 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final compact =
+        MediaQuery.sizeOf(context).width < ShellBreakpoints.sidebar;
+    final showAdvanced = !compact || _filtersExpanded;
 
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
@@ -160,8 +166,10 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Filters', style: theme.textTheme.titleSmall),
-            const SizedBox(height: 8),
+            if (!compact) ...[
+              Text('Filters', style: theme.textTheme.titleSmall),
+              const SizedBox(height: 8),
+            ],
             RawAutocomplete<Bean>(
               key: const Key('history_filter_bean_autocomplete'),
               textEditingController: _beanController,
@@ -273,240 +281,41 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
                 );
               },
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _DateFilterButton(
-                    key: const Key('history_filter_date_from'),
-                    label: 'From',
-                    value: widget.filters.startedOnOrAfter,
-                    onSelected: (date) => _emit(
-                      widget.filters.copyWith(
-                        startedOnOrAfter: startOfLocalDay(date),
-                      ),
-                      immediate: true,
-                    ),
-                    onClear: () => _emit(
-                      widget.filters.copyWith(clearStartedOnOrAfter: true),
-                      immediate: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _DateFilterButton(
-                    key: const Key('history_filter_date_to'),
-                    label: 'To',
-                    value: widget.filters.startedOnOrBefore,
-                    onSelected: (date) => _emit(
-                      widget.filters.copyWith(
-                        startedOnOrBefore: endOfLocalDay(date),
-                      ),
-                      immediate: true,
-                    ),
-                    onClear: () => _emit(
-                      widget.filters.copyWith(clearStartedOnOrBefore: true),
-                      immediate: true,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (widget.tags.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text('Tags', style: theme.textTheme.labelLarge),
+            if (compact) ...[
               const SizedBox(height: 4),
-              Wrap(
-                key: const Key('history_filter_tags'),
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  for (final tag in widget.tags)
-                    FilterChip(
-                      key: Key('history_filter_tag_${tag.id}'),
-                      label: Text(tag.name),
-                      selected: widget.filters.tagIds.contains(tag.id),
-                      onSelected: (_) => _emit(
-                        widget.filters.toggleTagId(tag.id),
-                        immediate: true,
-                      ),
-                    ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<int?>(
-                    key: const Key('history_filter_taste_min'),
-                    initialValue: widget.filters.minTasteScore,
-                    decoration: const InputDecoration(
-                      labelText: 'Min taste',
-                      isDense: true,
-                    ),
-                    items: _tasteScoreItems,
-                    onChanged: (value) {
-                      if (value == null) {
-                        _emit(
-                          widget.filters.copyWith(clearMinTasteScore: true),
-                          immediate: true,
-                        );
-                      } else {
-                        _emit(
-                          widget.filters.copyWith(minTasteScore: value),
-                          immediate: true,
-                        );
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    key: const Key('history_filter_peak_min'),
-                    controller: _minPeakController,
-                    decoration: const InputDecoration(
-                      labelText: 'Min peak (bar)',
-                      isDense: true,
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                    ],
-                    onChanged: _onMinPeakChanged,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                key: const Key('history_filter_more_toggle'),
-                onPressed: () => setState(() => _moreExpanded = !_moreExpanded),
-                icon: Icon(
-                  _moreExpanded ? Icons.expand_less : Icons.expand_more,
-                  size: 18,
-                ),
-                label: Text(_moreExpanded ? 'Fewer filters' : 'More filters'),
-              ),
-            ),
-            if (_moreExpanded) ...[
               Row(
                 children: [
-                  Expanded(
-                    child: TextField(
-                      key: const Key('history_filter_peak_max'),
-                      controller: _maxPeakController,
-                      decoration: const InputDecoration(
-                        labelText: 'Max peak (bar)',
-                        isDense: true,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                      ],
-                      onChanged: _onMaxPeakChanged,
+                  TextButton.icon(
+                    key: const Key('history_filter_toggle'),
+                    onPressed: () =>
+                        setState(() => _filtersExpanded = !_filtersExpanded),
+                    icon: Icon(
+                      _filtersExpanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                      size: 18,
                     ),
+                    label: const Text('Filters'),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      key: const Key('history_filter_duration_min'),
-                      controller: _minDurationController,
-                      decoration: const InputDecoration(
-                        labelText: 'Min time (s)',
-                        isDense: true,
-                      ),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      onChanged: _onMinDurationChanged,
+                  const Spacer(),
+                  if (widget.filters.isActive)
+                    TextButton(
+                      key: const Key('history_filter_clear'),
+                      onPressed: _clearAllFilters,
+                      child: const Text('Clear'),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      key: const Key('history_filter_duration_max'),
-                      controller: _maxDurationController,
-                      decoration: const InputDecoration(
-                        labelText: 'Max time (s)',
-                        isDense: true,
-                      ),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      onChanged: _onMaxDurationChanged,
-                    ),
-                  ),
                 ],
               ),
+            ] else
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: const Key('history_filter_grind_min'),
-                      controller: _minGrindController,
-                      decoration: const InputDecoration(
-                        labelText: 'Min grind',
-                        isDense: true,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                      ],
-                      onChanged: _onMinGrindChanged,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      key: const Key('history_filter_grind_max'),
-                      controller: _maxGrindController,
-                      decoration: const InputDecoration(
-                        labelText: 'Max grind',
-                        isDense: true,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                      ],
-                      onChanged: _onMaxGrindChanged,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            if (widget.filters.isActive) ...[
+            if (showAdvanced) ..._advancedFilterControls(theme),
+            if (!compact && widget.filters.isActive) ...[
               const SizedBox(height: 4),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   key: const Key('history_filter_clear'),
-                  onPressed: () {
-                    _debounce?.cancel();
-                    _beanController.clear();
-                    _minPeakController.clear();
-                    _maxPeakController.clear();
-                    _minDurationController.clear();
-                    _maxDurationController.clear();
-                    _minGrindController.clear();
-                    _maxGrindController.clear();
-                    widget.onChanged(ShotListFilters.empty);
-                  },
+                  onPressed: _clearAllFilters,
                   child: const Text('Clear filters'),
                 ),
               ),
@@ -515,6 +324,252 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
         ),
       ),
     );
+  }
+
+  List<Widget> _advancedFilterControls(ThemeData theme) {
+    return [
+      Row(
+        children: [
+          Expanded(
+            child: _DateFilterButton(
+              key: const Key('history_filter_date_from'),
+              label: 'From',
+              value: widget.filters.startedOnOrAfter,
+              onSelected: (date) => _emit(
+                widget.filters.copyWith(
+                  startedOnOrAfter: startOfLocalDay(date),
+                ),
+                immediate: true,
+              ),
+              onClear: () => _emit(
+                widget.filters.copyWith(clearStartedOnOrAfter: true),
+                immediate: true,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _DateFilterButton(
+              key: const Key('history_filter_date_to'),
+              label: 'To',
+              value: widget.filters.startedOnOrBefore,
+              onSelected: (date) => _emit(
+                widget.filters.copyWith(
+                  startedOnOrBefore: endOfLocalDay(date),
+                ),
+                immediate: true,
+              ),
+              onClear: () => _emit(
+                widget.filters.copyWith(clearStartedOnOrBefore: true),
+                immediate: true,
+              ),
+            ),
+          ),
+        ],
+      ),
+      if (widget.tags.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Text('Tags', style: theme.textTheme.labelLarge),
+        const SizedBox(height: 4),
+        Wrap(
+          key: const Key('history_filter_tags'),
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            for (final tag in widget.tags)
+              FilterChip(
+                key: Key('history_filter_tag_${tag.id}'),
+                label: Text(tag.name),
+                selected: widget.filters.tagIds.contains(tag.id),
+                onSelected: (_) => _emit(
+                  widget.filters.toggleTagId(tag.id),
+                  immediate: true,
+                ),
+              ),
+          ],
+        ),
+      ],
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          Expanded(
+            child: DropdownButtonFormField<int?>(
+              key: const Key('history_filter_taste_min'),
+              initialValue: widget.filters.minTasteScore,
+              decoration: const InputDecoration(
+                labelText: 'Min taste',
+                isDense: true,
+              ),
+              items: _tasteScoreItems,
+              onChanged: (value) {
+                if (value == null) {
+                  _emit(
+                    widget.filters.copyWith(clearMinTasteScore: true),
+                    immediate: true,
+                  );
+                } else {
+                  _emit(
+                    widget.filters.copyWith(minTasteScore: value),
+                    immediate: true,
+                  );
+                }
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              key: const Key('history_filter_peak_min'),
+              controller: _minPeakController,
+              decoration: const InputDecoration(
+                labelText: 'Min peak (bar)',
+                isDense: true,
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+              ],
+              onChanged: _onMinPeakChanged,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 4),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          key: const Key('history_filter_more_toggle'),
+          onPressed: () => setState(() => _moreExpanded = !_moreExpanded),
+          icon: Icon(
+            _moreExpanded ? Icons.expand_less : Icons.expand_more,
+            size: 18,
+          ),
+          label: Text(_moreExpanded ? 'Fewer filters' : 'More filters'),
+        ),
+      ),
+      if (_moreExpanded) ...[
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                key: const Key('history_filter_peak_max'),
+                controller: _maxPeakController,
+                decoration: const InputDecoration(
+                  labelText: 'Max peak (bar)',
+                  isDense: true,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                ],
+                onChanged: _onMaxPeakChanged,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                key: const Key('history_filter_duration_min'),
+                controller: _minDurationController,
+                decoration: const InputDecoration(
+                  labelText: 'Min time (s)',
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                onChanged: _onMinDurationChanged,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                key: const Key('history_filter_duration_max'),
+                controller: _maxDurationController,
+                decoration: const InputDecoration(
+                  labelText: 'Max time (s)',
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                onChanged: _onMaxDurationChanged,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                key: const Key('history_filter_grind_min'),
+                controller: _minGrindController,
+                decoration: const InputDecoration(
+                  labelText: 'Min grind',
+                  isDense: true,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                ],
+                onChanged: _onMinGrindChanged,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                key: const Key('history_filter_grind_max'),
+                controller: _maxGrindController,
+                decoration: const InputDecoration(
+                  labelText: 'Max grind',
+                  isDense: true,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                ],
+                onChanged: _onMaxGrindChanged,
+              ),
+            ),
+          ],
+        ),
+      ],
+    ];
+  }
+
+  void _clearAllFilters() {
+    _debounce?.cancel();
+    _beanController.clear();
+    _minPeakController.clear();
+    _maxPeakController.clear();
+    _minDurationController.clear();
+    _maxDurationController.clear();
+    _minGrindController.clear();
+    _maxGrindController.clear();
+    widget.onChanged(ShotListFilters.empty);
+  }
+
+  static bool _hiddenFiltersAreActive(ShotListFilters filters) {
+    return filters.startedOnOrAfter != null ||
+        filters.startedOnOrBefore != null ||
+        filters.minTasteScore != null ||
+        filters.minPeakPressureBar != null ||
+        filters.maxPeakPressureBar != null ||
+        filters.minDurationMs != null ||
+        filters.maxDurationMs != null ||
+        filters.minGrindSetting != null ||
+        filters.maxGrindSetting != null ||
+        filters.tagIds.isNotEmpty;
   }
 
   void _onMinPeakChanged(String value) {

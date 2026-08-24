@@ -33,13 +33,16 @@ class LivePressureDeviationBar extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final hasCurrent = currentPressure != null;
+    final hasTarget = targetPressure != null;
     final current = currentPressure ?? 0.0;
     final target = targetPressure ?? 9.0;
 
-    final deviation = current - target;
-    final normalized = ((deviation + range) / (2 * range)).clamp(0.0, 1.0);
+    final deviation = hasTarget ? current - target : 0.0;
+    final normalized = hasTarget
+        ? ((deviation + range) / (2 * range)).clamp(0.0, 1.0)
+        : (current / 12.0).clamp(0.0, 1.0);
 
-    final isDeviating = hasCurrent && deviation.abs() > 0.5;
+    final isDeviating = hasTarget && hasCurrent && deviation.abs() > 0.5;
     final markerColor = !hasCurrent
         ? cs.outline
         : isDeviating
@@ -56,47 +59,63 @@ class LivePressureDeviationBar extends StatelessWidget {
             height: height,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(height / 2),
-              gradient: const LinearGradient(
-                colors: [
-                  Colors.red,
-                  Colors.orange,
-                  Colors.green,
-                  Colors.orange,
-                  Colors.red,
-                ],
-                stops: [0.0, 0.35, 0.5, 0.65, 1.0],
-              ),
+              gradient: hasTarget
+                  ? const LinearGradient(
+                      colors: [
+                        Colors.red,
+                        Colors.orange,
+                        Colors.green,
+                        Colors.orange,
+                        Colors.red,
+                      ],
+                      stops: [0.0, 0.35, 0.5, 0.65, 1.0],
+                    )
+                  : null,
+              color: hasTarget ? null : cs.surfaceContainerHighest,
               border: Border.all(
                 color: cs.outline.withValues(alpha: 0.3),
               ),
             ),
           ),
-          Container(
-            height: height,
-            width: 2,
-            decoration: BoxDecoration(
-              color: Colors.green.shade700,
-              borderRadius: BorderRadius.circular(1),
-            ),
-          ),
-          Align(
-            alignment: Alignment((normalized * 2 - 1).toDouble(), 0),
-            child: Container(
-              width: 3,
-              height: height + 4,
-              decoration: BoxDecoration(
-                color: markerColor,
-                borderRadius: BorderRadius.circular(1.5),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 2,
-                    offset: Offset(0, 1),
-                  ),
-                ],
+          if (!hasTarget)
+            FractionallySizedBox(
+              widthFactor: normalized,
+              child: Container(
+                height: height,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(height / 2),
+                  color: cs.primary,
+                ),
               ),
             ),
-          ),
+          if (hasTarget) ...[
+            Container(
+              height: height,
+              width: 2,
+              decoration: BoxDecoration(
+                color: Colors.green.shade700,
+                borderRadius: BorderRadius.circular(1),
+              ),
+            ),
+            Align(
+              alignment: Alignment((normalized * 2 - 1).toDouble(), 0),
+              child: Container(
+                width: 3,
+                height: height + 4,
+                decoration: BoxDecoration(
+                  color: markerColor,
+                  borderRadius: BorderRadius.circular(1.5),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 2,
+                      offset: Offset(0, 1),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
