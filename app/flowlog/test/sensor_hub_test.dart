@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:fake_async/fake_async.dart';
 import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart'
@@ -108,11 +107,12 @@ void main() {
   });
 
   group('SensorHub reconnectPairedDevices', () {
-    test('force-reconnects a silent pressensor even when hub still reports connected',
-        () async {
-      final backend = _PressensorConnectBackend();
+    test('force-reconnects a silent pressensor even when hub still reports connected', () async {
+      var nowMs = 1_000;
+      final backend = _PressensorConnectBackend(monotonicClock: () => nowMs);
       final hub = SensorHub(bleBackend: backend);
       addTearDown(hub.dispose);
+
       hub.addDevice(SensorKind.pressensor);
       hub.assignBleRemoteId(
         SensorKind.pressensor,
@@ -125,6 +125,8 @@ void main() {
       expect(hub.devices.first.state, ConnectionState.connected);
       expect(backend.connectCalls, 1);
 
+      // Zombie: connected but no pressure samples past the 3s silent window.
+      nowMs += 3_000;
       final adapter = hub.activeAdapterFor(SensorKind.pressensor);
       expect(adapter, isA<PressensorBleAdapter>());
       expect(
@@ -205,44 +207,53 @@ void main() {
       expect(hub.scaleRecoveryEnabled, isTrue);
     });
 
-    test('setScaleRecoveryEnabled(false) skips hard reconnect after silent wait', () {
-      fakeAsync((async) {
-        final backend = _ScaleConnectBackend();
-        final hub = SensorHub(bleBackend: backend);
-        hub.addDevice(SensorKind.scale);
-        hub.assignBleRemoteId(
-          SensorKind.scale,
-          bleRemoteId: 'scale-1',
-          name: 'Decent Scale',
-        );
+    test('silent scale recovery reconnects when still enabled after wait', () async {
+      var nowMs = 1_000;
+      final backend = _ScaleConnectBackend(monotonicClock: () => nowMs);
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+      hub.addDevice(SensorKind.scale);
+      hub.assignBleRemoteId(
+        SensorKind.scale,
+        bleRemoteId: 'scale-1',
+        name: 'Decent Scale',
+      );
 
-        unawaited(hub.connect(hub.devices.first.id));
-        async.flushMicrotasks();
-        async.elapse(const Duration(milliseconds: 300));
-        async.flushMicrotasks();
-        expect(hub.devices.first.state, ConnectionState.connected);
-        expect(backend.connectCalls, 1);
+      await hub.connect(hub.devices.first.id);
+      expect(backend.connectCalls, 1);
 
-        // Silent for the 6s recovery threshold, then start recover + 2s wait.
-        async.elapse(const Duration(seconds: 6));
-        unawaited(hub.recoverSilentScalesForTest());
-        async.flushMicrotasks();
-        async.elapse(const Duration(milliseconds: 400));
-        async.flushMicrotasks();
+      nowMs += 6_000;
+      await hub.recoverSilentScalesForTest();
+      expect(backend.connectCalls, 2);
+    });
 
-        hub.setScaleRecoveryEnabled(false);
-        async.elapse(const Duration(seconds: 3));
-        async.flushMicrotasks();
+    test('setScaleRecoveryEnabled(false) skips hard reconnect after silent wait', () async {
+      var nowMs = 1_000;
+      final backend = _ScaleConnectBackend(monotonicClock: () => nowMs);
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+      hub.addDevice(SensorKind.scale);
+      hub.assignBleRemoteId(
+        SensorKind.scale,
+        bleRemoteId: 'scale-1',
+        name: 'Decent Scale',
+      );
 
-        expect(
-          backend.connectCalls,
-          1,
-          reason: 'hard reconnect must not run after recovery is disabled mid-wait',
-        );
+      await hub.connect(hub.devices.first.id);
+      expect(hub.devices.first.state, ConnectionState.connected);
+      expect(backend.connectCalls, 1);
 
-        hub.dispose();
-        async.flushMicrotasks();
-      });
+      nowMs += 6_000;
+      final recovery = hub.recoverSilentScalesForTest();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      hub.setScaleRecoveryEnabled(false);
+      await recovery;
+
+      expect(
+        backend.connectCalls,
+        1,
+        reason: 'hard reconnect must not run after recovery is disabled mid-wait',
+      );
     });
 
     test('skips devices without a BLE remote id', () async {
@@ -305,6 +316,9 @@ class _AlwaysConnectAdapter implements SensorAdapter {
 }
 
 class _PressensorConnectBackend implements BleConnectionBackend {
+  _PressensorConnectBackend({this.monotonicClock});
+
+  final int Function()? monotonicClock;
   int connectCalls = 0;
   _HubPressensorTransport? transport;
 
@@ -329,6 +343,7 @@ class _PressensorConnectBackend implements BleConnectionBackend {
     return PressensorBleAdapter(
       transport: transport!,
       deviceId: bleRemoteId,
+      monotonicClock: monotonicClock,
     );
   }
 }
@@ -363,6 +378,9 @@ class _HubPressensorTransport implements PressensorBleTransport {
 }
 
 class _ScaleConnectBackend implements BleConnectionBackend {
+  _ScaleConnectBackend({this.monotonicClock});
+
+  final int Function()? monotonicClock;
   int connectCalls = 0;
 
   @override
@@ -382,6 +400,9 @@ class _ScaleConnectBackend implements BleConnectionBackend {
     required String bleRemoteId,
   }) async {
     connectCalls += 1;
-    return DecentScaleBleAdapter(transport: MockDecentScaleTransport());
+    return DecentScaleBleAdapter(
+      transport: MockDecentScaleTransport(),
+      monotonicClock: monotonicClock,
+    );
   }
 }

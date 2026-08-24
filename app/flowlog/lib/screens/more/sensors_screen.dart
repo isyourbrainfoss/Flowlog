@@ -389,7 +389,7 @@ Future<void> _runSensorScanFlow(
     case BleScanAssignOutcome.assigned:
       final device = result.device!;
       await _connectPairedAfterAssign(
-        context: context,
+        context: context.mounted ? context : dialogNavContext,
         messenger: messenger,
         hub: hub,
         kind: kind,
@@ -429,7 +429,7 @@ Future<void> _runSensorScanFlow(
           rssi: selected.rssi,
         );
         await _connectPairedAfterAssign(
-          context: context,
+          context: context.mounted ? context : dialogNavContext,
           messenger: messenger,
           hub: hub,
           kind: kind,

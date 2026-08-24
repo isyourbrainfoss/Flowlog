@@ -257,15 +257,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Add'));
       await tester.pump();
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
       expect(hub.devices.first.bleRemoteId, 'AA:BB:CC:DD:EE:FF');
       expect(backend.connectCalls, 1);
       expect(hub.devices.first.state, ConnectionState.connected);
-      expect(
-        find.textContaining('PRS-CJ2'),
-        findsWidgets,
-      );
+      expect(find.text('Connected'), findsOneWidget);
+      expect(find.textContaining('Connecting to PRS-CJ2'), findsOneWidget);
     });
 
     testWidgets('connects the device chosen from multiple scan matches', (tester) async {
@@ -298,12 +297,14 @@ void main() {
 
       expect(find.text('Choose sensor'), findsOneWidget);
       await tester.tap(find.text('PRS-two'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
       expect(hub.devices.first.bleRemoteId, 'AA:BB:CC:DD:EE:02');
       expect(backend.connectCalls, 1);
       expect(hub.devices.first.state, ConnectionState.connected);
-      expect(find.textContaining('PRS-two'), findsWidgets);
+      expect(find.text('Connected'), findsOneWidget);
+      expect(find.textContaining('Connecting to PRS-two'), findsOneWidget);
     });
   });
 }

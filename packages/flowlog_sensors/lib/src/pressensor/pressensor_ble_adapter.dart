@@ -10,9 +10,14 @@ class PressensorBleAdapter implements SensorAdapter {
   PressensorBleAdapter({
     required PressensorBleTransport transport,
     this.deviceId,
-  }) : _transport = transport;
+    int Function()? monotonicClock,
+  })  : _transport = transport,
+        _monotonicClock = monotonicClock ?? _defaultMonotonicClock;
+
+  static int _defaultMonotonicClock() => DateTime.now().millisecondsSinceEpoch;
 
   final PressensorBleTransport _transport;
+  final int Function() _monotonicClock;
 
   /// Optional device ID from [PressensorBleTransport.scanForDevices].
   final String? deviceId;
@@ -41,12 +46,16 @@ class PressensorBleAdapter implements SensorAdapter {
   bool isPressureStreamSilent({
     Duration silentFor = const Duration(seconds: 3),
   }) {
+    final now = _monotonicClock();
     final last = _lastSampleReceiveMs;
-    if (last == null) {
+    if (last != null) {
+      return now - last >= silentFor.inMilliseconds;
+    }
+    final start = _streamStartMs;
+    if (start == null) {
       return true;
     }
-    return DateTime.now().millisecondsSinceEpoch - last >=
-        silentFor.inMilliseconds;
+    return now - start >= silentFor.inMilliseconds;
   }
 
   @override
@@ -73,7 +82,7 @@ class PressensorBleAdapter implements SensorAdapter {
       _stopwatch
         ..reset()
         ..start();
-      _streamStartMs = DateTime.now().millisecondsSinceEpoch;
+      _streamStartMs = _monotonicClock();
       _lastSampleReceiveMs = null;
       _pressureSub = _transport.subscribePressure().listen(
         _onPressureNotify,
@@ -100,7 +109,7 @@ class PressensorBleAdapter implements SensorAdapter {
 
   void _onPressureNotify(List<int> data) {
     final reading = parsePressureNotify(data);
-    _lastSampleReceiveMs = DateTime.now().millisecondsSinceEpoch;
+    _lastSampleReceiveMs = _monotonicClock();
     _samplesController.add(
       SensorSample(
         elapsedMs: _stopwatch.elapsedMilliseconds,
