@@ -43,6 +43,7 @@ abstract final class FlowlogChartColors {
   static const coffeePressureLine = Color(0xFFD4923A);
   static const coffeeWeightLine = Color(0xFF5B8DB8);
   static const coffeeFlowLine = Color(0xFF4ECDC4);
+
   /// Dashed target overlay on dark chart surfaces.
   static const coffeeTargetPressureLine = Color(0xFFE8E0D8);
 
@@ -57,34 +58,32 @@ abstract final class FlowlogChartColors {
   static const colorblindTargetPressureLine = Color(0xFFCC79A7);
 
   static Color get pressureLow => _lineColor(
-        coffee: coffeePressureLow,
-        colorblindSafe: colorblindPressureLow,
-      );
+    coffee: coffeePressureLow,
+    colorblindSafe: colorblindPressureLow,
+  );
 
   static Color get pressureHigh => _lineColor(
-        coffee: coffeePressureHigh,
-        colorblindSafe: colorblindPressureHigh,
-      );
+    coffee: coffeePressureHigh,
+    colorblindSafe: colorblindPressureHigh,
+  );
 
   static Color get pressureLine => _lineColor(
-        coffee: coffeePressureLine,
-        colorblindSafe: colorblindPressureLine,
-      );
+    coffee: coffeePressureLine,
+    colorblindSafe: colorblindPressureLine,
+  );
 
   static Color get weightLine => _lineColor(
-        coffee: coffeeWeightLine,
-        colorblindSafe: colorblindWeightLine,
-      );
+    coffee: coffeeWeightLine,
+    colorblindSafe: colorblindWeightLine,
+  );
 
-  static Color get flowLine => _lineColor(
-        coffee: coffeeFlowLine,
-        colorblindSafe: colorblindFlowLine,
-      );
+  static Color get flowLine =>
+      _lineColor(coffee: coffeeFlowLine, colorblindSafe: colorblindFlowLine);
 
   static Color get targetPressureLine => _lineColor(
-        coffee: coffeeTargetPressureLine,
-        colorblindSafe: colorblindTargetPressureLine,
-      );
+    coffee: coffeeTargetPressureLine,
+    colorblindSafe: colorblindTargetPressureLine,
+  );
 
   /// Target curve color for the active [ColorScheme] brightness.
   static Color targetPressureLineFor(ColorScheme scheme) {
@@ -185,9 +184,9 @@ class DualCurveChart extends StatefulWidget {
     this.denseTimeAxis = false,
     this.enableCrosshair = false,
   }) : assert(
-          samples != null || samplesNotifier != null,
-          'Provide samples or samplesNotifier',
-        );
+         samples != null || samplesNotifier != null,
+         'Provide samples or samplesNotifier',
+       );
 
   /// Static sample list (e.g. replayed or saved shot).
   final List<ShotSample>? samples;
@@ -247,7 +246,8 @@ class _DualCurveChartState extends State<DualCurveChart> {
   void initState() {
     super.initState();
     _ownsInteractionController = widget.interactionController == null;
-    _interactionController = widget.interactionController ??
+    _interactionController =
+        widget.interactionController ??
         ChartInteractionController(viewMode: widget.initialViewMode);
     _interactionController.addListener(_onInteractionChanged);
   }
@@ -261,7 +261,8 @@ class _DualCurveChartState extends State<DualCurveChart> {
         _interactionController.dispose();
       }
       _ownsInteractionController = widget.interactionController == null;
-      _interactionController = widget.interactionController ??
+      _interactionController =
+          widget.interactionController ??
           ChartInteractionController(viewMode: widget.initialViewMode);
       _interactionController.addListener(_onInteractionChanged);
     }
@@ -300,11 +301,7 @@ class _DualCurveChartState extends State<DualCurveChart> {
             _buildChart(context, samples, annotations),
       );
     }
-    return _buildChart(
-      context,
-      samples,
-      widget.annotations ?? const [],
-    );
+    return _buildChart(context, samples, widget.annotations ?? const []);
   }
 
   Widget _buildChart(
@@ -325,10 +322,11 @@ class _DualCurveChartState extends State<DualCurveChart> {
     final totalDurationMs = _resolveTotalDurationMs(prepared);
 
     if (widget.enableInteraction) {
-      final follow = widget.samplesNotifier != null &&
-          _interactionController.followLive;
-      final liveProgressMs =
-          follow && prepared.isNotEmpty ? prepared.last.elapsedMs : null;
+      final follow =
+          widget.samplesNotifier != null && _interactionController.followLive;
+      final liveProgressMs = follow && prepared.isNotEmpty
+          ? prepared.last.elapsedMs
+          : null;
       _interactionController.syncTotalDuration(
         totalDurationMs,
         followEndWhenZoomedOut: follow,
@@ -360,9 +358,7 @@ class _DualCurveChartState extends State<DualCurveChart> {
         child: LayoutBuilder(
           builder: (context, outerConstraints) {
             final boundedHeight = outerConstraints.maxHeight.isFinite;
-            final plotHeight = boundedHeight
-                ? null
-                : widget.height;
+            final plotHeight = boundedHeight ? null : widget.height;
 
             Widget plotArea({required double height}) {
               return SizedBox(
@@ -372,78 +368,80 @@ class _DualCurveChartState extends State<DualCurveChart> {
                   builder: (context, constraints) {
                     final plotWidth = _plotWidth(constraints.maxWidth);
                     final chartBody = viewMode == ChartViewMode.split
-                      ? _SplitCharts(
-                          samples: prepared,
-                          maxDurationMs: widget.maxDurationMs,
-                          viewport: viewport,
-                          visibility: visibility,
-                          surfaceStyle: surfaceStyle,
-                          annotations: annotations,
-                          targetPressureSamples: widget.targetPressureSamples,
-                          devicePixelRatio: devicePixelRatio,
-                        )
-                      : _OverlayChart(
-                          samples: prepared,
-                          maxDurationMs: widget.maxDurationMs,
-                          viewport: viewport,
-                          visibility: visibility,
-                          surfaceStyle: surfaceStyle,
-                          annotations: annotations,
-                          targetPressureSamples: widget.targetPressureSamples,
-                          denseTimeAxis: widget.denseTimeAxis,
-                          devicePixelRatio: devicePixelRatio,
-                        );
+                        ? _SplitCharts(
+                            samples: prepared,
+                            maxDurationMs: widget.maxDurationMs,
+                            viewport: viewport,
+                            visibility: visibility,
+                            surfaceStyle: surfaceStyle,
+                            annotations: annotations,
+                            targetPressureSamples: widget.targetPressureSamples,
+                            devicePixelRatio: devicePixelRatio,
+                          )
+                        : _OverlayChart(
+                            samples: prepared,
+                            maxDurationMs: widget.maxDurationMs,
+                            viewport: viewport,
+                            visibility: visibility,
+                            surfaceStyle: surfaceStyle,
+                            annotations: annotations,
+                            targetPressureSamples: widget.targetPressureSamples,
+                            denseTimeAxis: widget.denseTimeAxis,
+                            devicePixelRatio: devicePixelRatio,
+                          );
 
-                  final interactiveBody = widget.enableInteraction
-                      ? GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onScaleStart: _interactionController.onScaleStart,
-                          onScaleUpdate: (details) => _interactionController
-                              .onScaleUpdate(details, plotWidth),
-                          onScaleEnd: _interactionController.onScaleEnd,
-                          onTapUp: widget.enableCrosshair
-                              ? (details) {
-                                  final elapsedMs = chartElapsedMsFromLocalX(
-                                    localX: details.localPosition.dx,
-                                    chartWidth: constraints.maxWidth,
-                                    viewport: viewport,
-                                  );
-                                  _interactionController.setProbeFromElapsedMs(
-                                    elapsedMs,
-                                    prepared,
-                                  );
-                                }
-                              : null,
-                          onLongPressStart: widget.onAnnotateAtElapsedMs == null
-                              ? null
-                              : (details) {
-                                  final elapsedMs = chartElapsedMsFromLocalX(
-                                    localX: details.localPosition.dx,
-                                    chartWidth: constraints.maxWidth,
-                                    viewport: viewport,
-                                  );
-                                  widget.onAnnotateAtElapsedMs!(elapsedMs);
-                                },
-                          child: chartBody,
-                        )
-                      : chartBody;
+                    final interactiveBody = widget.enableInteraction
+                        ? GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onScaleStart: _interactionController.onScaleStart,
+                            onScaleUpdate: (details) => _interactionController
+                                .onScaleUpdate(details, plotWidth),
+                            onScaleEnd: _interactionController.onScaleEnd,
+                            onTapUp: widget.enableCrosshair
+                                ? (details) {
+                                    final elapsedMs = chartElapsedMsFromLocalX(
+                                      localX: details.localPosition.dx,
+                                      chartWidth: constraints.maxWidth,
+                                      viewport: viewport,
+                                    );
+                                    _interactionController
+                                        .setProbeFromElapsedMs(
+                                          elapsedMs,
+                                          prepared,
+                                        );
+                                  }
+                                : null,
+                            onLongPressStart:
+                                widget.onAnnotateAtElapsedMs == null
+                                ? null
+                                : (details) {
+                                    final elapsedMs = chartElapsedMsFromLocalX(
+                                      localX: details.localPosition.dx,
+                                      chartWidth: constraints.maxWidth,
+                                      viewport: viewport,
+                                    );
+                                    widget.onAnnotateAtElapsedMs!(elapsedMs);
+                                  },
+                            child: chartBody,
+                          )
+                        : chartBody;
 
-                  return Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      interactiveBody,
-                      if (widget.enableCrosshair)
-                        _ChartCrosshairOverlay(
-                          samples: prepared,
-                          viewport: viewport,
-                          interactionController: _interactionController,
-                          surfaceStyle: surfaceStyle,
-                          chartWidth: constraints.maxWidth,
-                          chartHeight: height,
-                          devicePixelRatio: devicePixelRatio,
-                        ),
-                    ],
-                  );
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        interactiveBody,
+                        if (widget.enableCrosshair)
+                          _ChartCrosshairOverlay(
+                            samples: prepared,
+                            viewport: viewport,
+                            interactionController: _interactionController,
+                            surfaceStyle: surfaceStyle,
+                            chartWidth: constraints.maxWidth,
+                            chartHeight: height,
+                            devicePixelRatio: devicePixelRatio,
+                          ),
+                      ],
+                    );
                   },
                 ),
               );
@@ -468,8 +466,10 @@ class _DualCurveChartState extends State<DualCurveChart> {
                   Expanded(
                     child: LayoutBuilder(
                       builder: (context, plotConstraints) {
-                        final height = plotConstraints.maxHeight
-                            .clamp(80.0, widget.height);
+                        final height = plotConstraints.maxHeight.clamp(
+                          80.0,
+                          widget.height,
+                        );
                         return plotArea(height: height);
                       },
                     ),
@@ -499,12 +499,8 @@ class _DualCurveChartState extends State<DualCurveChart> {
     if (raw.isEmpty) {
       return raw;
     }
-
-    final hasFlow = raw.any((sample) => sample.flowGs != null);
-    if (hasFlow) {
-      return List<ShotSample>.from(raw);
-    }
-
+    // Always derive flow from weight. Stored/live flowGs used adjacent
+    // merged ticks and spiked to tens of g/s.
     return computeFlowRates(raw);
   }
 
@@ -558,20 +554,20 @@ _SeriesVisibility _visibilityForMode({
 }) {
   return switch (viewMode) {
     ChartViewMode.overlay => _SeriesVisibility(
-        showPressure: showPressure,
-        showWeight: showWeight,
-        showFlow: showFlow,
-      ),
+      showPressure: showPressure,
+      showWeight: showWeight,
+      showFlow: showFlow,
+    ),
     ChartViewMode.split => _SeriesVisibility(
-        showPressure: showPressure,
-        showWeight: showWeight,
-        showFlow: showFlow,
-      ),
+      showPressure: showPressure,
+      showWeight: showWeight,
+      showFlow: showFlow,
+    ),
     ChartViewMode.flowOnly => _SeriesVisibility(
-        showPressure: false,
-        showWeight: false,
-        showFlow: showFlow,
-      ),
+      showPressure: false,
+      showWeight: false,
+      showFlow: showFlow,
+    ),
   };
 }
 
@@ -749,15 +745,10 @@ class _SplitPanel extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(
-            color: surfaceStyle.axisLabel,
-            fontSize: 10,
-          ),
+          style: TextStyle(color: surfaceStyle.axisLabel, fontSize: 10),
         ),
         const SizedBox(height: 2),
-        Expanded(
-          child: CustomPaint(painter: painter),
-        ),
+        Expanded(child: CustomPaint(painter: painter)),
       ],
     );
   }
@@ -787,10 +778,7 @@ class _Legend extends StatelessWidget {
     final items = <Widget>[];
     if (showPressure) {
       items.add(
-        _LegendItem(
-          color: FlowlogChartColors.pressureLine,
-          label: 'Pressure',
-        ),
+        _LegendItem(color: FlowlogChartColors.pressureLine, label: 'Pressure'),
       );
     }
     if (showWeight) {
@@ -814,13 +802,7 @@ class _Legend extends StatelessWidget {
     if (interactionController == null) {
       return Row(
         children: [
-          Expanded(
-            child: Wrap(
-              spacing: 16,
-              runSpacing: 4,
-              children: items,
-            ),
-          ),
+          Expanded(child: Wrap(spacing: 16, runSpacing: 4, children: items)),
           Text(
             _viewModeLabel(viewMode),
             style: const TextStyle(
@@ -835,11 +817,7 @@ class _Legend extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(
-          spacing: 16,
-          runSpacing: 4,
-          children: items,
-        ),
+        Wrap(spacing: 16, runSpacing: 4, children: items),
         const SizedBox(height: 6),
         Align(
           alignment: Alignment.centerRight,
@@ -862,10 +840,7 @@ class _Legend extends StatelessWidget {
 }
 
 class _ViewModePicker extends StatelessWidget {
-  const _ViewModePicker({
-    required this.viewMode,
-    required this.onModeSelected,
-  });
+  const _ViewModePicker({required this.viewMode, required this.onModeSelected});
 
   final ChartViewMode viewMode;
   final ValueChanged<ChartViewMode> onModeSelected;
@@ -985,21 +960,23 @@ class DualCurveChartPainter extends CustomPainter {
     this.targetPressureSamples = const [],
     this.denseTimeAxis = false,
     this.devicePixelRatio = 1.0,
-  })  : surfaceStyle = surfaceStyle ??
-            ChartSurfaceStyle(
-              background: FlowlogChartColors.background,
-              grid: FlowlogChartColors.grid,
-              axisLabel: FlowlogChartColors.axisLabel,
-              targetPressureLine: FlowlogChartColors.targetPressureLine,
-            ),
-        viewport = viewport ??
-            ChartViewport(
-              totalDurationMs: math.max(
-                1,
-                maxDurationMs ??
-                    _fallbackDuration(samples, targetPressureSamples),
-              ),
-            );
+  }) : surfaceStyle =
+           surfaceStyle ??
+           ChartSurfaceStyle(
+             background: FlowlogChartColors.background,
+             grid: FlowlogChartColors.grid,
+             axisLabel: FlowlogChartColors.axisLabel,
+             targetPressureLine: FlowlogChartColors.targetPressureLine,
+           ),
+       viewport =
+           viewport ??
+           ChartViewport(
+             totalDurationMs: math.max(
+               1,
+               maxDurationMs ??
+                   _fallbackDuration(samples, targetPressureSamples),
+             ),
+           );
 
   final List<ShotSample> samples;
   final int? maxDurationMs;
@@ -1021,10 +998,16 @@ class DualCurveChartPainter extends CustomPainter {
   static const bottomPad = 24.0;
   static const axisUnitTop = 2.0;
 
-  static double _snapStrokeCoord(double value, double strokeWidth, double pixelRatio) {
+  static double _snapStrokeCoord(
+    double value,
+    double strokeWidth,
+    double pixelRatio,
+  ) {
     final scaled = value * pixelRatio;
     final stroke = strokeWidth * pixelRatio;
-    final aligned = stroke % 2 == 0 ? scaled.roundToDouble() : scaled.floor() + 0.5;
+    final aligned = stroke % 2 == 0
+        ? scaled.roundToDouble()
+        : scaled.floor() + 0.5;
     return aligned / pixelRatio;
   }
 
@@ -1110,12 +1093,7 @@ class DualCurveChartPainter extends CustomPainter {
       );
     }
 
-    paintShotAnnotations(
-      canvas,
-      plotRect,
-      viewport,
-      annotations: annotations,
-    );
+    paintShotAnnotations(canvas, plotRect, viewport, annotations: annotations);
     canvas.restore();
   }
 
@@ -1240,9 +1218,7 @@ class DualCurveChartPainter extends CustomPainter {
       final strokeWidth = emphasized ? 1.25 : 1.0;
       final y = _snapStrokeCoord(rawY, strokeWidth, devicePixelRatio);
       final linePaint = Paint()
-        ..color = surfaceStyle.grid.withValues(
-          alpha: emphasized ? 0.58 : 0.38,
-        )
+        ..color = surfaceStyle.grid.withValues(alpha: emphasized ? 0.58 : 0.38)
         ..strokeWidth = strokeWidth
         ..isAntiAlias = false;
 
@@ -1295,16 +1271,17 @@ class DualCurveChartPainter extends CustomPainter {
   void _drawTimeGrid(Canvas canvas, Rect plotRect, _ChartScales scales) {
     final stepMs = _timeGridStepMs(scales.timeSpanMs);
 
-    final startTick =
-        ((scales.timeOffsetMs + stepMs - 1) ~/ stepMs) * stepMs;
+    final startTick = ((scales.timeOffsetMs + stepMs - 1) ~/ stepMs) * stepMs;
     final gridPaint = Paint()
       ..color = surfaceStyle.grid.withValues(alpha: 0.32)
       ..strokeWidth = 1
       ..isAntiAlias = false;
 
-    for (var elapsedMs = startTick;
-        elapsedMs <= scales.visibleEndMs;
-        elapsedMs += stepMs) {
+    for (
+      var elapsedMs = startTick;
+      elapsedMs <= scales.visibleEndMs;
+      elapsedMs += stepMs
+    ) {
       final normalizedTime =
           (elapsedMs - scales.timeOffsetMs) / scales.timeSpanMs;
       if (normalizedTime < 0 || normalizedTime > 1) {
@@ -1335,34 +1312,14 @@ class DualCurveChartPainter extends CustomPainter {
 
     if (compact) {
       final unit = axisUnitLabel ?? 'bar';
-      _drawAxisLabel(
-        canvas,
-        unit,
-        Offset(4, axisUnitTop),
-        textStyle,
-      );
+      _drawAxisLabel(canvas, unit, Offset(4, axisUnitTop), textStyle);
     } else {
       if (showPressure) {
-        _drawAxisLabel(
-          canvas,
-          'bar',
-          Offset(4, axisUnitTop),
-          textStyle,
-        );
+        _drawAxisLabel(canvas, 'bar', Offset(4, axisUnitTop), textStyle);
       } else if (showWeight) {
-        _drawAxisLabel(
-          canvas,
-          'g',
-          Offset(4, axisUnitTop),
-          textStyle,
-        );
+        _drawAxisLabel(canvas, 'g', Offset(4, axisUnitTop), textStyle);
       } else if (showFlow) {
-        _drawAxisLabel(
-          canvas,
-          'g/s',
-          Offset(4, axisUnitTop),
-          textStyle,
-        );
+        _drawAxisLabel(canvas, 'g/s', Offset(4, axisUnitTop), textStyle);
       }
 
       // Secondary units on the right (overlay). Weight is the primary scale
@@ -1376,9 +1333,7 @@ class DualCurveChartPainter extends CustomPainter {
         );
       }
       if (showPressure && showFlow) {
-        final flowLabelTop = showWeight
-            ? plotRect.center.dy
-            : axisUnitTop;
+        final flowLabelTop = showWeight ? plotRect.center.dy : axisUnitTop;
         _drawAxisLabel(
           canvas,
           'g/s',
@@ -1398,9 +1353,11 @@ class DualCurveChartPainter extends CustomPainter {
 
     final stepMs = _timeGridStepMs(scales.timeSpanMs);
     final startTick = ((scales.timeOffsetMs + stepMs - 1) ~/ stepMs) * stepMs;
-    for (var elapsedMs = startTick;
-        elapsedMs <= scales.visibleEndMs;
-        elapsedMs += stepMs) {
+    for (
+      var elapsedMs = startTick;
+      elapsedMs <= scales.visibleEndMs;
+      elapsedMs += stepMs
+    ) {
       final normalizedTime =
           (elapsedMs - scales.timeOffsetMs) / scales.timeSpanMs;
       if (normalizedTime < 0 || normalizedTime > 1) {
@@ -1410,8 +1367,10 @@ class DualCurveChartPainter extends CustomPainter {
       final x = plotRect.left + normalizedTime * plotRect.width;
       final label = _formatDuration(elapsedMs);
       final labelWidth = label.length * 6.0 + 8;
-      final labelX = (x - labelWidth / 2)
-          .clamp(plotRect.left, plotRect.right - labelWidth);
+      final labelX = (x - labelWidth / 2).clamp(
+        plotRect.left,
+        plotRect.right - labelWidth,
+      );
       _paintText(
         canvas,
         label,
@@ -1428,10 +1387,7 @@ class DualCurveChartPainter extends CustomPainter {
       canvas,
       message,
       Offset(plotRect.left, plotRect.center.dy - 6),
-      TextStyle(
-        color: surfaceStyle.axisLabel,
-        fontSize: 12,
-      ),
+      TextStyle(color: surfaceStyle.axisLabel, fontSize: 12),
       maxWidth: plotRect.width,
       align: TextAlign.center,
     );
@@ -1458,13 +1414,15 @@ class DualCurveChartPainter extends CustomPainter {
       if (pressure == null) {
         continue;
       }
-      points.add(_pointFor(
-        plotRect,
-        scales,
-        elapsedMs: sample.elapsedMs,
-        value: pressure,
-        maxValue: scales.pressureMax,
-      ));
+      points.add(
+        _pointFor(
+          plotRect,
+          scales,
+          elapsedMs: sample.elapsedMs,
+          value: pressure,
+          maxValue: scales.pressureMax,
+        ),
+      );
     }
 
     if (points.length < 2) {
@@ -1519,13 +1477,15 @@ class DualCurveChartPainter extends CustomPainter {
       if (value == null) {
         continue;
       }
-      points.add(_pointFor(
-        plotRect,
-        scales,
-        elapsedMs: sample.elapsedMs,
-        value: value,
-        maxValue: maxValue,
-      ));
+      points.add(
+        _pointFor(
+          plotRect,
+          scales,
+          elapsedMs: sample.elapsedMs,
+          value: value,
+          maxValue: maxValue,
+        ),
+      );
     }
 
     if (points.length < 2) {
@@ -1576,8 +1536,8 @@ class DualCurveChartPainter extends CustomPainter {
     final normalizedTime =
         (elapsedMs - scales.timeOffsetMs) / scales.timeSpanMs;
     final x = plotRect.left + normalizedTime.clamp(0.0, 1.0) * plotRect.width;
-    final y = plotRect.bottom -
-        (value / maxValue).clamp(0.0, 1.0) * plotRect.height;
+    final y =
+        plotRect.bottom - (value / maxValue).clamp(0.0, 1.0) * plotRect.height;
     return Offset(x, y);
   }
 
@@ -1686,13 +1646,11 @@ class _ChartCrosshairOverlay extends StatelessWidget {
           ),
         );
 
-        final scales = _ChartScales.fromSamples(
-          samples,
-          viewport: viewport,
-        );
+        final scales = _ChartScales.fromSamples(samples, viewport: viewport);
         final normalizedTime =
             (probe.elapsedMs - scales.timeOffsetMs) / scales.timeSpanMs;
-        final x = plotRect.left + normalizedTime.clamp(0.0, 1.0) * plotRect.width;
+        final x =
+            plotRect.left + normalizedTime.clamp(0.0, 1.0) * plotRect.width;
 
         final pressure = probe.pressureBar;
         final weight = probe.weightG;
@@ -1723,8 +1681,10 @@ class _ChartCrosshairOverlay extends StatelessWidget {
                   color: surfaceStyle.background.withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(6),
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     child: Text(
                       parts.join(' · '),
                       key: const Key('chart_crosshair_readout'),
@@ -1865,7 +1825,11 @@ class _ChartScales {
   }
 }
 
-double _snapAxisMax(double value, {required double step, required double minimum}) {
+double _snapAxisMax(
+  double value, {
+  required double step,
+  required double minimum,
+}) {
   final snapped = math.max(minimum, (value / step).ceil() * step);
   return snapped;
 }

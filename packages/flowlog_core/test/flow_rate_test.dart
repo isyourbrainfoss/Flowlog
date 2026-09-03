@@ -1,17 +1,22 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:test/test.dart';
 
-final _golden = jsonDecode(
-  File(_fixturePath('sensor_streams/flow_rate_golden.json')).readAsStringSync(),
-) as Map<String, dynamic>;
+final _golden =
+    jsonDecode(
+          File(
+            _fixturePath('sensor_streams/flow_rate_golden.json'),
+          ).readAsStringSync(),
+        )
+        as Map<String, dynamic>;
 
 final _goldenConfig = _golden['config'] as Map<String, dynamic>;
 final _calculator = FlowRateCalculator(
   maxGapMs: _goldenConfig['maxGapMs'] as int,
-  windowSize: _goldenConfig['windowSize'] as int,
+  windowMs: _goldenConfig['windowMs'] as int,
 );
 
 void main() {
@@ -64,6 +69,32 @@ void main() {
       expect(result[2].flowGs, 0.0);
       expect(result[3].flowGs, closeTo(1.0, 1e-9));
     });
+
+    test('carried-forward weight ticks do not spike flow', () {
+      final samples = <ShotSample>[];
+      var grams = 0.0;
+      var elapsedMs = 0;
+      // 1.0 g/s true pour, 0.1 g scale steps, 25 ms pressure ticks.
+      for (var step = 0; step < 40; step++) {
+        for (var tick = 0; tick < 4; tick++) {
+          samples.add(
+            ShotSample(elapsedMs: elapsedMs, weightG: grams, pressureBar: 9.0),
+          );
+          elapsedMs += 25;
+        }
+        grams += 0.1;
+      }
+
+      final flows = computeFlowRates(
+        samples,
+      ).map((sample) => sample.flowGs).whereType<double>().toList();
+
+      expect(flows, isNotEmpty);
+      expect(flows.reduce(math.max), lessThan(2.5));
+      final settled = flows.skip(40).toList();
+      final mean = settled.reduce((a, b) => a + b) / settled.length;
+      expect(mean, closeTo(1.0, 0.25));
+    });
   });
 }
 
@@ -80,12 +111,10 @@ List<ShotSample> _inputSamples(Map<String, dynamic> caseEntry) {
 }
 
 List<double?> _expectedFlowRates(Map<String, dynamic> caseEntry) {
-  return (caseEntry['samples'] as List<dynamic>)
-      .map((entry) {
-        final expected = (entry as Map<String, dynamic>)['expectedFlowGs'];
-        return expected == null ? null : (expected as num).toDouble();
-      })
-      .toList();
+  return (caseEntry['samples'] as List<dynamic>).map((entry) {
+    final expected = (entry as Map<String, dynamic>)['expectedFlowGs'];
+    return expected == null ? null : (expected as num).toDouble();
+  }).toList();
 }
 
 ShotSample _sampleFromGolden(Map<String, dynamic> json) {

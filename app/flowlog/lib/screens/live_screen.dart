@@ -10,6 +10,7 @@ import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/delight.dart';
 import 'package:flowlog/screens/live/feedback.dart';
 import 'package:flowlog/screens/live/fullscreen_chart.dart';
+import 'package:flowlog/screens/live/idle_sensor_status.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
 import 'package:flowlog/screens/live/live_pressure_bar.dart';
 import 'package:flowlog/screens/live/live_yield_bar.dart';
@@ -139,6 +140,7 @@ class _LiveScreenState extends State<LiveScreen> {
   ConnectionState? _lastPressensorState;
   ActiveBrewNotifier? _activeBrewNotifier;
   ShotEventsNotifier? _shotEventsNotifier;
+
   /// Fires once per brew when cup weight crosses the early-stop warn level.
   bool _yieldWarnFired = false;
 
@@ -147,6 +149,7 @@ class _LiveScreenState extends State<LiveScreen> {
   late final ValueNotifier<double?> _liveWeightNotifier;
   late final ValueNotifier<DateTime?> _liveWeightLastUpdate;
   DateTime _lastSamplesUpdate = DateTime.now();
+
   /// One automatic weight-stream re-arm per brew when the scale is silent.
   bool _weightRearmAttempted = false;
 
@@ -171,17 +174,18 @@ class _LiveScreenState extends State<LiveScreen> {
     _ownedAutoStartController = AutoStartSettingsController();
     unawaited(_ownedAutoStartController.load());
     _brewDefaultsStore = BrewDefaultsSettingsStore();
-    unawaited(_brewDefaultsStore.load().then((d) {
-      _brewDefaults = d;
-      if (mounted) setState(() {});
-    }));
+    unawaited(
+      _brewDefaultsStore.load().then((d) {
+        _brewDefaults = d;
+        if (mounted) setState(() {});
+      }),
+    );
 
     if (widget.controller != null) {
       _sensorSource = widget.sensorSource;
       _bindController(widget.controller!);
       _controllerReady = true;
     }
-
   }
 
   AutoStartSettingsController get _resolvedAutoStartController {
@@ -209,10 +213,10 @@ class _LiveScreenState extends State<LiveScreen> {
         previous != ConnectionState.connected &&
         current == ConnectionState.connected &&
         mounted) {
-      final threshold =
-          _resolvedAutoStartController.settings.startThresholdBar;
-      final batteryWarning =
-          pressensorLowBatteryWarning(hub.pressensorBatteryPercent);
+      final threshold = _resolvedAutoStartController.settings.startThresholdBar;
+      final batteryWarning = pressensorLowBatteryWarning(
+        hub.pressensorBatteryPercent,
+      );
       final message = StringBuffer(
         'Pressensor connected — auto-start at ${threshold.toStringAsFixed(1)} bar',
       );
@@ -243,7 +247,8 @@ class _LiveScreenState extends State<LiveScreen> {
 
   void _ensureProductionController() {
     final hub = SensorHubScope.of(context);
-    _sensorSource = widget.sensorSource ??
+    _sensorSource =
+        widget.sensorSource ??
         LiveSensorSource(
           hub: hub,
           demoFixturePath: _resolveDemoFixtureFilePath(),
@@ -303,8 +308,8 @@ class _LiveScreenState extends State<LiveScreen> {
     _repeatShotController =
         widget.repeatShotController ?? RepeatShotScope.maybeOf(context);
     _targetBrewController = TargetBrewScope.maybeOf(context);
-    _autoStartController = widget.autoStartController ??
-        AutoStartSettingsScope.maybeOf(context);
+    _autoStartController =
+        widget.autoStartController ?? AutoStartSettingsScope.maybeOf(context);
 
     _activeBrewNotifier = ActiveBrewScope.maybeOf(context);
     _shotEventsNotifier = ShotEventsScope.maybeOf(context);
@@ -415,8 +420,9 @@ class _LiveScreenState extends State<LiveScreen> {
               break;
             }
           }
-          _liveWeightLastUpdate.value =
-              DateTime.fromMillisecondsSinceEpoch(rxMs);
+          _liveWeightLastUpdate.value = DateTime.fromMillisecondsSinceEpoch(
+            rxMs,
+          );
           _weightRearmAttempted = false;
           return;
         }
@@ -442,7 +448,8 @@ class _LiveScreenState extends State<LiveScreen> {
     final source = _sensorSource;
     final scalePaired =
         source?.scalePaired ?? hub?.hasKind(SensorKind.scale) ?? false;
-    final linked = source?.scaleLinkConnected ??
+    final linked =
+        source?.scaleLinkConnected ??
         (hub?.scaleState == ConnectionState.connected);
     final adapter = hub?.activeAdapterFor(SensorKind.scale);
     int? rxMs;
@@ -457,11 +464,11 @@ class _LiveScreenState extends State<LiveScreen> {
       scalePaired: scalePaired,
       scaleLinked: linked,
       isBrewing: isBrewing,
-      shotHasWeight: (_controller?.samples ?? const <ShotSample>[])
-          .any((s) => s.weightG != null),
+      shotHasWeight: (_controller?.samples ?? const <ShotSample>[]).any(
+        (s) => s.weightG != null,
+      ),
       lastWeightReceiveMs: rxMs,
-      brewElapsed:
-          started == null ? null : DateTime.now().difference(started),
+      brewElapsed: started == null ? null : DateTime.now().difference(started),
     );
   }
 
@@ -514,7 +521,11 @@ class _LiveScreenState extends State<LiveScreen> {
     // tick with null weight if the scale stream is flaky).
     double? weight = samples.last.weightG ?? _liveWeightNotifier.value;
     if (weight == null) {
-      for (var i = samples.length - 1; i >= 0 && i >= samples.length - 12; i--) {
+      for (
+        var i = samples.length - 1;
+        i >= 0 && i >= samples.length - 12;
+        i--
+      ) {
         final w = samples[i].weightG;
         if (w != null) {
           weight = w;
@@ -592,8 +603,9 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   void _syncAnnotations() {
-    _annotationsNotifier.value =
-        List<ShotAnnotation>.from(_annotationController.annotations);
+    _annotationsNotifier.value = List<ShotAnnotation>.from(
+      _annotationController.annotations,
+    );
   }
 
   Future<void> _onToggleShotShortcut() async {
@@ -777,7 +789,10 @@ class _LiveScreenState extends State<LiveScreen> {
       _dismissBrewCompleteBanner();
     }
     // Trigger auto-save on stop transition (covers both manual stop and auto-stop).
-    if (_wasBrewing && !brewing && controller.canSaveShot && !_autoSavedCurrent) {
+    if (_wasBrewing &&
+        !brewing &&
+        controller.canSaveShot &&
+        !_autoSavedCurrent) {
       unawaited(_autoSaveStoppedSession());
     }
     // Also catch stopped state directly (helps auto-stop timer path reliability)
@@ -797,9 +812,11 @@ class _LiveScreenState extends State<LiveScreen> {
       // Re-enable live follow for the new pull.
       _chartInteractionController.resetViewport();
       // Reload brew defaults so yield target/warn edits apply to this shot.
-      unawaited(_brewDefaultsStore.load().then((d) {
-        if (mounted) setState(() => _brewDefaults = d);
-      }));
+      unawaited(
+        _brewDefaultsStore.load().then((d) {
+          if (mounted) setState(() => _brewDefaults = d);
+        }),
+      );
     }
     if (!brewing && _wasBrewing) {
       _sensorHub?.setScaleRecoveryEnabled(true);
@@ -889,9 +906,7 @@ class _LiveScreenState extends State<LiveScreen> {
         }
         _shotEventsNotifier?.notifyShotsChanged();
         final database = await _ensureDatabase();
-        unawaited(
-          FlowlogSyncCoordinator.syncIfEnabled(database: database),
-        );
+        unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
       }
     } finally {
       if (mounted) {
@@ -932,9 +947,7 @@ class _LiveScreenState extends State<LiveScreen> {
         confettiController: _confettiController,
       );
       final database = await _ensureDatabase();
-      unawaited(
-        FlowlogSyncCoordinator.syncIfEnabled(database: database),
-      );
+      unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
     }
   }
 
@@ -979,8 +992,7 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   List<ShotSample> _chartTargetPressureSamples() {
-    final repeatSamples =
-        _repeatShotController?.prefill?.targetPressureSamples;
+    final repeatSamples = _repeatShotController?.prefill?.targetPressureSamples;
     if (repeatSamples != null && repeatSamples.isNotEmpty) {
       return repeatSamples;
     }
@@ -1039,8 +1051,7 @@ class _LiveScreenState extends State<LiveScreen> {
       context: context,
       shot: shot,
       profileRepository: profileRepository,
-      repeatController:
-          _repeatShotController ?? widget.repeatShotController,
+      repeatController: _repeatShotController ?? widget.repeatShotController,
     );
   }
 
@@ -1048,10 +1059,7 @@ class _LiveScreenState extends State<LiveScreen> {
   Widget build(BuildContext context) {
     final controller = _controller;
     if (controller == null) {
-      return const Scaffold(
-        primary: false,
-        body: SizedBox.shrink(),
-      );
+      return const Scaffold(primary: false, body: SizedBox.shrink());
     }
 
     final listenables = <Listenable>[controller];
@@ -1110,7 +1118,8 @@ class _LiveScreenState extends State<LiveScreen> {
                 final targetYield =
                     _brewDefaults?.targetYieldG ?? kDefaultTargetYieldG;
                 final warnAt =
-                    _brewDefaults?.effectiveYieldWarnAtG ?? kDefaultYieldWarnAtG;
+                    _brewDefaults?.effectiveYieldWarnAtG ??
+                    kDefaultYieldWarnAtG;
                 final targetP = latestSample == null
                     ? null
                     : _targetPressureAtElapsed(latestSample.elapsedMs);
@@ -1156,7 +1165,8 @@ class _LiveScreenState extends State<LiveScreen> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 LiveYieldProgress(
-                                  weightG: latestSample?.weightG ??
+                                  weightG:
+                                      latestSample?.weightG ??
                                       _liveWeightNotifier.value,
                                   targetYieldG: targetYield,
                                   warnAtG: warnAt,
@@ -1185,11 +1195,11 @@ class _LiveScreenState extends State<LiveScreen> {
                                       .textTheme
                                       .headlineSmall
                                       ?.copyWith(
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures(),
-                                    ],
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                        fontFeatures: const [
+                                          FontFeature.tabularFigures(),
+                                        ],
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                 ),
                                 const SizedBox(height: 8),
                                 LiveControls(
@@ -1206,8 +1216,9 @@ class _LiveScreenState extends State<LiveScreen> {
                   );
                 } else {
                   final chartSection = Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: horizontalPadding),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -1233,7 +1244,7 @@ class _LiveScreenState extends State<LiveScreen> {
                         if (state == ShotSessionState.idle ||
                             state == ShotSessionState.stopped)
                           _sensorHub == null
-                              ? _IdleSensorStatus(
+                              ? IdleSensorStatus(
                                   pressureBarNotifier: _livePressureNotifier,
                                   lastUpdateNotifier: _livePressureLastUpdate,
                                   pressensorPaired: false,
@@ -1241,18 +1252,19 @@ class _LiveScreenState extends State<LiveScreen> {
                                       ConnectionState.disconnected,
                                   onReconnect: _onReconnectSensors,
                                   onPair: _onPairSensors,
-                                  autoStartEnabled:
-                                      _resolvedAutoStartController
-                                          .settings.enabled,
+                                  autoStartEnabled: _resolvedAutoStartController
+                                      .settings
+                                      .enabled,
                                   autoStartThreshold:
                                       _resolvedAutoStartController
-                                          .settings.startThresholdBar,
+                                          .settings
+                                          .startThresholdBar,
                                 )
                               : ListenableBuilder(
                                   listenable: _sensorHub!,
                                   builder: (context, _) {
                                     final hub = _sensorHub!;
-                                    return _IdleSensorStatus(
+                                    return IdleSensorStatus(
                                       pressureBarNotifier:
                                           _livePressureNotifier,
                                       lastUpdateNotifier:
@@ -1260,16 +1272,17 @@ class _LiveScreenState extends State<LiveScreen> {
                                       pressensorPaired: hub.hasKind(
                                         SensorKind.pressensor,
                                       ),
-                                      pressensorLinkState:
-                                          hub.pressensorState,
+                                      pressensorLinkState: hub.pressensorState,
                                       onReconnect: _onReconnectSensors,
                                       onPair: _onPairSensors,
                                       autoStartEnabled:
                                           _resolvedAutoStartController
-                                              .settings.enabled,
+                                              .settings
+                                              .enabled,
                                       autoStartThreshold:
                                           _resolvedAutoStartController
-                                              .settings.startThresholdBar,
+                                              .settings
+                                              .startThresholdBar,
                                     );
                                   },
                                 ),
@@ -1320,7 +1333,8 @@ class _LiveScreenState extends State<LiveScreen> {
                           ),
                           const SizedBox(height: 8),
                           LiveYieldProgress(
-                            weightG: latestSample.weightG ??
+                            weightG:
+                                latestSample.weightG ??
                                 _liveWeightNotifier.value,
                             targetYieldG: targetYield,
                             warnAtG: warnAt,
@@ -1328,7 +1342,7 @@ class _LiveScreenState extends State<LiveScreen> {
                             weightHealth: _weightStreamHealth(
                               isBrewing:
                                   state == ShotSessionState.recording ||
-                                      state == ShotSessionState.paused,
+                                  state == ShotSessionState.paused,
                             ),
                             onRearmWeight: () =>
                                 unawaited(_onRearmWeightPressed()),
@@ -1347,7 +1361,7 @@ class _LiveScreenState extends State<LiveScreen> {
                                   liveGamif['maxStreakSeconds'] as int? ?? 0,
                               currentStreakSec:
                                   liveGamif['currentStreakSeconds'] as int? ??
-                                      0,
+                                  0,
                               penaltyCount:
                                   liveGamif['penaltyCount'] as int? ?? 0,
                               score: liveGamif['score'] as double?,
@@ -1378,8 +1392,7 @@ class _LiveScreenState extends State<LiveScreen> {
                             const SizedBox(height: 8),
                             FilledButton.icon(
                               key: const Key('save_current_shot_button'),
-                              onPressed: () =>
-                                  unawaited(_saveCurrentSession()),
+                              onPressed: () => unawaited(_saveCurrentSession()),
                               icon: const Icon(Icons.save),
                               label: const Text('Save shot'),
                             ),
@@ -1390,7 +1403,8 @@ class _LiveScreenState extends State<LiveScreen> {
                     ),
                   );
 
-                  final pinChart = constraints.maxHeight.isFinite &&
+                  final pinChart =
+                      constraints.maxHeight.isFinite &&
                       constraints.maxHeight >= 360;
 
                   body = pinChart
@@ -1398,8 +1412,14 @@ class _LiveScreenState extends State<LiveScreen> {
                           key: const ValueKey('live-pinned-layout'),
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            chartSection,
                             Expanded(
+                              flex: 3,
+                              child: SingleChildScrollView(
+                                child: chartSection,
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
                               child: SingleChildScrollView(
                                 padding: EdgeInsets.only(
                                   top: useCompactLayout ? 0 : 8,
@@ -1416,39 +1436,36 @@ class _LiveScreenState extends State<LiveScreen> {
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              chartSection,
-                              controlsSection,
-                            ],
+                            children: [chartSection, controlsSection],
                           ),
                         );
                 }
 
-                  return Scaffold(
-                    primary: false,
-                    // During brew the stop control is embedded in the HUD so
-                    // the shell can go fully immersive (no bottom tab bar).
-                    bottomNavigationBar: isBrewing
-                        ? null
-                        : SafeArea(
-                            child: Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                horizontalPadding,
-                                8,
-                                horizontalPadding,
-                                useCompactLayout ? 8 : 12,
-                              ),
-                              child: LiveControls(
-                                controller: controller,
-                                prominent: useCompactLayout,
-                              ),
+                return Scaffold(
+                  primary: false,
+                  // During brew the stop control is embedded in the HUD so
+                  // the shell can go fully immersive (no bottom tab bar).
+                  bottomNavigationBar: isBrewing
+                      ? null
+                      : SafeArea(
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              horizontalPadding,
+                              8,
+                              horizontalPadding,
+                              useCompactLayout ? 8 : 12,
+                            ),
+                            child: LiveControls(
+                              controller: controller,
+                              prominent: useCompactLayout,
                             ),
                           ),
-                    body: body,
-                  );
-                },
-              ),
+                        ),
+                  body: body,
+                );
+              },
             ),
+          ),
         );
 
         final hub = SensorHubScope.maybeOf(context);
@@ -1516,20 +1533,28 @@ class _LiveTargetGamification extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasTarget = closeness != null || score != null || maxStreakSec > 0 || currentStreakSec > 0;
+    final hasTarget =
+        closeness != null ||
+        score != null ||
+        maxStreakSec > 0 ||
+        currentStreakSec > 0;
 
     if (!hasTarget) {
       return const SizedBox.shrink();
     }
 
-    final closenessStr = closeness != null ? '${closeness!.toStringAsFixed(0)}%' : '—';
+    final closenessStr = closeness != null
+        ? '${closeness!.toStringAsFixed(0)}%'
+        : '—';
     final scoreStr = score != null ? score!.toStringAsFixed(0) : '—';
     final streakStr = currentStreakSec > 0
         ? '${currentStreakSec}s / ${maxStreakSec}s'
         : (maxStreakSec > 0 ? 'max ${maxStreakSec}s' : '—');
 
     final isGoodStreak = currentStreakSec >= 3;
-    final streakColor = isGoodStreak ? Colors.green.shade700 : theme.colorScheme.onSurfaceVariant;
+    final streakColor = isGoodStreak
+        ? Colors.green.shade700
+        : theme.colorScheme.onSurfaceVariant;
     final hasPenalties = penaltyCount > 0;
 
     return Container(
@@ -1538,7 +1563,9 @@ class _LiveTargetGamification extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.2),
+        ),
       ),
       child: Row(
         children: [
@@ -1605,227 +1632,6 @@ class _GamifPill extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// How long a pressure reading stays "live" before the home screen treats
-/// the pressensor as not ready (same UX as a fresh app open).
-///
-/// Kept in sync with [kLivePressureFreshWindow] in auto_start.dart, which also
-/// clears leftover values after this window so idle never looks "ready" with
-/// a stale sample (especially right after a brew ends).
-Duration get kIdlePressureLiveWindow => kLivePressureFreshWindow;
-
-/// Clear sensor connection + readiness status shown above the plot in idle
-/// (post-shot) state on the main/home view.
-///
-/// A leftover pressure value after a brew is NOT treated as "connected /
-/// ready" once it goes stale — otherwise the UI looks ready when the
-/// sensor has already dropped (common right after a shot). Stale and missing
-/// readings both show the red "not ready" state. Action is **Reconnect** when
-/// a pressensor is already paired, or **Pair sensor** when none is paired.
-/// LiveAutoStartListener also clears notifiers on brew start/stop and when
-/// samples age out.
-class _IdleSensorStatus extends StatefulWidget {
-  const _IdleSensorStatus({
-    required this.pressureBarNotifier,
-    required this.lastUpdateNotifier,
-    required this.pressensorPaired,
-    required this.pressensorLinkState,
-    required this.onReconnect,
-    required this.onPair,
-    required this.autoStartEnabled,
-    required this.autoStartThreshold,
-  });
-
-  final ValueNotifier<double?> pressureBarNotifier;
-  final ValueNotifier<DateTime?> lastUpdateNotifier;
-  final bool pressensorPaired;
-  final ConnectionState pressensorLinkState;
-  final VoidCallback onReconnect;
-  final VoidCallback onPair;
-  final bool autoStartEnabled;
-  final double autoStartThreshold;
-
-  @override
-  State<_IdleSensorStatus> createState() => _IdleSensorStatusState();
-}
-
-class _IdleSensorStatusState extends State<_IdleSensorStatus> {
-  Timer? _ticker;
-
-  @override
-  void initState() {
-    super.initState();
-    // Only tick while this route is animated (Live tab visible). Avoids
-    // rebuilding Live every second while the user is on History / Library.
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) {
-        return;
-      }
-      if (!TickerMode.valuesOf(context).enabled) {
-        return;
-      }
-      setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _ticker?.cancel();
-    super.dispose();
-  }
-
-  bool _isLive(double? pressure, DateTime? lastUpdate) {
-    if (pressure == null) {
-      return false;
-    }
-    if (lastUpdate == null) {
-      // Value without a timestamp is treated as not live (cannot prove freshness).
-      return false;
-    }
-    return DateTime.now().difference(lastUpdate) <= kIdlePressureLiveWindow;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final paired = widget.pressensorPaired;
-    final link = widget.pressensorLinkState;
-    final linkConnected = link == ConnectionState.connected;
-    final linkConnecting = link == ConnectionState.connecting;
-
-    return ValueListenableBuilder<double?>(
-      valueListenable: widget.pressureBarNotifier,
-      builder: (context, pressure, _) {
-        return ValueListenableBuilder<DateTime?>(
-          valueListenable: widget.lastUpdateNotifier,
-          builder: (context, lastUpdate, _) {
-            final isLive = _isLive(pressure, lastUpdate);
-            final hasStaleReading = pressure != null && !isLive;
-
-            // BLE link is the source of truth for "connected". Live samples
-            // only refine readiness for auto-start. Previously "not connected"
-            // was shown whenever samples were missing even if BLE was up.
-            final bool showReady = isLive && pressure != null;
-            final bool showLinkedWaiting =
-                !showReady && (linkConnected || linkConnecting);
-
-            final Color color;
-            final Color onColor;
-            final IconData icon;
-            if (showReady) {
-              color = cs.primaryContainer;
-              onColor = cs.onPrimaryContainer;
-              icon = Icons.sensors;
-            } else if (showLinkedWaiting) {
-              color = cs.secondaryContainer;
-              onColor = cs.onSecondaryContainer;
-              icon = Icons.sensors;
-            } else {
-              color = cs.errorContainer;
-              onColor = cs.onErrorContainer;
-              icon = Icons.sensors_off;
-            }
-
-            final String title;
-            final String subtitle;
-            if (isLive && pressure != null) {
-              title = 'Pressensor connected — ready for new shot';
-              final pStr = pressure.toStringAsFixed(2);
-              subtitle = widget.autoStartEnabled
-                  ? 'Live: $pStr bar · Auto-start at ${widget.autoStartThreshold.toStringAsFixed(1)} bar'
-                  : 'Live: $pStr bar';
-            } else if (linkConnecting) {
-              title = 'Pressensor connecting…';
-              subtitle = 'Waiting for BLE link';
-            } else if (linkConnected && hasStaleReading) {
-              title = 'Pressensor connected — refreshing live pressure';
-              final pStr = pressure.toStringAsFixed(2);
-              subtitle =
-                  'Last reading: $pStr bar. Auto-start needs a fresh stream.';
-            } else if (linkConnected) {
-              title = 'Pressensor connected';
-              subtitle = widget.autoStartEnabled
-                  ? 'Waiting for live pressure · Auto-start at ${widget.autoStartThreshold.toStringAsFixed(1)} bar'
-                  : 'Waiting for live pressure readings';
-            } else if (hasStaleReading) {
-              title = 'Pressensor not ready — no live pressure';
-              final pStr = pressure.toStringAsFixed(2);
-              subtitle = paired
-                  ? 'Last reading: $pStr bar (stale). Reconnect, then start the next shot.'
-                  : 'Last reading: $pStr bar (stale). Pair a pressensor to continue.';
-            } else if (!paired) {
-              title = 'No pressensor paired';
-              subtitle = 'Pair a pressensor to record pressure and auto-start';
-            } else {
-              title = 'Pressensor not connected';
-              subtitle = 'Reconnect to start recording';
-            }
-
-            final showAction = !showReady && !linkConnecting;
-            final actionLabel = paired
-                ? (linkConnected ? 'Refresh' : 'Reconnect')
-                : 'Pair sensor';
-            final actionKey = paired
-                ? const Key('idle_sensor_reconnect')
-                : const Key('idle_sensor_pair');
-
-            return Material(
-              key: const Key('idle_sensor_status'),
-              color: color,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Row(
-                  children: [
-                    Icon(icon, color: onColor, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            title,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: onColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: onColor.withValues(alpha: 0.9),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (showAction)
-                      OutlinedButton(
-                        key: actionKey,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: onColor,
-                          side: BorderSide(
-                            color: onColor.withValues(alpha: 0.5),
-                          ),
-                        ),
-                        onPressed:
-                            paired ? widget.onReconnect : widget.onPair,
-                        child: Text(actionLabel),
-                      ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 }

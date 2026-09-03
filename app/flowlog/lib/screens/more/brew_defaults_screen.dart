@@ -33,7 +33,8 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
   @override
   void initState() {
     super.initState();
-    _brewDefaultsStore = widget.brewDefaultsStore ?? BrewDefaultsSettingsStore();
+    _brewDefaultsStore =
+        widget.brewDefaultsStore ?? BrewDefaultsSettingsStore();
     _coffeejackStore =
         widget.coffeejackSettingsStore ?? CoffeejackSettingsStore();
     _ownsAutoStartController = widget.autoStartController == null;
@@ -146,11 +147,12 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
                     const SizedBox(height: 8),
                     Text(
                       'Applied automatically when a shot is saved. Grind falls '
-                      'back to these defaults when you have no previous brew.',
+                      'back to these defaults when you have no previous brew. '
+                      'Dose (default 18 g) is also used to estimate how much '
+                      'is left in each bean bag.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     SwitchListTile(
@@ -198,9 +200,8 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
                       'Default warn is a few grams early so you can wind back '
                       'and finish on target.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     SwitchListTile(
                       key: const Key('brew_defaults_yield_alert_switch'),
@@ -257,9 +258,8 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
                       'When a pressensor is connected, brewing starts '
                       'automatically once pressure crosses the threshold.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     SwitchListTile(

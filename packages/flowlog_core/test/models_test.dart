@@ -90,6 +90,49 @@ void main() {
     test('minimal bean round-trip', () {
       const original = Bean(id: 'bean-min', name: 'House Blend');
       expect(Bean.fromJson(original.toJson()), original);
+      expect(original.toJson().containsKey('empty'), isFalse);
+    });
+
+    test('fromJson maps bagSizeG to stockG and empty flag', () {
+      final bean = Bean.fromJson({
+        'id': 'bean-1',
+        'name': 'House Blend',
+        'bagSizeG': 250,
+        'empty': true,
+      });
+
+      expect(bean.stockG, 250);
+      expect(bean.empty, isTrue);
+      expect(bean.toJson()['stockG'], 250);
+      expect(bean.toJson()['empty'], true);
+      expect(bean.toJson().containsKey('bagSizeG'), isFalse);
+    });
+
+    test('copyWith and equality include empty', () {
+      const original = Bean(id: 'bean-1', name: 'House Blend', empty: true);
+      final reopened = original.copyWith(empty: false);
+      expect(reopened.empty, isFalse);
+      expect(reopened, isNot(original));
+      expect(original.repaired().empty, isTrue);
+    });
+  });
+
+  group('bean remaining helpers', () {
+    test('uses default dose for missing shot doses', () {
+      final used = estimatedBeanUsedG(
+        shotDosesG: const [18.0, null],
+        defaultDoseG: 18.0,
+      );
+      expect(used, 36);
+      expect(estimatedBeanRemainingG(bagSizeG: 250, usedG: used), 214);
+      expect(estimatedBeanRemainingG(bagSizeG: null, usedG: used), isNull);
+    });
+
+    test('beanAppearsDepleted for empty or remaining <= 0', () {
+      const bag = Bean(id: 'bean-1', name: 'House Blend', stockG: 250);
+      expect(beanAppearsDepleted(bag, 10), isFalse);
+      expect(beanAppearsDepleted(bag, 0), isTrue);
+      expect(beanAppearsDepleted(bag.copyWith(empty: true), 100), isTrue);
     });
   });
 
@@ -114,10 +157,7 @@ void main() {
       );
 
       expect(device.toJson()['type'], 'scale');
-      expect(
-        Device.fromJson(device.toJson()).type,
-        DeviceType.scale,
-      );
+      expect(Device.fromJson(device.toJson()).type, DeviceType.scale);
     });
   });
 
@@ -189,8 +229,9 @@ void main() {
   group('fixtures', () {
     test('minimal_shot.json round-trips', () {
       final fixturePath = _fixturePath('shots/minimal_shot.json');
-      final json = jsonDecode(File(fixturePath).readAsStringSync())
-          as Map<String, dynamic>;
+      final json =
+          jsonDecode(File(fixturePath).readAsStringSync())
+              as Map<String, dynamic>;
 
       final shot = Shot.fromJson(json);
       expect(shot.id, 'shot-minimal-001');

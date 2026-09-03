@@ -8,17 +8,14 @@ import 'package:flowlog_sensors/flowlog_sensors.dart'
         ConnectionState,
         DecentScaleBleAdapter,
         PressensorBleAdapter,
-        SensorAdapter;
+        SensorAdapter,
+        SensorSample;
 import 'package:flutter/material.dart' hide ConnectionState;
 
 export 'package:flowlog/sensors/sensor_kind.dart';
 
 /// Outcome of a recorded reconnect attempt.
-enum ReconnectOutcome {
-  attempted,
-  connected,
-  failed,
-}
+enum ReconnectOutcome { attempted, connected, failed }
 
 /// A reconnect attempt recorded for sensor diagnostics.
 class SensorReconnectEvent {
@@ -76,8 +73,8 @@ class SensorHub extends ChangeNotifier {
     List<PairedSensorEntry>? initialDevices,
     BleConnectionBackend? bleBackend,
     this._pairedSensorsStore,
-  })  : _devices = List.of(initialDevices ?? []),
-        _bleBackend = bleBackend ?? const UnsupportedBleConnectionBackend() {
+  }) : _devices = List.of(initialDevices ?? []),
+       _bleBackend = bleBackend ?? const UnsupportedBleConnectionBackend() {
     _syncIdCounterFromDevices();
   }
 
@@ -88,6 +85,9 @@ class SensorHub extends ChangeNotifier {
   final Map<String, int?> _batteryByDevice = {};
   final Map<String, SensorAdapter> _activeAdapters = {};
   final Map<String, StreamSubscription<ConnectionState>> _adapterStateSubs = {};
+  final Map<String, StreamSubscription<SensorSample>> _adapterSampleSubs = {};
+  int _lastSampleNotifyMs = 0;
+  Future<void>? _reconnectInFlight;
   final BleConnectionBackend _bleBackend;
   int _idCounter = 0;
   String? _lastError;
@@ -119,7 +119,8 @@ class SensorHub extends ChangeNotifier {
   List<PairedSensorEntry> get devices => List.unmodifiable(_devices);
 
   /// Chronological reconnect attempts (newest last).
-  List<SensorReconnectEvent> get reconnectLog => List.unmodifiable(_reconnectLog);
+  List<SensorReconnectEvent> get reconnectLog =>
+      List.unmodifiable(_reconnectLog);
 
   /// Most recent connection error across all sensors.
   String? get lastError => _lastError;
@@ -168,7 +169,9 @@ class SensorHub extends ChangeNotifier {
 
   /// Restores a paired device from persisted storage.
   void restoreDevice(PairedSensorEntry entry) {
-    if (_devices.any((device) => device.id == entry.id || device.kind == entry.kind)) {
+    if (_devices.any(
+      (device) => device.id == entry.id || device.kind == entry.kind,
+    )) {
       return;
     }
     _devices.add(entry);
@@ -185,7 +188,9 @@ class SensorHub extends ChangeNotifier {
     _devices.add(
       PairedSensorEntry(
         id: 'sensor-$_idCounter',
-        name: (name?.trim().isNotEmpty ?? false) ? name!.trim() : kind.defaultName,
+        name: (name?.trim().isNotEmpty ?? false)
+            ? name!.trim()
+            : kind.defaultName,
         kind: kind,
       ),
     );
@@ -228,9 +233,11 @@ class SensorHub extends ChangeNotifier {
   }) async {
     var aborted = false;
     if (abort != null) {
-      unawaited(abort.whenComplete(() {
-        aborted = true;
-      }));
+      unawaited(
+        abort.whenComplete(() {
+          aborted = true;
+        }),
+      );
     }
 
     final readyError = await _bleBackend.ensureReady();
@@ -281,46 +288,167 @@ class SensorHub extends ChangeNotifier {
 
   /// Reconnects paired sensors that already have a saved BLE id.
   ///
-  /// Skips scales and pressensors that are already streaming (avoids
-  /// needless disconnect storms). Otherwise tears down and reconnects so a
-  /// zombie "connected" link is cleared.
+  /// Skips a sensor only when it is connected **and** has received a packet
+  /// this process. GATT-connected with a null receive stamp is not skipped —
+  /// adapter grace treats a new link as healthy, which hid zombie connects.
   Future<void> reconnectPairedDevices() async {
-    for (final device in List<PairedSensorEntry>.from(devices)) {
-      final bleRemoteId = device.bleRemoteId;
+    if (!_scaleRecoveryEnabled) {
+      return;
+    }
+    final existing = _reconnectInFlight;
+    if (existing != null) {
+      await existing;
+      return;
+    }
+    final run = Completer<void>();
+    _reconnectInFlight = run.future;
+    try {
+      await _reconnectPairedDevicesBody();
+    } finally {
+      _reconnectInFlight = null;
+      run.complete();
+    }
+  }
+
+  Future<void> _reconnectPairedDevicesBody() async {
+    if (!_scaleRecoveryEnabled) {
+      return;
+    }
+
+    final ordered = List<PairedSensorEntry>.from(devices)
+      ..sort((a, b) {
+        int rank(PairedSensorEntry device) =>
+            device.kind == SensorKind.scale ? 0 : 1;
+        return rank(a).compareTo(rank(b));
+      });
+
+    for (var i = 0; i < ordered.length; i++) {
+      if (!_scaleRecoveryEnabled) {
+        return;
+      }
+      final snapshot = ordered[i];
+      final bleRemoteId = snapshot.bleRemoteId;
       if (bleRemoteId == null || bleRemoteId.isEmpty) {
         continue;
       }
 
-      final adapter = _activeAdapters[device.id];
-      if (device.kind == SensorKind.scale &&
-          device.state == ConnectionState.connected &&
-          adapter is DecentScaleBleAdapter &&
-          !adapter.isWeightStreamSilent(
-            silentFor: const Duration(seconds: 3),
-          )) {
-        // Healthy weight stream — leave it alone.
-        continue;
-      }
-      if (device.kind == SensorKind.pressensor &&
-          device.state == ConnectionState.connected &&
-          adapter is PressensorBleAdapter &&
-          !adapter.isPressureStreamSilent(
-            silentFor: const Duration(seconds: 3),
-          )) {
-        // Healthy pressure stream — leave it alone.
+      final device = _deviceById(snapshot.id) ?? snapshot;
+      if (_hasFreshStream(device)) {
         continue;
       }
 
-      final wasLinked = device.state == ConnectionState.connected ||
+      final index = _devices.indexWhere((entry) => entry.id == device.id);
+      if (index >= 0) {
+        _devices[index] = _devices[index].copyWith(
+          state: ConnectionState.connecting,
+        );
+        notifyListeners();
+      }
+
+      final wasLinked =
+          device.state == ConnectionState.connected ||
           device.state == ConnectionState.connecting ||
           _activeAdapters.containsKey(device.id);
-      await disconnect(device.id);
+      await _teardownAdapter(device.id);
       if (wasLinked) {
         await Future<void>.delayed(const Duration(milliseconds: 350));
       }
       await connect(device.id);
-      // Stagger multi-device reconnect so the BLE stack stays responsive.
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      if (i >= ordered.length - 1) {
+        continue;
+      }
+      final latest = _deviceById(device.id);
+      final succeeded = latest?.state == ConnectionState.connected;
+      if (succeeded && device.kind == SensorKind.scale) {
+        await _waitForScaleGrams(device.id);
+      } else if (!succeeded) {
+        await Future<void>.delayed(const Duration(milliseconds: 800));
+      }
+    }
+  }
+
+  PairedSensorEntry? _deviceById(String id) {
+    for (final device in _devices) {
+      if (device.id == id) {
+        return device;
+      }
+    }
+    return null;
+  }
+
+  /// True only when this process has received a packet and the stream is live.
+  bool _hasFreshStream(PairedSensorEntry device) {
+    if (device.state != ConnectionState.connected) {
+      return false;
+    }
+    final adapter = _activeAdapters[device.id];
+    switch (device.kind) {
+      case SensorKind.scale:
+        return adapter is DecentScaleBleAdapter &&
+            adapter.lastWeightReceiveMs != null &&
+            !adapter.isWeightStreamSilent(
+              silentFor: const Duration(seconds: 3),
+            );
+      case SensorKind.pressensor:
+        return adapter is PressensorBleAdapter &&
+            adapter.lastSampleReceiveMs != null &&
+            !adapter.isPressureStreamSilent(
+              silentFor: const Duration(seconds: 3),
+            );
+    }
+  }
+
+  Future<void> _waitForScaleGrams(String id) async {
+    const poll = Duration(milliseconds: 100);
+    final deadline = DateTime.now().add(const Duration(milliseconds: 1200));
+    while (DateTime.now().isBefore(deadline)) {
+      if (!_scaleRecoveryEnabled) {
+        return;
+      }
+      final adapter = _activeAdapters[id];
+      if (adapter is DecentScaleBleAdapter &&
+          adapter.lastWeightReceiveMs != null) {
+        return;
+      }
+      await Future<void>.delayed(poll);
+    }
+  }
+
+  void _listenAdapterSamples(String id, SensorAdapter adapter) {
+    unawaited(_adapterSampleSubs.remove(id)?.cancel());
+    var isFirst = true;
+    _adapterSampleSubs[id] = adapter.samples.listen((_) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (isFirst || now - _lastSampleNotifyMs >= 400) {
+        isFirst = false;
+        _lastSampleNotifyMs = now;
+        notifyListeners();
+      }
+    });
+  }
+
+  Future<void> _cancelAdapterSubs(String id) async {
+    final stateSub = _adapterStateSubs.remove(id);
+    final sampleSub = _adapterSampleSubs.remove(id);
+    if (stateSub != null) {
+      await stateSub.cancel();
+    }
+    if (sampleSub != null) {
+      await sampleSub.cancel();
+    }
+  }
+
+  Future<void> _teardownAdapter(String id) async {
+    await _cancelAdapterSubs(id);
+    final adapter = _activeAdapters.remove(id);
+    if (adapter == null) {
+      return;
+    }
+    try {
+      await adapter.disconnect().timeout(const Duration(seconds: 3));
+    } on Object {
+      // Teardown races must not block a new connect attempt.
     }
   }
 
@@ -329,6 +457,7 @@ class SensorHub extends ChangeNotifier {
       return;
     }
     _scaleHealthTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      notifyListeners();
       unawaited(_recoverSilentScales());
     });
   }
@@ -525,15 +654,7 @@ class SensorHub extends ChangeNotifier {
     }
 
     try {
-      await _adapterStateSubs.remove(id)?.cancel();
-      final previous = _activeAdapters.remove(id);
-      if (previous != null) {
-        try {
-          await previous.disconnect().timeout(const Duration(seconds: 3));
-        } on Object {
-          // Teardown races must not block a new connect attempt.
-        }
-      }
+      await _teardownAdapter(id);
 
       final adapter = await _bleBackend.createAdapter(
         kind: device.kind,
@@ -546,6 +667,7 @@ class SensorHub extends ChangeNotifier {
       _adapterStateSubs[id] = adapter.state.listen((state) {
         _onAdapterStateChanged(id, state);
       });
+      _listenAdapterSamples(id, adapter);
 
       await adapter.connect().timeout(
         const Duration(seconds: 35),
@@ -565,8 +687,9 @@ class SensorHub extends ChangeNotifier {
         return;
       }
 
-      _devices[currentIndex] =
-          _devices[currentIndex].copyWith(state: ConnectionState.connected);
+      _devices[currentIndex] = _devices[currentIndex].copyWith(
+        state: ConnectionState.connected,
+      );
       setLastError(null);
       if (device.kind == SensorKind.scale) {
         _ensureScaleHealthWatchdog();
@@ -585,15 +708,7 @@ class SensorHub extends ChangeNotifier {
         device,
         message,
       );
-      await _adapterStateSubs.remove(id)?.cancel();
-      final failed = _activeAdapters.remove(id);
-      if (failed != null) {
-        try {
-          await failed.disconnect().timeout(const Duration(seconds: 2));
-        } on Object {
-          // ignore
-        }
-      }
+      await _teardownAdapter(id);
     }
   }
 
@@ -648,19 +763,17 @@ class SensorHub extends ChangeNotifier {
   }
 
   Future<void> disconnect(String id) async {
-    await _adapterStateSubs.remove(id)?.cancel();
-    final adapter = _activeAdapters.remove(id);
-    if (adapter != null) {
-      await adapter.disconnect();
-    }
+    await _teardownAdapter(id);
 
     final index = _devices.indexWhere((device) => device.id == id);
     if (index < 0) {
       return;
     }
-    _devices[index] =
-        _devices[index].copyWith(state: ConnectionState.disconnected);
+    _devices[index] = _devices[index].copyWith(
+      state: ConnectionState.disconnected,
+    );
     _batteryByDevice.remove(id);
+    _stopScaleHealthWatchdogIfIdle();
     notifyListeners();
   }
 
@@ -668,10 +781,14 @@ class SensorHub extends ChangeNotifier {
   void dispose() {
     _scaleHealthTimer?.cancel();
     _scaleHealthTimer = null;
-    for (final subscription in _adapterStateSubs.values) {
+    for (final subscription in [
+      ..._adapterStateSubs.values,
+      ..._adapterSampleSubs.values,
+    ]) {
       unawaited(subscription.cancel());
     }
     _adapterStateSubs.clear();
+    _adapterSampleSubs.clear();
     for (final adapter in _activeAdapters.values) {
       unawaited(adapter.disconnect());
     }

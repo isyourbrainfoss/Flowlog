@@ -78,7 +78,8 @@ Example response (your answer should look like this — one copyable code block 
   "notes": null
 }
 ```
-'''.trim();
+'''
+      .trim();
 }
 
 /// Extracts and parses bean fields from an AI chat response.
@@ -143,7 +144,7 @@ BeanAiDraft _parseBeanAiDraft(Map<String, dynamic> json) {
     process: _normalizeProcess(_optionalString(json['process'])),
     roastLevel: _normalizeRoastLevel(_optionalString(json['roastLevel'])),
     roastDate: _parseRoastDate(json['roastDate']),
-    stockG: _parseStockG(json['stockG']),
+    stockG: _parseStockG(json['bagSizeG'] ?? json['stockG']),
     notes: _optionalString(json['notes']),
   );
 }
@@ -198,8 +199,10 @@ String? _normalizeProcess(String? value) {
 
   final compact = value.toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
   for (final method in kBeanProcessMethods) {
-    final methodCompact =
-        method.toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+    final methodCompact = method.toLowerCase().replaceAll(
+      RegExp(r'[\s_-]+'),
+      '',
+    );
     if (methodCompact == compact) {
       return method;
     }

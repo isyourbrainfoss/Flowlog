@@ -1,5 +1,6 @@
 import 'package:flowlog/screens/history/shot_detail.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
+import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -9,11 +10,15 @@ class HistoryShotCard extends StatelessWidget {
   const HistoryShotCard({
     super.key,
     required this.shot,
+    this.beanLabel,
     this.onTap,
     this.onDelete,
   });
 
   final Shot shot;
+
+  /// Pre-resolved display name for [shot.beanId]; never a raw id.
+  final String? beanLabel;
 
   /// Called when the card is tapped; defaults to [openShotDetail].
   final VoidCallback? onTap;
@@ -30,6 +35,17 @@ class HistoryShotCard extends StatelessWidget {
     final valueStyle = theme.textTheme.titleSmall?.copyWith(
       fontFeatures: const [FontFeature.tabularFigures()],
     );
+    final metaStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      fontSize: 13,
+      height: 18 / 13,
+    );
+    final trimmedBean = beanLabel?.trim();
+    final hasBean = trimmedBean != null && trimmedBean.isNotEmpty;
+    final hasGrind = shot.grindSetting != null;
+    final showMeta = hasBean || hasGrind;
+    final grindText =
+        hasGrind ? formatGrindSetting(shot.grindSetting) : null;
 
     return Card(
       key: Key('history_shot_card_${shot.id}'),
@@ -59,6 +75,44 @@ class HistoryShotCard extends StatelessWidget {
                   ),
               ],
             ),
+            if (showMeta) ...[
+              const SizedBox(height: 4),
+              Semantics(
+                key: Key('history_shot_meta_${shot.id}'),
+                container: true,
+                excludeSemantics: true,
+                label: [
+                  if (hasBean) 'Bean $trimmedBean',
+                  if (grindText != null) 'Grind $grindText',
+                ].join('. '),
+                child: Row(
+                  children: [
+                    if (hasBean)
+                      Expanded(
+                        child: Text(
+                          trimmedBean,
+                          key: Key('history_shot_bean_${shot.id}'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: metaStyle,
+                        ),
+                      )
+                    else
+                      const Spacer(),
+                    if (hasBean && hasGrind) const SizedBox(width: 8),
+                    if (hasGrind)
+                      Text(
+                        'Grind $grindText',
+                        key: Key('history_shot_grind_${shot.id}'),
+                        maxLines: 1,
+                        style: metaStyle?.copyWith(
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
             SparklineChart(samples: shot.samples),
             const SizedBox(height: 10),

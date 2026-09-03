@@ -68,7 +68,8 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
       text: _formatNumber(widget.filters.maxGrindSetting),
     );
     _beanFocusNode = FocusNode();
-    _moreExpanded = widget.filters.minDurationMs != null ||
+    _moreExpanded =
+        widget.filters.minDurationMs != null ||
         widget.filters.maxDurationMs != null ||
         widget.filters.minGrindSetting != null ||
         widget.filters.maxGrindSetting != null ||
@@ -102,6 +103,16 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
       if (_maxGrindController.text.isNotEmpty) {
         _maxGrindController.clear();
       }
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final tabVisible = TickerMode.valuesOf(context).enabled;
+    final routeCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+    if ((!tabVisible || !routeCurrent) && _beanFocusNode.hasFocus) {
+      _beanFocusNode.unfocus();
     }
   }
 
@@ -155,8 +166,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final compact =
-        MediaQuery.sizeOf(context).width < ShellBreakpoints.sidebar;
+    final compact = MediaQuery.sizeOf(context).width < ShellBreakpoints.sidebar;
     final showAdvanced = !compact || _filtersExpanded;
 
     return Material(
@@ -170,116 +180,132 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
               Text('Filters', style: theme.textTheme.titleSmall),
               const SizedBox(height: 8),
             ],
-            RawAutocomplete<Bean>(
-              key: const Key('history_filter_bean_autocomplete'),
-              textEditingController: _beanController,
-              focusNode: _beanFocusNode,
-              displayStringForOption: (bean) =>
-                  formatBeanDisplayLabel(bean, allBeans: widget.beanSuggestions),
-              optionsBuilder: (textEditingValue) {
-                return _matchingBeans(textEditingValue.text);
+            Shortcuts(
+              shortcuts: const <ShortcutActivator, Intent>{
+                SingleActivator(LogicalKeyboardKey.escape): DismissIntent(),
               },
-              onSelected: (bean) {
-                _beanController.text = bean.name;
-                _emitBeanQuery(bean.name);
-                // Apply immediately when picking a suggestion.
-                _emit(
-                  widget.filters.copyWith(beanQuery: bean.name),
-                  immediate: true,
-                );
-              },
-              fieldViewBuilder: (
-                context,
-                controller,
-                focusNode,
-                onFieldSubmitted,
-              ) {
-                return ListenableBuilder(
-                  listenable: controller,
-                  builder: (context, _) {
-                    return TextField(
-                      key: const Key('history_filter_bean'),
-                      controller: controller,
-                      focusNode: focusNode,
-                      decoration: InputDecoration(
-                        labelText: 'Bean, roaster or origin',
-                        hintText: 'e.g. KAFFA or Oslo',
-                        isDense: true,
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        suffixIcon: controller.text.isEmpty
-                            ? null
-                            : IconButton(
-                                key: const Key('history_filter_bean_clear'),
-                                tooltip: 'Clear search',
-                                icon: const Icon(Icons.close, size: 20),
-                                onPressed: _clearBeanQuery,
-                              ),
-                      ),
-                      textInputAction: TextInputAction.search,
-                      onChanged: _emitBeanQuery,
-                      onSubmitted: (value) {
-                        _emit(
-                          widget.filters.copyWith(beanQuery: value),
-                          immediate: true,
-                        );
-                        onFieldSubmitted();
-                      },
+              child: Actions(
+                actions: <Type, Action<Intent>>{
+                  DismissIntent: CallbackAction<DismissIntent>(
+                    onInvoke: (_) {
+                      _beanFocusNode.unfocus();
+                      return null;
+                    },
+                  ),
+                },
+                child: RawAutocomplete<Bean>(
+                  key: const Key('history_filter_bean_autocomplete'),
+                  textEditingController: _beanController,
+                  focusNode: _beanFocusNode,
+                  displayStringForOption: (bean) => formatBeanDisplayLabel(
+                    bean,
+                    allBeans: widget.beanSuggestions,
+                  ),
+                  optionsBuilder: (textEditingValue) {
+                    return _matchingBeans(textEditingValue.text);
+                  },
+                  onSelected: (bean) {
+                    _beanController.text = bean.name;
+                    _emitBeanQuery(bean.name);
+                    // Apply immediately when picking a suggestion.
+                    _emit(
+                      widget.filters.copyWith(beanQuery: bean.name),
+                      immediate: true,
                     );
                   },
-                );
-              },
-              optionsViewBuilder: (context, onSelected, options) {
-                return Align(
-                  alignment: Alignment.topLeft,
-                  child: Material(
-                    elevation: 4,
-                    borderRadius: BorderRadius.circular(8),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        maxHeight: 220,
-                        maxWidth: 360,
-                      ),
-                      child: ListView.builder(
-                        key: const Key('history_filter_bean_options'),
-                        padding: EdgeInsets.zero,
-                        shrinkWrap: true,
-                        itemCount: options.length,
-                        itemBuilder: (context, index) {
-                          final bean = options.elementAt(index);
-                          return ListTile(
-                            dense: true,
-                            title: Text(
-                              formatBeanDisplayLabel(
-                                bean,
-                                allBeans: widget.beanSuggestions,
+                  fieldViewBuilder:
+                      (context, controller, focusNode, onFieldSubmitted) {
+                        return ListenableBuilder(
+                          listenable: controller,
+                          builder: (context, _) {
+                            return TextField(
+                              key: const Key('history_filter_bean'),
+                              controller: controller,
+                              focusNode: focusNode,
+                              decoration: InputDecoration(
+                                labelText: 'Bean, roaster or origin',
+                                hintText: 'e.g. KAFFA or Oslo',
+                                isDense: true,
+                                prefixIcon: const Icon(Icons.search, size: 20),
+                                suffixIcon: controller.text.isEmpty
+                                    ? null
+                                    : IconButton(
+                                        key: const Key(
+                                          'history_filter_bean_clear',
+                                        ),
+                                        tooltip: 'Clear search',
+                                        icon: const Icon(Icons.close, size: 20),
+                                        onPressed: _clearBeanQuery,
+                                      ),
                               ),
-                            ),
-                            subtitle: () {
-                              final parts = [
-                                if (bean.brand != null &&
-                                    bean.brand!.trim().isNotEmpty)
-                                  bean.brand!.trim(),
-                                if (bean.origin != null &&
-                                    bean.origin!.trim().isNotEmpty)
-                                  bean.origin!.trim(),
-                              ];
-                              if (parts.isEmpty) {
-                                return null;
-                              }
-                              return Text(
-                                parts.join(' · '),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              textInputAction: TextInputAction.search,
+                              onTapOutside: (_) => focusNode.unfocus(),
+                              onChanged: _emitBeanQuery,
+                              onSubmitted: (value) {
+                                _emit(
+                                  widget.filters.copyWith(beanQuery: value),
+                                  immediate: true,
+                                );
+                                onFieldSubmitted();
+                              },
+                            );
+                          },
+                        );
+                      },
+                  optionsViewBuilder: (context, onSelected, options) {
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4,
+                        borderRadius: BorderRadius.circular(8),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxHeight: 220,
+                            maxWidth: 360,
+                          ),
+                          child: ListView.builder(
+                            key: const Key('history_filter_bean_options'),
+                            padding: EdgeInsets.zero,
+                            shrinkWrap: true,
+                            itemCount: options.length,
+                            itemBuilder: (context, index) {
+                              final bean = options.elementAt(index);
+                              return ListTile(
+                                dense: true,
+                                title: Text(
+                                  formatBeanDisplayLabel(
+                                    bean,
+                                    allBeans: widget.beanSuggestions,
+                                  ),
+                                ),
+                                subtitle: () {
+                                  final parts = [
+                                    if (bean.brand != null &&
+                                        bean.brand!.trim().isNotEmpty)
+                                      bean.brand!.trim(),
+                                    if (bean.origin != null &&
+                                        bean.origin!.trim().isNotEmpty)
+                                      bean.origin!.trim(),
+                                  ];
+                                  if (parts.isEmpty) {
+                                    return null;
+                                  }
+                                  return Text(
+                                    parts.join(' · '),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  );
+                                }(),
+                                onTap: () => onSelected(bean),
                               );
-                            }(),
-                            onTap: () => onSelected(bean),
-                          );
-                        },
+                            },
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              },
+                    );
+                  },
+                ),
+              ),
             ),
             if (compact) ...[
               const SizedBox(height: 4),
@@ -290,9 +316,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
                     onPressed: () =>
                         setState(() => _filtersExpanded = !_filtersExpanded),
                     icon: Icon(
-                      _filtersExpanded
-                          ? Icons.expand_less
-                          : Icons.expand_more,
+                      _filtersExpanded ? Icons.expand_less : Icons.expand_more,
                       size: 18,
                     ),
                     label: const Text('Filters'),
@@ -354,9 +378,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
               label: 'To',
               value: widget.filters.startedOnOrBefore,
               onSelected: (date) => _emit(
-                widget.filters.copyWith(
-                  startedOnOrBefore: endOfLocalDay(date),
-                ),
+                widget.filters.copyWith(startedOnOrBefore: endOfLocalDay(date)),
                 immediate: true,
               ),
               onClear: () => _emit(
@@ -381,10 +403,8 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
                 key: Key('history_filter_tag_${tag.id}'),
                 label: Text(tag.name),
                 selected: widget.filters.tagIds.contains(tag.id),
-                onSelected: (_) => _emit(
-                  widget.filters.toggleTagId(tag.id),
-                  immediate: true,
-                ),
+                onSelected: (_) =>
+                    _emit(widget.filters.toggleTagId(tag.id), immediate: true),
               ),
           ],
         ),
@@ -479,9 +499,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
                   isDense: true,
                 ),
                 keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 onChanged: _onMinDurationChanged,
               ),
             ),
@@ -495,9 +513,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
                   isDense: true,
                 ),
                 keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 onChanged: _onMaxDurationChanged,
               ),
             ),
@@ -717,15 +733,9 @@ class _DateFilterButton extends StatelessWidget {
 }
 
 final List<DropdownMenuItem<int?>> _tasteScoreItems = [
-  const DropdownMenuItem<int?>(
-    value: null,
-    child: Text('Any'),
-  ),
+  const DropdownMenuItem<int?>(value: null, child: Text('Any')),
   for (var score = 0; score <= 10; score++)
-    DropdownMenuItem<int?>(
-      value: score,
-      child: Text('$score'),
-    ),
+    DropdownMenuItem<int?>(value: score, child: Text('$score')),
 ];
 
 /// Start of [date] in local time.

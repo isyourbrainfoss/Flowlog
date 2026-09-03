@@ -733,17 +733,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
   }
 
   Future<ShotMetadata> _buildMetadata() async {
-    final activeBeanScope = ActiveBeanScope.maybeOf(context);
     final beanId = await _resolveBeanId();
-    if (beanId != null && widget.beanRepository != null) {
-      final bean = await widget.beanRepository!.getBeanById(beanId);
-      if (bean != null) {
-        activeBeanScope?.onActiveBeanChanged(
-          bean.name,
-          beanId: bean.id,
-        );
-      }
-    }
 
     final flavourIntensities = normalizeFlavourIntensities(
       selectedTags: _selectedFlavourTags,

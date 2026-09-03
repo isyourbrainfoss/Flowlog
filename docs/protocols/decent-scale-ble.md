@@ -109,7 +109,7 @@ Used by the **espresso-scale** companion firmware. Official Decent / HDS ignore 
 | Type | Name | Data bytes | Meaning |
 |------|------|------------|---------|
 | `0xF0` | Phone pressure | mbar big-endian int16 in `[2..3]` | Phone → scale OLED pressure mirror during app brew |
-| `0xF1` | Phone brew start | zeros | App owns PRS; scale frees its PRS central link |
+| `0xF1` | Phone brew start | zeros | App owns PRS; scale frees its PRS central link. Firmware 1.6.2+ keeps live grams on the OLED (tare chime is enough — no full-screen status overlay). |
 | `0xF2` | Phone brew end | zeros | Stop phone-pressure display |
 | `0xF3` | Scale display config | `target_g`, `warn_g`, `p_min_bar`, `p_max_bar` (uint8 each) | OLED cup target, wind-back chirp, pressure bar window |
 

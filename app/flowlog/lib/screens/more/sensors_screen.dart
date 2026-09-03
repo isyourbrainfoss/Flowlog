@@ -25,26 +25,20 @@ class SensorsScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
-          'Sensors',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Sensors', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Text(
           'Pair your Pressensor and scale here. After you add a sensor, '
           'Flowlog scans and connects when it finds one nearby.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 16),
         if (devices.isEmpty)
           const _EmptySensorsState()
         else ...[
-          Text(
-            'Paired devices',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
+          Text('Paired devices', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 12),
           for (final device in devices) ...[
             _PairedDeviceCard(
@@ -109,10 +103,7 @@ class SensorsScreen extends StatelessWidget {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 }
@@ -147,10 +138,7 @@ Future<void> _connectPairedAfterAssign({
   }
 
   messenger.showSnackBar(
-    SnackBar(
-      content: Text(message),
-      behavior: SnackBarBehavior.floating,
-    ),
+    SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
   );
 }
 
@@ -162,22 +150,32 @@ Future<String> _connectMessage({
       device.state == ConnectionState.connected) {
     final adapter = hub.activeAdapterFor(SensorKind.scale);
     if (adapter is DecentScaleBleAdapter) {
-      // Give the first weight packet a moment after connect/LED-on.
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-      final rx = adapter.lastWeightReceiveMs;
-      if (rx == null) {
+      const poll = Duration(milliseconds: 100);
+      const grace = Duration(seconds: 4);
+      for (var i = 0; i < 20; i++) {
+        if (adapter.lastWeightReceiveMs != null) {
+          break;
+        }
+        await Future<void>.delayed(poll);
+      }
+      if (adapter.lastWeightReceiveMs == null) {
+        if (!adapter.isWeightStreamSilent(silentFor: grace)) {
+          return 'Connected to ${device.name}. Waiting for grams…';
+        }
         return 'Scale BLE connected, but no weight packets yet. '
             'Stay on Live and wait for grams — or reconnect if it stays blank.';
       }
     }
   }
   return switch (device.state) {
-    ConnectionState.connected => device.kind == SensorKind.pressensor
-        ? _pressensorConnectedMessage(device.name, hub)
-        : 'Connected to ${device.name}.',
+    ConnectionState.connected =>
+      device.kind == SensorKind.pressensor
+          ? _pressensorConnectedMessage(device.name, hub)
+          : 'Connected to ${device.name}.',
     ConnectionState.connecting => 'Connecting to ${device.name}…',
-    _ => hub.lastError ??
-        'Could not connect to ${device.name}. Check Bluetooth and try again.',
+    _ =>
+      hub.lastError ??
+          'Could not connect to ${device.name}. Check Bluetooth and try again.',
   };
 }
 
@@ -190,7 +188,9 @@ Future<String> _pressensorConnectedMessage(
     'Connected to $deviceName. Auto-start at '
     '${settings.startThresholdBar.toStringAsFixed(1)} bar.',
   );
-  final batteryWarning = pressensorLowBatteryWarning(hub.pressensorBatteryPercent);
+  final batteryWarning = pressensorLowBatteryWarning(
+    hub.pressensorBatteryPercent,
+  );
   if (batteryWarning != null) {
     buffer.write(' $batteryWarning');
   }
@@ -226,8 +226,8 @@ class _EmptySensorsState extends StatelessWidget {
               'Add your Pressensor and scale below.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -257,8 +257,9 @@ class _AddSensorButtons extends StatelessWidget {
         const SizedBox(height: 8),
         FilledButton.icon(
           key: const Key('add_scale_button'),
-          onPressed:
-              hub.hasKind(SensorKind.scale) ? null : () => _add(context, SensorKind.scale),
+          onPressed: hub.hasKind(SensorKind.scale)
+              ? null
+              : () => _add(context, SensorKind.scale),
           icon: const Icon(Icons.scale),
           label: const Text('Add scale'),
         ),
@@ -559,7 +560,8 @@ class _PairedDeviceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canConnect = device.state == ConnectionState.disconnected ||
+    final canConnect =
+        device.state == ConnectionState.disconnected ||
         device.state == ConnectionState.error;
     final canDisconnect = device.state == ConnectionState.connected;
     final batteryPercent = device.kind == SensorKind.pressensor
@@ -596,9 +598,8 @@ class _PairedDeviceCard extends StatelessWidget {
                       Text(
                         device.kind.subtitle,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color:
-                                  Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -614,8 +615,8 @@ class _PairedDeviceCard extends StatelessWidget {
               Text(
                 'BLE id: ${device.bleRemoteId}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 8),
             ],
@@ -634,14 +635,11 @@ class _PairedDeviceCard extends StatelessWidget {
                       detail,
                       key: Key('scale_stream_status_${device.id}'),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: warn
-                                ? Theme.of(context).colorScheme.error
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                            fontWeight:
-                                warn ? FontWeight.w600 : FontWeight.normal,
-                          ),
+                        color: warn
+                            ? Theme.of(context).colorScheme.error
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: warn ? FontWeight.w600 : FontWeight.normal,
+                      ),
                     ),
                   );
                 },
@@ -655,10 +653,10 @@ class _PairedDeviceCard extends StatelessWidget {
                     : 'Battery: $batteryPercent%',
                 key: Key('paired_battery_${device.id}'),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: batteryIsLow
-                          ? Theme.of(context).colorScheme.error
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: batteryIsLow
+                      ? Theme.of(context).colorScheme.error
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 8),
             ],
@@ -683,10 +681,7 @@ class _PairedDeviceCard extends StatelessWidget {
                   onPressed: onScan,
                   child: const Text('Scan'),
                 ),
-                TextButton(
-                  onPressed: onRemove,
-                  child: const Text('Remove'),
-                ),
+                TextButton(onPressed: onRemove, child: const Text('Remove')),
               ],
             ),
           ],
@@ -705,24 +700,26 @@ String? _scaleStreamDetail(SensorHub hub, PairedSensorEntry device) {
   if (adapter is! DecentScaleBleAdapter) {
     return 'Connected — waiting for weight stream';
   }
+  const grace = Duration(seconds: 4);
+  const fresh = Duration(milliseconds: 2500);
   final rx = adapter.lastWeightReceiveMs;
   if (rx == null) {
+    if (!adapter.isWeightStreamSilent(silentFor: grace)) {
+      return 'Connected — waiting for weight stream';
+    }
     return 'Connected but no weight packets yet';
   }
-  final ageMs = DateTime.now().millisecondsSinceEpoch - rx;
-  if (ageMs > 2500) {
-    return 'Connected but no weight for ${(ageMs / 1000).toStringAsFixed(0)}s — stream silent';
+  // Use the adapter clock, not DateTime.now() — tests (and DIY monotonic
+  // clocks) do not share wall time, so a wall-clock age is a false alarm.
+  if (adapter.isWeightStreamSilent(silentFor: fresh)) {
+    return 'Connected but no weight — stream silent';
   }
   return 'Weight stream live';
 }
 
 /// Compact chip showing a sensor [ConnectionState] with Flowlog palette tokens.
 class ConnectionStateChip extends StatelessWidget {
-  const ConnectionStateChip({
-    super.key,
-    required this.state,
-    this.detail,
-  });
+  const ConnectionStateChip({super.key, required this.state, this.detail});
 
   final ConnectionState state;
 
@@ -734,11 +731,7 @@ class ConnectionStateChip extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final silent = detail != null && detail!.contains('no weight');
     final (label, background, foreground) = silent
-        ? (
-            'No weight',
-            scheme.errorContainer,
-            scheme.onErrorContainer,
-          )
+        ? ('No weight', scheme.errorContainer, scheme.onErrorContainer)
         : _styleForState(scheme, state);
 
     return Container(
@@ -752,35 +745,38 @@ class ConnectionStateChip extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w600,
-            ),
+          color: foreground,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
 
-  (String, Color, Color) _styleForState(ColorScheme scheme, ConnectionState state) {
+  (String, Color, Color) _styleForState(
+    ColorScheme scheme,
+    ConnectionState state,
+  ) {
     return switch (state) {
       ConnectionState.connected => (
-          'Connected',
-          scheme.primaryContainer,
-          scheme.onPrimaryContainer,
-        ),
+        'Connected',
+        scheme.primaryContainer,
+        scheme.onPrimaryContainer,
+      ),
       ConnectionState.disconnected => (
-          'Disconnected',
-          scheme.surface,
-          scheme.onSurfaceVariant,
-        ),
+        'Disconnected',
+        scheme.surface,
+        scheme.onSurfaceVariant,
+      ),
       ConnectionState.connecting => (
-          'Connecting',
-          scheme.secondaryContainer,
-          scheme.onSecondaryContainer,
-        ),
+        'Connecting',
+        scheme.secondaryContainer,
+        scheme.onSecondaryContainer,
+      ),
       ConnectionState.error => (
-          'Error',
-          scheme.error.withValues(alpha: 0.16),
-          scheme.error,
-        ),
+        'Error',
+        scheme.error.withValues(alpha: 0.16),
+        scheme.error,
+      ),
     };
   }
 }

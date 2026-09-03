@@ -3,11 +3,7 @@ import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
 /// Direction of change for a live metric compared to the previous sample.
-enum MetricTrend {
-  up,
-  down,
-  neutral,
-}
+enum MetricTrend { up, down, neutral }
 
 /// Display-ready snapshot for the live metrics row.
 @immutable
@@ -57,13 +53,14 @@ class LiveMetrics {
     int targetDurationMs = defaultTargetDurationMs,
   }) {
     final history = <ShotSample>[
-      ...? (previous != null ? [previous] : null),
+      ...?(previous != null ? [previous] : null),
       sample,
     ];
     final computed = computeFlowRates(history);
     final current = _preferProvidedFlow(sample, computed.last);
-    final prior =
-        previous == null ? null : _preferProvidedFlow(previous, computed.first);
+    final prior = previous == null
+        ? null
+        : _preferProvidedFlow(previous, computed.first);
 
     final projectedYieldG = _projectedYield(
       weightG: current.weightG,
@@ -107,10 +104,11 @@ class LiveMetrics {
     final last = samples.last;
     final hold = plateauAveragePressureBar(samples);
     final peak = peakPressureBarFromSamples(samples);
+    final withFlow = computeFlowRates(samples);
     // Mean flow over samples that still have espresso flowing.
     var flowSum = 0.0;
     var flowCount = 0;
-    for (final s in samples) {
+    for (final s in withFlow) {
       final f = s.flowGs;
       if (f != null && f > 0.2) {
         flowSum += f;
@@ -122,7 +120,7 @@ class LiveMetrics {
       pressureLabel: hold != null ? 'Hold avg' : 'Peak',
       weightG: last.weightG,
       weightLabel: 'Yield',
-      flowGs: flowCount > 0 ? flowSum / flowCount : last.flowGs,
+      flowGs: flowCount > 0 ? flowSum / flowCount : withFlow.last.flowGs,
       tempC: last.tempC,
       elapsedMs: last.elapsedMs,
       projectedYieldG: last.weightG,
@@ -151,7 +149,10 @@ class LiveMetrics {
     return weightG + (flowGs ?? 0) * remainingSec;
   }
 
-  static ShotSample _preferProvidedFlow(ShotSample original, ShotSample computed) {
+  static ShotSample _preferProvidedFlow(
+    ShotSample original,
+    ShotSample computed,
+  ) {
     if (original.flowGs != null) {
       return original;
     }
@@ -183,10 +184,7 @@ class LiveMetricsRow extends StatelessWidget {
     this.sample,
     this.previousSample,
     this.targetDurationMs = LiveMetrics.defaultTargetDurationMs,
-  }) : assert(
-          metrics != null || sample != null,
-          'Provide metrics or sample',
-        );
+  }) : assert(metrics != null || sample != null, 'Provide metrics or sample');
 
   /// Below this width, metrics render in a 2×2 grid instead of one row.
   @visibleForTesting
@@ -206,7 +204,8 @@ class LiveMetricsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final resolved = metrics ??
+    final resolved =
+        metrics ??
         LiveMetrics.fromSamples(
           sample: sample!,
           previous: previousSample,
@@ -266,7 +265,7 @@ class LiveMetricsRow extends StatelessWidget {
         labelStyle: labelStyle,
         valueStyle: valueStyle,
       ),
-      ? (resolved.tempC != null
+      ?(resolved.tempC != null
           ? _MetricTile(
               key: const Key('live_metric_temp'),
               label: 'Temp',
@@ -305,10 +304,7 @@ class LiveMetricsRow extends StatelessWidget {
                   ),
                 );
               }
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: rows,
-              );
+              return Column(mainAxisSize: MainAxisSize.min, children: rows);
             }
 
             return Row(

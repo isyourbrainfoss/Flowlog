@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live_screen.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
+import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/live_sensor_source.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/app_destinations.dart';
@@ -180,6 +181,113 @@ void main() {
         isTrue,
       );
     });
+
+    test('onTare sends tare only when hub scale stream is live', () async {
+      final transport = MockDecentScaleTransport();
+      final liveHub = SensorHub(
+        bleBackend: _ScaleBleBackend(transport: transport),
+      );
+      addTearDown(liveHub.dispose);
+      final liveSource = LiveSensorSource(hub: liveHub);
+
+      liveHub.addDevice(SensorKind.scale);
+      liveHub.assignBleRemoteId(SensorKind.scale, bleRemoteId: 'scale-1');
+      await liveHub.connect(liveHub.devices.single.id);
+      expect(
+        liveHub.activeAdapterFor(SensorKind.scale),
+        isA<DecentScaleBleAdapter>(),
+      );
+
+      transport.emitNotification(
+        [0x03, 0xCE, 0x00, 0x65, 0x00, 0x00, 0xA8],
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final before = transport.writtenCommands.length;
+      await liveSource.onTare();
+      final added = transport.writtenCommands.skip(before).toList();
+      expect(added, [DecentScaleCommands.tare()]);
+    });
+
+    test('rearmWeightStream skips CCCD when brew recovery is disabled', () async {
+      final transport = _CountingRearmTransport();
+      final liveHub = SensorHub(
+        bleBackend: _ScaleBleBackend(transport: transport),
+      );
+      addTearDown(liveHub.dispose);
+      final liveSource = LiveSensorSource(hub: liveHub);
+
+      liveHub.addDevice(SensorKind.scale);
+      liveHub.assignBleRemoteId(SensorKind.scale, bleRemoteId: 'scale-1');
+      await liveHub.connect(liveHub.devices.single.id);
+      expect(transport.rearmCalls, 0);
+
+      liveHub.setScaleRecoveryEnabled(false);
+      await liveSource.rearmWeightStream();
+      expect(transport.rearmCalls, 0);
+      expect(
+        transport.writtenCommands.last,
+        DecentScaleCommands.ledOnGrams(),
+      );
+
+      liveHub.setScaleRecoveryEnabled(true);
+      await liveSource.rearmWeightStream();
+      expect(transport.rearmCalls, 1);
+    });
+
+    test('start tares then F1, and defers F3 until still brewing', () async {
+      final events = <String>[];
+      final controller = LiveShotController(
+        sampleAdapter: IdleSensorAdapter(),
+        onTare: () async {
+          events.add('tare');
+        },
+        onPhoneBrewStart: () async {
+          events.add('f1');
+        },
+        onPhoneBrewEnd: () async {
+          events.add('f2');
+        },
+        onPushScaleConfig: () async {
+          events.add('f3');
+        },
+      );
+      addTearDown(controller.dispose);
+
+      await controller.start();
+      expect(events, ['tare', 'f1']);
+      expect(controller.isBrewing, isTrue);
+
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
+      expect(events, ['tare', 'f1', 'f3']);
+      await controller.stop();
+      expect(events.last, 'f2');
+    });
+
+    test('start does not send deferred F3 after stop', () async {
+      final events = <String>[];
+      final controller = LiveShotController(
+        sampleAdapter: IdleSensorAdapter(),
+        onTare: () async {
+          events.add('tare');
+        },
+        onPhoneBrewStart: () async {
+          events.add('f1');
+        },
+        onPhoneBrewEnd: () async {
+          events.add('f2');
+        },
+        onPushScaleConfig: () async {
+          events.add('f3');
+        },
+      );
+      addTearDown(controller.dispose);
+
+      await controller.start();
+      await controller.stop();
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
+      expect(events, ['tare', 'f1', 'f2']);
+    });
   });
 
   group('LiveScreen sensor wiring', () {
@@ -241,7 +349,8 @@ void main() {
 
       await tester.runAsync(() async {
         await tester.tap(startButton);
-        await Future<void>.delayed(Duration.zero);
+        // Start now drains 36F5 (~250ms) before leaving isStarting.
+        await Future<void>.delayed(const Duration(milliseconds: 400));
       });
       await tester.pumpAndSettle();
 
@@ -275,6 +384,11 @@ void main() {
     });
 
     testWidgets('dismissing demo banner exits demo mode', (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       final registry = await pumpLiveScreen(tester);
 
       await tester.runAsync(() async {
@@ -312,6 +426,45 @@ void main() {
       expect(find.byKey(const Key('live_brew')), findsOneWidget);
     });
   });
+}
+
+class _ScaleBleBackend implements BleConnectionBackend {
+  _ScaleBleBackend({required this.transport});
+
+  final MockDecentScaleTransport transport;
+
+  @override
+  Future<String?> ensureReady() async => null;
+
+  @override
+  Future<List<BleDiscoveredDevice>> scan(
+    SensorKind kind, {
+    Duration timeout = const Duration(seconds: 8),
+    Future<void>? abort,
+  }) async =>
+      const [];
+
+  @override
+  Future<SensorAdapter> createAdapter({
+    required SensorKind kind,
+    required String bleRemoteId,
+  }) async {
+    return DecentScaleBleAdapter(
+      transport: transport,
+      heartbeatInterval: const Duration(days: 1),
+      minCommandSpacing: Duration.zero,
+    );
+  }
+}
+
+class _CountingRearmTransport extends MockDecentScaleTransport {
+  int rearmCalls = 0;
+
+  @override
+  Future<void> rearmNotifications() {
+    rearmCalls += 1;
+    return super.rearmNotifications();
+  }
 }
 
 String _fixturePath(String relativePath) {

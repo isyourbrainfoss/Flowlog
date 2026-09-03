@@ -17,13 +17,13 @@ class LiveShotController extends ChangeNotifier {
     Future<void> Function(double pressureBar)? onForwardPressure,
     Future<void> Function()? onPushScaleConfig,
     ShotSession? session,
-  })  : _sampleAdapter = sampleAdapter,
-        _onTare = onTare,
-        _onPhoneBrewStart = onPhoneBrewStart,
-        _onPhoneBrewEnd = onPhoneBrewEnd,
-        _onForwardPressure = onForwardPressure,
-        _onPushScaleConfig = onPushScaleConfig,
-        _session = session ?? ShotSession() {
+  }) : _sampleAdapter = sampleAdapter,
+       _onTare = onTare,
+       _onPhoneBrewStart = onPhoneBrewStart,
+       _onPhoneBrewEnd = onPhoneBrewEnd,
+       _onForwardPressure = onForwardPressure,
+       _onPushScaleConfig = onPushScaleConfig,
+       _session = session ?? ShotSession() {
     _stateSub = _session.stateChanges.listen((_) => _notify());
     _sampleBatchSub = _session.sampleBatches.listen(_onSampleBatch);
   }
@@ -44,6 +44,7 @@ class LiveShotController extends ChangeNotifier {
   bool _stopInFlight = false;
   String? _lastStartError;
   DateTime? _lastUiNotify;
+  Timer? _deferredDisplayConfigTimer;
 
   /// Cleared on successful start; set when connect fails (UI can show snackbar).
   String? get lastStartError => _lastStartError;
@@ -204,14 +205,9 @@ class LiveShotController extends ChangeNotifier {
         // Scale tare failed — keep recording pressure.
       }
 
-      final pushCfg = _onPushScaleConfig;
-      if (pushCfg != null) {
-        try {
-          await pushCfg().timeout(const Duration(seconds: 2));
-        } on Object {
-          // Best-effort.
-        }
-      }
+      // Drain 36F5 so tare/LED cannot overlap 0xF1. 0xF3 is deferred — NVS.
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+
       final brewStart = _onPhoneBrewStart;
       if (brewStart != null) {
         try {
@@ -220,6 +216,23 @@ class LiveShotController extends ChangeNotifier {
         } on Object {
           // Best-effort.
         }
+      }
+
+      final pushCfg = _onPushScaleConfig;
+      if (pushCfg != null) {
+        _deferredDisplayConfigTimer?.cancel();
+        _deferredDisplayConfigTimer = Timer(const Duration(seconds: 1), () {
+          if (!isBrewing) {
+            return;
+          }
+          unawaited(() async {
+            try {
+              await pushCfg().timeout(const Duration(seconds: 2));
+            } on Object {
+              // Best-effort.
+            }
+          }());
+        });
       }
 
       // If we somehow rolled back after notifying the scale, clear mirror mode.
@@ -283,6 +296,8 @@ class LiveShotController extends ChangeNotifier {
     }
 
     _stopInFlight = true;
+    _deferredDisplayConfigTimer?.cancel();
+    _deferredDisplayConfigTimer = null;
     _notify();
     try {
       if (_session.state == ShotSessionState.recording ||
@@ -358,6 +373,8 @@ class LiveShotController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _deferredDisplayConfigTimer?.cancel();
+    _deferredDisplayConfigTimer = null;
     _stateSub?.cancel();
     _sampleBatchSub?.cancel();
     unawaited(_session.dispose());
@@ -405,23 +422,28 @@ class LiveControls extends StatelessWidget {
         final baseStyle = compact
             ? FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(44),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 10,
+                ),
                 shape: const StadiumBorder(),
-                textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                textStyle: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
               )
             : prominent
-                ? FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(64),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
-                    shape: const StadiumBorder(),
-                    textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  )
-                : null;
+            ? FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(64),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 18,
+                ),
+                shape: const StadiumBorder(),
+                textStyle: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              )
+            : null;
 
         Future<void> onBrewPressed() async {
           if (controller.isStarting) {
@@ -471,22 +493,19 @@ class LiveControls extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    Positioned.fill(
-                      child: _AnimatedCoffeeLiquid(),
-                    ),
+                    Positioned.fill(child: _AnimatedCoffeeLiquid()),
                     // Text centered over the liquid.
                     Text(
                       'Start brew',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFFF5F0E8), // light crema for contrast
-                            shadows: const [
-                              Shadow(
-                                color: Colors.black54,
-                                blurRadius: 3,
-                              ),
-                            ],
-                          ),
+                        fontWeight: FontWeight.w600,
+                        color: const Color(
+                          0xFFF5F0E8,
+                        ), // light crema for contrast
+                        shadows: const [
+                          Shadow(color: Colors.black54, blurRadius: 3),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -515,8 +534,8 @@ class LiveControls extends StatelessWidget {
           label: starting
               ? 'Starting brew'
               : brewing
-                  ? 'Stop brew'
-                  : 'Start brew',
+              ? 'Stop brew'
+              : 'Start brew',
           child: ExcludeSemantics(child: button),
         );
       },
@@ -548,7 +567,9 @@ class _AnimatedCoffeeLiquidState extends State<_AnimatedCoffeeLiquid>
     // Repeating animations prevent pumpAndSettle from completing in widget tests.
     // Only repeat the pulse in real runs; in tests use a static mid value.
     final binding = WidgetsBinding.instance;
-    final isTest = binding.runtimeType.toString().contains('TestWidgetsFlutterBinding');
+    final isTest = binding.runtimeType.toString().contains(
+      'TestWidgetsFlutterBinding',
+    );
     if (!isTest) {
       _controller.repeat();
     } else {
@@ -621,5 +642,3 @@ class _CoffeeLiquidPainter extends CustomPainter {
         oldDelegate.cremaTint != cremaTint;
   }
 }
-
-

@@ -11,10 +11,34 @@ class BeanWithShotCount {
   const BeanWithShotCount({
     required this.bean,
     required this.shotCount,
+    this.knownDoseG = 0,
+    this.unknownDoseCount = 0,
   });
 
   final models.Bean bean;
   final int shotCount;
+
+  /// Sum of non-null `dose_g` values on linked shots.
+  final double knownDoseG;
+
+  /// Linked shots whose `dose_g` is null.
+  final int unknownDoseCount;
+
+  /// Estimated grams used, substituting [defaultDoseG] for unknown doses.
+  double usedG(double defaultDoseG) =>
+      knownDoseG + unknownDoseCount * defaultDoseG;
+}
+
+class _BeanDoseStats {
+  const _BeanDoseStats({
+    required this.shotCount,
+    required this.knownDoseG,
+    required this.unknownDoseCount,
+  });
+
+  final int shotCount;
+  final double knownDoseG;
+  final int unknownDoseCount;
 }
 
 /// Persists and loads [models.Bean] records.
@@ -32,8 +56,9 @@ class BeanRepository {
   /// Updates an existing bean (text fields are mojibake-repaired first).
   Future<void> updateBean(models.Bean bean) async {
     final clean = bean.repaired();
-    await (_db.update(_db.beans)..where((row) => row.id.equals(clean.id)))
-        .write(_beanToCompanion(clean));
+    await (_db.update(
+      _db.beans,
+    )..where((row) => row.id.equals(clean.id))).write(_beanToCompanion(clean));
   }
 
   /// Deletes a bean by id.
@@ -43,9 +68,9 @@ class BeanRepository {
 
   /// Returns a bean by id.
   Future<models.Bean?> getBeanById(String id) async {
-    final row = await (_db.select(_db.beans)
-          ..where((bean) => bean.id.equals(id)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.beans,
+    )..where((bean) => bean.id.equals(id))).getSingleOrNull();
 
     if (row == null) {
       return null;
@@ -55,7 +80,11 @@ class BeanRepository {
   }
 
   /// Returns beans with most recently used (in shots) first, then alphabetical.
-  Future<List<models.Bean>> listBeansByRecentUse() async {
+  ///
+  /// Depleted or empty bags are sorted last while preserving that order.
+  Future<List<models.Bean>> listBeansByRecentUse({
+    double defaultDoseG = 18.0,
+  }) async {
     final beans = await listBeans();
     if (beans.isEmpty) {
       return beans;
@@ -76,7 +105,7 @@ class BeanRepository {
       }
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
     });
-    return beans;
+    return _depletedLast(beans, defaultDoseG: defaultDoseG);
   }
 
   /// Creates a new bean entry (duplicate names are allowed).
@@ -116,10 +145,7 @@ class BeanRepository {
   ///
   /// When only [name] is provided, returns the most recently used matching
   /// bean or creates a new entry if none exist.
-  Future<String?> resolveActiveBeanId({
-    String? beanId,
-    String? name,
-  }) async {
+  Future<String?> resolveActiveBeanId({String? beanId, String? name}) async {
     if (beanId != null && beanId.trim().isNotEmpty) {
       final existing = await getBeanById(beanId.trim());
       if (existing != null) {
@@ -144,37 +170,83 @@ class BeanRepository {
 
   /// Returns all beans ordered by name.
   Future<List<models.Bean>> listBeans() async {
-    final rows = await (_db.select(_db.beans)
-          ..orderBy([(bean) => OrderingTerm.asc(bean.name)]))
-        .get();
+    final rows = await (_db.select(
+      _db.beans,
+    )..orderBy([(bean) => OrderingTerm.asc(bean.name)])).get();
 
     return rows.map(_beanFromRow).toList();
   }
 
-  /// Returns beans with linked shot counts.
-  Future<List<BeanWithShotCount>> listBeansWithShotCounts() async {
+  /// Returns beans with linked shot counts, depleted/empty bags last.
+  Future<List<BeanWithShotCount>> listBeansWithShotCounts({
+    double defaultDoseG = 18.0,
+  }) async {
     final beans = await listBeans();
-    final counts = await _shotCountsByBeanId();
+    final stats = await _doseStatsByBeanId();
 
-    return [
+    final entries = [
       for (final bean in beans)
         BeanWithShotCount(
           bean: bean,
-          shotCount: counts[bean.id] ?? 0,
+          shotCount: stats[bean.id]?.shotCount ?? 0,
+          knownDoseG: stats[bean.id]?.knownDoseG ?? 0,
+          unknownDoseCount: stats[bean.id]?.unknownDoseCount ?? 0,
         ),
     ];
+
+    final active = <BeanWithShotCount>[];
+    final depleted = <BeanWithShotCount>[];
+    for (final entry in entries) {
+      if (_appearsDepleted(entry.bean, stats[entry.bean.id], defaultDoseG)) {
+        depleted.add(entry);
+      } else {
+        active.add(entry);
+      }
+    }
+    return [...active, ...depleted];
   }
 
   /// Counts shots linked to [beanId].
   Future<int> countShotsForBean(String beanId) async {
-    final counts = await _shotCountsByBeanId(beanIds: {beanId});
-    return counts[beanId] ?? 0;
+    final stats = await _doseStatsByBeanId(beanIds: {beanId});
+    return stats[beanId]?.shotCount ?? 0;
+  }
+
+  Future<List<models.Bean>> _depletedLast(
+    List<models.Bean> beans, {
+    required double defaultDoseG,
+  }) async {
+    final stats = await _doseStatsByBeanId();
+    final active = <models.Bean>[];
+    final depleted = <models.Bean>[];
+    for (final bean in beans) {
+      if (_appearsDepleted(bean, stats[bean.id], defaultDoseG)) {
+        depleted.add(bean);
+      } else {
+        active.add(bean);
+      }
+    }
+    return [...active, ...depleted];
+  }
+
+  bool _appearsDepleted(
+    models.Bean bean,
+    _BeanDoseStats? stats,
+    double defaultDoseG,
+  ) {
+    final usedG =
+        (stats?.knownDoseG ?? 0) +
+        (stats?.unknownDoseCount ?? 0) * defaultDoseG;
+    return models.beanAppearsDepleted(
+      bean,
+      models.estimatedBeanRemainingG(bagSizeG: bean.stockG, usedG: usedG),
+    );
   }
 
   Future<List<String>> _recentBeanIdsFromShots() async {
-    final rows = await (_db.select(_db.shots)
-          ..orderBy([(shot) => OrderingTerm.desc(shot.startedAt)]))
-        .get();
+    final rows = await (_db.select(
+      _db.shots,
+    )..orderBy([(shot) => OrderingTerm.desc(shot.startedAt)])).get();
 
     final seen = <String>{};
     final recent = <String>[];
@@ -188,10 +260,14 @@ class BeanRepository {
     return recent;
   }
 
-  Future<Map<String, int>> _shotCountsByBeanId({Set<String>? beanIds}) async {
+  Future<Map<String, _BeanDoseStats>> _doseStatsByBeanId({
+    Set<String>? beanIds,
+  }) async {
     final shotCount = _db.shots.id.count();
+    final knownDoseSum = _db.shots.doseG.sum();
+    final knownDoseCount = _db.shots.doseG.count();
     final query = _db.selectOnly(_db.shots)
-      ..addColumns([_db.shots.beanId, shotCount])
+      ..addColumns([_db.shots.beanId, shotCount, knownDoseSum, knownDoseCount])
       ..where(_db.shots.beanId.isNotNull());
 
     if (beanIds != null && beanIds.isNotEmpty) {
@@ -203,7 +279,13 @@ class BeanRepository {
     final rows = await query.get();
     return {
       for (final row in rows)
-        row.read<String>(_db.shots.beanId)!: row.read<int>(shotCount) ?? 0,
+        row.read<String>(_db.shots.beanId)!: _BeanDoseStats(
+          shotCount: row.read<int>(shotCount) ?? 0,
+          knownDoseG: row.read<double>(knownDoseSum) ?? 0,
+          unknownDoseCount:
+              (row.read<int>(shotCount) ?? 0) -
+              (row.read<int>(knownDoseCount) ?? 0),
+        ),
     };
   }
 
@@ -219,6 +301,7 @@ class BeanRepository {
       variety: Value(bean.variety),
       stockG: Value(bean.stockG),
       notes: Value(bean.notes),
+      empty: Value(bean.empty),
     );
   }
 
@@ -234,6 +317,7 @@ class BeanRepository {
       variety: repairMojibake(row.variety),
       stockG: row.stockG,
       notes: repairMojibake(row.notes),
+      empty: row.empty,
     );
   }
 }

@@ -58,11 +58,9 @@ void main() {
     });
 
     test('merges shot metadata without wiping samples', () async {
-      final shot = _loadFixtureShot('shots/minimal_shot.json').copyWith(
-        doseG: null,
-        grindSetting: null,
-        notes: '',
-      );
+      final shot = _loadFixtureShot(
+        'shots/minimal_shot.json',
+      ).copyWith(doseG: null, grindSetting: null, notes: '');
       final richShot = shot.copyWith(
         doseG: 18,
         grindSetting: 14,
@@ -124,29 +122,32 @@ void main() {
       expect(stored?.notes, 'Updated notes');
     });
 
-    test('local delete tombstone prevents remote shot from resurrecting', () async {
-      final shot = _loadFixtureShot('shots/minimal_shot.json');
-      final repo = ShotRepository(db);
-      await repo.insertShot(shot);
-      await repo.deleteShot(shot.id);
-      expect(await repo.getShotById(shot.id), isNull);
+    test(
+      'local delete tombstone prevents remote shot from resurrecting',
+      () async {
+        final shot = _loadFixtureShot('shots/minimal_shot.json');
+        final repo = ShotRepository(db);
+        await repo.insertShot(shot);
+        await repo.deleteShot(shot.id);
+        expect(await repo.getShotById(shot.id), isNull);
 
-      await mergeSyncPayloadFromRemote(
-        database: db,
-        payload: SyncPayload(
-          version: syncPayloadVersion,
-          exportedAt: DateTime.utc(2026, 8, 9),
-          config: const SyncConfig(),
-          shots: [shot],
-          profiles: const [],
-          beans: const [],
-        ),
-        remoteExportedAt: DateTime.utc(2026, 8, 9),
-      );
+        await mergeSyncPayloadFromRemote(
+          database: db,
+          payload: SyncPayload(
+            version: syncPayloadVersion,
+            exportedAt: DateTime.utc(2026, 8, 9),
+            config: const SyncConfig(),
+            shots: [shot],
+            profiles: const [],
+            beans: const [],
+          ),
+          remoteExportedAt: DateTime.utc(2026, 8, 9),
+        );
 
-      expect(await repo.getShotById(shot.id), isNull);
-      expect(await repo.isShotDeleted(shot.id), isTrue);
-    });
+        expect(await repo.getShotById(shot.id), isNull);
+        expect(await repo.isShotDeleted(shot.id), isTrue);
+      },
+    );
 
     test('remote tombstone deletes a local shot', () async {
       final shot = _loadFixtureShot('shots/minimal_shot.json');
@@ -176,37 +177,99 @@ void main() {
       expect(await repo.isShotDeleted(shot.id), isTrue);
     });
 
-    test('keeps local bean edit when a later blob re-exports the old shot',
-        () async {
-      final shot = _loadFixtureShot('shots/minimal_shot.json');
-      final repo = ShotRepository(db);
-      final edited = shot.copyWith(
-        beanId: 'bean-oslo',
-        lastModifiedAt: DateTime.utc(2026, 8, 12, 10),
-      );
-      await repo.insertShot(edited);
+    test(
+      'keeps local bean edit when a later blob re-exports the old shot',
+      () async {
+        final shot = _loadFixtureShot('shots/minimal_shot.json');
+        final repo = ShotRepository(db);
+        final edited = shot.copyWith(
+          beanId: 'bean-oslo',
+          lastModifiedAt: DateTime.utc(2026, 8, 12, 10),
+        );
+        await repo.insertShot(edited);
 
-      final staleRemote = shot.copyWith(
-        beanId: 'bean-house-blend',
-        lastModifiedAt: DateTime.utc(2026, 8, 12, 8),
+        final staleRemote = shot.copyWith(
+          beanId: 'bean-house-blend',
+          lastModifiedAt: DateTime.utc(2026, 8, 12, 8),
+        );
+
+        await mergeSyncPayloadFromRemote(
+          database: db,
+          payload: SyncPayload(
+            version: syncPayloadVersion,
+            exportedAt: DateTime.utc(2026, 8, 12, 11),
+            config: const SyncConfig(),
+            shots: [staleRemote],
+            profiles: const [],
+            beans: const [],
+          ),
+          remoteExportedAt: DateTime.utc(2026, 8, 12, 11),
+        );
+
+        final stored = await repo.getShotById(shot.id);
+        expect(stored?.beanId, 'bean-oslo');
+        expect(stored?.lastModifiedAt, DateTime.utc(2026, 8, 12, 10));
+      },
+    );
+
+    test('bean merge is sticky-empty and prefers remote bag size', () async {
+      const local = Bean(
+        id: 'bean-merge-empty',
+        name: 'House Blend',
+        stockG: 250,
       );
+      const remote = Bean(
+        id: 'bean-merge-empty',
+        name: 'House Blend',
+        stockG: 200,
+        empty: true,
+      );
+      await BeanRepository(db).upsertBean(local);
 
       await mergeSyncPayloadFromRemote(
         database: db,
         payload: SyncPayload(
           version: syncPayloadVersion,
-          exportedAt: DateTime.utc(2026, 8, 12, 11),
+          exportedAt: DateTime.utc(2026, 8, 1),
           config: const SyncConfig(),
-          shots: [staleRemote],
+          shots: const [],
           profiles: const [],
-          beans: const [],
+          beans: [remote],
         ),
-        remoteExportedAt: DateTime.utc(2026, 8, 12, 11),
+        remoteExportedAt: DateTime.utc(2026, 8, 1),
       );
 
-      final stored = await repo.getShotById(shot.id);
-      expect(stored?.beanId, 'bean-oslo');
-      expect(stored?.lastModifiedAt, DateTime.utc(2026, 8, 12, 10));
+      final stored = await BeanRepository(db).getBeanById(local.id);
+      expect(stored?.empty, isTrue);
+      expect(stored?.stockG, 200);
+    });
+
+    test('bean merge keeps local empty when remote is still open', () async {
+      const local = Bean(
+        id: 'bean-local-empty',
+        name: 'House Blend',
+        stockG: 250,
+        empty: true,
+      );
+      const remote = Bean(id: 'bean-local-empty', name: 'House Blend');
+      await BeanRepository(db).upsertBean(local);
+
+      await mergeSyncPayloadFromRemote(
+        database: db,
+        payload: SyncPayload(
+          version: syncPayloadVersion,
+          exportedAt: DateTime.utc(2026, 8, 1),
+          config: const SyncConfig(),
+          shots: const [],
+          profiles: const [],
+          beans: [remote],
+        ),
+        remoteExportedAt: DateTime.utc(2026, 8, 1),
+      );
+
+      final stored = await BeanRepository(db).getBeanById(local.id);
+      expect(stored?.empty, isTrue);
+      expect(stored?.stockG, 250);
     });
 
     test('export includes deletedShots after local delete', () async {
@@ -217,10 +280,7 @@ void main() {
 
       final payload = await buildSyncPayloadFromDatabase(db);
       expect(payload.shots.map((s) => s.id), isNot(contains(shot.id)));
-      expect(
-        payload.deletedShots.map((d) => d.shotId),
-        contains(shot.id),
-      );
+      expect(payload.deletedShots.map((d) => d.shotId), contains(shot.id));
     });
   });
 
@@ -231,9 +291,9 @@ void main() {
       db = FlowlogDatabase.inMemory();
       final shot = _loadFixtureShot('shots/minimal_shot.json');
       await ShotRepository(db).insertShot(shot);
-      await BeanRepository(db).upsertBean(
-        const Bean(id: 'bean-export', name: 'Export Bean'),
-      );
+      await BeanRepository(
+        db,
+      ).upsertBean(const Bean(id: 'bean-export', name: 'Export Bean'));
     });
 
     tearDown(() async {

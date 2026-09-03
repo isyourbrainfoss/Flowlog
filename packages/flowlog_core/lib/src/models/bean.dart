@@ -70,10 +70,7 @@ String? repairMojibake(String? text) {
   current = _applyPhraseFixes(current);
 
   // 4) If still a long run of mojibake markers between letters, drop the run.
-  current = current.replaceAll(
-    RegExp(r'[\u00c3\u00c2ÃÂ]{4,}'),
-    '',
-  );
+  current = current.replaceAll(RegExp(r'[\u00c3\u00c2ÃÂ]{4,}'), '');
 
   // Collapse whitespace left by stripping.
   current = current.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
@@ -82,7 +79,10 @@ String? repairMojibake(String? text) {
 
 String _applyPhraseFixes(String current) {
   return current
-      .replaceAll(RegExp(r'M[\u00b8]rkbrent', caseSensitive: false), 'Mørkbrent')
+      .replaceAll(
+        RegExp(r'M[\u00b8]rkbrent', caseSensitive: false),
+        'Mørkbrent',
+      )
       .replaceAll(
         RegExp(r'kaffeb[\u00b8]?nner', caseSensitive: false),
         'kaffebønner',
@@ -102,9 +102,9 @@ bool _looksLikeMojibake(String s) {
 int _mojibakeScore(String s) {
   // Weighted: long marker runs are much worse than a single accented letter.
   final markers = _countMojibakeMarkers(s);
-  final runBonus = RegExp(r'[\u00c3\u00c2ÃÂ]{3,}')
-      .allMatches(s)
-      .fold<int>(0, (sum, m) => sum + m.group(0)!.length);
+  final runBonus = RegExp(
+    r'[\u00c3\u00c2ÃÂ]{3,}',
+  ).allMatches(s).fold<int>(0, (sum, m) => sum + m.group(0)!.length);
   return markers * 2 + runBonus * 3 + (s.length > 80 ? s.length ~/ 10 : 0);
 }
 
@@ -214,6 +214,7 @@ class Bean {
     this.variety,
     this.stockG,
     this.notes,
+    this.empty = false,
   });
 
   final String id;
@@ -224,8 +225,13 @@ class Bean {
   final DateTime? roastDate;
   final String? process;
   final String? variety;
+
+  /// Retail bag size in grams (not remaining stock).
   final double? stockG;
   final String? notes;
+
+  /// User-marked empty bag; sticky across sync.
+  final bool empty;
 
   factory Bean.fromJson(Map<String, dynamic> json) {
     return Bean(
@@ -239,8 +245,9 @@ class Bean {
           : DateTime.parse(json['roastDate'] as String).toUtc(),
       process: json['process'] as String?,
       variety: repairMojibake(json['variety'] as String?),
-      stockG: (json['stockG'] as num?)?.toDouble(),
+      stockG: ((json['bagSizeG'] ?? json['stockG']) as num?)?.toDouble(),
       notes: repairMojibake(json['notes'] as String?),
+      empty: json['empty'] == true,
     );
   }
 
@@ -256,6 +263,7 @@ class Bean {
       if (variety != null) 'variety': variety,
       if (stockG != null) 'stockG': stockG,
       if (notes != null) 'notes': notes,
+      if (empty) 'empty': true,
     };
   }
 
@@ -270,6 +278,7 @@ class Bean {
     String? variety,
     double? stockG,
     String? notes,
+    bool? empty,
   }) {
     return Bean(
       id: id ?? this.id,
@@ -282,6 +291,7 @@ class Bean {
       variety: variety ?? this.variety,
       stockG: stockG ?? this.stockG,
       notes: notes ?? this.notes,
+      empty: empty ?? this.empty,
     );
   }
 
@@ -298,6 +308,7 @@ class Bean {
       variety: repairMojibake(variety),
       stockG: stockG,
       notes: repairMojibake(notes),
+      empty: empty,
     );
   }
 
@@ -314,23 +325,53 @@ class Bean {
             process == other.process &&
             variety == other.variety &&
             stockG == other.stockG &&
-            notes == other.notes;
+            notes == other.notes &&
+            empty == other.empty;
   }
 
   @override
   int get hashCode => Object.hash(
-        id,
-        name,
-        brand,
-        origin,
-        roastLevel,
-        roastDate,
-        process,
-        variety,
-        stockG,
-        notes,
-      );
+    id,
+    name,
+    brand,
+    origin,
+    roastLevel,
+    roastDate,
+    process,
+    variety,
+    stockG,
+    notes,
+    empty,
+  );
 
   @override
-  String toString() => 'Bean(id: $id, name: $name, brand: $brand)';
+  String toString() =>
+      'Bean(id: $id, name: $name, brand: $brand, empty: $empty)';
 }
+
+/// Sum of shot doses, substituting [defaultDoseG] when a shot has no dose.
+double estimatedBeanUsedG({
+  required Iterable<double?> shotDosesG,
+  required double defaultDoseG,
+}) {
+  var used = 0.0;
+  for (final dose in shotDosesG) {
+    used += dose ?? defaultDoseG;
+  }
+  return used;
+}
+
+/// Remaining grams from bag size minus used mass, or null if bag size is unknown.
+double? estimatedBeanRemainingG({
+  required double? bagSizeG,
+  required double usedG,
+}) {
+  if (bagSizeG == null) {
+    return null;
+  }
+  return bagSizeG - usedG;
+}
+
+/// True when the bag is marked empty or estimated remaining is at or below zero.
+bool beanAppearsDepleted(Bean bean, double? remainingG) =>
+    bean.empty || (remainingG != null && remainingG <= 0);

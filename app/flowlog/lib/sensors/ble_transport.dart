@@ -152,9 +152,7 @@ class UnsupportedBleConnectionBackend implements BleConnectionBackend {
     required SensorKind kind,
     required String bleRemoteId,
   }) async {
-    throw UnsupportedError(
-      (await ensureReady()) ?? 'Bluetooth unavailable',
-    );
+    throw UnsupportedError((await ensureReady()) ?? 'Bluetooth unavailable');
   }
 }
 
@@ -178,12 +176,27 @@ class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
       }
     }
 
-    final state = await FlutterBluePlus.adapterState
+    var state = await FlutterBluePlus.adapterState
         .where((value) => value != BluetoothAdapterState.unknown)
         .first
-        .timeout(const Duration(seconds: 5), onTimeout: () {
-      return BluetoothAdapterState.unknown;
-    });
+        .timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            return BluetoothAdapterState.unknown;
+          },
+        );
+
+    if (state == BluetoothAdapterState.turningOn) {
+      state = await FlutterBluePlus.adapterState
+          .where((value) => value == BluetoothAdapterState.on)
+          .first
+          .timeout(
+            const Duration(seconds: 8),
+            onTimeout: () {
+              return BluetoothAdapterState.turningOn;
+            },
+          );
+    }
 
     return switch (state) {
       BluetoothAdapterState.on => null,
@@ -195,8 +208,7 @@ class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
         'Bluetooth is unavailable on this device.',
       BluetoothAdapterState.turningOn || BluetoothAdapterState.turningOff =>
         'Bluetooth is still starting. Try again in a moment.',
-      BluetoothAdapterState.unknown =>
-        'Bluetooth state is unknown. Try again.',
+      BluetoothAdapterState.unknown => 'Bluetooth state is unknown. Try again.',
     };
   }
 
@@ -243,29 +255,26 @@ class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
       }
     }
 
-    final subscription = FlutterBluePlus.onScanResults.listen(
-      (results) {
-        for (final result in results) {
-          final name = _bleScanResultName(result);
-          if (!matchesSensorKind(name, kind)) {
-            continue;
-          }
-          final id = result.device.remoteId.str;
-          final isNew = !found.containsKey(id);
-          found[id] = BleDiscoveredDevice(
-            remoteId: id,
-            name: name,
-            kind: kind,
-            rssi: result.rssi,
-          );
-          // First match: keep a short window for additional devices, then stop.
-          if (isNew && found.length == 1) {
-            extraWindowTimer ??= Timer(kBleScanExtraMatchWindow, complete);
-          }
+    final subscription = FlutterBluePlus.onScanResults.listen((results) {
+      for (final result in results) {
+        final name = _bleScanResultName(result);
+        if (!matchesSensorKind(name, kind)) {
+          continue;
         }
-      },
-      onError: (_) {},
-    );
+        final id = result.device.remoteId.str;
+        final isNew = !found.containsKey(id);
+        found[id] = BleDiscoveredDevice(
+          remoteId: id,
+          name: name,
+          kind: kind,
+          rssi: result.rssi,
+        );
+        // First match: keep a short window for additional devices, then stop.
+        if (isNew && found.length == 1) {
+          extraWindowTimer ??= Timer(kBleScanExtraMatchWindow, complete);
+        }
+      }
+    }, onError: (_) {});
 
     FlutterBluePlus.cancelWhenScanComplete(subscription);
 
@@ -370,16 +379,17 @@ class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
   }) async {
     return switch (kind) {
       SensorKind.pressensor => PressensorBleAdapter(
-          transport: FlutterBluePressensorTransport(deviceId: bleRemoteId),
-          deviceId: bleRemoteId,
-        ),
+        transport: FlutterBluePressensorTransport(deviceId: bleRemoteId),
+        deviceId: bleRemoteId,
+      ),
       SensorKind.scale => () {
-          final transport =
-              FlutterBlueDecentScaleTransport(remoteId: bleRemoteId);
-          final adapter = DecentScaleBleAdapter(transport: transport);
-          transport.onLinkLost = adapter.notifyLinkLost;
-          return adapter;
-        }(),
+        final transport = FlutterBlueDecentScaleTransport(
+          remoteId: bleRemoteId,
+        );
+        final adapter = DecentScaleBleAdapter(transport: transport);
+        transport.onLinkLost = adapter.notifyLinkLost;
+        return adapter;
+      }(),
     };
   }
 }
@@ -410,10 +420,7 @@ class FlutterBluePressensorTransport implements PressensorBleTransport {
     Duration timeout = const Duration(seconds: 4),
   }) async {
     final backend = FlutterBlueBleConnectionBackend();
-    final devices = await backend.scan(
-      SensorKind.pressensor,
-      timeout: timeout,
-    );
+    final devices = await backend.scan(SensorKind.pressensor, timeout: timeout);
     return devices.map((device) => device.remoteId).toList(growable: false);
   }
 
@@ -697,7 +704,8 @@ class FlutterBlueDecentScaleTransport implements DecentScaleTransport {
       for (final characteristic in service.characteristics) {
         if (characteristic.uuid == Guid(DecentScaleConstants.notifyUuid)) {
           notify = characteristic;
-        } else if (characteristic.uuid == Guid(DecentScaleConstants.writeUuid)) {
+        } else if (characteristic.uuid ==
+            Guid(DecentScaleConstants.writeUuid)) {
           write = characteristic;
         }
       }
@@ -770,10 +778,7 @@ class FlutterBlueDecentScaleTransport implements DecentScaleTransport {
     // Prefer write-without-response (36F5 is WRITE_NR on DIY firmware); fall
     // back to write-with-response if the characteristic only supports that.
     final withoutResponse = characteristic.properties.writeWithoutResponse;
-    await characteristic.write(
-      command,
-      withoutResponse: withoutResponse,
-    );
+    await characteristic.write(command, withoutResponse: withoutResponse);
   }
 
   @override

@@ -92,7 +92,9 @@ void main() {
       expect(repeatController.prefill!.metadata.doseG, shot.doseG);
       expect(repeatController.prefill!.targetPressureSamples, isNotEmpty);
 
-      final profiles = await profileRepository.listProfiles(includeSamples: true);
+      final profiles = await profileRepository.listProfiles(
+        includeSamples: true,
+      );
       expect(profiles, hasLength(1));
       expect(profiles.single.sourceShotId, shot.id);
       expect(profiles.single.pressureSamples, isNotEmpty);
@@ -188,11 +190,12 @@ void main() {
         tester.element(find.byType(LiveScreen)),
       );
       messenger?.clearSnackBars();
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       final repeatButton = find.byKey(const Key('repeat_shot_button'));
       await tester.ensureVisible(repeatButton);
-      await tester.pumpAndSettle();
+      await tester.pump();
       await tester.runAsync(() async {
         await tester.tap(repeatButton);
         await Future<void>.delayed(const Duration(milliseconds: 500));
@@ -202,7 +205,9 @@ void main() {
       expect(repeatController.prefill, isNotNull);
       expect(repeatController.prefill!.targetPressureSamples, isNotEmpty);
 
-      final profiles = await profileRepository.listProfiles(includeSamples: true);
+      final profiles = await profileRepository.listProfiles(
+        includeSamples: true,
+      );
       expect(profiles, hasLength(1));
     });
   });
@@ -223,7 +228,8 @@ Future<void> _startSession(
     await controller.start();
     await Future<void>.delayed(Duration.zero);
   });
-  await tester.pumpAndSettle();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 100));
 }
 
 Future<void> _startAndStopSession(
@@ -233,8 +239,10 @@ Future<void> _startAndStopSession(
   await _startSession(tester, controller);
   await tester.runAsync(() async {
     await controller.stop();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
   });
-  await tester.pumpAndSettle();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 100));
 }
 
 String _fixturePath(String relativePath) {

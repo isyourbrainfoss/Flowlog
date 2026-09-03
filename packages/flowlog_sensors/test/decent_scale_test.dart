@@ -234,6 +234,75 @@ void main() {
       );
     });
 
+    test('sendPhonePressure and heartbeat do not throw', () async {
+      await adapter.connect();
+      await adapter.sendPhonePressure(9.0);
+      clockMs += 120;
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(adapter.writtenCommands, isNotEmpty);
+    });
+
+    test('heartbeat drops while another write is in flight', () async {
+      clockMs = 1_000;
+      final blocking = _BlockingDecentScaleTransport();
+      final busyAdapter = DecentScaleBleAdapter(
+        transport: blocking,
+        heartbeatInterval: const Duration(milliseconds: 40),
+        minCommandSpacing: Duration.zero,
+        monotonicClock: () => clockMs,
+      );
+      addTearDown(busyAdapter.disconnect);
+
+      await busyAdapter.connect();
+      blocking.blockWrites = Completer<void>();
+      final tare = busyAdapter.tare();
+      await Future<void>.delayed(Duration.zero);
+
+      await busyAdapter.sendPhonePressure(9.0);
+      clockMs += 200;
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      expect(
+        busyAdapter.writtenCommands,
+        [DecentScaleCommands.ledOnGrams()],
+      );
+
+      blocking.blockWrites!.complete();
+      blocking.blockWrites = null;
+      await tare;
+      expect(busyAdapter.writtenCommands.last, DecentScaleCommands.tare());
+    });
+
+    test('rearmStream skips CCCD toggle when hard recovery is disabled', () async {
+      final counting = _CountingRearmTransport();
+      final recoveryAdapter = DecentScaleBleAdapter(
+        transport: counting,
+        heartbeatInterval: const Duration(days: 1),
+        minCommandSpacing: Duration.zero,
+        monotonicClock: () => clockMs,
+      );
+      addTearDown(recoveryAdapter.disconnect);
+
+      await recoveryAdapter.connect();
+      expect(counting.rearmCalls, 0);
+
+      recoveryAdapter.allowHardRecovery = false;
+      await recoveryAdapter.rearmStream();
+      expect(counting.rearmCalls, 0);
+      expect(
+        recoveryAdapter.writtenCommands.last,
+        DecentScaleCommands.ledOnGrams(),
+      );
+
+      recoveryAdapter.allowHardRecovery = true;
+      await recoveryAdapter.rearmStream();
+      expect(counting.rearmCalls, 1);
+      expect(
+        recoveryAdapter.writtenCommands.last,
+        DecentScaleCommands.ledOnGrams(),
+      );
+    });
+
     test('disconnect stops heartbeat and emits disconnected', () async {
       final states = <ConnectionState>[];
       final sub = adapter.state.listen(states.add);
@@ -256,4 +325,27 @@ void main() {
       await sub.cancel();
     });
   });
+}
+
+class _BlockingDecentScaleTransport extends MockDecentScaleTransport {
+  Completer<void>? blockWrites;
+
+  @override
+  Future<void> writeCommand(List<int> command) async {
+    final block = blockWrites;
+    if (block != null) {
+      await block.future;
+    }
+    await super.writeCommand(command);
+  }
+}
+
+class _CountingRearmTransport extends MockDecentScaleTransport {
+  int rearmCalls = 0;
+
+  @override
+  Future<void> rearmNotifications() {
+    rearmCalls += 1;
+    return super.rearmNotifications();
+  }
 }

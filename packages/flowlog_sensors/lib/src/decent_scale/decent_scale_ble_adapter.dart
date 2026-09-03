@@ -128,7 +128,14 @@ class DecentScaleBleAdapter implements SensorAdapter {
   }
 
   /// Re-enables weight notifications and LED-on without a full disconnect.
+  ///
+  /// Mid-brew ([allowHardRecovery] false) only sends LED-on — toggling CCCD
+  /// can freeze the DIY scale.
   Future<void> rearmStream() async {
+    if (!allowHardRecovery) {
+      await ledOn();
+      return;
+    }
     try {
       await _transport.rearmNotifications();
       await _notificationSub?.cancel();
@@ -216,7 +223,12 @@ class DecentScaleBleAdapter implements SensorAdapter {
   void _startHeartbeatTimer() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(heartbeatInterval, (_) {
-      unawaited(_writeCommand(DecentScaleCommands.heartbeat()));
+      if (_writeInFlight) {
+        return;
+      }
+      unawaited(
+        _writeCommand(DecentScaleCommands.heartbeat(), dropIfBusy: true),
+      );
     });
   }
 

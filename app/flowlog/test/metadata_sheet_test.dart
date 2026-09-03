@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flowlog/screens/live/metadata_sheet.dart';
 import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog/settings/coffeejack_settings_store.dart';
+import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -337,6 +338,71 @@ void main() {
           lastModifiedAt: saved!.lastModifiedAt,
         ),
       );
+    });
+
+    testWidgets('saving notes with a different bean does not change ActiveBeanScope',
+        (tester) async {
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+
+      final db = FlowlogDatabase.inMemory();
+      addTearDown(db.close);
+      final repository = BeanRepository(db);
+      await repository.upsertBean(
+        const Bean(id: 'bean-a', name: 'House Blend'),
+      );
+      await repository.upsertBean(
+        const Bean(id: 'bean-b', name: 'Ethiopia'),
+      );
+
+      var activeBeanChanged = false;
+      ShotMetadata? saved;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ActiveBeanScope(
+            name: 'House Blend',
+            beanId: 'bean-a',
+            onActiveBeanChanged: (name, {beanId}) {
+              activeBeanChanged = true;
+            },
+            child: Builder(
+              builder: (context) {
+                return Scaffold(
+                  body: Center(
+                    child: FilledButton(
+                      onPressed: () async {
+                        final result = await showMetadataSheet(
+                          context,
+                          initial: const ShotMetadata(beanId: 'bean-b'),
+                          beanRepository: repository,
+                        );
+                        saved = result;
+                      },
+                      child: const Text('Open'),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.byKey(const Key('metadata_save')));
+      await tester.tap(find.byKey(const Key('metadata_save')));
+      await tester.pumpAndSettle();
+
+      expect(saved, isNotNull);
+      expect(saved!.beanId, 'bean-b');
+      expect(activeBeanChanged, isFalse);
     });
   });
 }

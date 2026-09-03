@@ -28,6 +28,7 @@ void main() {
 
       expect(find.text('No beans yet'), findsOneWidget);
       expect(find.byType(BeanCard), findsNothing);
+      expect(find.byKey(const Key('beans_search_field')), findsNothing);
     });
 
     testWidgets('creates bean from add dialog', (tester) async {
@@ -55,9 +56,7 @@ void main() {
         find.byKey(const Key('bean_editor_variety')),
         'Yellow Catuai',
       );
-      await tester.ensureVisible(
-        find.byKey(const Key('bean_process_washed')),
-      );
+      await tester.ensureVisible(find.byKey(const Key('bean_process_washed')));
       await tester.tap(find.byKey(const Key('bean_process_washed')));
       await tester.pump();
       await tester.ensureVisible(
@@ -115,7 +114,10 @@ void main() {
 
       final saved = await beanRepository.getBeanById('bean-custom-bag');
       expect(saved?.stockG, 340);
-      expect(find.byKey(const Key('bean_card_bean-custom-bag')), findsOneWidget);
+      expect(
+        find.byKey(const Key('bean_card_bean-custom-bag')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('shows linked shot count on bean card', (tester) async {
@@ -139,28 +141,141 @@ void main() {
       await _pumpBeansScreen(tester, beanRepository: beanRepository);
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('bean_shot_count_bean-linked')), findsOneWidget);
+      expect(
+        find.byKey(const Key('bean_shot_count_bean-linked')),
+        findsOneWidget,
+      );
       expect(find.text('2 shots'), findsOneWidget);
     });
 
-    testWidgets('updates stock inline', (tester) async {
-      const bean = Bean(
-        id: 'bean-stock',
-        name: 'Stock Bean',
-        stockG: 300,
+    testWidgets('shows remaining estimate and marks bag empty', (tester) async {
+      const bean = Bean(id: 'bean-stock', name: 'Stock Bean', stockG: 250);
+      await beanRepository.upsertBean(bean);
+      await shotRepository.insertShot(
+        Shot(
+          id: 'shot-1',
+          startedAt: DateTime.utc(2026, 6, 29, 10),
+          beanId: bean.id,
+        ),
       );
+      await shotRepository.insertShot(
+        Shot(
+          id: 'shot-2',
+          startedAt: DateTime.utc(2026, 6, 29, 11),
+          beanId: bean.id,
+        ),
+      );
+
+      await _pumpBeansScreen(tester, beanRepository: beanRepository);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('bean_remaining_bean-stock')),
+        findsOneWidget,
+      );
+      expect(find.text('~214 g left'), findsOneWidget);
+      expect(find.text('2 shots · ~36 g used'), findsOneWidget);
+      expect(find.text('Bag size unknown'), findsNothing);
+      expect(find.byKey(const Key('beans_dose_chip')), findsOneWidget);
+      expect(find.text('Dose 18 g'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('bean_mark_empty_bean-stock')));
+      await tester.pumpAndSettle();
+
+      expect((await beanRepository.getBeanById(bean.id))!.empty, isTrue);
+      expect(find.text('Reopen bag'), findsOneWidget);
+      expect(
+        find.byKey(const Key('bean_reopen_bag_bean-stock')),
+        findsOneWidget,
+      );
+      final opacity = tester.widget<Opacity>(
+        find.ancestor(
+          of: find.byKey(const Key('bean_card_bean-stock')),
+          matching: find.byType(Opacity),
+        ),
+      );
+      expect(opacity.opacity, closeTo(0.55, 0.001));
+
+      await tester.tap(find.byKey(const Key('bean_reopen_bag_bean-stock')));
+      await tester.pumpAndSettle();
+      expect((await beanRepository.getBeanById(bean.id))!.empty, isFalse);
+    });
+
+    testWidgets('shows bag size unknown when stock is missing', (tester) async {
+      const bean = Bean(id: 'bean-unknown', name: 'Mystery');
       await beanRepository.upsertBean(bean);
 
       await _pumpBeansScreen(tester, beanRepository: beanRepository);
       await tester.pumpAndSettle();
 
-      final stockField = find.byKey(const Key('bean_stock_bean-stock'));
-      await tester.enterText(stockField, '250');
-      await tester.testTextInput.receiveAction(TextInputAction.done);
+      expect(find.text('Bag size unknown'), findsOneWidget);
+    });
+
+    testWidgets('filters library by KAFFA, unicode name, origin, and clear X', (
+      tester,
+    ) async {
+      await beanRepository.upsertBean(
+        const Bean(
+          id: 'bean-oslo',
+          name: 'Oslo Mørkbrent',
+          brand: 'KAFFA',
+          origin: 'Colombia',
+        ),
+      );
+      await beanRepository.upsertBean(
+        const Bean(
+          id: 'bean-ethiopia',
+          name: 'Ethiopia Yirgacheffe',
+          origin: 'Ethiopia',
+        ),
+      );
+
+      await _pumpBeansScreen(tester, beanRepository: beanRepository);
       await tester.pumpAndSettle();
 
-      final updated = await beanRepository.getBeanById(bean.id);
-      expect(updated!.stockG, 250);
+      expect(find.byKey(const Key('beans_search_field')), findsOneWidget);
+      expect(find.byKey(const Key('bean_card_bean-oslo')), findsOneWidget);
+      expect(find.byKey(const Key('bean_card_bean-ethiopia')), findsOneWidget);
+      expect(find.byKey(const Key('beans_search_clear')), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('beans_search_field')),
+        'KAFFA',
+      );
+      await tester.pump();
+      expect(find.byKey(const Key('bean_card_bean-oslo')), findsOneWidget);
+      expect(find.byKey(const Key('bean_card_bean-ethiopia')), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('beans_search_field')),
+        'mørkbrent',
+      );
+      await tester.pump();
+      expect(find.byKey(const Key('bean_card_bean-oslo')), findsOneWidget);
+      expect(find.byKey(const Key('bean_card_bean-ethiopia')), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('beans_search_field')),
+        'colombia',
+      );
+      await tester.pump();
+      expect(find.byKey(const Key('bean_card_bean-oslo')), findsOneWidget);
+      expect(find.byKey(const Key('bean_card_bean-ethiopia')), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('beans_search_field')),
+        'zzzz-no-match',
+      );
+      await tester.pump();
+      expect(find.text('No beans match your search'), findsOneWidget);
+      expect(find.byKey(const Key('beans_search_field')), findsOneWidget);
+      expect(find.byType(BeanCard), findsNothing);
+
+      await tester.tap(find.byKey(const Key('beans_search_clear')));
+      await tester.pump();
+      expect(find.byKey(const Key('bean_card_bean-oslo')), findsOneWidget);
+      expect(find.byKey(const Key('bean_card_bean-ethiopia')), findsOneWidget);
+      expect(find.byKey(const Key('beans_search_clear')), findsNothing);
     });
 
     testWidgets('bean editor does not dismiss on barrier tap', (tester) async {
@@ -178,7 +293,9 @@ void main() {
       expect(find.byKey(const Key('bean_editor_add')), findsOneWidget);
     });
 
-    testWidgets('bean editor confirms discard when dirty on back', (tester) async {
+    testWidgets('bean editor confirms discard when dirty on back', (
+      tester,
+    ) async {
       await _pumpBeansScreen(tester, beanRepository: beanRepository);
       await tester.pumpAndSettle();
 
@@ -217,8 +334,10 @@ void main() {
         },
       );
       addTearDown(
-        () => tester.binding.defaultBinaryMessenger
-            .setMockMethodCallHandler(SystemChannels.platform, null),
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
       );
 
       await _pumpBeansScreen(tester, beanRepository: beanRepository);
@@ -238,8 +357,9 @@ void main() {
       );
     });
 
-    testWidgets('imports AI response from clipboard into bean editor',
-        (tester) async {
+    testWidgets('imports AI response from clipboard into bean editor', (
+      tester,
+    ) async {
       const clipboardJson = '''
 ```json
 {
@@ -265,8 +385,10 @@ void main() {
         },
       );
       addTearDown(
-        () => tester.binding.defaultBinaryMessenger
-            .setMockMethodCallHandler(SystemChannels.platform, null),
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
       );
 
       await _pumpBeansScreen(
@@ -290,16 +412,9 @@ void main() {
         find.byKey(const Key('bean_ai_imported_snackbar')),
         findsOneWidget,
       );
+      expect(find.widgetWithText(TextFormField, 'Name'), findsOneWidget);
       expect(
-        find.widgetWithText(TextFormField, 'Name'),
-        findsOneWidget,
-      );
-      expect(
-        find
-            .widgetWithText(TextFormField, 'Name')
-            .evaluate()
-            .single
-            .widget,
+        find.widgetWithText(TextFormField, 'Name').evaluate().single.widget,
         isA<TextFormField>().having(
           (field) => field.controller?.text,
           'controller text',
@@ -330,8 +445,9 @@ void main() {
       expect(saved?.notes, 'Blueberry');
     });
 
-    testWidgets('opens import dialog when clipboard JSON is invalid',
-        (tester) async {
+    testWidgets('opens import dialog when clipboard JSON is invalid', (
+      tester,
+    ) async {
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
         (methodCall) async {
@@ -342,8 +458,10 @@ void main() {
         },
       );
       addTearDown(
-        () => tester.binding.defaultBinaryMessenger
-            .setMockMethodCallHandler(SystemChannels.platform, null),
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
       );
 
       await _pumpBeansScreen(tester, beanRepository: beanRepository);
@@ -355,10 +473,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('bean_ai_import_dialog')), findsOneWidget);
-      expect(
-        find.byKey(const Key('bean_ai_import_field')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('bean_ai_import_field')), findsOneWidget);
     });
 
     testWidgets('deletes bean from card action', (tester) async {

@@ -23,16 +23,12 @@ abstract final class DecentScaleCommands {
   }
 
   /// Tare with heartbeat-aware byte 5 (`030F000000010D`).
-  static List<int> tare({bool heartbeatAware = true}) => _build(
-        0x0F,
-        [0x00, 0x00, 0x00, heartbeatAware ? 0x01 : 0x00],
-      );
+  static List<int> tare({bool heartbeatAware = true}) =>
+      _build(0x0F, [0x00, 0x00, 0x00, heartbeatAware ? 0x01 : 0x00]);
 
   /// LED on, grams display (`030A0101000108`). Starts the weight stream.
-  static List<int> ledOnGrams({bool heartbeatAware = true}) => _build(
-        0x0A,
-        [0x01, 0x01, 0x00, heartbeatAware ? 0x01 : 0x00],
-      );
+  static List<int> ledOnGrams({bool heartbeatAware = true}) =>
+      _build(0x0A, [0x01, 0x01, 0x00, heartbeatAware ? 0x01 : 0x00]);
 
   /// LED off (`030A0000000009`).
   static List<int> ledOff() => _build(0x0A, [0x00, 0x00, 0x00, 0x00]);
@@ -65,7 +61,9 @@ abstract final class DecentScaleCommands {
     return _build(0xF0, [hi, lo, 0x00, 0x00]);
   }
 
-  /// App brew started — scale frees PRS, tares, shows phone pressure.
+  /// App brew started — scale frees PRS and mirrors phone pressure.
+  ///
+  /// Does not tare (app already did) and must not cover the OLED grams.
   static List<int> phoneBrewStart() => _build(0xF1, [0x00, 0x00, 0x00, 0x00]);
 
   /// App brew ended.

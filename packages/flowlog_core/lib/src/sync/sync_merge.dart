@@ -121,6 +121,7 @@ Future<SyncMergeResult> mergeSyncPayloadFromRemote({
       roastDate: remote.roastDate ?? local.roastDate,
       process: remote.process ?? local.process,
       stockG: remote.stockG ?? local.stockG,
+      empty: local.empty || remote.empty,
     );
     if (merged != local) {
       await beanRepository.upsertBean(merged);
@@ -147,7 +148,9 @@ Future<SyncMergeResult> mergeSyncPayloadFromRemote({
   // Apply remote deletion tombstones first so we never re-import a shot that
   // another device intentionally removed.
   for (final tombstone in payload.deletedShots) {
-    final stillThere = await shotRepository.getShotWithSamples(tombstone.shotId);
+    final stillThere = await shotRepository.getShotWithSamples(
+      tombstone.shotId,
+    );
     if (stillThere != null) {
       await shotRepository.deleteShot(tombstone.shotId);
       // deleteShot records a tombstone with "now"; keep the earlier remote time.
@@ -197,9 +200,9 @@ Future<SyncMergeResult> mergeSyncPayloadFromRemote({
     if (remoteTagIds != null) {
       final localTagIds = local == null
           ? const <String>[]
-          : (await tagRepository.getTagsForShot(remoteShot.id))
-              .map((tag) => tag.id)
-              .toList();
+          : (await tagRepository.getTagsForShot(
+              remoteShot.id,
+            )).map((tag) => tag.id).toList();
       if (local == null ||
           remoteExportedAt.isAfter(_shotActivityAt(local)!) ||
           localTagIds.isEmpty) {
@@ -269,8 +272,10 @@ Shot mergeShotRecords({
   // Per-shot lastModifiedAt, not blob exportedAt. A device that is open and
   // re-exports the whole DB after a peer edited one shot used to look "newer"
   // and roll bean/notes back to the stale copy.
-  final localWinsMeta =
-      _isNewerRecord(local.lastModifiedAt, remote.lastModifiedAt);
+  final localWinsMeta = _isNewerRecord(
+    local.lastModifiedAt,
+    remote.lastModifiedAt,
+  );
 
   T? pickMeta<T>(T? localValue, T? remoteValue) {
     if (localWinsMeta) {
@@ -305,15 +310,20 @@ Shot mergeShotRecords({
     basket: pickMeta(local.basket, remote.basket),
     scale: pickMeta(local.scale, remote.scale),
     brewer: pickMeta(local.brewer, remote.brewer),
-    lastModifiedAt: _laterTimestamp(local.lastModifiedAt, remote.lastModifiedAt),
+    lastModifiedAt: _laterTimestamp(
+      local.lastModifiedAt,
+      remote.lastModifiedAt,
+    ),
     flavourTags: localWinsMeta
         ? local.flavourTags
-        : (remote.flavourTags.isNotEmpty ? remote.flavourTags : local.flavourTags),
+        : (remote.flavourTags.isNotEmpty
+              ? remote.flavourTags
+              : local.flavourTags),
     flavourIntensities: localWinsMeta
         ? local.flavourIntensities
         : (remote.flavourIntensities.isNotEmpty
-            ? remote.flavourIntensities
-            : local.flavourIntensities),
+              ? remote.flavourIntensities
+              : local.flavourIntensities),
     samples: local.samples.length >= remote.samples.length
         ? local.samples
         : remote.samples,

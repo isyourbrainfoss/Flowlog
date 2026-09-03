@@ -7,42 +7,43 @@ import 'package:test/test.dart';
 
 void main() {
   group('schema', () {
-    test('schema version is 18', () async {
+    test('schema version is 19', () async {
       final db = FlowlogDatabase.inMemory();
       addTearDown(db.close);
 
-      expect(db.schemaVersion, 18);
+      expect(db.schemaVersion, 19);
     });
 
     test(
       'creates shots, shot_samples, shot_target_samples, beans, tags, shot_tags, shot_annotations, and saved profile tables',
       () async {
-      final db = FlowlogDatabase.inMemory();
-      addTearDown(db.close);
+        final db = FlowlogDatabase.inMemory();
+        addTearDown(db.close);
 
-      final tables = await db
-          .customSelect(
-            "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
-            readsFrom: {},
-          )
-          .map((row) => row.read<String>('name'))
-          .get();
+        final tables = await db
+            .customSelect(
+              "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+              readsFrom: {},
+            )
+            .map((row) => row.read<String>('name'))
+            .get();
 
-      expect(
-        tables,
-        containsAll([
-          'shots',
-          'shot_samples',
-          'shot_target_samples',
-          'beans',
-          'tags',
-          'shot_tags',
-          'shot_annotations',
-          'saved_profiles',
-          'saved_profile_samples',
-        ]),
-      );
-    });
+        expect(
+          tables,
+          containsAll([
+            'shots',
+            'shot_samples',
+            'shot_target_samples',
+            'beans',
+            'tags',
+            'shot_tags',
+            'shot_annotations',
+            'saved_profiles',
+            'saved_profile_samples',
+          ]),
+        );
+      },
+    );
   });
 
   group('ShotRepository', () {
@@ -137,9 +138,7 @@ void main() {
       final shot = Shot(
         id: 'shot-delete-me',
         startedAt: DateTime.utc(2026, 6, 29, 10, 0),
-        samples: const [
-          ShotSample(elapsedMs: 0, pressureBar: 1.0),
-        ],
+        samples: const [ShotSample(elapsedMs: 0, pressureBar: 1.0)],
         annotations: const [
           ShotAnnotation(
             elapsedMs: 500,
@@ -163,9 +162,7 @@ void main() {
       final original = Shot(
         id: 'shot-replace',
         startedAt: DateTime.utc(2026, 6, 29, 10, 0),
-        samples: const [
-          ShotSample(elapsedMs: 0, pressureBar: 1.0),
-        ],
+        samples: const [ShotSample(elapsedMs: 0, pressureBar: 1.0)],
       );
 
       await repository.insertShot(original);
@@ -234,20 +231,29 @@ void main() {
       await shotRepository.insertShot(taggedShot);
       await shotRepository.insertShot(otherShot);
 
-      await tagRepository.setTagsForShot(taggedShot.id, [practice.id, dialIn.id]);
+      await tagRepository.setTagsForShot(taggedShot.id, [
+        practice.id,
+        dialIn.id,
+      ]);
 
       expect(
-        (await tagRepository.getTagsForShot(taggedShot.id))
-            .map((tag) => tag.id)
-            .toList(),
+        (await tagRepository.getTagsForShot(
+          taggedShot.id,
+        )).map((tag) => tag.id).toList(),
         [dialIn.id, practice.id],
       );
       expect(await tagRepository.getTagsForShot(otherShot.id), isEmpty);
       expect(await tagRepository.countShotsForTag(practice.id), 1);
 
       final withCounts = await tagRepository.listTagsWithShotCounts();
-      expect(withCounts.firstWhere((entry) => entry.tag.id == practice.id).shotCount, 1);
-      expect(withCounts.firstWhere((entry) => entry.tag.id == dialIn.id).shotCount, 1);
+      expect(
+        withCounts.firstWhere((entry) => entry.tag.id == practice.id).shotCount,
+        1,
+      );
+      expect(
+        withCounts.firstWhere((entry) => entry.tag.id == dialIn.id).shotCount,
+        1,
+      );
 
       await tagRepository.setTagsForShot(taggedShot.id, [practice.id]);
       expect(await tagRepository.countShotsForTag(dialIn.id), 0);
@@ -329,9 +335,7 @@ void main() {
       expect(duplicate.id, isNot(newerBean.id));
       expect(duplicate.name, 'Test');
 
-      final resolved = await beanRepository.resolveActiveBeanId(
-        name: 'Test',
-      );
+      final resolved = await beanRepository.resolveActiveBeanId(name: 'Test');
       expect(resolved, newerBean.id);
     });
 
@@ -346,7 +350,12 @@ void main() {
       );
 
       expect(first.id, isNot(second.id));
-      expect((await beanRepository.listBeans()).where((b) => b.name == 'House Blend'), hasLength(2));
+      expect(
+        (await beanRepository.listBeans()).where(
+          (b) => b.name == 'House Blend',
+        ),
+        hasLength(2),
+      );
     });
 
     test('counts shots linked by beanId', () async {
@@ -373,6 +382,109 @@ void main() {
       expect(withCounts, hasLength(1));
       expect(withCounts.first.bean, bean);
       expect(withCounts.first.shotCount, 1);
+      expect(withCounts.first.knownDoseG, 0);
+      expect(withCounts.first.unknownDoseCount, 1);
+      expect(withCounts.first.usedG(18), 18);
+    });
+
+    test('persists empty flag', () async {
+      const bean = Bean(id: 'bean-empty', name: 'Finished', empty: true);
+      await beanRepository.upsertBean(bean);
+      expect((await beanRepository.getBeanById(bean.id))!.empty, isTrue);
+
+      await beanRepository.updateBean(bean.copyWith(empty: false));
+      expect((await beanRepository.getBeanById(bean.id))!.empty, isFalse);
+    });
+
+    test('aggregates known and unknown shot doses', () async {
+      const bean = Bean(id: 'bean-doses', name: 'House Blend', stockG: 250);
+      await beanRepository.upsertBean(bean);
+      await shotRepository.insertShot(
+        Shot(
+          id: 'shot-known',
+          startedAt: DateTime.utc(2026, 6, 29, 10),
+          beanId: bean.id,
+          doseG: 18,
+        ),
+      );
+      await shotRepository.insertShot(
+        Shot(
+          id: 'shot-unknown',
+          startedAt: DateTime.utc(2026, 6, 29, 11),
+          beanId: bean.id,
+        ),
+      );
+
+      final withCounts = await beanRepository.listBeansWithShotCounts();
+      expect(withCounts, hasLength(1));
+      expect(withCounts.single.shotCount, 2);
+      expect(withCounts.single.knownDoseG, 18);
+      expect(withCounts.single.unknownDoseCount, 1);
+      expect(withCounts.single.usedG(18), 36);
+    });
+
+    test('lists depleted and empty beans after active beans', () async {
+      const active = Bean(id: 'bean-z', name: 'Zebra', stockG: 250);
+      const emptyBag = Bean(
+        id: 'bean-a',
+        name: 'Alpha',
+        empty: true,
+        stockG: 250,
+      );
+      const usedUp = Bean(id: 'bean-b', name: 'Beta', stockG: 20);
+      await beanRepository.upsertBean(active);
+      await beanRepository.upsertBean(emptyBag);
+      await beanRepository.upsertBean(usedUp);
+      await shotRepository.insertShot(
+        Shot(
+          id: 'shot-used-1',
+          startedAt: DateTime.utc(2026, 6, 29, 10),
+          beanId: usedUp.id,
+          doseG: 18,
+        ),
+      );
+      await shotRepository.insertShot(
+        Shot(
+          id: 'shot-used-2',
+          startedAt: DateTime.utc(2026, 6, 29, 11),
+          beanId: usedUp.id,
+          doseG: 18,
+        ),
+      );
+
+      final listed = await beanRepository.listBeansWithShotCounts();
+      expect(listed.map((entry) => entry.bean.id).toList(), [
+        active.id,
+        emptyBag.id,
+        usedUp.id,
+      ]);
+    });
+
+    test('recent-use list still puts depleted beans last', () async {
+      const emptyRecent = Bean(id: 'bean-empty', name: 'Empty', empty: true);
+      const activeOld = Bean(id: 'bean-active', name: 'Active');
+      await beanRepository.upsertBean(emptyRecent);
+      await beanRepository.upsertBean(activeOld);
+      await shotRepository.insertShot(
+        Shot(
+          id: 'shot-old',
+          startedAt: DateTime.utc(2026, 6, 28),
+          beanId: activeOld.id,
+        ),
+      );
+      await shotRepository.insertShot(
+        Shot(
+          id: 'shot-new',
+          startedAt: DateTime.utc(2026, 6, 29),
+          beanId: emptyRecent.id,
+        ),
+      );
+
+      final ordered = await beanRepository.listBeansByRecentUse();
+      expect(ordered.map((bean) => bean.id).toList(), [
+        activeOld.id,
+        emptyRecent.id,
+      ]);
     });
   });
 
@@ -387,13 +499,13 @@ void main() {
         final shot = _loadFixtureShot('shots/minimal_shot.json');
 
         await writerRepo.insertShot(shot);
-        expect(writer.schemaVersion, 18);
+        expect(writer.schemaVersion, 19);
         await writer.close();
 
         final reader = FlowlogDatabase.openFile(dbPath);
         final readerRepo = ShotRepository(reader);
 
-        expect(reader.schemaVersion, 18);
+        expect(reader.schemaVersion, 19);
         expect(await readerRepo.getShotWithSamples(shot.id), shot);
 
         await reader.close();
@@ -443,7 +555,7 @@ void main() {
         final migrated = FlowlogDatabase.openFile(dbPath);
         addTearDown(migrated.close);
 
-        expect(migrated.schemaVersion, 18);
+        expect(migrated.schemaVersion, 19);
 
         final tables = await migrated
             .customSelect(
@@ -465,13 +577,13 @@ void main() {
         );
 
         final beanColumns = await migrated
-            .customSelect(
-              'PRAGMA table_info(beans)',
-              readsFrom: {},
-            )
+            .customSelect('PRAGMA table_info(beans)', readsFrom: {})
             .map((row) => row.read<String>('name'))
             .get();
-        expect(beanColumns, containsAll(['roast_date', 'process', 'variety']));
+        expect(
+          beanColumns,
+          containsAll(['roast_date', 'process', 'variety', 'empty']),
+        );
 
         final shotRepo = ShotRepository(migrated);
         final loaded = await shotRepo.getShotById('legacy-shot');
@@ -533,7 +645,7 @@ void main() {
         final migrated = FlowlogDatabase.openFile(dbPath);
         addTearDown(migrated.close);
 
-        expect(migrated.schemaVersion, 18);
+        expect(migrated.schemaVersion, 19);
 
         final tables = await migrated
             .customSelect(
@@ -560,7 +672,7 @@ void main() {
             )
             .map((row) => row.read<String>('name'))
             .get();
-        expect(beanColumns, contains('brand'));
+        expect(beanColumns, containsAll(['brand', 'empty']));
 
         final shotRepo = ShotRepository(migrated);
         final loaded = await shotRepo.getShotById('legacy-shot');

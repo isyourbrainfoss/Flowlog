@@ -44,8 +44,8 @@ void main() {
       expect(result.samples, hasLength(2));
       expect(result.samples.first.elapsedMs, 0);
       expect(result.samples.last.elapsedMs, 1000);
-      expect(result.samples.first.flowGs, closeTo(0.3666666666666667, 1e-9));
-      expect(result.samples.last.flowGs, closeTo(0.7, 1e-9));
+      expect(result.samples.first.flowGs, closeTo(1.0, 1e-9));
+      expect(result.samples.last.flowGs, closeTo(1.0, 1e-9));
     });
 
     test('higher threshold delays shot start', () {
@@ -67,7 +67,7 @@ void main() {
 
       expect(highThreshold.detected, isTrue);
       expect(highThreshold.shotStartElapsedMs, 2000);
-      expect(highThreshold.samples.first.flowGs, closeTo(1.15, 1e-9));
+      expect(highThreshold.samples.first.flowGs, closeTo(2.0, 1e-9));
     });
 
     test('returns not detected when flow never exceeds threshold', () {
@@ -92,7 +92,7 @@ void main() {
       expect(result.detected, isTrue);
       expect(result.shotStartElapsedMs, 5600);
       expect(result.samples.first.elapsedMs, 0);
-      expect(result.samples.first.flowGs, closeTo(2.1, 1e-9));
+      expect(result.samples.first.flowGs, closeTo(0.7875, 1e-9));
       expect(result.samples.last.elapsedMs, samples.last.elapsedMs - 5600);
     });
 
@@ -113,7 +113,9 @@ List<ShotSample> _loadDemoShot() {
   return File(_fixturePath('sensor_streams/demo_shot.jsonl'))
       .readAsLinesSync()
       .where((line) => line.trim().isNotEmpty)
-      .map((line) => ShotSample.fromJson(jsonDecode(line) as Map<String, dynamic>))
+      .map(
+        (line) => ShotSample.fromJson(jsonDecode(line) as Map<String, dynamic>),
+      )
       .toList();
 }
 

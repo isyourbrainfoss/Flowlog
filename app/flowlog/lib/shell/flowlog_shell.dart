@@ -3,6 +3,7 @@ import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/live/auto_start.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
+import 'package:flowlog/settings/default_bean_store.dart';
 import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
 import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog/shell/active_brew_scope.dart';
@@ -57,6 +58,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
   late final bool _ownsAutoStartController;
   late final ActiveBrewNotifier _activeBrewNotifier;
   late final ShotEventsNotifier _shotEventsNotifier;
+  final DefaultBeanStore _defaultBeanStore = DefaultBeanStore();
   Timer? _deferredSyncTimer;
 
   /// Keeps Live (and other tabs) mounted across immersive chrome toggles.
@@ -119,15 +121,58 @@ class _FlowlogShellState extends State<FlowlogShell> {
 
   Future<void> _loadActiveBean() async {
     final repository = await _ensureBeanRepository();
+    final stored = await _defaultBeanStore.load();
+    if (!mounted) {
+      return;
+    }
+
+    final storedId = stored.beanId?.trim();
+    if (storedId != null && storedId.isNotEmpty) {
+      final bean = await repository.getBeanById(storedId);
+      if (!mounted) {
+        return;
+      }
+      if (bean != null) {
+        setState(() {
+          _beanName = bean.name;
+          _beanId = bean.id;
+        });
+        return;
+      }
+    }
+
+    final storedName = stored.name?.trim();
+    if (storedName != null && storedName.isNotEmpty) {
+      setState(() {
+        _beanName = storedName;
+        _beanId = null;
+      });
+      return;
+    }
+
+    // One-time: seed from last-used bean, then persist so later launches
+    // no longer follow recent shots.
     final beans = await repository.listBeansByRecentUse();
     if (!mounted || beans.isEmpty) {
       return;
     }
 
+    final migrated = beans.first;
     setState(() {
-      _beanName = beans.first.name;
-      _beanId = beans.first.id;
+      _beanName = migrated.name;
+      _beanId = migrated.id;
     });
+    await _persistDefaultBean();
+  }
+
+  Future<void> _persistDefaultBean() async {
+    final name = _beanName.trim();
+    await _defaultBeanStore.save(
+      DefaultBean(
+        beanId: _beanId,
+        name: name.isEmpty ? null : name,
+      ),
+    );
   }
 
   @override
@@ -162,6 +207,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
         setState(() {
           _beanName = updated.name;
         });
+        await _persistDefaultBean();
         return;
       }
     }
@@ -175,6 +221,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
       _beanName = created.name;
       _beanId = created.id;
     });
+    await _persistDefaultBean();
   }
 
   Future<void> _handleActiveBeanChanged(String name, {String? beanId}) async {
@@ -193,6 +240,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
           _beanName = bean.name;
           _beanId = bean.id;
         });
+        await _persistDefaultBean();
         return;
       }
     }

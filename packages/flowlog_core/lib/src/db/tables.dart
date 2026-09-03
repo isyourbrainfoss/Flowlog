@@ -6,8 +6,7 @@ import 'type_converters.dart';
 @DataClassName('ShotRow')
 class Shots extends Table {
   TextColumn get id => text()();
-  TextColumn get startedAt =>
-      text().map(const UtcIso8601Converter())();
+  TextColumn get startedAt => text().map(const UtcIso8601Converter())();
   TextColumn get endedAt =>
       text().nullable().map(const NullableUtcIso8601Converter())();
   RealColumn get doseG => real().nullable()();
@@ -17,8 +16,7 @@ class Shots extends Table {
   RealColumn get waterTempC => real().nullable()();
   TextColumn get notes => text().nullable()();
   IntColumn get tasteScore => integer().nullable()();
-  TextColumn get flavourTags =>
-      text().withDefault(const Constant('[]'))();
+  TextColumn get flavourTags => text().withDefault(const Constant('[]'))();
   TextColumn get flavourIntensities =>
       text().withDefault(const Constant('{}'))();
   TextColumn get location => text().nullable()();
@@ -56,6 +54,7 @@ class Beans extends Table {
   TextColumn get variety => text().nullable()();
   RealColumn get stockG => real().nullable()();
   TextColumn get notes => text().nullable()();
+  BoolColumn get empty => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -87,8 +86,7 @@ class ShotTags extends Table {
 @DataClassName('DeletedShotRow')
 class DeletedShots extends Table {
   TextColumn get shotId => text()();
-  TextColumn get deletedAt =>
-      text().map(const UtcIso8601Converter())();
+  TextColumn get deletedAt => text().map(const UtcIso8601Converter())();
 
   @override
   Set<Column<Object>> get primaryKey => {shotId};
@@ -134,8 +132,7 @@ class ShotTargetSamples extends Table {
 class SavedProfiles extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
-  TextColumn get createdAt =>
-      text().map(const UtcIso8601Converter())();
+  TextColumn get createdAt => text().map(const UtcIso8601Converter())();
   TextColumn get sourceShotId => text().nullable()();
   RealColumn get doseG => real().nullable()();
   RealColumn get yieldG => real().nullable()();

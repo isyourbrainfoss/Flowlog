@@ -17,6 +17,7 @@ class HistoryScreen extends StatefulWidget {
     super.key,
     this.shotRepository,
     this.tagRepository,
+    this.beanRepository,
     this.initialFilters = ShotListFilters.empty,
   });
 
@@ -25,6 +26,9 @@ class HistoryScreen extends StatefulWidget {
 
   /// Optional tag repository override for tests or dependency injection.
   final TagRepository? tagRepository;
+
+  /// Optional bean repository override for tests or dependency injection.
+  final BeanRepository? beanRepository;
 
   /// Initial filter state (primarily for tests).
   final ShotListFilters initialFilters;
@@ -112,6 +116,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<BeanRepository> _ensureBeanRepository() async {
+    if (widget.beanRepository != null) {
+      return widget.beanRepository!;
+    }
     if (_beanRepository != null) {
       return _beanRepository!;
     }
@@ -139,6 +146,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Future<_HistoryData> _loadHistory() async {
     final shotRepository = await _ensureShotRepository();
     final tagRepository = await _ensureTagRepository();
+    // Injected-shot tests skip beans unless beanRepository is also provided
+    // (don't open the app database).
+    BeanRepository? beanRepository = widget.beanRepository;
+    if (beanRepository == null && widget.shotRepository == null) {
+      beanRepository = await _ensureBeanRepository();
+    }
     final results = await Future.wait([
       // sparklineOnly: one batched sample query + downsample (no per-shot
       // N+1 queries that froze History with many brews).
@@ -148,12 +161,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ),
       tagRepository.listTags(),
       shotRepository.topTargetScores(limit: 5),
+      if (beanRepository != null) beanRepository.listBeans(),
     ]);
 
     final data = _HistoryData(
       shots: results[0] as List<Shot>,
       tags: results[1] as List<Tag>,
       topScores: results[2] as List<Shot>,
+      beans: beanRepository != null
+          ? results[3] as List<Bean>
+          : const <Bean>[],
     );
     _lastData = data;
     return data;
@@ -353,6 +370,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
         final tags = data?.tags ?? const <Tag>[];
         final shots = data?.shots ?? const <Shot>[];
         final topScores = data?.topScores ?? const <Shot>[];
+        final beans = data?.beans ?? const <Bean>[];
+        final beanLabelsById = {
+          for (final bean in beans)
+            bean.id: formatBeanDisplayLabel(bean, allBeans: beans),
+        };
         final listLoading = isInitialLoad ||
             (snapshot.connectionState != ConnectionState.done && data != null);
 
@@ -398,6 +420,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   children: [
                     _HistoryShotList(
                       shots: shots,
+                      beanLabelsById: beanLabelsById,
                       filters: _filters,
                       onRefresh: _refresh,
                       onOpenShot: _openShotDetail,
@@ -429,16 +452,19 @@ class _HistoryData {
     required this.shots,
     required this.tags,
     this.topScores = const [],
+    this.beans = const [],
   });
 
   final List<Shot> shots;
   final List<Tag> tags;
   final List<Shot> topScores;
+  final List<Bean> beans;
 }
 
 class _HistoryShotList extends StatelessWidget {
   const _HistoryShotList({
     required this.shots,
+    required this.beanLabelsById,
     required this.filters,
     required this.onRefresh,
     required this.onOpenShot,
@@ -449,6 +475,7 @@ class _HistoryShotList extends StatelessWidget {
   });
 
   final List<Shot> shots;
+  final Map<String, String> beanLabelsById;
   final ShotListFilters filters;
   final Future<void> Function() onRefresh;
   final Future<void> Function(Shot shot) onOpenShot;
@@ -533,6 +560,7 @@ class _HistoryShotList extends StatelessWidget {
             ),
             child: HistoryShotCard(
               shot: shot,
+              beanLabel: beanLabelsById[shot.beanId],
               onTap: () => unawaited(onOpenShot(shot)),
               onDelete: () => unawaited(onDeleteShot(shot)),
             ),

@@ -7,14 +7,12 @@ import 'package:flowlog_sensors/flowlog_sensors.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 
 /// Builds a [PressensorBleAdapter] for a paired pressensor device.
-typedef PressureAdapterFactory = PressensorBleAdapter Function(
-  PairedSensorEntry device,
-);
+typedef PressureAdapterFactory =
+    PressensorBleAdapter Function(PairedSensorEntry device);
 
 /// Builds a [DecentScaleBleAdapter] for a paired scale device.
-typedef WeightAdapterFactory = DecentScaleBleAdapter Function(
-  PairedSensorEntry device,
-);
+typedef WeightAdapterFactory =
+    DecentScaleBleAdapter Function(PairedSensorEntry device);
 
 /// Sensor adapter that connects successfully but never emits samples.
 class IdleSensorAdapter implements SensorAdapter {
@@ -42,7 +40,7 @@ class IdleSensorAdapter implements SensorAdapter {
 /// [SensorAdapter] wrapper around [MergedSampleStream] for [LiveShotController].
 class MergedSampleStreamAdapter implements SensorAdapter {
   MergedSampleStreamAdapter({required MergedSampleStream merged})
-      : _merged = merged;
+    : _merged = merged;
 
   final MergedSampleStream _merged;
   final _stateController = StreamController<ConnectionState>.broadcast();
@@ -165,9 +163,8 @@ class LiveSensorSource {
   }
 
   /// Whether any paired sensor is currently connected.
-  bool get hasConnectedSensors => hub.devices.any(
-        (device) => device.state == ConnectionState.connected,
-      );
+  bool get hasConnectedSensors =>
+      hub.devices.any((device) => device.state == ConnectionState.connected);
 
   /// Adapter used for the next live shot session.
   SensorAdapter resolveSampleAdapter() {
@@ -199,11 +196,11 @@ class LiveSensorSource {
     );
   }
 
-  /// Re-arms the weight stream and tares before a brew.
+  /// Tares the scale before a brew.
   ///
   /// Call after the session sample merge is already listening so the first
-  /// post-tare packets are not dropped. LED-on then tare matches Decent /
-  /// Flowlog DIY scale expectations.
+  /// post-tare packets are not dropped. LED-on is only sent when FFF4 is
+  /// quiet — it is not required when weight is already streaming.
   Future<void> onTare() async {
     if (_demoMode) {
       return;
@@ -229,16 +226,21 @@ class LiveSensorSource {
   }
 
   Future<void> _prepareDecentScale(DecentScaleBleAdapter scale) async {
-    // Always re-assert LED-on so FFF4 weight notifies resume. A "connected"
-    // hub link with a quiet notify stream shows "—" weight mid-brew.
+    // LED-on is for a quiet FFF4 stream, not required when already streaming.
+    final hasLiveWeight =
+        scale.lastWeightReceiveMs != null &&
+        !scale.isWeightStreamSilent(silentFor: const Duration(seconds: 2));
+    if (hasLiveWeight) {
+      await scale.tare();
+      return;
+    }
+
     try {
       await scale.ledOn();
       await Future<void>.delayed(const Duration(milliseconds: 100));
       await scale.tare();
     } on Object {
       try {
-        await scale.ledOn();
-        await Future<void>.delayed(const Duration(milliseconds: 150));
         await scale.tare();
       } on Object {
         rethrow;
@@ -253,6 +255,10 @@ class LiveSensorSource {
     }
     final scale = _connectedScaleAdapter();
     if (scale == null) {
+      // Mid-brew: never start a new GATT connect — that reboots the DIY scale.
+      if (!hub.scaleRecoveryEnabled) {
+        return;
+      }
       // Try hub-level reconnect of the paired scale only.
       for (final device in hub.devices) {
         if (device.kind == SensorKind.scale &&
@@ -265,7 +271,11 @@ class LiveSensorSource {
       return;
     }
     try {
-      await scale.rearmStream();
+      if (!hub.scaleRecoveryEnabled) {
+        await scale.ledOn();
+      } else {
+        await scale.rearmStream();
+      }
     } on Object {
       try {
         await scale.ledOn();
@@ -420,10 +430,7 @@ class LiveSensorSource {
 
 /// Banner shown on Live while a demo replay session is active.
 class DemoModeBanner extends StatelessWidget {
-  const DemoModeBanner({
-    required this.onDismiss,
-    super.key,
-  });
+  const DemoModeBanner({required this.onDismiss, super.key});
 
   final VoidCallback onDismiss;
 

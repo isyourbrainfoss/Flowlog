@@ -15,11 +15,13 @@ void main() {
     late FlowlogDatabase db;
     late ShotRepository repository;
     late TagRepository tagRepository;
+    late BeanRepository beanRepository;
 
     setUp(() {
       db = FlowlogDatabase.inMemory();
       repository = ShotRepository(db);
       tagRepository = TagRepository(db);
+      beanRepository = BeanRepository(db);
     });
 
     tearDown(() async {
@@ -65,19 +67,53 @@ void main() {
     ) async {
       final shot = _loadFixtureShot('shots/minimal_shot.json');
       await repository.insertShot(shot);
+      await beanRepository.upsertBean(
+        const Bean(id: 'bean-house-blend', name: 'House Blend'),
+      );
 
       await _pumpHistoryScreen(
         tester,
         shotRepository: repository,
         tagRepository: tagRepository,
+        beanRepository: beanRepository,
       );
       await tester.pumpAndSettle();
 
       expect(find.byKey(Key('history_shot_card_${shot.id}')), findsOneWidget);
       expect(find.byType(SparklineChart), findsOneWidget);
+      expect(find.byKey(Key('history_shot_bean_${shot.id}')), findsOneWidget);
+      expect(find.byKey(Key('history_shot_grind_${shot.id}')), findsOneWidget);
+      expect(find.text('House Blend'), findsOneWidget);
+      expect(find.text('Grind 14.0'), findsOneWidget);
       expect(find.text('9.0 bar'), findsOneWidget);
       expect(find.text('36.0 g'), findsOneWidget);
       expect(find.text('7/10'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('unknown bean id omits name and still shows grind', (
+      tester,
+    ) async {
+      final shot = _loadFixtureShot('shots/minimal_shot.json').copyWith(
+        beanId: 'bean-does-not-exist',
+      );
+      await repository.insertShot(shot);
+
+      await _pumpHistoryScreen(
+        tester,
+        shotRepository: repository,
+        tagRepository: tagRepository,
+        beanRepository: beanRepository,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(Key('history_shot_card_${shot.id}')), findsOneWidget);
+      expect(find.byKey(Key('history_shot_meta_${shot.id}')), findsOneWidget);
+      expect(find.byKey(Key('history_shot_grind_${shot.id}')), findsOneWidget);
+      expect(find.text('Grind 14.0'), findsOneWidget);
+      expect(find.byKey(Key('history_shot_bean_${shot.id}')), findsNothing);
+      expect(find.text('bean-does-not-exist'), findsNothing);
+      expect(find.text('bean-house-blend'), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -239,11 +275,13 @@ Future<void> _pumpHistoryScreen(
   WidgetTester tester, {
   required ShotRepository shotRepository,
   required TagRepository tagRepository,
+  BeanRepository? beanRepository,
   ShotEventsNotifier? shotEventsNotifier,
 }) async {
   final history = HistoryScreen(
     shotRepository: shotRepository,
     tagRepository: tagRepository,
+    beanRepository: beanRepository,
   );
 
   await tester.pumpWidget(

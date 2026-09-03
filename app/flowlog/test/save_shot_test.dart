@@ -79,13 +79,10 @@ void main() {
         ),
       );
 
-      final metadata = await defaultMetadataFromSamples(
-        const [
-          ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0),
-          ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 36),
-        ],
-        coffeejackSettingsStore: coffeejackStore,
-      );
+      final metadata = await defaultMetadataFromSamples(const [
+        ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0),
+        ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 36),
+      ], coffeejackSettingsStore: coffeejackStore);
 
       expect(metadata.coffeejackRewindTurns, 9);
       expect(metadata.coffeejackPreinfusionTurns, 5);
@@ -99,13 +96,10 @@ void main() {
       );
       await repository.insertShot(prior);
 
-      final metadata = await defaultMetadataFromSamples(
-        const [
-          ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0),
-          ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 36),
-        ],
-        shotRepository: repository,
-      );
+      final metadata = await defaultMetadataFromSamples(const [
+        ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0),
+        ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 36),
+      ], shotRepository: repository);
 
       expect(metadata.doseG, kDefaultBrewDoseG);
       expect(metadata.grindSetting, 14.5);
@@ -114,17 +108,16 @@ void main() {
     });
 
     test('does not set yield from empty or noise-scale weight', () async {
-      final metadata = await defaultMetadataFromSamples(
-        const [
-          ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0),
-          ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 0.2),
-        ],
-      );
+      final metadata = await defaultMetadataFromSamples(const [
+        ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0),
+        ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 0.2),
+      ]);
 
       expect(metadata.yieldG, isNull);
-      expect(yieldFromScaleSamples(const [
-        ShotSample(elapsedMs: 0, weightG: 0),
-      ]), isNull);
+      expect(
+        yieldFromScaleSamples(const [ShotSample(elapsedMs: 0, weightG: 0)]),
+        isNull,
+      );
     });
 
     test('falls back to peak weight when last sample re-tared near zero', () {
@@ -139,13 +132,10 @@ void main() {
     });
 
     test('uses default grind when no prior brew exists', () async {
-      final metadata = await defaultMetadataFromSamples(
-        const [
-          ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0),
-          ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 36),
-        ],
-        shotRepository: repository,
-      );
+      final metadata = await defaultMetadataFromSamples(const [
+        ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0),
+        ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 36),
+      ], shotRepository: repository);
 
       expect(metadata.grindSetting, kDefaultBrewGrindSetting);
     });
@@ -164,48 +154,55 @@ void main() {
       await db.close();
     });
 
-    test('fills missing dose, grind, temp, turns, and scale yield for history display',
-        () async {
-      final coffeejackStore = CoffeejackSettingsStore(
-        settingsPath:
-            '${Directory.systemTemp.path}/coffeejack_display_${DateTime.now().microsecondsSinceEpoch}.json',
-      );
-      await coffeejackStore.save(
-        const CoffeejackSettings(
-          rewindTurnsBeforeFill: 10,
-          slowPreinfusionTurns: 6,
-        ),
-      );
-      final prior = _loadFixtureShot().copyWith(
-        id: 'prior-shot',
-        grindSetting: 14.5,
-        startedAt: DateTime.utc(2026, 6, 28),
-      );
-      await repository.insertShot(prior);
+    test(
+      'fills missing dose, grind, temp, turns, and scale yield for history display',
+      () async {
+        final coffeejackStore = CoffeejackSettingsStore(
+          settingsPath:
+              '${Directory.systemTemp.path}/coffeejack_display_${DateTime.now().microsecondsSinceEpoch}.json',
+        );
+        await coffeejackStore.save(
+          const CoffeejackSettings(
+            rewindTurnsBeforeFill: 10,
+            slowPreinfusionTurns: 6,
+          ),
+        );
+        final prior = _loadFixtureShot().copyWith(
+          id: 'prior-shot',
+          grindSetting: 14.5,
+          startedAt: DateTime.utc(2026, 6, 28),
+        );
+        await repository.insertShot(prior);
 
-      final shot = Shot(
-        id: 'sparse-shot',
-        startedAt: DateTime.utc(2026, 6, 29),
-        samples: const [
-          ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0, tempC: 92.0),
-          ShotSample(elapsedMs: 1000, pressureBar: 9, weightG: 36.2, tempC: 93.5),
-        ],
-      );
+        final shot = Shot(
+          id: 'sparse-shot',
+          startedAt: DateTime.utc(2026, 6, 29),
+          samples: const [
+            ShotSample(elapsedMs: 0, pressureBar: 0, weightG: 0, tempC: 92.0),
+            ShotSample(
+              elapsedMs: 1000,
+              pressureBar: 9,
+              weightG: 36.2,
+              tempC: 93.5,
+            ),
+          ],
+        );
 
-      final metadata = await displayMetadataForShot(
-        shot,
-        shotRepository: repository,
-        coffeejackSettingsStore: coffeejackStore,
-      );
+        final metadata = await displayMetadataForShot(
+          shot,
+          shotRepository: repository,
+          coffeejackSettingsStore: coffeejackStore,
+        );
 
-      expect(metadata.doseG, kDefaultBrewDoseG);
-      expect(metadata.grindSetting, 14.5);
-      // Display uses last scale weight when yield was not stored on the shot.
-      expect(metadata.yieldG, 36.2);
-      expect(metadata.waterTempC, 93.5);
-      expect(metadata.coffeejackRewindTurns, 10);
-      expect(metadata.coffeejackPreinfusionTurns, 6);
-    });
+        expect(metadata.doseG, kDefaultBrewDoseG);
+        expect(metadata.grindSetting, 14.5);
+        // Display uses last scale weight when yield was not stored on the shot.
+        expect(metadata.yieldG, 36.2);
+        expect(metadata.waterTempC, 93.5);
+        expect(metadata.coffeejackRewindTurns, 10);
+        expect(metadata.coffeejackPreinfusionTurns, 6);
+      },
+    );
   });
 
   group('saveShot', () {
@@ -301,17 +298,18 @@ void main() {
       final flavourTagsFinder = find.text('Flavour tags');
       await tester.ensureVisible(flavourTagsFinder);
       await tester.tap(flavourTagsFinder, warnIfMissed: false);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-      await tester.ensureVisible(find.byKey(const Key('metadata_save')));
-      await tester.tap(find.byKey(const Key('metadata_save')));
-      await tester.pumpAndSettle();
+      final saveButton = tester.widget<FilledButton>(
+        find.byKey(const Key('metadata_save')),
+      );
+      saveButton.onPressed?.call();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       expect(saved, isNotNull);
-      await saveShot(
-        repository: repository,
-        shot: saved!.applyTo(shot),
-      );
+      await saveShot(repository: repository, shot: saved!.applyTo(shot));
 
       final loaded = await repository.getShotWithSamples('shot-notes-test');
       expect(loaded?.doseG, 18);
@@ -521,4 +519,3 @@ Future<void> _startAndStopSession(
   });
   await pumpUntilFound(tester, find.byKey(const Key('shot_saved_snackbar')));
 }
-

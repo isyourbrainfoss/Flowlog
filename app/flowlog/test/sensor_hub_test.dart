@@ -23,8 +23,7 @@ class _ReadyBleBackend extends BleConnectionBackend {
     SensorKind kind, {
     Duration timeout = const Duration(seconds: 8),
     Future<void>? abort,
-  }) async =>
-      const [];
+  }) async => const [];
 
   @override
   Future<SensorAdapter> createAdapter({
@@ -107,44 +106,49 @@ void main() {
   });
 
   group('SensorHub reconnectPairedDevices', () {
-    test('force-reconnects a silent pressensor even when hub still reports connected', () async {
-      var nowMs = 1_000;
-      final backend = _PressensorConnectBackend(monotonicClock: () => nowMs);
-      final hub = SensorHub(bleBackend: backend);
-      addTearDown(hub.dispose);
+    test(
+      'force-reconnects a silent pressensor even when hub still reports connected',
+      () async {
+        var nowMs = 1_000;
+        final backend = _PressensorConnectBackend(monotonicClock: () => nowMs);
+        final hub = SensorHub(bleBackend: backend);
+        addTearDown(hub.dispose);
 
-      hub.addDevice(SensorKind.pressensor);
-      hub.assignBleRemoteId(
-        SensorKind.pressensor,
-        bleRemoteId: 'AA:BB:CC:DD:EE:FF',
-        name: 'PRS-test',
-      );
-      final deviceId = hub.devices.first.id;
+        hub.addDevice(SensorKind.pressensor);
+        hub.assignBleRemoteId(
+          SensorKind.pressensor,
+          bleRemoteId: 'AA:BB:CC:DD:EE:FF',
+          name: 'PRS-test',
+        );
+        final deviceId = hub.devices.first.id;
 
-      await hub.connect(deviceId);
-      expect(hub.devices.first.state, ConnectionState.connected);
-      expect(backend.connectCalls, 1);
+        await hub.connect(deviceId);
+        expect(hub.devices.first.state, ConnectionState.connected);
+        expect(backend.connectCalls, 1);
 
-      // Zombie: connected but no pressure samples past the 3s silent window.
-      nowMs += 3_000;
-      final adapter = hub.activeAdapterFor(SensorKind.pressensor);
-      expect(adapter, isA<PressensorBleAdapter>());
-      expect(
-        (adapter as PressensorBleAdapter).isPressureStreamSilent(
-          silentFor: const Duration(seconds: 3),
-        ),
-        isTrue,
-      );
+        // Zombie: connected but no pressure samples past the 3s silent window.
+        nowMs += 3_000;
+        final adapter = hub.activeAdapterFor(SensorKind.pressensor);
+        expect(adapter, isA<PressensorBleAdapter>());
+        expect(
+          (adapter as PressensorBleAdapter).isPressureStreamSilent(
+            silentFor: const Duration(seconds: 3),
+          ),
+          isTrue,
+        );
 
-      await hub.reconnectPairedDevices();
+        await hub.reconnectPairedDevices();
 
-      expect(backend.connectCalls, 2);
-      expect(hub.devices.first.state, ConnectionState.connected);
-      expect(
-        hub.reconnectLog.where((e) => e.outcome == ReconnectOutcome.connected),
-        hasLength(2),
-      );
-    });
+        expect(backend.connectCalls, 2);
+        expect(hub.devices.first.state, ConnectionState.connected);
+        expect(
+          hub.reconnectLog.where(
+            (e) => e.outcome == ReconnectOutcome.connected,
+          ),
+          hasLength(2),
+        );
+      },
+    );
 
     test('skips reconnect for a pressensor that is emitting samples', () async {
       final backend = _PressensorConnectBackend();
@@ -207,54 +211,61 @@ void main() {
       expect(hub.scaleRecoveryEnabled, isTrue);
     });
 
-    test('silent scale recovery reconnects when still enabled after wait', () async {
-      var nowMs = 1_000;
-      final backend = _ScaleConnectBackend(monotonicClock: () => nowMs);
-      final hub = SensorHub(bleBackend: backend);
-      addTearDown(hub.dispose);
-      hub.addDevice(SensorKind.scale);
-      hub.assignBleRemoteId(
-        SensorKind.scale,
-        bleRemoteId: 'scale-1',
-        name: 'Decent Scale',
-      );
+    test(
+      'silent scale recovery reconnects when still enabled after wait',
+      () async {
+        var nowMs = 1_000;
+        final backend = _ScaleConnectBackend(monotonicClock: () => nowMs);
+        final hub = SensorHub(bleBackend: backend);
+        addTearDown(hub.dispose);
+        hub.addDevice(SensorKind.scale);
+        hub.assignBleRemoteId(
+          SensorKind.scale,
+          bleRemoteId: 'scale-1',
+          name: 'Decent Scale',
+        );
 
-      await hub.connect(hub.devices.first.id);
-      expect(backend.connectCalls, 1);
+        await hub.connect(hub.devices.first.id);
+        expect(backend.connectCalls, 1);
 
-      nowMs += 6_000;
-      await hub.recoverSilentScalesForTest();
-      expect(backend.connectCalls, 2);
-    });
+        nowMs += 6_000;
+        await hub.recoverSilentScalesForTest();
+        expect(backend.connectCalls, 2);
+      },
+    );
 
-    test('setScaleRecoveryEnabled(false) skips hard reconnect after silent wait', () async {
-      var nowMs = 1_000;
-      final backend = _ScaleConnectBackend(monotonicClock: () => nowMs);
-      final hub = SensorHub(bleBackend: backend);
-      addTearDown(hub.dispose);
-      hub.addDevice(SensorKind.scale);
-      hub.assignBleRemoteId(
-        SensorKind.scale,
-        bleRemoteId: 'scale-1',
-        name: 'Decent Scale',
-      );
+    test(
+      'setScaleRecoveryEnabled(false) skips hard reconnect after silent wait',
+      () async {
+        var nowMs = 1_000;
+        final backend = _ScaleConnectBackend(monotonicClock: () => nowMs);
+        final hub = SensorHub(bleBackend: backend);
+        addTearDown(hub.dispose);
+        hub.addDevice(SensorKind.scale);
+        hub.assignBleRemoteId(
+          SensorKind.scale,
+          bleRemoteId: 'scale-1',
+          name: 'Decent Scale',
+        );
 
-      await hub.connect(hub.devices.first.id);
-      expect(hub.devices.first.state, ConnectionState.connected);
-      expect(backend.connectCalls, 1);
+        await hub.connect(hub.devices.first.id);
+        expect(hub.devices.first.state, ConnectionState.connected);
+        expect(backend.connectCalls, 1);
 
-      nowMs += 6_000;
-      final recovery = hub.recoverSilentScalesForTest();
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      hub.setScaleRecoveryEnabled(false);
-      await recovery;
+        nowMs += 6_000;
+        final recovery = hub.recoverSilentScalesForTest();
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        hub.setScaleRecoveryEnabled(false);
+        await recovery;
 
-      expect(
-        backend.connectCalls,
-        1,
-        reason: 'hard reconnect must not run after recovery is disabled mid-wait',
-      );
-    });
+        expect(
+          backend.connectCalls,
+          1,
+          reason:
+              'hard reconnect must not run after recovery is disabled mid-wait',
+        );
+      },
+    );
 
     test('skips devices without a BLE remote id', () async {
       final backend = _CountingConnectBackend();
@@ -264,6 +275,147 @@ void main() {
       hub.addDevice(SensorKind.pressensor);
       await hub.reconnectPairedDevices();
       expect(backend.connectCalls, 0);
+    });
+
+    test(
+      'reconnects a connected pressensor that has not received a packet',
+      () async {
+        final backend = _PressensorConnectBackend();
+        final hub = SensorHub(bleBackend: backend);
+        addTearDown(hub.dispose);
+
+        hub.addDevice(SensorKind.pressensor);
+        hub.assignBleRemoteId(
+          SensorKind.pressensor,
+          bleRemoteId: 'AA:BB:CC:DD:EE:FF',
+          name: 'PRS-null-rx',
+        );
+        final deviceId = hub.devices.first.id;
+
+        await hub.connect(deviceId);
+        expect(hub.devices.first.state, ConnectionState.connected);
+        expect(backend.connectCalls, 1);
+
+        final adapter = hub.activeAdapterFor(SensorKind.pressensor);
+        expect(adapter, isA<PressensorBleAdapter>());
+        expect((adapter as PressensorBleAdapter).lastSampleReceiveMs, isNull);
+        expect(
+          adapter.isPressureStreamSilent(silentFor: const Duration(seconds: 3)),
+          isFalse,
+        );
+
+        await hub.reconnectPairedDevices();
+        expect(backend.connectCalls, 2);
+        expect(hub.devices.first.state, ConnectionState.connected);
+      },
+    );
+
+    test(
+      'reconnects scale before pressensor when both are paired without packets',
+      () async {
+        final backend = _OrderedConnectBackend();
+        final hub = SensorHub(bleBackend: backend);
+        addTearDown(hub.dispose);
+
+        hub.addDevice(SensorKind.pressensor);
+        hub.assignBleRemoteId(
+          SensorKind.pressensor,
+          bleRemoteId: 'prs-1',
+          name: 'PRS-test',
+        );
+        hub.addDevice(SensorKind.scale);
+        hub.assignBleRemoteId(
+          SensorKind.scale,
+          bleRemoteId: 'scale-1',
+          name: 'Decent Scale',
+        );
+
+        expect(hub.devices.map((d) => d.kind).toList(), [
+          SensorKind.pressensor,
+          SensorKind.scale,
+        ]);
+
+        await hub.reconnectPairedDevices();
+
+        expect(backend.connectKinds, [SensorKind.scale, SensorKind.pressensor]);
+        expect(hub.stateFor(SensorKind.scale), ConnectionState.connected);
+        expect(hub.stateFor(SensorKind.pressensor), ConnectionState.connected);
+      },
+    );
+
+    test('reconnectPairedDevices is a no-op while brewing', () async {
+      final backend = _CountingConnectBackend();
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+
+      hub.addDevice(SensorKind.pressensor);
+      hub.assignBleRemoteId(
+        SensorKind.pressensor,
+        bleRemoteId: '11:22:33:44:55:66',
+        name: 'PRS-idle',
+      );
+      hub.setScaleRecoveryEnabled(false);
+
+      await hub.reconnectPairedDevices();
+      expect(backend.connectCalls, 0);
+    });
+
+    test(
+      'overlapping reconnectPairedDevices shares one in-flight run',
+      () async {
+        final backend = _CountingConnectBackend();
+        final hub = SensorHub(bleBackend: backend);
+        addTearDown(hub.dispose);
+
+        hub.addDevice(SensorKind.pressensor);
+        hub.assignBleRemoteId(
+          SensorKind.pressensor,
+          bleRemoteId: '11:22:33:44:55:66',
+          name: 'PRS-idle',
+        );
+
+        final first = hub.reconnectPairedDevices();
+        final second = hub.reconnectPairedDevices();
+        await Future.wait([first, second]);
+        expect(backend.connectCalls, 1);
+      },
+    );
+  });
+
+  group('SensorHub sample notifications', () {
+    test('first weight sample notifies hub listeners', () async {
+      final backend = _ScaleConnectBackend();
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+
+      hub.addDevice(SensorKind.scale);
+      hub.assignBleRemoteId(
+        SensorKind.scale,
+        bleRemoteId: 'scale-1',
+        name: 'Decent Scale',
+      );
+
+      await hub.connect(hub.devices.first.id);
+      expect(hub.devices.first.state, ConnectionState.connected);
+
+      var notifications = 0;
+      hub.addListener(() => notifications += 1);
+
+      backend.transport!.emitNotification([
+        0x03,
+        0xCE,
+        0x00,
+        0x65,
+        0x00,
+        0x00,
+        0xA8,
+      ]);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(notifications, greaterThan(0));
+      final adapter = hub.activeAdapterFor(SensorKind.scale);
+      expect(adapter, isA<DecentScaleBleAdapter>());
+      expect((adapter as DecentScaleBleAdapter).lastWeightReceiveMs, isNotNull);
     });
   });
 }
@@ -279,8 +431,7 @@ class _CountingConnectBackend implements BleConnectionBackend {
     SensorKind kind, {
     Duration timeout = const Duration(seconds: 8),
     Future<void>? abort,
-  }) async =>
-      const [];
+  }) async => const [];
 
   @override
   Future<SensorAdapter> createAdapter({
@@ -330,8 +481,7 @@ class _PressensorConnectBackend implements BleConnectionBackend {
     SensorKind kind, {
     Duration timeout = const Duration(seconds: 8),
     Future<void>? abort,
-  }) async =>
-      const [];
+  }) async => const [];
 
   @override
   Future<SensorAdapter> createAdapter({
@@ -356,8 +506,7 @@ class _HubPressensorTransport implements PressensorBleTransport {
   @override
   Future<List<String>> scanForDevices({
     Duration timeout = const Duration(seconds: 4),
-  }) async =>
-      const [];
+  }) async => const [];
 
   @override
   Future<void> connect({String? deviceId}) async {}
@@ -382,6 +531,7 @@ class _ScaleConnectBackend implements BleConnectionBackend {
 
   final int Function()? monotonicClock;
   int connectCalls = 0;
+  MockDecentScaleTransport? transport;
 
   @override
   Future<String?> ensureReady() async => null;
@@ -391,8 +541,7 @@ class _ScaleConnectBackend implements BleConnectionBackend {
     SensorKind kind, {
     Duration timeout = const Duration(seconds: 8),
     Future<void>? abort,
-  }) async =>
-      const [];
+  }) async => const [];
 
   @override
   Future<SensorAdapter> createAdapter({
@@ -400,9 +549,41 @@ class _ScaleConnectBackend implements BleConnectionBackend {
     required String bleRemoteId,
   }) async {
     connectCalls += 1;
+    transport = MockDecentScaleTransport();
     return DecentScaleBleAdapter(
-      transport: MockDecentScaleTransport(),
+      transport: transport!,
       monotonicClock: monotonicClock,
     );
+  }
+}
+
+class _OrderedConnectBackend implements BleConnectionBackend {
+  final connectKinds = <SensorKind>[];
+
+  @override
+  Future<String?> ensureReady() async => null;
+
+  @override
+  Future<List<BleDiscoveredDevice>> scan(
+    SensorKind kind, {
+    Duration timeout = const Duration(seconds: 8),
+    Future<void>? abort,
+  }) async => const [];
+
+  @override
+  Future<SensorAdapter> createAdapter({
+    required SensorKind kind,
+    required String bleRemoteId,
+  }) async {
+    connectKinds.add(kind);
+    return switch (kind) {
+      SensorKind.scale => DecentScaleBleAdapter(
+        transport: MockDecentScaleTransport(),
+      ),
+      SensorKind.pressensor => PressensorBleAdapter(
+        transport: _HubPressensorTransport(),
+        deviceId: bleRemoteId,
+      ),
+    };
   }
 }

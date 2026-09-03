@@ -12,13 +12,13 @@ import 'package:flutter/material.dart';
 
 /// Distinct colors for overlaid shot pressure curves.
 List<Color> get compareShotPalette => [
-      FlowlogChartColors.pressureLine,
-      FlowlogChartColors.weightLine,
-      FlowlogChartColors.flowLine,
-      const Color(0xFFE8786A),
-      const Color(0xFF9B7EDE),
-      const Color(0xFFF2C94C),
-    ];
+  FlowlogChartColors.pressureLine,
+  FlowlogChartColors.weightLine,
+  FlowlogChartColors.flowLine,
+  const Color(0xFFE8786A),
+  const Color(0xFF9B7EDE),
+  const Color(0xFFF2C94C),
+];
 
 /// Picks [index] from [compareShotPalette].
 Color compareShotColor(int index) {
@@ -28,10 +28,7 @@ Color compareShotColor(int index) {
 
 /// Compare saved shots by overlaying pressure curves on a shared time axis.
 class CompareScreen extends StatefulWidget {
-  const CompareScreen({
-    super.key,
-    this.shotRepository,
-  });
+  const CompareScreen({super.key, this.shotRepository});
 
   /// Optional repository override for tests or dependency injection.
   final ShotRepository? shotRepository;
@@ -114,9 +111,7 @@ class _CompareScreenState extends State<CompareScreen> {
         }
 
         if (snapshot.hasError) {
-          return Center(
-            child: Text('Failed to load shots: ${snapshot.error}'),
-          );
+          return Center(child: Text('Failed to load shots: ${snapshot.error}'));
         }
 
         final shots = snapshot.data ?? const <Shot>[];
@@ -212,8 +207,9 @@ class _CompareScreenState extends State<CompareScreen> {
                           itemCount: shots.length,
                           itemBuilder: (context, index) {
                             final shot = shots[index];
-                            final isSelected =
-                                _selectedShotIds.contains(shot.id);
+                            final isSelected = _selectedShotIds.contains(
+                              shot.id,
+                            );
                             return CheckboxListTile(
                               key: Key('compare_select_${shot.id}'),
                               value: isSelected,
@@ -626,10 +622,6 @@ class _CompareOverlayChartState extends State<CompareOverlayChart> {
     if (raw.isEmpty) {
       return raw;
     }
-    final hasFlow = raw.any((sample) => sample.flowGs != null);
-    if (hasFlow) {
-      return List<ShotSample>.from(raw);
-    }
     return computeFlowRates(raw);
   }
 
@@ -658,10 +650,7 @@ class _CompareOverlayChartState extends State<CompareOverlayChart> {
 }
 
 class _PreparedCompareShot {
-  const _PreparedCompareShot({
-    required this.shot,
-    required this.samples,
-  });
+  const _PreparedCompareShot({required this.shot, required this.samples});
 
   final Shot shot;
   final List<ShotSample> samples;
@@ -694,10 +683,7 @@ class _CompareOverlayPainter extends CustomPainter {
       math.max(1, size.height - topPad - bottomPad),
     );
 
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = backgroundColor,
-    );
+    canvas.drawRect(Offset.zero & size, Paint()..color = backgroundColor);
 
     _drawGrid(canvas, plotRect);
 
@@ -772,10 +758,7 @@ class _CompareOverlayPainter extends CustomPainter {
       canvas,
       'No samples to compare',
       Offset(plotRect.left, plotRect.center.dy - 6),
-      const TextStyle(
-        color: FlowlogChartColors.axisLabel,
-        fontSize: 12,
-      ),
+      const TextStyle(color: FlowlogChartColors.axisLabel, fontSize: 12),
       maxWidth: plotRect.width,
       align: TextAlign.center,
     );
@@ -798,12 +781,14 @@ class _CompareOverlayPainter extends CustomPainter {
           sample.elapsedMs > scales.visibleEndMs) {
         continue;
       }
-      points.add(_pointFor(
-        plotRect,
-        scales,
-        elapsedMs: sample.elapsedMs,
-        value: pressure,
-      ));
+      points.add(
+        _pointFor(
+          plotRect,
+          scales,
+          elapsedMs: sample.elapsedMs,
+          value: pressure,
+        ),
+      );
     }
 
     if (points.length < 2) {
@@ -831,15 +816,18 @@ class _CompareOverlayPainter extends CustomPainter {
     _PreparedCompareShot baseline,
     _PreparedCompareShot comparison,
   ) {
-    final times = <int>{
-      for (final sample in baseline.samples) sample.elapsedMs,
-      for (final sample in comparison.samples) sample.elapsedMs,
-    }.where(
-      (elapsedMs) =>
-          elapsedMs >= scales.timeOffsetMs &&
-          elapsedMs <= scales.visibleEndMs,
-    ).toList()
-      ..sort();
+    final times =
+        <int>{
+              for (final sample in baseline.samples) sample.elapsedMs,
+              for (final sample in comparison.samples) sample.elapsedMs,
+            }
+            .where(
+              (elapsedMs) =>
+                  elapsedMs >= scales.timeOffsetMs &&
+                  elapsedMs <= scales.visibleEndMs,
+            )
+            .toList()
+          ..sort();
 
     if (times.length < 2) {
       return;
@@ -857,18 +845,8 @@ class _CompareOverlayPainter extends CustomPainter {
 
       final high = math.max(basePressure, comparePressure);
       final low = math.min(basePressure, comparePressure);
-      upper.add(_pointFor(
-        plotRect,
-        scales,
-        elapsedMs: elapsedMs,
-        value: high,
-      ));
-      lower.add(_pointFor(
-        plotRect,
-        scales,
-        elapsedMs: elapsedMs,
-        value: low,
-      ));
+      upper.add(_pointFor(plotRect, scales, elapsedMs: elapsedMs, value: high));
+      lower.add(_pointFor(plotRect, scales, elapsedMs: elapsedMs, value: low));
     }
 
     if (upper.length < 2 || lower.length < 2) {
@@ -936,7 +914,8 @@ class _CompareOverlayPainter extends CustomPainter {
     final normalizedTime =
         (elapsedMs - scales.timeOffsetMs) / scales.timeSpanMs;
     final x = plotRect.left + normalizedTime.clamp(0.0, 1.0) * plotRect.width;
-    final y = plotRect.bottom -
+    final y =
+        plotRect.bottom -
         (value / scales.pressureMax).clamp(0.0, 1.0) * plotRect.height;
     return Offset(x, y);
   }

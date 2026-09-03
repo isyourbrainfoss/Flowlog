@@ -1,4 +1,5 @@
 import 'package:flowlog/persistence/flowlog_storage.dart';
+import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -52,8 +53,13 @@ class BeansScreen extends StatefulWidget {
 class _BeansScreenState extends State<BeansScreen> {
   BeanRepository? _beanRepository;
   FlowlogDatabase? _database;
+  final TextEditingController _searchController = TextEditingController();
+  final BrewDefaultsSettingsStore _brewDefaultsStore =
+      BrewDefaultsSettingsStore();
 
   late Future<List<BeanWithShotCount>> _beansFuture;
+  List<BeanWithShotCount>? _cachedBeans;
+  double _defaultDoseG = kDefaultBrewDoseG;
 
   @override
   void initState() {
@@ -76,7 +82,13 @@ class _BeansScreenState extends State<BeansScreen> {
 
   Future<List<BeanWithShotCount>> _loadBeans() async {
     final repository = await _ensureRepository();
-    return repository.listBeansWithShotCounts();
+    final settings = await _brewDefaultsStore.load();
+    _defaultDoseG = settings.defaultDoseG;
+    final beans = await repository.listBeansWithShotCounts(
+      defaultDoseG: _defaultDoseG,
+    );
+    _cachedBeans = beans;
+    return beans;
   }
 
   Future<void> _refresh() async {
@@ -115,7 +127,9 @@ class _BeansScreenState extends State<BeansScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete bean'),
-        content: Text('Delete "${bean.name}"? Linked shots keep their bean id.'),
+        content: Text(
+          'Delete "${bean.name}"? Linked shots keep their bean id.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -138,15 +152,78 @@ class _BeansScreenState extends State<BeansScreen> {
     await _refresh();
   }
 
-  Future<void> _updateStock(Bean bean, double? stockG) async {
+  Future<void> _setEmpty(Bean bean, bool empty) async {
     final repository = await _ensureRepository();
-    await repository.updateBean(bean.copyWith(stockG: stockG));
+    await repository.updateBean(bean.copyWith(empty: empty));
+    await _refresh();
+  }
+
+  Future<void> _openDoseDialog() async {
+    final current = await _brewDefaultsStore.load();
+    if (!mounted) {
+      return;
+    }
+    var dose = current.defaultDoseG.clamp(kBrewDoseMinG, kBrewDoseMaxG);
+    final selected = await showDialog<double>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              key: const Key('beans_dose_dialog'),
+              title: const Text('Default dose'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('${dose.toStringAsFixed(1)} g'),
+                  Slider(
+                    key: const Key('beans_dose_slider'),
+                    value: dose,
+                    min: kBrewDoseMinG,
+                    max: kBrewDoseMaxG,
+                    divisions: ((kBrewDoseMaxG - kBrewDoseMinG) * 2).round(),
+                    label: '${dose.toStringAsFixed(1)} g',
+                    onChanged: (value) {
+                      setDialogState(() => dose = value);
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  key: const Key('beans_dose_save'),
+                  onPressed: () => Navigator.pop(dialogContext, dose),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (selected == null || !mounted) {
+      return;
+    }
+    await _brewDefaultsStore.save(current.copyWith(defaultDoseG: selected));
+    setState(() => _defaultDoseG = selected);
     await _refresh();
   }
 
   @override
   void dispose() {
+    _searchController.dispose();
     super.dispose();
+  }
+
+  String _doseChipLabel(double grams) {
+    if (grams == grams.roundToDouble()) {
+      return grams.round().toString();
+    }
+    return grams.toStringAsFixed(1);
   }
 
   @override
@@ -154,17 +231,30 @@ class _BeansScreenState extends State<BeansScreen> {
     return FutureBuilder<List<BeanWithShotCount>>(
       future: _beansFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (snapshot.hasData) {
+          _cachedBeans = snapshot.data;
+        }
+
+        final beans = snapshot.data ?? _cachedBeans;
+
+        if (beans == null) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('Failed to load beans: ${snapshot.error}'),
+            );
+          }
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (snapshot.hasError) {
-          return Center(
-            child: Text('Failed to load beans: ${snapshot.error}'),
-          );
+        if (snapshot.hasError && beans.isEmpty) {
+          return Center(child: Text('Failed to load beans: ${snapshot.error}'));
         }
 
-        final beans = snapshot.data ?? const <BeanWithShotCount>[];
+        final query = _searchController.text;
+        final filtered = beans
+            .where((entry) => beanMatchesQuery(entry.bean, query))
+            .toList(growable: false);
+        final allBeanModels = [for (final item in beans) item.bean];
 
         return Scaffold(
           body: beans.isEmpty
@@ -186,26 +276,83 @@ class _BeansScreenState extends State<BeansScreen> {
                     ],
                   ),
                 )
-              : RefreshIndicator(
-                  onRefresh: _refresh,
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: beans.length,
-                    itemBuilder: (context, index) {
-                      final entry = beans[index];
-                      final allBeanModels = [
-                        for (final item in beans) item.bean,
-                      ];
-                      return BeanCard(
-                        entry: entry,
-                        allBeans: allBeanModels,
-                        onTap: () => _openBeanEditor(bean: entry.bean),
-                        onDelete: () => _deleteBean(entry.bean),
-                        onStockChanged: (stockG) =>
-                            _updateStock(entry.bean, stockG),
-                      );
-                    },
-                  ),
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      child: TextField(
+                        key: const Key('beans_search_field'),
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          labelText: 'Bean, roaster or origin',
+                          hintText: 'e.g. KAFFA or Oslo',
+                          isDense: true,
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: query.isEmpty
+                              ? null
+                              : IconButton(
+                                  key: const Key('beans_search_clear'),
+                                  tooltip: 'Clear search',
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() {});
+                                  },
+                                ),
+                        ),
+                        textInputAction: TextInputAction.search,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: ActionChip(
+                          key: const Key('beans_dose_chip'),
+                          label: Text(
+                            'Dose ${_doseChipLabel(_defaultDoseG)} g',
+                          ),
+                          onPressed: _openDoseDialog,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? RefreshIndicator(
+                              onRefresh: _refresh,
+                              child: ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: const [
+                                  SizedBox(height: 80),
+                                  Center(
+                                    child: Text('No beans match your search'),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : RefreshIndicator(
+                              onRefresh: _refresh,
+                              child: ListView.builder(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                itemCount: filtered.length,
+                                itemBuilder: (context, index) {
+                                  final entry = filtered[index];
+                                  return BeanCard(
+                                    entry: entry,
+                                    allBeans: allBeanModels,
+                                    defaultDoseG: _defaultDoseG,
+                                    onTap: () =>
+                                        _openBeanEditor(bean: entry.bean),
+                                    onDelete: () => _deleteBean(entry.bean),
+                                    onEmptyChanged: (empty) =>
+                                        _setEmpty(entry.bean, empty),
+                                  );
+                                },
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
           floatingActionButton: FloatingActionButton(
             key: const Key('beans_add_fab'),
@@ -225,16 +372,18 @@ class BeanCard extends StatelessWidget {
     super.key,
     required this.entry,
     this.allBeans,
+    required this.defaultDoseG,
     required this.onTap,
     required this.onDelete,
-    required this.onStockChanged,
+    required this.onEmptyChanged,
   });
 
   final BeanWithShotCount entry;
   final List<Bean>? allBeans;
+  final double defaultDoseG;
   final VoidCallback onTap;
   final VoidCallback onDelete;
-  final ValueChanged<double?> onStockChanged;
+  final ValueChanged<bool> onEmptyChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -254,8 +403,21 @@ class BeanCard extends StatelessWidget {
       if (bean.roastDate != null && title == bean.name)
         'Roasted ${_formatBeanDate(bean.roastDate!)}',
     ].join(' · ');
+    final usedG = entry.usedG(defaultDoseG);
+    final remainingG = estimatedBeanRemainingG(
+      bagSizeG: bean.stockG,
+      usedG: usedG,
+    );
+    final depleted = beanAppearsDepleted(bean, remainingG);
+    final markedEmpty = bean.empty;
+    final remainingLabel = remainingG == null
+        ? 'Bag size unknown'
+        : '~${remainingG.round()} g left';
+    final usedLabel = entry.shotCount == 1
+        ? '1 shot · ~${usedG.round()} g used'
+        : '${entry.shotCount} shots · ~${usedG.round()} g used';
 
-    return Card(
+    final card = Card(
       key: Key('bean_card_${bean.id}'),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: InkWell(
@@ -269,10 +431,7 @@ class BeanCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      title,
-                      style: theme.textTheme.titleMedium,
-                    ),
+                    child: Text(title, style: theme.textTheme.titleMedium),
                   ),
                   Chip(
                     key: Key('bean_shot_count_${bean.id}'),
@@ -301,11 +460,35 @@ class BeanCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 10),
-              BeanStockField(
-                key: Key('bean_stock_${bean.id}'),
-                stockG: bean.stockG,
-                onSubmitted: onStockChanged,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      remainingLabel,
+                      key: Key('bean_remaining_${bean.id}'),
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                  TextButton(
+                    key: Key(
+                      markedEmpty
+                          ? 'bean_reopen_bag_${bean.id}'
+                          : 'bean_mark_empty_${bean.id}',
+                    ),
+                    onPressed: () => onEmptyChanged(!markedEmpty),
+                    child: Text(markedEmpty ? 'Reopen bag' : 'Mark empty'),
+                  ),
+                ],
               ),
+              if (entry.shotCount > 0) ...[
+                Text(
+                  usedLabel,
+                  key: Key('bean_used_${bean.id}'),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
               if (bean.notes != null && bean.notes!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -320,98 +503,11 @@ class BeanCard extends StatelessWidget {
         ),
       ),
     );
-  }
-}
 
-/// Inline editable stock field in grams.
-class BeanStockField extends StatefulWidget {
-  const BeanStockField({
-    super.key,
-    required this.stockG,
-    required this.onSubmitted,
-  });
-
-  final double? stockG;
-  final ValueChanged<double?> onSubmitted;
-
-  @override
-  State<BeanStockField> createState() => _BeanStockFieldState();
-}
-
-class _BeanStockFieldState extends State<BeanStockField> {
-  late final TextEditingController _controller;
-  final FocusNode _focusNode = FocusNode();
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: _formatStock(widget.stockG));
-    _focusNode.addListener(_handleFocusChange);
-  }
-
-  @override
-  void didUpdateWidget(covariant BeanStockField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!_focusNode.hasFocus && oldWidget.stockG != widget.stockG) {
-      _controller.text = _formatStock(widget.stockG);
+    if (!depleted) {
+      return card;
     }
-  }
-
-  void _handleFocusChange() {
-    if (!_focusNode.hasFocus) {
-      _submit();
-    }
-  }
-
-  String _formatStock(double? stockG) {
-    if (stockG == null) {
-      return '';
-    }
-    return stockG.toStringAsFixed(stockG.truncateToDouble() == stockG ? 0 : 1);
-  }
-
-  double? _parseStock(String text) {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty) {
-      return null;
-    }
-    return double.tryParse(trimmed);
-  }
-
-  void _submit() {
-    final parsed = _parseStock(_controller.text);
-    if (parsed == widget.stockG) {
-      return;
-    }
-    widget.onSubmitted(parsed);
-  }
-
-  @override
-  void dispose() {
-    _focusNode
-      ..removeListener(_handleFocusChange)
-      ..dispose();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: _controller,
-      focusNode: _focusNode,
-      decoration: const InputDecoration(
-        labelText: 'Stock (g)',
-        isDense: true,
-        border: OutlineInputBorder(),
-      ),
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-      ],
-      textInputAction: TextInputAction.done,
-      onSubmitted: (_) => _submit(),
-    );
+    return Opacity(opacity: 0.55, child: card);
   }
 }
 
@@ -424,18 +520,13 @@ Future<Bean?> showBeanEditorDialog({
   return showDialog<Bean>(
     context: context,
     barrierDismissible: false,
-    builder: (dialogContext) => _BeanEditorDialog(
-      bean: bean,
-      beanIdGenerator: beanIdGenerator,
-    ),
+    builder: (dialogContext) =>
+        _BeanEditorDialog(bean: bean, beanIdGenerator: beanIdGenerator),
   );
 }
 
 class _BeanEditorDialog extends StatefulWidget {
-  const _BeanEditorDialog({
-    required this.bean,
-    required this.beanIdGenerator,
-  });
+  const _BeanEditorDialog({required this.bean, required this.beanIdGenerator});
 
   final Bean? bean;
   final BeanIdGenerator beanIdGenerator;
@@ -605,6 +696,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
         process: _selectedProcess,
         stockG: stock,
         notes: _optionalText(_notesController.text),
+        empty: widget.bean?.empty ?? false,
       ),
     );
   }
@@ -617,7 +709,9 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         key: Key('bean_ai_prompt_copied_snackbar'),
-        content: Text('AI prompt copied — paste it into your AI with a bag photo'),
+        content: Text(
+          'AI prompt copied — paste it into your AI with a bag photo',
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -653,10 +747,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
         ),
       );
     } on FormatException {
-      final draft = await showBeanAiImportDialog(
-        context,
-        initialText: text,
-      );
+      final draft = await showBeanAiImportDialog(context, initialText: text);
       if (!mounted || draft == null) {
         return;
       }
@@ -730,247 +821,251 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
         }
       },
       child: AlertDialog(
-      key: Key(isEditing ? 'bean_editor_edit' : 'bean_editor_add'),
-      title: Text(isEditing ? 'Edit bean' : 'Add bean'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Card(
-                margin: EdgeInsets.zero,
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Auto-fill from bag photo',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Copy the prompt into any AI with a photo of the bag, '
-                        'copy the AI\'s code block, then import from clipboard.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color:
-                                  Theme.of(context).colorScheme.onSurfaceVariant,
+        key: Key(isEditing ? 'bean_editor_edit' : 'bean_editor_add'),
+        title: Text(isEditing ? 'Edit bean' : 'Add bean'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Card(
+                  margin: EdgeInsets.zero,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Auto-fill from bag photo',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Copy the prompt into any AI with a photo of the bag, '
+                          'copy the AI\'s code block, then import from clipboard.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                key: const Key('bean_ai_copy_prompt'),
+                                onPressed: _copyAiPrompt,
+                                icon: const Icon(Icons.copy_outlined, size: 18),
+                                label: const Text('Copy prompt'),
+                              ),
                             ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              key: const Key('bean_ai_copy_prompt'),
-                              onPressed: _copyAiPrompt,
-                              icon: const Icon(Icons.copy_outlined, size: 18),
-                              label: const Text('Copy prompt'),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                key: const Key('bean_ai_import_clipboard'),
+                                onPressed: _importFromClipboard,
+                                icon: const Icon(
+                                  Icons.content_paste_go_outlined,
+                                  size: 18,
+                                ),
+                                label: const Text('Import'),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: FilledButton.tonalIcon(
-                              key: const Key('bean_ai_import_clipboard'),
-                              onPressed: _importFromClipboard,
-                              icon: const Icon(Icons.content_paste_go_outlined,
-                                  size: 18),
-                              label: const Text('Import'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
-                textCapitalization: TextCapitalization.words,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Name is required';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                key: const Key('bean_editor_brand'),
-                controller: _brandController,
-                decoration: const InputDecoration(
-                  labelText: 'Brand',
-                  hintText: 'e.g. Onyx, Square Mile',
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  textCapitalization: TextCapitalization.words,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Name is required';
+                    }
+                    return null;
+                  },
                 ),
-                textCapitalization: TextCapitalization.words,
-              ),
-              TextFormField(
-                controller: _originController,
-                decoration: const InputDecoration(labelText: 'Origin'),
-                textCapitalization: TextCapitalization.words,
-              ),
-              TextFormField(
-                key: const Key('bean_editor_variety'),
-                controller: _varietyController,
-                decoration: const InputDecoration(
-                  labelText: 'Variety',
-                  hintText: 'e.g. Yellow Catuai',
+                TextFormField(
+                  key: const Key('bean_editor_brand'),
+                  controller: _brandController,
+                  decoration: const InputDecoration(
+                    labelText: 'Brand',
+                    hintText: 'e.g. Onyx, Square Mile',
+                  ),
+                  textCapitalization: TextCapitalization.words,
                 ),
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Process',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final method in kBeanProcessMethods)
-                    FilterChip(
-                      key: Key(
-                        'bean_process_${method.toLowerCase().replaceAll(' ', '_')}',
+                TextFormField(
+                  controller: _originController,
+                  decoration: const InputDecoration(labelText: 'Origin'),
+                  textCapitalization: TextCapitalization.words,
+                ),
+                TextFormField(
+                  key: const Key('bean_editor_variety'),
+                  controller: _varietyController,
+                  decoration: const InputDecoration(
+                    labelText: 'Variety',
+                    hintText: 'e.g. Yellow Catuai',
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                ),
+                const SizedBox(height: 12),
+                Text('Process', style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final method in kBeanProcessMethods)
+                      FilterChip(
+                        key: Key(
+                          'bean_process_${method.toLowerCase().replaceAll(' ', '_')}',
+                        ),
+                        label: Text(method),
+                        selected: _selectedProcess == method,
+                        onSelected: (selected) {
+                          setState(() {
+                            _selectedProcess = selected ? method : null;
+                          });
+                        },
                       ),
-                      label: Text(method),
-                      selected: _selectedProcess == method,
-                      onSelected: (selected) {
-                        setState(() {
-                          _selectedProcess = selected ? method : null;
-                        });
-                      },
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Roast: ${_sliderToRoastLevel(_roastSliderValue)}',
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Roast: ${_sliderToRoastLevel(_roastSliderValue)}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: _roastSliderColor(_roastSliderValue),
+                    inactiveTrackColor: _roastSliderColor(
+                      _roastSliderValue,
+                    ).withValues(alpha: 0.28),
+                    thumbColor: _roastSliderColor(_roastSliderValue),
+                    overlayColor: _roastSliderColor(
+                      _roastSliderValue,
+                    ).withValues(alpha: 0.14),
+                  ),
+                  child: Slider(
+                    key: const Key('bean_editor_roast_slider'),
+                    value: _roastSliderValue,
+                    min: 0,
+                    max: (kBeanRoastLevels.length - 1).toDouble(),
+                    divisions: kBeanRoastLevels.length - 1,
+                    label: _sliderToRoastLevel(_roastSliderValue),
+                    onChanged: (value) =>
+                        setState(() => _roastSliderValue = value),
+                  ),
+                ),
+                ListTile(
+                  key: const Key('bean_editor_roast_date'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Roast date'),
+                  subtitle: Text(
+                    _roastDate == null
+                        ? 'Tap to pick a day'
+                        : _formatBeanDate(_roastDate!),
+                  ),
+                  trailing: _roastDate == null
+                      ? const Icon(Icons.calendar_today_outlined)
+                      : IconButton(
+                          tooltip: 'Clear roast date',
+                          onPressed: () => setState(() => _roastDate = null),
+                          icon: const Icon(Icons.clear),
+                        ),
+                  onTap: _pickRoastDate,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Bag size (g)',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
-              ),
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: _roastSliderColor(_roastSliderValue),
-                  inactiveTrackColor: _roastSliderColor(_roastSliderValue)
-                      .withValues(alpha: 0.28),
-                  thumbColor: _roastSliderColor(_roastSliderValue),
-                  overlayColor: _roastSliderColor(_roastSliderValue)
-                      .withValues(alpha: 0.14),
+                const SizedBox(height: 4),
+                Text(
+                  'Tap a common size or type any weight below',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
-                child: Slider(
-                  key: const Key('bean_editor_roast_slider'),
-                  value: _roastSliderValue,
-                  min: 0,
-                  max: (kBeanRoastLevels.length - 1).toDouble(),
-                  divisions: kBeanRoastLevels.length - 1,
-                  label: _sliderToRoastLevel(_roastSliderValue),
-                  onChanged: (value) =>
-                      setState(() => _roastSliderValue = value),
-                ),
-              ),
-              ListTile(
-                key: const Key('bean_editor_roast_date'),
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Roast date'),
-                subtitle: Text(
-                  _roastDate == null
-                      ? 'Tap to pick a day'
-                      : _formatBeanDate(_roastDate!),
-                ),
-                trailing: _roastDate == null
-                    ? const Icon(Icons.calendar_today_outlined)
-                    : IconButton(
-                        tooltip: 'Clear roast date',
-                        onPressed: () => setState(() => _roastDate = null),
-                        icon: const Icon(Icons.clear),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final preset in kBeanStockPresetsG)
+                      FilterChip(
+                        key: Key('bean_stock_preset_$preset'),
+                        label: Text('${preset}g'),
+                        selected: _selectedStockPreset == preset,
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedStockPreset = preset;
+                              _stockController.text = preset.toString();
+                            } else if (_selectedStockPreset == preset) {
+                              _selectedStockPreset = null;
+                              _stockController.clear();
+                            }
+                          });
+                        },
                       ),
-                onTap: _pickRoastDate,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Bag size (g)',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Tap a common size or type any weight below',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final preset in kBeanStockPresetsG)
-                    FilterChip(
-                      key: Key('bean_stock_preset_$preset'),
-                      label: Text('${preset}g'),
-                      selected: _selectedStockPreset == preset,
-                      onSelected: (selected) {
-                        setState(() {
-                          if (selected) {
-                            _selectedStockPreset = preset;
-                            _stockController.text = preset.toString();
-                          } else if (_selectedStockPreset == preset) {
-                            _selectedStockPreset = null;
-                            _stockController.clear();
-                          }
-                        });
-                      },
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                key: const Key('bean_stock_custom_field'),
-                controller: _stockController,
-                decoration: const InputDecoration(
-                  labelText: 'Custom bag size (g)',
-                  hintText: 'e.g. 340 or 454',
-                  border: OutlineInputBorder(),
+                  ],
                 ),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                ],
-                onChanged: (value) {
-                  final parsed = double.tryParse(value.trim());
-                  setState(() {
-                    _selectedStockPreset = _matchingStockPreset(parsed);
-                  });
-                },
-              ),
-              TextFormField(
-                controller: _notesController,
-                decoration: const InputDecoration(labelText: 'Notes'),
-                maxLines: 3,
-              ),
-            ],
+                const SizedBox(height: 8),
+                TextFormField(
+                  key: const Key('bean_stock_custom_field'),
+                  controller: _stockController,
+                  decoration: const InputDecoration(
+                    labelText: 'Bag size (g)',
+                    hintText: 'e.g. 340 or 454',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                  ],
+                  onChanged: (value) {
+                    final parsed = double.tryParse(value.trim());
+                    setState(() {
+                      _selectedStockPreset = _matchingStockPreset(parsed);
+                    });
+                  },
+                ),
+                TextFormField(
+                  controller: _notesController,
+                  decoration: const InputDecoration(labelText: 'Notes'),
+                  maxLines: 3,
+                ),
+              ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            key: const Key('bean_editor_cancel'),
+            onPressed: _cancel,
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const Key('bean_editor_save'),
+            onPressed: _save,
+            child: Text(isEditing ? 'Save' : 'Add'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          key: const Key('bean_editor_cancel'),
-          onPressed: _cancel,
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          key: const Key('bean_editor_save'),
-          onPressed: _save,
-          child: Text(isEditing ? 'Save' : 'Add'),
-        ),
-      ],
-    ),
     );
   }
 }

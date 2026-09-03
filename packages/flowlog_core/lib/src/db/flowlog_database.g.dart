@@ -2439,6 +2439,19 @@ class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _emptyMeta = const VerificationMeta('empty');
+  @override
+  late final GeneratedColumn<bool> empty = GeneratedColumn<bool>(
+    'empty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("empty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2451,6 +2464,7 @@ class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
     variety,
     stockG,
     notes,
+    empty,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2519,6 +2533,12 @@ class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('empty')) {
+      context.handle(
+        _emptyMeta,
+        empty.isAcceptableOrUnknown(data['empty']!, _emptyMeta),
+      );
+    }
     return context;
   }
 
@@ -2570,6 +2590,10 @@ class $BeansTable extends Beans with TableInfo<$BeansTable, BeanRow> {
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       ),
+      empty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}empty'],
+      )!,
     );
   }
 
@@ -2593,6 +2617,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
   final String? variety;
   final double? stockG;
   final String? notes;
+  final bool empty;
   const BeanRow({
     required this.id,
     required this.name,
@@ -2604,6 +2629,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     this.variety,
     this.stockG,
     this.notes,
+    required this.empty,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2636,6 +2662,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
     }
+    map['empty'] = Variable<bool>(empty);
     return map;
   }
 
@@ -2667,6 +2694,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
+      empty: Value(empty),
     );
   }
 
@@ -2686,6 +2714,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
       variety: serializer.fromJson<String?>(json['variety']),
       stockG: serializer.fromJson<double?>(json['stockG']),
       notes: serializer.fromJson<String?>(json['notes']),
+      empty: serializer.fromJson<bool>(json['empty']),
     );
   }
   @override
@@ -2702,6 +2731,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
       'variety': serializer.toJson<String?>(variety),
       'stockG': serializer.toJson<double?>(stockG),
       'notes': serializer.toJson<String?>(notes),
+      'empty': serializer.toJson<bool>(empty),
     };
   }
 
@@ -2716,6 +2746,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     Value<String?> variety = const Value.absent(),
     Value<double?> stockG = const Value.absent(),
     Value<String?> notes = const Value.absent(),
+    bool? empty,
   }) => BeanRow(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -2727,6 +2758,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     variety: variety.present ? variety.value : this.variety,
     stockG: stockG.present ? stockG.value : this.stockG,
     notes: notes.present ? notes.value : this.notes,
+    empty: empty ?? this.empty,
   );
   BeanRow copyWithCompanion(BeansCompanion data) {
     return BeanRow(
@@ -2742,6 +2774,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
       variety: data.variety.present ? data.variety.value : this.variety,
       stockG: data.stockG.present ? data.stockG.value : this.stockG,
       notes: data.notes.present ? data.notes.value : this.notes,
+      empty: data.empty.present ? data.empty.value : this.empty,
     );
   }
 
@@ -2757,7 +2790,8 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
           ..write('process: $process, ')
           ..write('variety: $variety, ')
           ..write('stockG: $stockG, ')
-          ..write('notes: $notes')
+          ..write('notes: $notes, ')
+          ..write('empty: $empty')
           ..write(')'))
         .toString();
   }
@@ -2774,6 +2808,7 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
     variety,
     stockG,
     notes,
+    empty,
   );
   @override
   bool operator ==(Object other) =>
@@ -2788,7 +2823,8 @@ class BeanRow extends DataClass implements Insertable<BeanRow> {
           other.process == this.process &&
           other.variety == this.variety &&
           other.stockG == this.stockG &&
-          other.notes == this.notes);
+          other.notes == this.notes &&
+          other.empty == this.empty);
 }
 
 class BeansCompanion extends UpdateCompanion<BeanRow> {
@@ -2802,6 +2838,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
   final Value<String?> variety;
   final Value<double?> stockG;
   final Value<String?> notes;
+  final Value<bool> empty;
   final Value<int> rowid;
   const BeansCompanion({
     this.id = const Value.absent(),
@@ -2814,6 +2851,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
     this.variety = const Value.absent(),
     this.stockG = const Value.absent(),
     this.notes = const Value.absent(),
+    this.empty = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   BeansCompanion.insert({
@@ -2827,6 +2865,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
     this.variety = const Value.absent(),
     this.stockG = const Value.absent(),
     this.notes = const Value.absent(),
+    this.empty = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name);
@@ -2841,6 +2880,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
     Expression<String>? variety,
     Expression<double>? stockG,
     Expression<String>? notes,
+    Expression<bool>? empty,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2854,6 +2894,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
       if (variety != null) 'variety': variety,
       if (stockG != null) 'stock_g': stockG,
       if (notes != null) 'notes': notes,
+      if (empty != null) 'empty': empty,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2869,6 +2910,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
     Value<String?>? variety,
     Value<double?>? stockG,
     Value<String?>? notes,
+    Value<bool>? empty,
     Value<int>? rowid,
   }) {
     return BeansCompanion(
@@ -2882,6 +2924,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
       variety: variety ?? this.variety,
       stockG: stockG ?? this.stockG,
       notes: notes ?? this.notes,
+      empty: empty ?? this.empty,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2921,6 +2964,9 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (empty.present) {
+      map['empty'] = Variable<bool>(empty.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2940,6 +2986,7 @@ class BeansCompanion extends UpdateCompanion<BeanRow> {
           ..write('variety: $variety, ')
           ..write('stockG: $stockG, ')
           ..write('notes: $notes, ')
+          ..write('empty: $empty, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6583,6 +6630,7 @@ typedef $$BeansTableCreateCompanionBuilder =
       Value<String?> variety,
       Value<double?> stockG,
       Value<String?> notes,
+      Value<bool> empty,
       Value<int> rowid,
     });
 typedef $$BeansTableUpdateCompanionBuilder =
@@ -6597,6 +6645,7 @@ typedef $$BeansTableUpdateCompanionBuilder =
       Value<String?> variety,
       Value<double?> stockG,
       Value<String?> notes,
+      Value<bool> empty,
       Value<int> rowid,
     });
 
@@ -6659,6 +6708,11 @@ class $$BeansTableFilterComposer
     column: $table.notes,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<bool> get empty => $composableBuilder(
+    column: $table.empty,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$BeansTableOrderingComposer
@@ -6719,6 +6773,11 @@ class $$BeansTableOrderingComposer
     column: $table.notes,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get empty => $composableBuilder(
+    column: $table.empty,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$BeansTableAnnotationComposer
@@ -6761,6 +6820,9 @@ class $$BeansTableAnnotationComposer
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<bool> get empty =>
+      $composableBuilder(column: $table.empty, builder: (column) => column);
 }
 
 class $$BeansTableTableManager
@@ -6801,6 +6863,7 @@ class $$BeansTableTableManager
                 Value<String?> variety = const Value.absent(),
                 Value<double?> stockG = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<bool> empty = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BeansCompanion(
                 id: id,
@@ -6813,6 +6876,7 @@ class $$BeansTableTableManager
                 variety: variety,
                 stockG: stockG,
                 notes: notes,
+                empty: empty,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6827,6 +6891,7 @@ class $$BeansTableTableManager
                 Value<String?> variety = const Value.absent(),
                 Value<double?> stockG = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<bool> empty = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BeansCompanion.insert(
                 id: id,
@@ -6839,6 +6904,7 @@ class $$BeansTableTableManager
                 variety: variety,
                 stockG: stockG,
                 notes: notes,
+                empty: empty,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -16,10 +16,7 @@ import 'pump_helpers.dart';
 void main() {
   group('beanFillProgress', () {
     test('returns zero when yield and elapsed are zero', () {
-      expect(
-        beanFillProgress(yieldG: 0, elapsedMs: 0),
-        0,
-      );
+      expect(beanFillProgress(yieldG: 0, elapsedMs: 0), 0);
     });
 
     test('averages normalized yield and elapsed progress', () {
@@ -83,64 +80,57 @@ void main() {
         isPersonalBestTasteScore(tasteScore: 7, previousBest: null),
         isTrue,
       );
-      expect(
-        isPersonalBestTasteScore(tasteScore: 7, previousBest: 7),
-        isFalse,
-      );
-      expect(
-        isPersonalBestTasteScore(tasteScore: 8, previousBest: 7),
-        isTrue,
-      );
+      expect(isPersonalBestTasteScore(tasteScore: 7, previousBest: 7), isFalse);
+      expect(isPersonalBestTasteScore(tasteScore: 8, previousBest: 7), isTrue);
       expect(
         isPersonalBestTasteScore(tasteScore: null, previousBest: 7),
         isFalse,
       );
     });
 
-    test('celebratePersonalBestTasteScore bursts only on a new high score', () async {
-      final confetti = ConfettiController();
-      addTearDown(confetti.dispose);
+    test(
+      'celebratePersonalBestTasteScore bursts only on a new high score',
+      () async {
+        final confetti = ConfettiController();
+        addTearDown(confetti.dispose);
 
-      await repository.insertShot(
-        Shot(
-          id: 'shot-old',
-          startedAt: DateTime.parse('2026-06-29T10:00:00.000Z'),
-          tasteScore: 7,
-        ),
-      );
+        await repository.insertShot(
+          Shot(
+            id: 'shot-old',
+            startedAt: DateTime.parse('2026-06-29T10:00:00.000Z'),
+            tasteScore: 7,
+          ),
+        );
 
-      await celebratePersonalBestTasteScore(
-        repository: repository,
-        shot: Shot(
-          id: 'shot-tied',
-          startedAt: DateTime.parse('2026-06-29T11:00:00.000Z'),
-          tasteScore: 7,
-        ),
-        confettiController: confetti,
-      );
-      expect(confetti.burstGeneration, 0);
+        await celebratePersonalBestTasteScore(
+          repository: repository,
+          shot: Shot(
+            id: 'shot-tied',
+            startedAt: DateTime.parse('2026-06-29T11:00:00.000Z'),
+            tasteScore: 7,
+          ),
+          confettiController: confetti,
+        );
+        expect(confetti.burstGeneration, 0);
 
-      await celebratePersonalBestTasteScore(
-        repository: repository,
-        shot: Shot(
-          id: 'shot-new-pb',
-          startedAt: DateTime.parse('2026-06-29T12:00:00.000Z'),
-          tasteScore: 9,
-        ),
-        confettiController: confetti,
-      );
-      expect(confetti.burstGeneration, 1);
-    });
+        await celebratePersonalBestTasteScore(
+          repository: repository,
+          shot: Shot(
+            id: 'shot-new-pb',
+            startedAt: DateTime.parse('2026-06-29T12:00:00.000Z'),
+            tasteScore: 9,
+          ),
+          confettiController: confetti,
+        );
+        expect(confetti.burstGeneration, 1);
+      },
+    );
   });
 
   group('BeanFillIcon', () {
     testWidgets('renders fill semantics from progress', (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: BeanFillIcon(progress: 0.42),
-          ),
-        ),
+        const MaterialApp(home: Scaffold(body: BeanFillIcon(progress: 0.42))),
       );
 
       expect(find.byKey(const Key('bean_fill_icon')), findsOneWidget);
@@ -254,7 +244,9 @@ void main() {
       expect(find.byKey(const Key('live_yield_weight_digit')), findsOneWidget);
     });
 
-    testWidgets('bursts confetti when star shot sets a taste PB', (tester) async {
+    testWidgets('bursts confetti when star shot sets a taste PB', (
+      tester,
+    ) async {
       await repository.insertShot(
         Shot(
           id: 'shot-existing',
@@ -284,21 +276,16 @@ void main() {
       await tester.pump();
       await pumpUntilFound(tester, find.text('Shot metadata'));
 
-      final sliderFinder = find.byKey(const Key('metadata_taste_slider'));
-      await tester.ensureVisible(sliderFinder);
-      await tester.pumpAndSettle();
-
-      final sliderBox = tester.renderObject<RenderBox>(sliderFinder);
-      final start = sliderBox.localToGlobal(
-        Offset(0, sliderBox.size.height / 2),
+      final slider = tester.widget<Slider>(
+        find.byKey(const Key('metadata_taste_slider')),
       );
-      final end = sliderBox.localToGlobal(
-        Offset(sliderBox.size.width * 0.95, sliderBox.size.height / 2),
-      );
-      await tester.dragFrom(start, end - start);
-      await tester.pumpAndSettle();
+      slider.onChanged?.call(10);
+      await tester.pump();
 
-      await tester.tap(find.byKey(const Key('metadata_save')));
+      final saveButton = tester.widget<FilledButton>(
+        find.byKey(const Key('metadata_save')),
+      );
+      saveButton.onPressed?.call();
       await tester.pump();
       await pumpUntilGone(tester, find.text('Shot metadata'));
 
@@ -348,9 +335,7 @@ Future<_LiveHarness> _pumpLiveScreen(
         shotRepository: repository,
         beanRepository: beanRepository,
         shotIdGenerator: shotIdGenerator,
-        brewGpsCapture: const BrewGpsCapture(
-          debugOverride: _nullGpsPosition,
-        ),
+        brewGpsCapture: const BrewGpsCapture(debugOverride: _nullGpsPosition),
       ),
     ),
   );

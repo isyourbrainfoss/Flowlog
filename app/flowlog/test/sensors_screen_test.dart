@@ -6,7 +6,12 @@ import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_sensors/flowlog_sensors.dart'
-    show ConnectionState, SensorAdapter, SensorSample;
+    show
+        ConnectionState,
+        DecentScaleBleAdapter,
+        MockDecentScaleTransport,
+        SensorAdapter,
+        SensorSample;
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,8 +24,7 @@ class _ReadyBleBackend extends BleConnectionBackend {
     SensorKind kind, {
     Duration timeout = const Duration(seconds: 8),
     Future<void>? abort,
-  }) async =>
-      const [];
+  }) async => const [];
 
   @override
   Future<SensorAdapter> createAdapter({
@@ -47,9 +51,7 @@ void main() {
         hub: sensorHub,
         child: MaterialApp(
           theme: theme ?? FlowlogTheme.coffeeDark,
-          home: const Scaffold(
-            body: SensorsScreen(),
-          ),
+          home: const Scaffold(body: SensorsScreen()),
         ),
       ),
     );
@@ -143,32 +145,34 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(480, 1200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      final hub = SensorHub(initialDevices: [
-        PairedSensorEntry(
-          id: 'a',
-          name: 'Connected device',
-          kind: SensorKind.pressensor,
-          state: ConnectionState.connected,
-        ),
-        PairedSensorEntry(
-          id: 'b',
-          name: 'Disconnected device',
-          kind: SensorKind.scale,
-          state: ConnectionState.disconnected,
-        ),
-        PairedSensorEntry(
-          id: 'c',
-          name: 'Connecting device',
-          kind: SensorKind.pressensor,
-          state: ConnectionState.connecting,
-        ),
-        PairedSensorEntry(
-          id: 'd',
-          name: 'Error device',
-          kind: SensorKind.scale,
-          state: ConnectionState.error,
-        ),
-      ]);
+      final hub = SensorHub(
+        initialDevices: [
+          PairedSensorEntry(
+            id: 'a',
+            name: 'Connected device',
+            kind: SensorKind.pressensor,
+            state: ConnectionState.connected,
+          ),
+          PairedSensorEntry(
+            id: 'b',
+            name: 'Disconnected device',
+            kind: SensorKind.scale,
+            state: ConnectionState.disconnected,
+          ),
+          PairedSensorEntry(
+            id: 'c',
+            name: 'Connecting device',
+            kind: SensorKind.pressensor,
+            state: ConnectionState.connecting,
+          ),
+          PairedSensorEntry(
+            id: 'd',
+            name: 'Error device',
+            kind: SensorKind.scale,
+            state: ConnectionState.error,
+          ),
+        ],
+      );
       addTearDown(hub.dispose);
 
       await pumpSensorsScreen(tester, hub: hub);
@@ -185,15 +189,17 @@ void main() {
     });
 
     testWidgets('shows disconnect for connected device', (tester) async {
-      final hub = SensorHub(initialDevices: [
-        PairedSensorEntry(
-          id: 'prs-connected',
-          name: 'PRS39739',
-          kind: SensorKind.pressensor,
-          state: ConnectionState.connected,
-          bleRemoteId: 'E5:98:75:7D:9B:3B',
-        ),
-      ]);
+      final hub = SensorHub(
+        initialDevices: [
+          PairedSensorEntry(
+            id: 'prs-connected',
+            name: 'PRS39739',
+            kind: SensorKind.pressensor,
+            state: ConnectionState.connected,
+            bleRemoteId: 'E5:98:75:7D:9B:3B',
+          ),
+        ],
+      );
       addTearDown(hub.dispose);
 
       await pumpSensorsScreen(tester, hub: hub);
@@ -267,7 +273,9 @@ void main() {
       expect(find.textContaining('Connecting to PRS-CJ2'), findsOneWidget);
     });
 
-    testWidgets('connects the device chosen from multiple scan matches', (tester) async {
+    testWidgets('connects the device chosen from multiple scan matches', (
+      tester,
+    ) async {
       final backend = _AssignAndConnectBackend(
         discovered: const [
           BleDiscoveredDevice(
@@ -306,6 +314,113 @@ void main() {
       expect(find.text('Connected'), findsOneWidget);
       expect(find.textContaining('Connecting to PRS-two'), findsOneWidget);
     });
+
+    testWidgets('connected scale without packets does not show No weight', (
+      tester,
+    ) async {
+      final backend = _ScaleBleBackend();
+      final hub = SensorHub(bleBackend: backend);
+
+      hub.addDevice(SensorKind.scale);
+      hub.assignBleRemoteId(
+        SensorKind.scale,
+        bleRemoteId: 'scale-1',
+        name: 'Decent Scale',
+      );
+
+      try {
+        await pumpSensorsScreen(tester, hub: hub);
+        await hub.connect(hub.devices.first.id);
+        await tester.pump();
+
+        expect(hub.devices.first.state, ConnectionState.connected);
+        expect(
+          find.byKey(const Key('connection_chip_no_weight')),
+          findsNothing,
+        );
+        expect(find.text('No weight'), findsNothing);
+        expect(find.text('Connected but no weight packets yet'), findsNothing);
+        expect(
+          find.text('Connected — waiting for weight stream'),
+          findsOneWidget,
+        );
+        expect(find.text('Connected'), findsOneWidget);
+
+        backend.transport!.emitNotification([
+          0x03,
+          0xCE,
+          0x00,
+          0x65,
+          0x00,
+          0x00,
+          0xA8,
+        ]);
+        // Broadcast streams deliver on a microtask; one pump handles FFF4 →
+        // lastWeightReceiveMs, the next rebuilds Sensors after the hub sample
+        // subscription notifies.
+        await tester.pump();
+        await tester.pump();
+
+        final adapter = hub.activeAdapterFor(SensorKind.scale);
+        expect(adapter, isA<DecentScaleBleAdapter>());
+        expect(
+          (adapter as DecentScaleBleAdapter).lastWeightReceiveMs,
+          isNotNull,
+        );
+        expect(find.text('Weight stream live'), findsOneWidget);
+        expect(
+          find.byKey(const Key('connection_chip_no_weight')),
+          findsNothing,
+        );
+        expect(find.text('No weight'), findsNothing);
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        hub.dispose();
+      }
+    });
+
+    testWidgets(
+      'scale connect snackbar waits for grams without saying no weight',
+      (tester) async {
+        final backend = _ScaleBleBackend();
+        final hub = SensorHub(bleBackend: backend);
+
+        hub.addDevice(SensorKind.scale);
+        hub.assignBleRemoteId(
+          SensorKind.scale,
+          bleRemoteId: 'scale-1',
+          name: 'Decent Scale',
+        );
+
+        try {
+          await pumpSensorsScreen(tester, hub: hub);
+          await tester.tap(find.byKey(Key('connect_${hub.devices.first.id}')));
+          await tester.pump();
+          await tester.pump();
+
+          expect(
+            find.byKey(const Key('connection_chip_no_weight')),
+            findsNothing,
+          );
+          expect(
+            find.text('Connected — waiting for weight stream'),
+            findsOneWidget,
+          );
+
+          await tester.pump(const Duration(seconds: 2));
+
+          expect(find.textContaining('Waiting for grams'), findsOneWidget);
+          expect(find.textContaining('no weight'), findsNothing);
+          expect(
+            find.byKey(const Key('connection_chip_no_weight')),
+            findsNothing,
+          );
+        } finally {
+          await tester.pumpWidget(const SizedBox.shrink());
+          hub.dispose();
+        }
+      },
+    );
   });
 }
 
@@ -350,8 +465,7 @@ class _AssignAndConnectBackend implements BleConnectionBackend {
     SensorKind kind, {
     Duration timeout = const Duration(seconds: 8),
     Future<void>? abort,
-  }) async =>
-      discovered;
+  }) async => discovered;
 
   @override
   Future<SensorAdapter> createAdapter({
@@ -360,6 +474,29 @@ class _AssignAndConnectBackend implements BleConnectionBackend {
   }) async {
     connectCalls += 1;
     return _AlwaysConnectAdapter();
+  }
+}
+
+class _ScaleBleBackend implements BleConnectionBackend {
+  MockDecentScaleTransport? transport;
+
+  @override
+  Future<String?> ensureReady() async => null;
+
+  @override
+  Future<List<BleDiscoveredDevice>> scan(
+    SensorKind kind, {
+    Duration timeout = const Duration(seconds: 8),
+    Future<void>? abort,
+  }) async => const [];
+
+  @override
+  Future<SensorAdapter> createAdapter({
+    required SensorKind kind,
+    required String bleRemoteId,
+  }) async {
+    transport = MockDecentScaleTransport();
+    return DecentScaleBleAdapter(transport: transport!);
   }
 }
 

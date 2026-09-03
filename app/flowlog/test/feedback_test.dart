@@ -244,7 +244,10 @@ void main() {
       await tester.runAsync(() async {
         await tester.tap(find.byKey(const Key('live_brew')));
         await tester.pump();
+        // Start holds the button on "Starting…" through tare + 250ms BLE drain.
+        await Future<void>.delayed(const Duration(milliseconds: 400));
       });
+      await tester.pump();
 
       await tester.runAsync(() async {
         await tester.tap(find.byKey(const Key('live_brew')));

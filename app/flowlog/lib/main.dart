@@ -44,31 +44,34 @@ class FlowlogApp extends StatefulWidget {
   State<FlowlogApp> createState() => _FlowlogAppState();
 }
 
-class _FlowlogAppState extends State<FlowlogApp> {
+class _FlowlogAppState extends State<FlowlogApp> with WidgetsBindingObserver {
   late final FlowlogThemeController _themeController;
   late final SensorHub _sensorHub;
   late final bool _ownsController;
   late final bool _ownsSensorHub;
   late final AppearanceSettingsStore _appearanceSettingsStore;
   late final PairedSensorsStore _pairedSensorsStore;
-  Timer? _autoReconnectTimer;
+  final List<Timer> _autoReconnectTimers = [];
+  Timer? _resumeReconnectTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _appearanceSettingsStore =
         widget.appearanceSettingsStore ?? AppearanceSettingsStore();
-    _pairedSensorsStore =
-        widget.pairedSensorsStore ?? PairedSensorsStore();
+    _pairedSensorsStore = widget.pairedSensorsStore ?? PairedSensorsStore();
     _ownsController = widget.themeController == null;
-    _themeController = widget.themeController ??
+    _themeController =
+        widget.themeController ??
         FlowlogThemeController(
           onThemeModeChanged: (mode) => _appearanceSettingsStore.save(
             AppearanceSettings(themeMode: mode),
           ),
         );
     _ownsSensorHub = widget.sensorHub == null;
-    _sensorHub = widget.sensorHub ??
+    _sensorHub =
+        widget.sensorHub ??
         SensorHub(
           bleBackend: createBleConnectionBackend(),
           pairedSensorsStore: _pairedSensorsStore,
@@ -90,21 +93,63 @@ class _FlowlogAppState extends State<FlowlogApp> {
         _sensorHub.restoreDevice(SensorHub.entryFromRecord(record));
       }
       if (widget.autoReconnectSensors && mounted) {
-        _autoReconnectTimer?.cancel();
-        _autoReconnectTimer = Timer(
-          const Duration(milliseconds: 600),
-          () {
-            unawaited(_sensorHub.reconnectPairedDevices());
-          },
-        );
+        _scheduleStartupReconnects();
       }
     }
   }
 
+  static const _startupReconnectDelays = [
+    Duration(milliseconds: 600),
+    Duration(seconds: 2),
+    Duration(seconds: 5),
+    Duration(seconds: 10),
+  ];
+
+  void _scheduleStartupReconnects() {
+    _cancelAutoReconnectTimers();
+    for (final delay in _startupReconnectDelays) {
+      _autoReconnectTimers.add(Timer(delay, _attemptAutoReconnect));
+    }
+  }
+
+  void _cancelAutoReconnectTimers() {
+    for (final timer in _autoReconnectTimers) {
+      timer.cancel();
+    }
+    _autoReconnectTimers.clear();
+  }
+
+  void _attemptAutoReconnect() {
+    if (!mounted || !widget.autoReconnectSensors) {
+      return;
+    }
+    if (!_sensorHub.scaleRecoveryEnabled) {
+      return;
+    }
+    unawaited(_sensorHub.reconnectPairedDevices());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      return;
+    }
+    if (!widget.autoReconnectSensors) {
+      return;
+    }
+    _resumeReconnectTimer?.cancel();
+    _resumeReconnectTimer = Timer(
+      const Duration(milliseconds: 400),
+      _attemptAutoReconnect,
+    );
+  }
+
   @override
   void dispose() {
-    _autoReconnectTimer?.cancel();
-    _autoReconnectTimer = null;
+    WidgetsBinding.instance.removeObserver(this);
+    _resumeReconnectTimer?.cancel();
+    _resumeReconnectTimer = null;
+    _cancelAutoReconnectTimers();
     if (_ownsController) {
       _themeController.dispose();
     }
