@@ -94,6 +94,7 @@ class SensorHub extends ChangeNotifier {
   Timer? _scaleHealthTimer;
   final Set<String> _scaleRecoverInFlight = {};
   bool _scaleRecoveryEnabled = true;
+  bool? _scaleSilenceNotified;
 
   /// When false, silent-scale recovery must not disconnect/reconnect.
   /// Live turns this off for the duration of a brew so a brief FFF4 gap
@@ -156,6 +157,20 @@ class SensorHub extends ChangeNotifier {
   ConnectionState get pressensorState => stateFor(SensorKind.pressensor);
 
   ConnectionState get scaleState => stateFor(SensorKind.scale);
+
+  /// True when the scale GATT link is up but FFF4 has gone quiet.
+  ///
+  /// Used by the top bar so "connected" is not the same as "sending grams".
+  bool get isScaleWeightStreamSilent {
+    if (scaleState != ConnectionState.connected) {
+      return false;
+    }
+    final adapter = activeAdapterFor(SensorKind.scale);
+    if (adapter is! DecentScaleBleAdapter) {
+      return false;
+    }
+    return adapter.isWeightStreamSilent(silentFor: const Duration(seconds: 6));
+  }
 
   /// Active adapter for a connected device of [kind], when [connect] succeeded.
   SensorAdapter? activeAdapterFor(SensorKind kind) {
@@ -420,8 +435,17 @@ class SensorHub extends ChangeNotifier {
     var isFirst = true;
     _adapterSampleSubs[id] = adapter.samples.listen((_) {
       final now = DateTime.now().millisecondsSinceEpoch;
-      if (isFirst || now - _lastSampleNotifyMs >= 400) {
+      if (isFirst) {
         isFirst = false;
+        _lastSampleNotifyMs = now;
+        notifyListeners();
+        return;
+      }
+      // Mid-brew: packet-driven rebuilds hitch the HUD and overlay.
+      if (!_scaleRecoveryEnabled) {
+        return;
+      }
+      if (now - _lastSampleNotifyMs >= 400) {
         _lastSampleNotifyMs = now;
         notifyListeners();
       }
@@ -457,9 +481,18 @@ class SensorHub extends ChangeNotifier {
       return;
     }
     _scaleHealthTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      notifyListeners();
+      _notifyIfScaleSilenceChanged();
       unawaited(_recoverSilentScales());
     });
+  }
+
+  void _notifyIfScaleSilenceChanged() {
+    final silent = isScaleWeightStreamSilent;
+    if (_scaleSilenceNotified == silent) {
+      return;
+    }
+    _scaleSilenceNotified = silent;
+    notifyListeners();
   }
 
   /// Test hook for [_recoverSilentScales] (mid-wait recovery-flag race).
@@ -477,6 +510,7 @@ class SensorHub extends ChangeNotifier {
     if (!anyScaleUp) {
       _scaleHealthTimer?.cancel();
       _scaleHealthTimer = null;
+      _scaleSilenceNotified = null;
     }
   }
 

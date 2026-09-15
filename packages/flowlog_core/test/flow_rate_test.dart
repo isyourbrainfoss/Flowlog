@@ -90,10 +90,41 @@ void main() {
       ).map((sample) => sample.flowGs).whereType<double>().toList();
 
       expect(flows, isNotEmpty);
-      expect(flows.reduce(math.max), lessThan(2.5));
+      expect(flows.reduce(math.max), lessThan(1.6));
       final settled = flows.skip(40).toList();
       final mean = settled.reduce((a, b) => a + b) / settled.length;
-      expect(mean, closeTo(1.0, 0.25));
+      expect(mean, closeTo(1.0, 0.15));
+      final peakToPeak = settled.reduce(math.max) - settled.reduce(math.min);
+      expect(peakToPeak, lessThan(0.35));
+    });
+
+    test('first 0.1 g BLE step does not become a 4 g/s spike', () {
+      const samples = [
+        ShotSample(elapsedMs: 0, weightG: 0.0),
+        ShotSample(elapsedMs: 25, weightG: 0.1),
+        ShotSample(elapsedMs: 50, weightG: 0.1),
+        ShotSample(elapsedMs: 400, weightG: 0.4),
+        ShotSample(elapsedMs: 800, weightG: 0.8),
+      ];
+
+      final flows = computeFlowRates(
+        samples,
+      ).map((sample) => sample.flowGs).whereType<double>().toList();
+
+      expect(flows[1], 0.0);
+      expect(flows[2], 0.0);
+      expect(flows.reduce(math.max), lessThan(1.5));
+      expect(flows.last, closeTo(1.0, 0.15));
+    });
+
+    test('latestFlowGs reads the tail of a dense series', () {
+      final samples = <ShotSample>[
+        for (var i = 0; i <= 20; i++)
+          ShotSample(elapsedMs: i * 100, weightG: i * 0.1),
+      ];
+
+      expect(latestFlowGs(samples), closeTo(1.0, 0.15));
+      expect(latestFlowGs(const []), isNull);
     });
   });
 }

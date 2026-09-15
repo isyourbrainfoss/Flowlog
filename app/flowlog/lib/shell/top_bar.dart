@@ -23,6 +23,7 @@ class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
     this.pressensorState = ConnectionState.disconnected,
     this.scaleState = ConnectionState.disconnected,
     this.pressensorBatteryPercent,
+    this.scaleStreamSilent = false,
   });
 
   final String beanName;
@@ -31,6 +32,9 @@ class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
   final ConnectionState pressensorState;
   final ConnectionState scaleState;
   final int? pressensorBatteryPercent;
+
+  /// Scale BLE is up but FFF4 has gone quiet.
+  final bool scaleStreamSilent;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -54,8 +58,9 @@ class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
                   child: InkWell(
                     key: const Key('top_bar_bean_name'),
                     onTap: () => _showBeanNameDialog(context),
-                    borderRadius:
-                        BorderRadius.circular(FlowlogColors.cardRadius),
+                    borderRadius: BorderRadius.circular(
+                      FlowlogColors.cardRadius,
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         vertical: 8,
@@ -112,6 +117,7 @@ class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
                   label: 'Decent Scale',
                   icon: Icons.scale,
                   state: scaleState,
+                  warning: scaleStreamSilent,
                   onTap: () => _openSensorsScreen(context),
                 ),
               ],
@@ -217,71 +223,62 @@ class _BeanNameEditDialogState extends State<_BeanNameEditDialog> {
             displayStringForOption: (bean) =>
                 formatBeanDisplayLabel(bean, allBeans: _beans),
             optionsBuilder: (value) {
-              final query = value.text.trim().toLowerCase();
-              if (query.isEmpty) {
+              final query = value.text;
+              if (query.trim().isEmpty) {
                 return _beans;
               }
-              return _beans.where((bean) {
-                final label = formatBeanDisplayLabel(
-                  bean,
-                  allBeans: _beans,
-                ).toLowerCase();
-                return label.contains(query) ||
-                    bean.name.toLowerCase().contains(query);
-              });
+              return _beans.where((bean) => beanMatchesQuery(bean, query));
             },
             onSelected: (bean) {
               setState(() {
                 _selectedBeanId = bean.id;
-                _beanController.text =
-                    formatBeanDisplayLabel(bean, allBeans: _beans);
+                _beanController.text = formatBeanDisplayLabel(
+                  bean,
+                  allBeans: _beans,
+                );
               });
             },
-            fieldViewBuilder: (
-              context,
-              controller,
-              focusNode,
-              onFieldSubmitted,
-            ) {
-              if (controller.text != _beanController.text) {
-                controller.text = _beanController.text;
-              }
-              return TextField(
-                key: const Key('top_bar_bean_edit_field'),
-                controller: controller,
-                focusNode: focusNode,
-                autofocus: true,
-                enabled: _beansReady,
-                textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  labelText: 'Bean',
-                  hintText: 'e.g. Ethiopia Yirgacheffe',
-                  helperText:
-                      'Pick a saved bag or type a new name to create one',
-                  suffixIcon: controller.text.isEmpty
-                      ? null
-                      : IconButton(
-                          key: const Key('top_bar_bean_clear'),
-                          tooltip: 'Clear',
-                          onPressed: () {
-                            controller.clear();
-                            setState(() {
-                              _beanController.clear();
-                              _selectedBeanId = null;
-                            });
-                          },
-                          icon: const Icon(Icons.close),
-                        ),
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _beanController.text = value;
-                    _selectedBeanId = null;
-                  });
+            fieldViewBuilder:
+                (context, controller, focusNode, onFieldSubmitted) {
+                  if (controller.text != _beanController.text) {
+                    controller.text = _beanController.text;
+                  }
+                  return TextField(
+                    key: const Key('top_bar_bean_edit_field'),
+                    controller: controller,
+                    focusNode: focusNode,
+                    autofocus: true,
+                    enabled: _beansReady,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      labelText: 'Bean',
+                      hintText: 'e.g. Ethiopia Yirgacheffe',
+                      helperText:
+                          'Pick a saved bag or type a new name to create one',
+                      suffixIcon: controller.text.isEmpty
+                          ? null
+                          : IconButton(
+                              key: const Key('top_bar_bean_clear'),
+                              tooltip: 'Clear',
+                              onPressed: () {
+                                controller.clear();
+                                setState(() {
+                                  _beanController.clear();
+                                  _selectedBeanId = null;
+                                });
+                              },
+                              icon: const Icon(Icons.close),
+                            ),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _beanController.text = value;
+                        _selectedBeanId = null;
+                      });
+                    },
+                    onSubmitted: (_) => onFieldSubmitted(),
+                  );
                 },
-                onSubmitted: (_) => onFieldSubmitted(),
-              );
-            },
           ),
         ],
       ),
@@ -308,6 +305,7 @@ class SensorConnectionIcon extends StatelessWidget {
     required this.icon,
     required this.state,
     this.batteryPercent,
+    this.warning = false,
     this.onTap,
   });
 
@@ -315,12 +313,19 @@ class SensorConnectionIcon extends StatelessWidget {
   final IconData icon;
   final ConnectionState state;
   final int? batteryPercent;
+
+  /// Connected but not actually streaming (scale FFF4 silent).
+  final bool warning;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final (tooltip, color, background) = _styleForState(scheme, state);
+    final (tooltip, color, background) = _styleForState(
+      scheme,
+      state,
+      warning: warning,
+    );
 
     final child = Container(
       padding: const EdgeInsets.all(8),
@@ -336,8 +341,8 @@ class SensorConnectionIcon extends StatelessWidget {
     final batterySuffix = battery == null
         ? ''
         : isPressensorLowBattery(battery)
-            ? ' — Battery $battery% (low)'
-            : ' — Battery $battery%';
+        ? ' — Battery $battery% (low)'
+        : ' — Battery $battery%';
 
     return Tooltip(
       message: onTap != null
@@ -355,29 +360,37 @@ class SensorConnectionIcon extends StatelessWidget {
 
   (String, Color, Color) _styleForState(
     ColorScheme scheme,
-    ConnectionState state,
-  ) {
+    ConnectionState state, {
+    bool warning = false,
+  }) {
+    if (warning && state == ConnectionState.connected) {
+      return (
+        'Connected — no weight',
+        scheme.onErrorContainer,
+        scheme.errorContainer,
+      );
+    }
     return switch (state) {
       ConnectionState.connected => (
-          'Connected',
-          scheme.onPrimaryContainer,
-          scheme.primaryContainer,
-        ),
+        'Connected',
+        scheme.onPrimaryContainer,
+        scheme.primaryContainer,
+      ),
       ConnectionState.disconnected => (
-          'Disconnected',
-          scheme.onSurfaceVariant,
-          scheme.surface,
-        ),
+        'Disconnected',
+        scheme.onSurfaceVariant,
+        scheme.surface,
+      ),
       ConnectionState.connecting => (
-          'Connecting',
-          scheme.onSecondaryContainer,
-          scheme.secondaryContainer,
-        ),
+        'Connecting',
+        scheme.onSecondaryContainer,
+        scheme.secondaryContainer,
+      ),
       ConnectionState.error => (
-          'Error',
-          scheme.error,
-          scheme.error.withValues(alpha: 0.16),
-        ),
+        'Error',
+        scheme.error,
+        scheme.error.withValues(alpha: 0.16),
+      ),
     };
   }
 }

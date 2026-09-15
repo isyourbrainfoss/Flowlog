@@ -19,6 +19,7 @@ void main() {
     void Function(String name, {String? beanId})? onActiveBeanChanged,
     ConnectionState pressensorState = ConnectionState.disconnected,
     ConnectionState scaleState = ConnectionState.disconnected,
+    bool scaleStreamSilent = false,
     ThemeData? theme,
   }) async {
     await tester.pumpWidget(
@@ -31,6 +32,7 @@ void main() {
             onActiveBeanChanged: onActiveBeanChanged,
             pressensorState: pressensorState,
             scaleState: scaleState,
+            scaleStreamSilent: scaleStreamSilent,
           ),
           body: const SizedBox.shrink(),
         ),
@@ -59,10 +61,7 @@ void main() {
           matching: find.byType(Material),
         ),
       );
-      expect(
-        material.color,
-        FlowlogTheme.coffeeDark.colorScheme.surface,
-      );
+      expect(material.color, FlowlogTheme.coffeeDark.colorScheme.surface);
     });
 
     testWidgets('opens bean name dialog on tap', (tester) async {
@@ -74,7 +73,8 @@ void main() {
       expect(find.text('Active bean'), findsOneWidget);
       expect(find.byKey(const Key('top_bar_bean_edit_field')), findsOneWidget);
       expect(
-        tester.widget<TextField>(find.byKey(const Key('top_bar_bean_edit_field')))
+        tester
+            .widget<TextField>(find.byKey(const Key('top_bar_bean_edit_field')))
             .controller
             ?.text,
         _testBeanName,
@@ -107,16 +107,43 @@ void main() {
       expect(updatedBeanId, isNull);
     });
 
+    testWidgets('unicode bean query matches ø and brand', (tester) async {
+      const beans = [
+        Bean(id: 'bean-oslo', name: 'Oslo Mørkbrent', brand: 'KAFFA'),
+        Bean(id: 'bean-eth', name: 'Ethiopia Yirgacheffe'),
+      ];
+
+      await pumpTopBar(tester, loadBeans: () async => beans);
+
+      await tester.tap(find.byKey(const Key('top_bar_bean_name')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('top_bar_bean_edit_field')),
+        'morkbrent',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Oslo'), findsWidgets);
+      expect(find.text('Ethiopia Yirgacheffe'), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('top_bar_bean_edit_field')),
+        'KAFFA',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Oslo'), findsWidgets);
+      expect(find.text('Ethiopia Yirgacheffe'), findsNothing);
+    });
+
     testWidgets('shows autocomplete options from bean loader', (tester) async {
       const beans = [
         Bean(id: 'bean-1', name: 'Ethiopia Yirgacheffe'),
         Bean(id: 'bean-2', name: 'Colombia Huila'),
       ];
 
-      await pumpTopBar(
-        tester,
-        loadBeans: () async => beans,
-      );
+      await pumpTopBar(tester, loadBeans: () async => beans);
 
       await tester.tap(find.byKey(const Key('top_bar_bean_name')));
       await tester.pumpAndSettle();
@@ -131,7 +158,9 @@ void main() {
       expect(find.text('Colombia Huila'), findsNothing);
     });
 
-    testWidgets('bean field clear button empties the text field', (tester) async {
+    testWidgets('bean field clear button empties the text field', (
+      tester,
+    ) async {
       await pumpTopBar(tester);
 
       await tester.tap(find.byKey(const Key('top_bar_bean_name')));
@@ -152,8 +181,9 @@ void main() {
       expect(find.byKey(const Key('top_bar_bean_clear')), findsNothing);
     });
 
-    testWidgets('returns bean id when selecting autocomplete option',
-        (tester) async {
+    testWidgets('returns bean id when selecting autocomplete option', (
+      tester,
+    ) async {
       const beans = [
         Bean(id: 'bean-eth', name: 'Ethiopia Yirgacheffe'),
         Bean(id: 'bean-col', name: 'Colombia Huila'),
@@ -207,6 +237,27 @@ void main() {
       expect(scaleIcon.state, ConnectionState.disconnected);
     });
 
+    testWidgets('scale icon warns when the weight stream is silent', (
+      tester,
+    ) async {
+      await pumpTopBar(
+        tester,
+        scaleState: ConnectionState.connected,
+        scaleStreamSilent: true,
+      );
+
+      final scaleIcon = tester.widget<SensorConnectionIcon>(
+        find.byKey(const Key('top_bar_scale_status')),
+      );
+      expect(scaleIcon.warning, isTrue);
+      expect(
+        find.byTooltip(
+          'Decent Scale: Connected — no weight — tap to open Sensors',
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('sensor icons open Sensors screen', (tester) async {
       final hub = SensorHub();
       addTearDown(hub.dispose);
@@ -236,15 +287,15 @@ void main() {
   });
 
   group('FlowlogShell top bar integration', () {
-    testWidgets('shell shows top bar bean picker (no default bean)', (tester) async {
+    testWidgets('shell shows top bar bean picker (no default bean)', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(800, 600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        const FlowlogApp(autoReconnectSensors: false),
-      );
+      await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
       await tester.pump();
 
       expect(find.byType(FlowlogTopBar), findsOneWidget);

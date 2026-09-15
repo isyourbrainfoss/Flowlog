@@ -26,7 +26,9 @@ void main() {
       expect(find.text('36.0 g'), findsOneWidget);
       expect(find.text('7/10'), findsOneWidget);
       expect(
-        tester.getSemantics(find.byKey(Key('history_shot_meta_${shot.id}'))).label,
+        tester
+            .getSemantics(find.byKey(Key('history_shot_meta_${shot.id}')))
+            .label,
         'Bean Ethiopia. Grind 3.2',
       );
     });
@@ -49,10 +51,7 @@ void main() {
       tester,
     ) async {
       final shot = _cardShot(grindSetting: null);
-      await _pumpCard(
-        tester,
-        HistoryShotCard(shot: shot, beanLabel: '  '),
-      );
+      await _pumpCard(tester, HistoryShotCard(shot: shot, beanLabel: '  '));
 
       expect(find.byKey(Key('history_shot_meta_${shot.id}')), findsNothing);
     });
@@ -66,7 +65,9 @@ void main() {
       expect(find.byKey(Key('history_shot_grind_${shot.id}')), findsOneWidget);
       expect(find.text('Grind 3.2'), findsOneWidget);
       expect(
-        tester.getSemantics(find.byKey(Key('history_shot_meta_${shot.id}'))).label,
+        tester
+            .getSemantics(find.byKey(Key('history_shot_meta_${shot.id}')))
+            .label,
         'Grind 3.2',
       );
     });
@@ -84,7 +85,9 @@ void main() {
       expect(find.text('Ethiopia'), findsOneWidget);
       expect(find.textContaining('Grind'), findsNothing);
       expect(
-        tester.getSemantics(find.byKey(Key('history_shot_meta_${shot.id}'))).label,
+        tester
+            .getSemantics(find.byKey(Key('history_shot_meta_${shot.id}')))
+            .label,
         'Bean Ethiopia',
       );
     });
@@ -108,7 +111,50 @@ void main() {
       expect(find.text('Peak P'), findsOneWidget);
       expect(find.text('Yield'), findsOneWidget);
       expect(find.text('Taste'), findsOneWidget);
+      expect(find.textContaining('0:15'), findsOneWidget);
+      expect(find.text('Target'), findsNothing);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('hides target scores on a phone-width card', (tester) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final shot = _cardShot(grindSetting: 3.2).copyWith(
+        targetScore: 82,
+        targetClosenessPercent: 90,
+        targetMaxStreakSeconds: 8,
+      );
+      await _pumpCard(
+        tester,
+        HistoryShotCard(shot: shot, beanLabel: 'Ethiopia'),
+      );
+
+      expect(find.text('Target'), findsNothing);
+      expect(find.text('Streak'), findsNothing);
+      expect(find.textContaining('0:15'), findsOneWidget);
+    });
+
+    testWidgets('wide layout keeps target scores', (tester) async {
+      tester.view.physicalSize = const Size(900, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final shot = _cardShot(grindSetting: 3.2).copyWith(
+        targetScore: 82,
+        targetClosenessPercent: 90,
+        targetMaxStreakSeconds: 8,
+      );
+      await _pumpCard(
+        tester,
+        HistoryShotCard(shot: shot, beanLabel: 'Ethiopia'),
+      );
+
+      expect(find.text('Target'), findsOneWidget);
+      expect(find.text('Streak'), findsOneWidget);
     });
   });
 }
@@ -128,9 +174,5 @@ Shot _cardShot({double? grindSetting}) {
 }
 
 Future<void> _pumpCard(WidgetTester tester, HistoryShotCard card) async {
-  await tester.pumpWidget(
-    MaterialApp(
-      home: Scaffold(body: card),
-    ),
-  );
+  await tester.pumpWidget(MaterialApp(home: Scaffold(body: card)));
 }

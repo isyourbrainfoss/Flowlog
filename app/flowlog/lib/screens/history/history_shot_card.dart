@@ -1,6 +1,7 @@
 import 'package:flowlog/screens/history/shot_detail.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog/settings/brew_defaults_store.dart';
+import 'package:flowlog/shell/shell_breakpoints.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -44,8 +45,15 @@ class HistoryShotCard extends StatelessWidget {
     final hasBean = trimmedBean != null && trimmedBean.isNotEmpty;
     final hasGrind = shot.grindSetting != null;
     final showMeta = hasBean || hasGrind;
-    final grindText =
-        hasGrind ? formatGrindSetting(shot.grindSetting) : null;
+    final grindText = hasGrind ? formatGrindSetting(shot.grindSetting) : null;
+    final compact = MediaQuery.sizeOf(context).width < ShellBreakpoints.sidebar;
+    final durationText = _formatDuration(shot);
+    final titleText = durationText == null
+        ? _formatStartedAt(shot.startedAt)
+        : '${_formatStartedAt(shot.startedAt)} · $durationText';
+    final showTargetRow =
+        !compact &&
+        (shot.targetScore != null || shot.targetClosenessPercent != null);
 
     return Card(
       key: Key('history_shot_card_${shot.id}'),
@@ -58,116 +66,122 @@ class HistoryShotCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _formatStartedAt(shot.startedAt),
-                    style: theme.textTheme.titleSmall,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      titleText,
+                      key: Key('history_shot_title_${shot.id}'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall,
+                    ),
                   ),
-                ),
-                if (onDelete != null)
-                  IconButton(
-                    key: Key('history_delete_${shot.id}'),
-                    tooltip: 'Delete brew',
-                    onPressed: onDelete,
-                    icon: const Icon(Icons.delete_outline),
-                  ),
-              ],
-            ),
-            if (showMeta) ...[
-              const SizedBox(height: 4),
-              Semantics(
-                key: Key('history_shot_meta_${shot.id}'),
-                container: true,
-                excludeSemantics: true,
-                label: [
-                  if (hasBean) 'Bean $trimmedBean',
-                  if (grindText != null) 'Grind $grindText',
-                ].join('. '),
-                child: Row(
-                  children: [
-                    if (hasBean)
-                      Expanded(
-                        child: Text(
-                          trimmedBean,
-                          key: Key('history_shot_bean_${shot.id}'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: metaStyle,
-                        ),
-                      )
-                    else
-                      const Spacer(),
-                    if (hasBean && hasGrind) const SizedBox(width: 8),
-                    if (hasGrind)
-                      Text(
-                        'Grind $grindText',
-                        key: Key('history_shot_grind_${shot.id}'),
-                        maxLines: 1,
-                        style: metaStyle?.copyWith(
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                  ],
-                ),
+                  if (onDelete != null)
+                    IconButton(
+                      key: Key('history_delete_${shot.id}'),
+                      tooltip: 'Delete brew',
+                      onPressed: onDelete,
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                ],
               ),
-            ],
-            const SizedBox(height: 8),
-            SparklineChart(samples: shot.samples),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _MetricCell(
-                    label: 'Peak P',
-                    value: _formatPeakPressure(shot.samples),
-                    labelStyle: labelStyle,
-                    valueStyle: valueStyle,
-                  ),
-                ),
-                Expanded(
-                  child: _MetricCell(
-                    label: 'Yield',
-                    value: _formatYield(inferredYieldG(shot)),
-                    labelStyle: labelStyle,
-                    valueStyle: valueStyle,
-                  ),
-                ),
-                Expanded(
-                  child: _MetricCell(
-                    label: 'Taste',
-                    value: _formatTasteScore(shot.tasteScore),
-                    labelStyle: labelStyle,
-                    valueStyle: valueStyle,
+              if (showMeta) ...[
+                const SizedBox(height: 4),
+                Semantics(
+                  key: Key('history_shot_meta_${shot.id}'),
+                  container: true,
+                  excludeSemantics: true,
+                  label: [
+                    if (hasBean) 'Bean $trimmedBean',
+                    if (grindText != null) 'Grind $grindText',
+                  ].join('. '),
+                  child: Row(
+                    children: [
+                      if (hasBean)
+                        Expanded(
+                          child: Text(
+                            trimmedBean,
+                            key: Key('history_shot_bean_${shot.id}'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: metaStyle,
+                          ),
+                        )
+                      else
+                        const Spacer(),
+                      if (hasBean && hasGrind) const SizedBox(width: 8),
+                      if (hasGrind)
+                        Text(
+                          'Grind $grindText',
+                          key: Key('history_shot_grind_${shot.id}'),
+                          maxLines: 1,
+                          style: metaStyle?.copyWith(
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
-            ),
-            if (shot.targetScore != null || shot.targetClosenessPercent != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
+              SparklineChart(samples: shot.samples),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
                     child: _MetricCell(
-                      label: 'Target',
-                      value: _formatTargetScore(shot.targetScore, shot.targetClosenessPercent),
+                      label: 'Peak P',
+                      value: _formatPeakPressure(shot.samples),
                       labelStyle: labelStyle,
                       valueStyle: valueStyle,
                     ),
                   ),
                   Expanded(
                     child: _MetricCell(
-                      label: 'Streak',
-                      value: _formatTargetStreak(shot.targetMaxStreakSeconds),
+                      label: 'Yield',
+                      value: _formatYield(inferredYieldG(shot)),
                       labelStyle: labelStyle,
                       valueStyle: valueStyle,
                     ),
                   ),
-                  const Spacer(),
+                  Expanded(
+                    child: _MetricCell(
+                      label: 'Taste',
+                      value: _formatTasteScore(shot.tasteScore),
+                      labelStyle: labelStyle,
+                      valueStyle: valueStyle,
+                    ),
+                  ),
                 ],
               ),
-            ],
+              if (showTargetRow) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MetricCell(
+                        label: 'Target',
+                        value: _formatTargetScore(
+                          shot.targetScore,
+                          shot.targetClosenessPercent,
+                        ),
+                        labelStyle: labelStyle,
+                        valueStyle: valueStyle,
+                      ),
+                    ),
+                    Expanded(
+                      child: _MetricCell(
+                        label: 'Streak',
+                        value: _formatTargetStreak(shot.targetMaxStreakSeconds),
+                        labelStyle: labelStyle,
+                        valueStyle: valueStyle,
+                      ),
+                    ),
+                    const Spacer(),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -177,6 +191,22 @@ class HistoryShotCard extends StatelessWidget {
 
   static double? peakPressureBar(Iterable<ShotSample> samples) {
     return peakPressureBarFromSamples(samples);
+  }
+
+  static String? _formatDuration(Shot shot) {
+    final ms = shot.endedAt != null
+        ? shot.endedAt!.difference(shot.startedAt).inMilliseconds
+        : (shot.samples.isNotEmpty ? shot.samples.last.elapsedMs : null);
+    if (ms == null || ms <= 0) {
+      return null;
+    }
+    final totalSec = ms ~/ 1000;
+    if (totalSec <= 0) {
+      return null;
+    }
+    final minutes = totalSec ~/ 60;
+    final seconds = totalSec % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
   static String _formatStartedAt(DateTime startedAt) {

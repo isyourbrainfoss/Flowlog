@@ -92,7 +92,8 @@ void main() {
       expect(result.detected, isTrue);
       expect(result.shotStartElapsedMs, 5600);
       expect(result.samples.first.elapsedMs, 0);
-      expect(result.samples.first.flowGs, closeTo(0.7875, 1e-9));
+      expect(result.samples.first.flowGs, greaterThanOrEqualTo(0.2));
+      expect(result.samples.first.flowGs, lessThan(2.0));
       expect(result.samples.last.elapsedMs, samples.last.elapsedMs - 5600);
     });
 

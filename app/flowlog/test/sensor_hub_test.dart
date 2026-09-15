@@ -417,6 +417,78 @@ void main() {
       expect(adapter, isA<DecentScaleBleAdapter>());
       expect((adapter as DecentScaleBleAdapter).lastWeightReceiveMs, isNotNull);
     });
+
+    test('skips later sample notifies while brew recovery is off', () async {
+      final backend = _ScaleConnectBackend();
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+
+      hub.addDevice(SensorKind.scale);
+      hub.assignBleRemoteId(
+        SensorKind.scale,
+        bleRemoteId: 'scale-1',
+        name: 'Decent Scale',
+      );
+      await hub.connect(hub.devices.first.id);
+
+      var notifications = 0;
+      hub.addListener(() => notifications += 1);
+      hub.setScaleRecoveryEnabled(false);
+
+      backend.transport!.emitNotification([
+        0x03,
+        0xCE,
+        0x00,
+        0x65,
+        0x00,
+        0x00,
+        0xA8,
+      ]);
+      await Future<void>.delayed(Duration.zero);
+      final afterFirst = notifications;
+      expect(afterFirst, greaterThan(0));
+
+      backend.transport!.emitNotification([
+        0x03,
+        0xCE,
+        0x00,
+        0x66,
+        0x00,
+        0x00,
+        0xA9,
+      ]);
+      await Future<void>.delayed(Duration.zero);
+      expect(notifications, afterFirst);
+    });
+
+    test('isScaleWeightStreamSilent is false with a fresh packet', () async {
+      var nowMs = 1_000;
+      final backend = _ScaleConnectBackend(monotonicClock: () => nowMs);
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+
+      hub.addDevice(SensorKind.scale);
+      hub.assignBleRemoteId(
+        SensorKind.scale,
+        bleRemoteId: 'scale-1',
+        name: 'Decent Scale',
+      );
+      await hub.connect(hub.devices.first.id);
+      backend.transport!.emitNotification([
+        0x03,
+        0xCE,
+        0x00,
+        0x65,
+        0x00,
+        0x00,
+        0xA8,
+      ]);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(hub.isScaleWeightStreamSilent, isFalse);
+      nowMs += 7_000;
+      expect(hub.isScaleWeightStreamSilent, isTrue);
+    });
   });
 }
 

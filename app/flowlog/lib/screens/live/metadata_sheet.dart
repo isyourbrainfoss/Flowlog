@@ -9,7 +9,6 @@ import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
-
 /// Metadata fields captured after a shot, aligned with [Shot] properties.
 @immutable
 class ShotMetadata {
@@ -36,9 +35,9 @@ class ShotMetadata {
     this.targetMaxStreakSeconds,
     this.targetScore,
   }) : assert(
-          tasteScore == null || (tasteScore >= 0 && tasteScore <= 10),
-          'tasteScore must be between 0 and 10',
-        );
+         tasteScore == null || (tasteScore >= 0 && tasteScore <= 10),
+         'tasteScore must be between 0 and 10',
+       );
 
   final double? doseG;
   final double? yieldG;
@@ -164,8 +163,10 @@ class ShotMetadata {
       scale: scale ?? this.scale,
       brewer: brewer ?? this.brewer,
       lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
-      targetClosenessPercent: targetClosenessPercent ?? this.targetClosenessPercent,
-      targetMaxStreakSeconds: targetMaxStreakSeconds ?? this.targetMaxStreakSeconds,
+      targetClosenessPercent:
+          targetClosenessPercent ?? this.targetClosenessPercent,
+      targetMaxStreakSeconds:
+          targetMaxStreakSeconds ?? this.targetMaxStreakSeconds,
       targetScore: targetScore ?? this.targetScore,
     );
   }
@@ -199,30 +200,30 @@ class ShotMetadata {
 
   @override
   int get hashCode => Object.hash(
-        doseG,
-        yieldG,
-        grindSetting,
-        beanId,
-        waterTempC,
-        notes,
-        location,
-        tasteScore,
-        coffeejackRewindTurns,
-        coffeejackPreinfusionTurns,
-        grinder,
-        showerScreen,
-        basket,
-        scale,
-        brewer,
-        lastModifiedAt,
-        targetClosenessPercent,
-        targetMaxStreakSeconds,
-        targetScore,
-        Object.hash(
-          Object.hashAll(flavourTags),
-          Object.hashAll(flavourIntensities.entries),
-        ),
-      );
+    doseG,
+    yieldG,
+    grindSetting,
+    beanId,
+    waterTempC,
+    notes,
+    location,
+    tasteScore,
+    coffeejackRewindTurns,
+    coffeejackPreinfusionTurns,
+    grinder,
+    showerScreen,
+    basket,
+    scale,
+    brewer,
+    lastModifiedAt,
+    targetClosenessPercent,
+    targetMaxStreakSeconds,
+    targetScore,
+    Object.hash(
+      Object.hashAll(flavourTags),
+      Object.hashAll(flavourIntensities.entries),
+    ),
+  );
 }
 
 bool _mapEquals(Map<String, int> a, Map<String, int> b) {
@@ -262,10 +263,9 @@ const List<String> kFlavourTagOptions = [
 
 /// Preset chips plus any custom tags the user added this session.
 List<String> flavourTagsForDisplay(Set<String> selected) {
-  final custom = selected
-      .where((tag) => !kFlavourTagOptions.contains(tag))
-      .toList()
-    ..sort();
+  final custom =
+      selected.where((tag) => !kFlavourTagOptions.contains(tag)).toList()
+        ..sort();
   return [...kFlavourTagOptions, ...custom];
 }
 
@@ -288,8 +288,8 @@ Future<ShotMetadata?> showMetadataSheet(
         child: MetadataSheet(
           initial: initial,
           beanRepository: beanRepository,
-          activeBeanName: activeBeanName ??
-              ActiveBeanScope.maybeOf(context)?.name,
+          activeBeanName:
+              activeBeanName ?? ActiveBeanScope.maybeOf(context)?.name,
         ),
       );
     },
@@ -368,7 +368,9 @@ class _MetadataSheetState extends State<MetadataSheet> {
     _notesController = TextEditingController(text: initial?.notes ?? '');
     _locationController = TextEditingController(text: initial?.location ?? '');
     _grinderController = TextEditingController(text: initial?.grinder ?? '');
-    _showerScreenController = TextEditingController(text: initial?.showerScreen ?? '');
+    _showerScreenController = TextEditingController(
+      text: initial?.showerScreen ?? '',
+    );
     _basketController = TextEditingController(text: initial?.basket ?? '');
     _scaleController = TextEditingController(text: initial?.scale ?? '');
     _brewerController = TextEditingController(text: initial?.brewer ?? '');
@@ -378,9 +380,11 @@ class _MetadataSheetState extends State<MetadataSheet> {
       initial?.flavourIntensities ?? const {},
     );
     _coffeejackSettings = CoffeejackSettings(
-      rewindTurnsBeforeFill: initial?.coffeejackRewindTurns ??
+      rewindTurnsBeforeFill:
+          initial?.coffeejackRewindTurns ??
           const CoffeejackSettings().rewindTurnsBeforeFill,
-      slowPreinfusionTurns: initial?.coffeejackPreinfusionTurns ??
+      slowPreinfusionTurns:
+          initial?.coffeejackPreinfusionTurns ??
           const CoffeejackSettings().slowPreinfusionTurns,
     );
     unawaited(_loadDefaults());
@@ -402,7 +406,8 @@ class _MetadataSheetState extends State<MetadataSheet> {
     if (defaultId == null) return;
 
     // Only apply if no equipment has been set yet (from initial or manual)
-    final hasEquipment = _grinderController.text.isNotEmpty ||
+    final hasEquipment =
+        _grinderController.text.isNotEmpty ||
         _showerScreenController.text.isNotEmpty ||
         _basketController.text.isNotEmpty ||
         _scaleController.text.isNotEmpty ||
@@ -486,11 +491,14 @@ class _MetadataSheetState extends State<MetadataSheet> {
               initial?.grindSetting == null) {
             _grindSetting = snapGrindSetting(brewDefaults.defaultGrindSetting);
           }
-          if (coffeejack != null && (brewDefaults?.useDefaultCoffeejack ?? true)) {
+          if (coffeejack != null &&
+              (brewDefaults?.useDefaultCoffeejack ?? true)) {
             _coffeejackSettings = CoffeejackSettings(
-              rewindTurnsBeforeFill: initial?.coffeejackRewindTurns ??
+              rewindTurnsBeforeFill:
+                  initial?.coffeejackRewindTurns ??
                   coffeejack.rewindTurnsBeforeFill,
-              slowPreinfusionTurns: initial?.coffeejackPreinfusionTurns ??
+              slowPreinfusionTurns:
+                  initial?.coffeejackPreinfusionTurns ??
                   coffeejack.slowPreinfusionTurns,
             );
           }
@@ -535,8 +543,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
         }
         if (match != null) {
           _selectedBeanId = match.id;
-          _beanController.text =
-              formatBeanDisplayLabel(match, allBeans: beans);
+          _beanController.text = formatBeanDisplayLabel(match, allBeans: beans);
         }
       } else if (_beanController.text.isEmpty &&
           widget.activeBeanName != null) {
@@ -550,8 +557,10 @@ class _MetadataSheetState extends State<MetadataSheet> {
         }
         if (activeMatch != null) {
           _selectedBeanId = activeMatch.id;
-          _beanController.text =
-              formatBeanDisplayLabel(activeMatch, allBeans: beans);
+          _beanController.text = formatBeanDisplayLabel(
+            activeMatch,
+            allBeans: beans,
+          );
         } else {
           _beanController.text = widget.activeBeanName!.trim();
         }
@@ -803,7 +812,8 @@ class _MetadataSheetState extends State<MetadataSheet> {
                         doseG: _doseG,
                         grindSetting: _grindSetting,
                         coffeejackSettings: _coffeejackSettings,
-                        onDoseChanged: (value) => setState(() => _doseG = value),
+                        onDoseChanged: (value) =>
+                            setState(() => _doseG = value),
                         onGrindChanged: (value) => setState(
                           () => _grindSetting = snapGrindSetting(value),
                         ),
@@ -842,335 +852,392 @@ class _MetadataSheetState extends State<MetadataSheet> {
                         ),
                       ],
                     ),
-              const SizedBox(height: 12),
-              Autocomplete<Bean>(
-                initialValue: TextEditingValue(text: _beanController.text),
-                displayStringForOption: (bean) =>
-                    formatBeanDisplayLabel(bean, allBeans: _beans),
-                optionsBuilder: (value) {
-                  final query = value.text.trim().toLowerCase();
-                  if (query.isEmpty) {
-                    return _beans;
-                  }
-                  return _beans.where((bean) {
-                    final label = formatBeanDisplayLabel(
-                      bean,
-                      allBeans: _beans,
-                    ).toLowerCase();
-                    return label.contains(query) ||
-                        bean.name.toLowerCase().contains(query);
-                  });
-                },
-                onSelected: (bean) {
-                  _selectedBeanId = bean.id;
-                  _beanController.text =
-                      formatBeanDisplayLabel(bean, allBeans: _beans);
-                },
-                fieldViewBuilder: (
-                  context,
-                  controller,
-                  focusNode,
-                  onFieldSubmitted,
-                ) {
-                  if (controller.text != _beanController.text) {
-                    controller.text = _beanController.text;
-                  }
-                  return TextField(
-                    key: const Key('metadata_bean'),
-                    controller: controller,
-                    focusNode: focusNode,
-                    enabled: _beansReady,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: InputDecoration(
-                      labelText: 'Bean',
-                      border: const OutlineInputBorder(),
-                      helperText: 'Pick a bag or type a new name',
-                      suffixIcon: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (controller.text.trim().isNotEmpty)
-                            IconButton(
-                              key: const Key('metadata_bean_clear'),
-                              tooltip: 'Clear bean',
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
+                    const SizedBox(height: 12),
+                    Autocomplete<Bean>(
+                      initialValue: TextEditingValue(
+                        text: _beanController.text,
+                      ),
+                      displayStringForOption: (bean) =>
+                          formatBeanDisplayLabel(bean, allBeans: _beans),
+                      optionsBuilder: (value) {
+                        final query = value.text;
+                        if (query.trim().isEmpty) {
+                          return _beans;
+                        }
+                        return _beans.where(
+                          (bean) => beanMatchesQuery(bean, query),
+                        );
+                      },
+                      onSelected: (bean) {
+                        _selectedBeanId = bean.id;
+                        _beanController.text = formatBeanDisplayLabel(
+                          bean,
+                          allBeans: _beans,
+                        );
+                      },
+                      fieldViewBuilder:
+                          (context, controller, focusNode, onFieldSubmitted) {
+                            if (controller.text != _beanController.text) {
+                              controller.text = _beanController.text;
+                            }
+                            return TextField(
+                              key: const Key('metadata_bean'),
+                              controller: controller,
+                              focusNode: focusNode,
+                              enabled: _beansReady,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: InputDecoration(
+                                labelText: 'Bean',
+                                border: const OutlineInputBorder(),
+                                helperText: 'Pick a bag or type a new name',
+                                suffixIcon: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (controller.text.trim().isNotEmpty)
+                                      IconButton(
+                                        key: const Key('metadata_bean_clear'),
+                                        tooltip: 'Clear bean',
+                                        icon: const Icon(Icons.clear),
+                                        onPressed: () {
+                                          setState(() {
+                                            controller.clear();
+                                            _beanController.clear();
+                                            _selectedBeanId = null;
+                                          });
+                                        },
+                                      ),
+                                    IconButton(
+                                      key: const Key('metadata_bean_add'),
+                                      tooltip: 'Add new bean',
+                                      icon: const Icon(
+                                        Icons.add_circle_outline,
+                                      ),
+                                      onPressed: _beansReady
+                                          ? () => unawaited(
+                                              _promptAddBean(
+                                                fieldController: controller,
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              onChanged: (value) {
                                 setState(() {
-                                  controller.clear();
-                                  _beanController.clear();
+                                  _beanController.text = value;
                                   _selectedBeanId = null;
                                 });
                               },
-                            ),
-                          IconButton(
-                            key: const Key('metadata_bean_add'),
-                            tooltip: 'Add new bean',
-                            icon: const Icon(Icons.add_circle_outline),
-                            onPressed: _beansReady
-                                ? () => unawaited(_promptAddBean(
-                                      fieldController: controller,
-                                    ))
-                                : null,
-                          ),
-                        ],
-                      ),
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        _beanController.text = value;
-                        _selectedBeanId = null;
-                      });
-                    },
-                    onSubmitted: (_) => onFieldSubmitted(),
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                key: const Key('metadata_location'),
-                controller: _locationController,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Location',
-                  hintText: 'e.g. Home kitchen',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                key: const Key('metadata_notes'),
-                controller: _notesController,
-                minLines: 2,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Notes',
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Text('Equipment', style: Theme.of(context).textTheme.titleSmall),
-                  const Spacer(),
-                  if (_equipmentReady && _equipmentStore.settings.presets.isNotEmpty)
-                    PopupMenuButton<String>(
-                      tooltip: 'Load preset',
-                      onSelected: (presetId) {
-                        final preset = _equipmentStore.settings.presets.firstWhere((p) => p.id == presetId);
-                        preset.selections.forEach((cat, name) {
-                          switch (cat) {
-                            case 'grinder':
-                              _grinderController.text = name;
-                              break;
-                            case 'showerScreen':
-                              _showerScreenController.text = name;
-                              break;
-                            case 'basket':
-                              _basketController.text = name;
-                              break;
-                            case 'scale':
-                              _scaleController.text = name;
-                              break;
-                            case 'brewer':
-                              _brewerController.text = name;
-                              break;
-                          }
-                        });
-                        // Apply preset-tied defaults if present (dose/grind)
-                        if (preset.defaultDoseG != null && _doseG == _initialDose) {
-                          _doseG = preset.defaultDoseG!;
-                        }
-                        if (preset.defaultGrindSetting != null && _grindSetting == _initialGrind) {
-                          _grindSetting = snapGrindSetting(preset.defaultGrindSetting!);
-                        }
-                        if (preset.defaultRewindTurnsBeforeFill != null) {
-                          _coffeejackSettings = _coffeejackSettings.copyWith(
-                            rewindTurnsBeforeFill: preset.defaultRewindTurnsBeforeFill!,
-                          );
-                        }
-                        if (preset.defaultSlowPreinfusionTurns != null) {
-                          _coffeejackSettings = _coffeejackSettings.copyWith(
-                            slowPreinfusionTurns: preset.defaultSlowPreinfusionTurns!,
-                          );
-                        }
-                        setState(() {});
-                      },
-                      itemBuilder: (ctx) => _equipmentStore.settings.presets
-                          .map((p) => PopupMenuItem(value: p.id, child: Text(p.name)))
-                          .toList(),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8),
-                        child: Text('Load preset', style: TextStyle(fontSize: 12)),
-                      ),
-                    ),
-                  TextButton.icon(
-                    onPressed: () => Navigator.of(context, rootNavigator: true).push(
-                      MaterialPageRoute(builder: (_) => const EquipmentScreen()),
-                    ),
-                    icon: const Icon(Icons.settings, size: 16),
-                    label: const Text('Manage', style: TextStyle(fontSize: 12)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              _EquipmentAutocomplete(
-                controller: _grinderController,
-                label: 'Grinder',
-                hint: 'e.g. Chestnut X',
-                options: _equipmentReady ? _equipmentStore.itemsForCategory('grinder').map((e) => e.name).toList() : const [],
-              ),
-              const SizedBox(height: 4),
-              _EquipmentAutocomplete(
-                controller: _showerScreenController,
-                label: 'Shower screen',
-                hint: 'e.g. CoffeeJack v2, IKAPE v3',
-                options: _equipmentReady ? _equipmentStore.itemsForCategory('showerScreen').map((e) => e.name).toList() : const [],
-              ),
-              const SizedBox(height: 4),
-              _EquipmentAutocomplete(
-                controller: _basketController,
-                label: 'Basket',
-                hint: 'e.g. CJ v2, IKAPE 54→32mm',
-                options: _equipmentReady ? _equipmentStore.itemsForCategory('basket').map((e) => e.name).toList() : const [],
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Expanded(
-                    child: _EquipmentAutocomplete(
-                      controller: _scaleController,
-                      label: 'Scale',
-                      hint: 'e.g. Acaia',
-                      options: _equipmentReady ? _equipmentStore.itemsForCategory('scale').map((e) => e.name).toList() : const [],
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: _EquipmentAutocomplete(
-                      controller: _brewerController,
-                      label: 'Brewer',
-                      hint: 'e.g. CoffeeJack v2',
-                      options: _equipmentReady ? _equipmentStore.itemsForCategory('brewer').map((e) => e.name).toList() : const [],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Taste',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: Slider(
-                      key: const Key('metadata_taste_slider'),
-                      value: _tasteScore,
-                      min: 0,
-                      max: 10,
-                      divisions: 10,
-                      label: _tasteScore.round().toString(),
-                      onChanged: (value) {
-                        setState(() => _tasteScore = value);
-                      },
-                    ),
-                  ),
-                  SizedBox(
-                    width: 32,
-                    child: Text(
-                      key: const Key('metadata_taste_value'),
-                      _tasteScore.round().toString(),
-                      textAlign: TextAlign.end,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Flavour tags',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                key: const Key('metadata_flavour_tags'),
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final tag in flavourTagsForDisplay(_selectedFlavourTags))
-                    FilterChip(
-                      key: Key('metadata_flavour_$tag'),
-                      label: Text(tag),
-                      selected: _selectedFlavourTags.contains(tag),
-                      onSelected: (selected) {
-                        setState(() {
-                          if (selected) {
-                            _selectedFlavourTags.add(tag);
-                            _flavourIntensities.putIfAbsent(
-                              tag,
-                              () => kDefaultFlavourIntensity,
+                              onSubmitted: (_) => onFieldSubmitted(),
                             );
-                          } else {
-                            _selectedFlavourTags.remove(tag);
-                            _flavourIntensities.remove(tag);
-                          }
-                        });
-                      },
+                          },
                     ),
-                ],
-              ),
-              if (_selectedFlavourTags.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Text(
-                  'Flavour intensity',
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Rate how much of each note you taste (1–10).',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                for (final tag in sortedFlavourTags(_selectedFlavourTags))
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _FlavourIntensityRow(
-                      tag: tag,
-                      value: _flavourIntensities[tag] ?? kDefaultFlavourIntensity,
-                      onChanged: (value) {
-                        setState(() => _flavourIntensities[tag] = value);
-                      },
-                    ),
-                  ),
-              ],
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: const Key('metadata_custom_flavour_input'),
-                      controller: _customTagController,
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: const Key('metadata_location'),
+                      controller: _locationController,
                       textCapitalization: TextCapitalization.words,
                       decoration: const InputDecoration(
-                        labelText: 'New tag',
-                        hintText: 'e.g. funky, jammy',
+                        labelText: 'Location',
+                        hintText: 'e.g. Home kitchen',
                         border: OutlineInputBorder(),
-                        isDense: true,
                       ),
-                      onSubmitted: (_) => _addCustomFlavourTag(),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.tonal(
-                    key: const Key('metadata_add_flavour_tag'),
-                    onPressed: _addCustomFlavourTag,
-                    child: const Text('Add'),
-                  ),
-                ],
-              ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: const Key('metadata_notes'),
+                      controller: _notesController,
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Notes',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text(
+                          'Equipment',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const Spacer(),
+                        if (_equipmentReady &&
+                            _equipmentStore.settings.presets.isNotEmpty)
+                          PopupMenuButton<String>(
+                            tooltip: 'Load preset',
+                            onSelected: (presetId) {
+                              final preset = _equipmentStore.settings.presets
+                                  .firstWhere((p) => p.id == presetId);
+                              preset.selections.forEach((cat, name) {
+                                switch (cat) {
+                                  case 'grinder':
+                                    _grinderController.text = name;
+                                    break;
+                                  case 'showerScreen':
+                                    _showerScreenController.text = name;
+                                    break;
+                                  case 'basket':
+                                    _basketController.text = name;
+                                    break;
+                                  case 'scale':
+                                    _scaleController.text = name;
+                                    break;
+                                  case 'brewer':
+                                    _brewerController.text = name;
+                                    break;
+                                }
+                              });
+                              // Apply preset-tied defaults if present (dose/grind)
+                              if (preset.defaultDoseG != null &&
+                                  _doseG == _initialDose) {
+                                _doseG = preset.defaultDoseG!;
+                              }
+                              if (preset.defaultGrindSetting != null &&
+                                  _grindSetting == _initialGrind) {
+                                _grindSetting = snapGrindSetting(
+                                  preset.defaultGrindSetting!,
+                                );
+                              }
+                              if (preset.defaultRewindTurnsBeforeFill != null) {
+                                _coffeejackSettings = _coffeejackSettings
+                                    .copyWith(
+                                      rewindTurnsBeforeFill:
+                                          preset.defaultRewindTurnsBeforeFill!,
+                                    );
+                              }
+                              if (preset.defaultSlowPreinfusionTurns != null) {
+                                _coffeejackSettings = _coffeejackSettings
+                                    .copyWith(
+                                      slowPreinfusionTurns:
+                                          preset.defaultSlowPreinfusionTurns!,
+                                    );
+                              }
+                              setState(() {});
+                            },
+                            itemBuilder: (ctx) => _equipmentStore
+                                .settings
+                                .presets
+                                .map(
+                                  (p) => PopupMenuItem(
+                                    value: p.id,
+                                    child: Text(p.name),
+                                  ),
+                                )
+                                .toList(),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                'Load preset',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ),
+                        TextButton.icon(
+                          onPressed: () =>
+                              Navigator.of(context, rootNavigator: true).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const EquipmentScreen(),
+                                ),
+                              ),
+                          icon: const Icon(Icons.settings, size: 16),
+                          label: const Text(
+                            'Manage',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    _EquipmentAutocomplete(
+                      controller: _grinderController,
+                      label: 'Grinder',
+                      hint: 'e.g. Chestnut X',
+                      options: _equipmentReady
+                          ? _equipmentStore
+                                .itemsForCategory('grinder')
+                                .map((e) => e.name)
+                                .toList()
+                          : const [],
+                    ),
+                    const SizedBox(height: 4),
+                    _EquipmentAutocomplete(
+                      controller: _showerScreenController,
+                      label: 'Shower screen',
+                      hint: 'e.g. CoffeeJack v2, IKAPE v3',
+                      options: _equipmentReady
+                          ? _equipmentStore
+                                .itemsForCategory('showerScreen')
+                                .map((e) => e.name)
+                                .toList()
+                          : const [],
+                    ),
+                    const SizedBox(height: 4),
+                    _EquipmentAutocomplete(
+                      controller: _basketController,
+                      label: 'Basket',
+                      hint: 'e.g. CJ v2, IKAPE 54→32mm',
+                      options: _equipmentReady
+                          ? _equipmentStore
+                                .itemsForCategory('basket')
+                                .map((e) => e.name)
+                                .toList()
+                          : const [],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _EquipmentAutocomplete(
+                            controller: _scaleController,
+                            label: 'Scale',
+                            hint: 'e.g. Acaia',
+                            options: _equipmentReady
+                                ? _equipmentStore
+                                      .itemsForCategory('scale')
+                                      .map((e) => e.name)
+                                      .toList()
+                                : const [],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: _EquipmentAutocomplete(
+                            controller: _brewerController,
+                            label: 'Brewer',
+                            hint: 'e.g. CoffeeJack v2',
+                            options: _equipmentReady
+                                ? _equipmentStore
+                                      .itemsForCategory('brewer')
+                                      .map((e) => e.name)
+                                      .toList()
+                                : const [],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Taste',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Slider(
+                            key: const Key('metadata_taste_slider'),
+                            value: _tasteScore,
+                            min: 0,
+                            max: 10,
+                            divisions: 10,
+                            label: _tasteScore.round().toString(),
+                            onChanged: (value) {
+                              setState(() => _tasteScore = value);
+                            },
+                          ),
+                        ),
+                        SizedBox(
+                          width: 32,
+                          child: Text(
+                            key: const Key('metadata_taste_value'),
+                            _tasteScore.round().toString(),
+                            textAlign: TextAlign.end,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Flavour tags',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      key: const Key('metadata_flavour_tags'),
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final tag in flavourTagsForDisplay(
+                          _selectedFlavourTags,
+                        ))
+                          FilterChip(
+                            key: Key('metadata_flavour_$tag'),
+                            label: Text(tag),
+                            selected: _selectedFlavourTags.contains(tag),
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _selectedFlavourTags.add(tag);
+                                  _flavourIntensities.putIfAbsent(
+                                    tag,
+                                    () => kDefaultFlavourIntensity,
+                                  );
+                                } else {
+                                  _selectedFlavourTags.remove(tag);
+                                  _flavourIntensities.remove(tag);
+                                }
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                    if (_selectedFlavourTags.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        'Flavour intensity',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Rate how much of each note you taste (1–10).',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      for (final tag in sortedFlavourTags(_selectedFlavourTags))
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _FlavourIntensityRow(
+                            tag: tag,
+                            value:
+                                _flavourIntensities[tag] ??
+                                kDefaultFlavourIntensity,
+                            onChanged: (value) {
+                              setState(() => _flavourIntensities[tag] = value);
+                            },
+                          ),
+                        ),
+                    ],
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            key: const Key('metadata_custom_flavour_input'),
+                            controller: _customTagController,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: const InputDecoration(
+                              labelText: 'New tag',
+                              hintText: 'e.g. funky, jammy',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            onSubmitted: (_) => _addCustomFlavourTag(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.tonal(
+                          key: const Key('metadata_add_flavour_tag'),
+                          onPressed: _addCustomFlavourTag,
+                          child: const Text('Add'),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -1231,14 +1298,15 @@ class _FlavourIntensityRow extends StatelessWidget {
             value.toString(),
             textAlign: TextAlign.end,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
         ),
       ],
     );
   }
 }
+
 /// Autocomplete for equipment that pulls suggestions from the user's list for the category,
 /// while still allowing free-text custom entry.
 class _EquipmentAutocomplete extends StatelessWidget {

@@ -78,8 +78,9 @@ class _FlowlogShellState extends State<FlowlogShell> {
         widget.autoStartController ?? AutoStartSettingsController();
     _activeBrewNotifier = ActiveBrewNotifier();
     _shotEventsNotifier = ShotEventsNotifier();
-    _selectedIndex = appDestinations
-        .indexWhere((destination) => destination.tab == widget.initialTab);
+    _selectedIndex = appDestinations.indexWhere(
+      (destination) => destination.tab == widget.initialTab,
+    );
     if (_selectedIndex < 0) {
       _selectedIndex = 0;
     }
@@ -96,9 +97,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
       // competing with BLE reconnect and History open on cold start.
       _deferredSyncTimer?.cancel();
       _deferredSyncTimer = Timer(const Duration(seconds: 3), () {
-        unawaited(
-          FlowlogSyncCoordinator.syncIfEnabled(database: database),
-        );
+        unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
       });
     }
   }
@@ -168,10 +167,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
   Future<void> _persistDefaultBean() async {
     final name = _beanName.trim();
     await _defaultBeanStore.save(
-      DefaultBean(
-        beanId: _beanId,
-        name: name.isEmpty ? null : name,
-      ),
+      DefaultBean(beanId: _beanId, name: name.isEmpty ? null : name),
     );
   }
 
@@ -274,8 +270,9 @@ class _FlowlogShellState extends State<FlowlogShell> {
   }
 
   void _switchTab(AppTab tab) {
-    final index =
-        appDestinations.indexWhere((destination) => destination.tab == tab);
+    final index = appDestinations.indexWhere(
+      (destination) => destination.tab == tab,
+    );
     if (index < 0) {
       return;
     }
@@ -336,8 +333,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
                             _syncImmersiveBrewUi(brewImmersive);
                           });
 
-                          final tabIndex =
-                              brewImmersive ? 0 : _selectedIndex;
+                          final tabIndex = brewImmersive ? 0 : _selectedIndex;
 
                           // CRITICAL: do not change the Element path of the tab
                           // stack when brewImmersive flips (no conditional
@@ -362,8 +358,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
                                           labelType:
                                               NavigationRailLabelType.none,
                                           destinations: [
-                                            for (final item
-                                                in appDestinations)
+                                            for (final item in appDestinations)
                                               NavigationRailDestination(
                                                 icon: _TabIcon(
                                                   icon: item.icon,
@@ -394,16 +389,16 @@ class _FlowlogShellState extends State<FlowlogShell> {
                                     beanId: _beanId,
                                     loadBeans: () =>
                                         _ensureBeanRepository().then(
-                                      (repository) =>
-                                          repository.listBeansByRecentUse(),
-                                    ),
-                                    onActiveBeanChanged:
-                                        (name, {beanId}) => unawaited(
-                                      _handleActiveBeanChanged(
-                                        name,
-                                        beanId: beanId,
-                                      ),
-                                    ),
+                                          (repository) =>
+                                              repository.listBeansByRecentUse(),
+                                        ),
+                                    onActiveBeanChanged: (name, {beanId}) =>
+                                        unawaited(
+                                          _handleActiveBeanChanged(
+                                            name,
+                                            beanId: beanId,
+                                          ),
+                                        ),
                                     child: _PersistentTabStack(
                                       key: _tabStackKey,
                                       index: tabIndex,
@@ -514,7 +509,8 @@ class _ShellContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final wantTopBar = !hideChrome &&
+        final wantTopBar =
+            !hideChrome &&
             constraints.maxHeight >= ShellBreakpoints.minHeightForAppBar;
 
         final hub = SensorHubScope.of(context);
@@ -543,6 +539,7 @@ class _ShellContent extends StatelessWidget {
                       pressensorState: hub.pressensorState,
                       scaleState: hub.scaleState,
                       pressensorBatteryPercent: hub.pressensorBatteryPercent,
+                      scaleStreamSilent: hub.isScaleWeightStreamSilent,
                     );
                   },
                 ),
@@ -589,13 +586,13 @@ class _FlowlogBottomBar extends StatelessWidget {
               NavigationDestination(
                 icon: _TabIcon(
                   icon: item.icon,
-                  showRecordingBadge: item.tab == AppTab.live &&
-                      activeBrewNotifier.isBrewing,
+                  showRecordingBadge:
+                      item.tab == AppTab.live && activeBrewNotifier.isBrewing,
                 ),
                 selectedIcon: _TabIcon(
                   icon: item.icon,
-                  showRecordingBadge: item.tab == AppTab.live &&
-                      activeBrewNotifier.isBrewing,
+                  showRecordingBadge:
+                      item.tab == AppTab.live && activeBrewNotifier.isBrewing,
                 ),
                 label: item.label,
                 tooltip: item.semanticsLabel,
@@ -613,10 +610,7 @@ class _FlowlogBottomBar extends StatelessWidget {
 }
 
 class _TabIcon extends StatelessWidget {
-  const _TabIcon({
-    required this.icon,
-    required this.showRecordingBadge,
-  });
+  const _TabIcon({required this.icon, required this.showRecordingBadge});
 
   final IconData icon;
   final bool showRecordingBadge;

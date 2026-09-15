@@ -241,6 +241,8 @@ class DualCurveChart extends StatefulWidget {
 class _DualCurveChartState extends State<DualCurveChart> {
   late ChartInteractionController _interactionController;
   bool _ownsInteractionController = false;
+  List<ShotSample>? _preparedSamples;
+  int _preparedSignature = 0;
 
   @override
   void initState() {
@@ -318,7 +320,7 @@ class _DualCurveChartState extends State<DualCurveChart> {
       axisLabel: themeStyle.axisLabel,
       targetPressureLine: themeStyle.targetPressureLine,
     );
-    final prepared = _prepareSamples(rawSamples);
+    final prepared = _cachedPrepare(rawSamples);
     final totalDurationMs = _resolveTotalDurationMs(prepared);
 
     if (widget.enableInteraction) {
@@ -492,6 +494,31 @@ class _DualCurveChartState extends State<DualCurveChart> {
           },
         ),
       ),
+    );
+  }
+
+  List<ShotSample> _cachedPrepare(List<ShotSample> raw) {
+    final signature = _samplesSignature(raw);
+    final cached = _preparedSamples;
+    if (cached != null && signature == _preparedSignature) {
+      return cached;
+    }
+    _preparedSignature = signature;
+    _preparedSamples = _prepareSamples(raw);
+    return _preparedSamples!;
+  }
+
+  static int _samplesSignature(List<ShotSample> raw) {
+    if (raw.isEmpty) {
+      return 0;
+    }
+    final last = raw.last;
+    return Object.hash(
+      raw.length,
+      last.elapsedMs,
+      last.weightG,
+      last.pressureBar,
+      last.flowGs,
     );
   }
 

@@ -1085,11 +1085,10 @@ class _LiveScreenState extends State<LiveScreen> {
         final chartTargetSamples = _chartTargetPressureSamples();
         final autoStartSettings = _resolvedAutoStartController.settings;
 
-        // Live gamification stats (recomputed cheaply on each sample update)
+        // Skip during the pull — brew HUD does not show it, and O(n) on
+        // every 50 ms notify hitch the chart.
         final bool showLiveGamif =
-            (state == ShotSessionState.recording ||
-                state == ShotSessionState.paused ||
-                state == ShotSessionState.stopped) &&
+            state == ShotSessionState.stopped &&
             samples.isNotEmpty &&
             chartTargetSamples.isNotEmpty;
         final Map<String, dynamic> liveGamif = showLiveGamif
@@ -1187,19 +1186,43 @@ class _LiveScreenState extends State<LiveScreen> {
                                   height: 10,
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  _formatBrewElapsed(latestSample?.elapsedMs),
-                                  key: const Key('live_elapsed_digit'),
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        fontFeatures: const [
-                                          FontFeature.tabularFigures(),
-                                        ],
-                                        fontWeight: FontWeight.w700,
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _formatBrewElapsed(
+                                          latestSample?.elapsedMs,
+                                        ),
+                                        key: const Key('live_elapsed_digit'),
+                                        textAlign: TextAlign.center,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineSmall
+                                            ?.copyWith(
+                                              fontFeatures: const [
+                                                FontFeature.tabularFigures(),
+                                              ],
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                       ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        _formatBrewFlow(latestFlowGs(samples)),
+                                        key: const Key('live_flow_digit'),
+                                        textAlign: TextAlign.center,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineSmall
+                                            ?.copyWith(
+                                              fontFeatures: const [
+                                                FontFeature.tabularFigures(),
+                                              ],
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 8),
                                 LiveControls(
@@ -1414,9 +1437,7 @@ class _LiveScreenState extends State<LiveScreen> {
                           children: [
                             Expanded(
                               flex: 3,
-                              child: SingleChildScrollView(
-                                child: chartSection,
-                              ),
+                              child: SingleChildScrollView(child: chartSection),
                             ),
                             Expanded(
                               flex: 2,
@@ -1508,6 +1529,13 @@ String _formatBrewElapsed(int? elapsedMs) {
   final minutes = totalSec ~/ 60;
   final seconds = totalSec % 60;
   return '${minutes.toString().padLeft(1, '0')}:${seconds.toString().padLeft(2, '0')}';
+}
+
+String _formatBrewFlow(double? flowGs) {
+  if (flowGs == null) {
+    return '— g/s';
+  }
+  return '${flowGs.toStringAsFixed(1)} g/s';
 }
 
 /// Compact live gamification strip shown while brewing against a target curve.
