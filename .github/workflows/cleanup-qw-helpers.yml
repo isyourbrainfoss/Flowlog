@@ -14,13 +14,21 @@ jobs:
       - name: Remove helper artifacts
         run: |
           set -euo pipefail
+          shopt -s nullglob
           git config user.name "isyourbrainfoss"
           git config user.email "isyourbrainfoss@proton.me"
-          git rm -rf .ci/qw-patches .ci/rem.*.b64.txt .ci/remaining.patch \
-            .ci/qw-*.b64.txt .ci/quick-wins-0.0.3*.patch || true
-          # Do not delete workflow files here (needs workflows permission).
+          paths=()
+          if [ -d .ci/qw-patches ]; then paths+=(.ci/qw-patches); fi
+          for f in .ci/rem.*.b64.txt .ci/remaining.patch .ci/qw-*.b64.txt .ci/quick-wins-0.0.3*.patch; do
+            paths+=("$f")
+          done
+          if [ ${#paths[@]} -eq 0 ]; then
+            echo "Nothing to remove"
+            exit 0
+          fi
+          git rm -rf --ignore-unmatch "${paths[@]}"
           if git diff --cached --quiet; then
-            echo "Nothing to clean"
+            echo "Nothing staged"
             exit 0
           fi
           git commit -m "chore: remove quick-wins patch helpers"
