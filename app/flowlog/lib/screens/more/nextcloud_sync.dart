@@ -323,8 +323,7 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
         Text(
           'Your app password is stored in the platform secure store '
           '(Android Keystore / system credential vault), not in plaintext. '
-          'Sync transfers use HTTPS WebDAV; optional on-blob E2E encryption '
-          'remains a future enhancement.',
+          'Sync transfers use HTTPS WebDAV.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
