@@ -14,8 +14,8 @@ jobs:
       - name: Decode and apply remaining patch
         run: |
           set -euo pipefail
-          for i in 0 1 2 3 4 5; do
-            cat ".ci/rem.${i}.b64.txt"
+          for n in 0a 0b 1a 1b 2a 2b 3a 3b 4a 4b 5; do
+            cat ".ci/rem.${n}.b64.txt"
           done | tr -d '\n' | base64 -d > .ci/remaining.patch
           git apply --index .ci/remaining.patch
           git config user.name "isyourbrainfoss"
