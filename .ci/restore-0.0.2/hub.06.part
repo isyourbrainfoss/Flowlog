@@ -1,0 +1,80 @@
+      return;
+    }
+    _scaleHealthTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      _notifyIfScaleSilenceChanged();
+      unawaited(_recoverSilentScales());
+    });
+  }
+
+  void _notifyIfScaleSilenceChanged() {
+    final silent = isScaleWeightStreamSilent;
+    if (_scaleSilenceNotified == silent) {
+      return;
+    }
+    _scaleSilenceNotified = silent;
+    notifyListeners();
+  }
+
+  /// Test hook for [_recoverSilentScales] (mid-wait recovery-flag race).
+  @visibleForTesting
+  Future<void> recoverSilentScalesForTest() => _recoverSilentScales();
+
+  void _stopScaleHealthWatchdogIfIdle() {
+    final anyScaleUp = _devices.any(
+      (d) =>
+          d.kind == SensorKind.scale &&
+          (d.state == ConnectionState.connected ||
+              d.state == ConnectionState.connecting ||
+              d.state == ConnectionState.error),
+    );
+    if (!anyScaleUp) {
+      _scaleHealthTimer?.cancel();
+      _scaleHealthTimer = null;
+      _scaleSilenceNotified = null;
+    }
+  }
+
+  Future<void> _recoverSilentScales() async {
+    if (!_scaleRecoveryEnabled) {
+      return;
+    }
+    for (final device in List<PairedSensorEntry>.from(_devices)) {
+      if (device.kind != SensorKind.scale) {
+        continue;
+      }
+      if (device.state != ConnectionState.connected &&
+          device.state != ConnectionState.error) {
+        continue;
+      }
+      final adapter = _activeAdapters[device.id];
+      if (adapter is! DecentScaleBleAdapter) {
+        continue;
+      }
+      if (!adapter.isWeightStreamSilent(
+        silentFor: const Duration(seconds: 6),
+      )) {
+        continue;
+      }
+      if (_scaleRecoverInFlight.contains(device.id)) {
+        continue;
+      }
+      _scaleRecoverInFlight.add(device.id);
+      try {
+        // Soft rearm first.
+        try {
+          await adapter.rearmStream().timeout(const Duration(seconds: 3));
+        } on Object {
+          // Fall through to hard reconnect.
+        }
+        await Future<void>.delayed(const Duration(seconds: 2));
+        // Brew may have started during the wait — do not tear the link.
+        if (!_scaleRecoveryEnabled) {
+          continue;
+        }
+        if (!adapter.isWeightStreamSilent(
+          silentFor: const Duration(seconds: 3),
+        )) {
+          continue;
+        }
+        // Hard reconnect this scale only.
+        await disconnect(device.id);
