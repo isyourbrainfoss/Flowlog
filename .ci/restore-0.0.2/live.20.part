@@ -1,0 +1,80 @@
+    required this.closeness,
+    required this.maxStreakSec,
+    required this.currentStreakSec,
+    required this.penaltyCount,
+    required this.score,
+  });
+
+  final double? closeness;
+  final int maxStreakSec;
+  final int currentStreakSec;
+  final int penaltyCount;
+  final double? score;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasTarget =
+        closeness != null ||
+        score != null ||
+        maxStreakSec > 0 ||
+        currentStreakSec > 0;
+
+    if (!hasTarget) {
+      return const SizedBox.shrink();
+    }
+
+    final closenessStr = closeness != null
+        ? '${closeness!.toStringAsFixed(0)}%'
+        : '—';
+    final scoreStr = score != null ? score!.toStringAsFixed(0) : '—';
+    final streakStr = currentStreakSec > 0
+        ? '${currentStreakSec}s / ${maxStreakSec}s'
+        : (maxStreakSec > 0 ? 'max ${maxStreakSec}s' : '—');
+
+    final isGoodStreak = currentStreakSec >= 3;
+    final streakColor = isGoodStreak
+        ? Colors.green.shade700
+        : theme.colorScheme.onSurfaceVariant;
+    final hasPenalties = penaltyCount > 0;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.track_changes, size: 16),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              children: [
+                _GamifPill(label: 'Close', value: closenessStr),
+                _GamifPill(
+                  label: 'Streak',
+                  value: streakStr,
+                  valueColor: streakColor,
+                ),
+                if (hasPenalties)
+                  _GamifPill(
+                    label: 'Penalties',
+                    value: '$penaltyCount',
+                    valueColor: theme.colorScheme.error,
+                  ),
+                _GamifPill(label: 'Score', value: scoreStr),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
