@@ -1,0 +1,80 @@
+
+  /// Scans for a sensor of [kind] and auto-assigns when exactly one is found.
+  ///
+  /// When [abort] completes, the scan is stopped and nothing is assigned.
+  Future<BleScanAssignResult> scanAndAssign(
+    SensorKind kind, {
+    Future<void>? abort,
+  }) async {
+    var aborted = false;
+    if (abort != null) {
+      unawaited(
+        abort.whenComplete(() {
+          aborted = true;
+        }),
+      );
+    }
+
+    final readyError = await _bleBackend.ensureReady();
+    if (readyError != null) {
+      setLastError(readyError);
+      return BleScanAssignResult.unavailable(readyError);
+    }
+    if (aborted) {
+      return BleScanAssignResult.cancelled();
+    }
+
+    final discovered = await _bleBackend.scan(kind, abort: abort);
+    if (aborted) {
+      return BleScanAssignResult.cancelled();
+    }
+    if (discovered.isEmpty) {
+      const message = 'No nearby sensor found. Make sure it is powered on.';
+      setLastError(message);
+      return BleScanAssignResult.notFound();
+    }
+
+    if (discovered.length > 1) {
+      return BleScanAssignResult.multiple(discovered);
+    }
+
+    final match = discovered.first;
+    assignBleRemoteId(
+      kind,
+      bleRemoteId: match.remoteId,
+      name: match.name,
+      rssi: match.rssi,
+    );
+    setLastError(null);
+    return BleScanAssignResult.assigned(match);
+  }
+
+  void removeDevice(String id) {
+    final before = _devices.length;
+    unawaited(disconnect(id));
+    _devices.removeWhere((device) => device.id == id);
+    if (_devices.length != before) {
+      _rssiByDevice.remove(id);
+      _batteryByDevice.remove(id);
+      unawaited(_persistDevices());
+      notifyListeners();
+    }
+  }
+
+  /// Reconnects paired sensors that already have a saved BLE id.
+  ///
+  /// Skips a sensor only when it is connected **and** has received a packet
+  /// this process. GATT-connected with a null receive stamp is not skipped —
+  /// adapter grace treats a new link as healthy, which hid zombie connects.
+  Future<void> reconnectPairedDevices() async {
+    if (!_scaleRecoveryEnabled) {
+      return;
+    }
+    final existing = _reconnectInFlight;
+    if (existing != null) {
+      await existing;
+      return;
+    }
+    final run = Completer<void>();
+    _reconnectInFlight = run.future;
+    try {

@@ -1,0 +1,80 @@
+      await _reconnectPairedDevicesBody();
+    } finally {
+      _reconnectInFlight = null;
+      run.complete();
+    }
+  }
+
+  Future<void> _reconnectPairedDevicesBody() async {
+    if (!_scaleRecoveryEnabled) {
+      return;
+    }
+
+    final ordered = List<PairedSensorEntry>.from(devices)
+      ..sort((a, b) {
+        int rank(PairedSensorEntry device) =>
+            device.kind == SensorKind.scale ? 0 : 1;
+        return rank(a).compareTo(rank(b));
+      });
+
+    for (var i = 0; i < ordered.length; i++) {
+      if (!_scaleRecoveryEnabled) {
+        return;
+      }
+      final snapshot = ordered[i];
+      final bleRemoteId = snapshot.bleRemoteId;
+      if (bleRemoteId == null || bleRemoteId.isEmpty) {
+        continue;
+      }
+
+      final device = _deviceById(snapshot.id) ?? snapshot;
+      if (_hasFreshStream(device)) {
+        continue;
+      }
+
+      final index = _devices.indexWhere((entry) => entry.id == device.id);
+      if (index >= 0) {
+        _devices[index] = _devices[index].copyWith(
+          state: ConnectionState.connecting,
+        );
+        notifyListeners();
+      }
+
+      final wasLinked =
+          device.state == ConnectionState.connected ||
+          device.state == ConnectionState.connecting ||
+          _activeAdapters.containsKey(device.id);
+      await _teardownAdapter(device.id);
+      if (wasLinked) {
+        await Future<void>.delayed(const Duration(milliseconds: 350));
+      }
+      await connect(device.id);
+
+      if (i >= ordered.length - 1) {
+        continue;
+      }
+      final latest = _deviceById(device.id);
+      final succeeded = latest?.state == ConnectionState.connected;
+      if (succeeded && device.kind == SensorKind.scale) {
+        await _waitForScaleGrams(device.id);
+      } else if (!succeeded) {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      }
+    }
+  }
+
+  PairedSensorEntry? _deviceById(String id) {
+    for (final device in _devices) {
+      if (device.id == id) {
+        return device;
+      }
+    }
+    return null;
+  }
+
+  /// True only when this process has received a packet and the stream is live.
+  bool _hasFreshStream(PairedSensorEntry device) {
+    if (device.state != ConnectionState.connected) {
+      return false;
+    }
+    final adapter = _activeAdapters[device.id];
