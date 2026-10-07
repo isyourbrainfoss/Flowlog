@@ -1,0 +1,80 @@
+    _brewGpsCapture = widget.brewGpsCapture ?? const BrewGpsCapture();
+
+    _samplesNotifier = ValueNotifier<List<ShotSample>>(const []);
+    _livePressureNotifier = ValueNotifier<double?>(null);
+    _livePressureLastUpdate = ValueNotifier<DateTime?>(null);
+    _liveWeightNotifier = ValueNotifier<double?>(null);
+    _liveWeightLastUpdate = ValueNotifier<DateTime?>(null);
+    _annotationController = ShotAnnotationController();
+    _annotationsNotifier = ValueNotifier<List<ShotAnnotation>>(
+      List<ShotAnnotation>.from(_annotationController.annotations),
+    );
+    _annotationController.addListener(_syncAnnotations);
+    _chartInteractionController = ChartInteractionController();
+    _ownedAutoStartController = AutoStartSettingsController();
+    unawaited(_ownedAutoStartController.load());
+    _brewDefaultsStore = BrewDefaultsSettingsStore();
+    unawaited(
+      _brewDefaultsStore.load().then((d) {
+        _brewDefaults = d;
+        if (mounted) setState(() {});
+      }),
+    );
+
+    if (widget.controller != null) {
+      _sensorSource = widget.sensorSource;
+      _bindController(widget.controller!);
+      _controllerReady = true;
+    }
+  }
+
+  AutoStartSettingsController get _resolvedAutoStartController {
+    return _autoStartController ??
+        widget.autoStartController ??
+        _ownedAutoStartController;
+  }
+
+  void _onSensorHubChanged() {
+    final hub = _sensorHub;
+    if (hub == null) {
+      return;
+    }
+
+    final current = hub.pressensorState;
+    final previous = _lastPressensorState;
+    _lastPressensorState = current;
+
+    // Snackbars during a pull hitch the brew UI and sit on the stop control.
+    if (_controller?.isBrewing ?? false) {
+      return;
+    }
+
+    if (previous != null &&
+        previous != ConnectionState.connected &&
+        current == ConnectionState.connected &&
+        mounted) {
+      final threshold = _resolvedAutoStartController.settings.startThresholdBar;
+      final batteryWarning = pressensorLowBatteryWarning(
+        hub.pressensorBatteryPercent,
+      );
+      final message = StringBuffer(
+        'Pressensor connected — auto-start at ${threshold.toStringAsFixed(1)} bar',
+      );
+      if (batteryWarning != null) {
+        message.write('. $batteryWarning');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          key: const Key('pressensor_connected_snackbar'),
+          content: Text(message.toString()),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _bindController(LiveShotController controller) {
+    _controller?.removeListener(_syncSamples);
+    _controller?.removeListener(_onSessionLifecycle);
+    _controller = controller;
+    _controller!.addListener(_syncSamples);
