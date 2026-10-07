@@ -1,0 +1,57 @@
+diff --git a/.github/workflows/android-release.yml b/.github/workflows/android-release.yml
+index 5afce6d..0a5ad51 100644
+--- a/.github/workflows/android-release.yml
++++ b/.github/workflows/android-release.yml
+@@ -39,15 +39,25 @@ jobs:
+       - name: Accept Android licenses
+         run: yes | flutter doctor --android-licenses
+ 
++      - name: Resolve marketing version
++        id: app_version
++        run: |
++          # pubspec marketing version (e.g. 0.0.3) — Obtainium versionName.
++          # GitHub release tags stay build-${{ github.run_number }}.
++          VER=$(awk '/^version:/ {print $2; exit}' app/flowlog/pubspec.yaml | cut -d+ -f1)
++          echo "marketing=$VER" >> "$GITHUB_OUTPUT"
++          echo "Marketing version: $VER"
++
+       - name: Build release APK (arm64 only)
+         working-directory: app/flowlog
+         run: |
+-          BUILD=build-${{ github.run_number }}
+-          # Gradle wrapper download occasionally EOFs; retry the whole assemble.
++          MARKETING="${{ steps.app_version.outputs.marketing }}"
++          # versionName = marketing (0.0.3); versionCode = CI run number.
++          # Tags remain build-N so the existing Obtainium/tag pipeline stays intact.
+           for attempt in 1 2 3; do
+             if flutter build apk --release --split-per-abi --target-platform android-arm64 \
+               --build-number=${{ github.run_number }} \
+-              --build-name="$BUILD"; then
++              --build-name="$MARKETING"; then
+               exit 0
+             fi
+             echo "APK build failed (attempt ${attempt}), retrying..."
+@@ -58,10 +68,11 @@ jobs:
+       - name: Prepare release assets
+         run: |
+           APK=app/flowlog/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+-          BUILD=build-${{ github.run_number }}
++          MARKETING="${{ steps.app_version.outputs.marketing }}"
+           cp "$APK" flowlog-release.apk
+           cp "$APK" flowlog-arm64-v8a.apk
+-          echo "VERSION=$BUILD" >> "$GITHUB_ENV"
++          # Obtainium versionName shows marketing; versionCode drives updates.
++          echo "VERSION=$MARKETING" >> "$GITHUB_ENV"
+           echo "VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
+           ls -lh flowlog-*.apk
+ 
+@@ -76,6 +87,9 @@ jobs:
+           body: |
+             Automated Android build for commit ${{ github.sha }}.
+ 
++            Marketing version: `${{ steps.app_version.outputs.marketing }}`
++            (APK versionName). Tag/build number: `build-${{ github.run_number }}`.
++
+             **Obtainium (recommended):** Direct APK Link → Standard JSON:
+             ```
+             https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/version.json

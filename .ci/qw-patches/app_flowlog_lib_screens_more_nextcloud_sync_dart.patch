@@ -1,0 +1,21 @@
+diff --git a/app/flowlog/lib/screens/more/nextcloud_sync.dart b/app/flowlog/lib/screens/more/nextcloud_sync.dart
+index 5faa7d2..53bfa87 100644
+--- a/app/flowlog/lib/screens/more/nextcloud_sync.dart
++++ b/app/flowlog/lib/screens/more/nextcloud_sync.dart
+@@ -321,11 +321,12 @@ class _NextcloudSyncScreenState extends State<NextcloudSyncScreen> {
+         ),
+         const SizedBox(height: 8),
+         Text(
+-          'Note: Transfer uses your WebDAV credentials. On-device encryption is '
+-          'currently a basic placeholder and will be improved before relying on '
+-          'it for sensitive data.',
++          'Your app password is stored in the platform secure store '
++          '(Android Keystore / system credential vault), not in plaintext. '
++          'Sync transfers use HTTPS WebDAV; optional on-blob E2E encryption '
++          'remains a future enhancement.',
+           style: Theme.of(context).textTheme.bodySmall?.copyWith(
+-                color: Theme.of(context).colorScheme.error,
++                color: Theme.of(context).colorScheme.onSurfaceVariant,
+               ),
+         ),
+         const SizedBox(height: 16),
