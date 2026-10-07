@@ -1,1 +1,1 @@
-PLACEHOLDER_LOAD_FROM_FILE
+$file:/tmp/fix_content.dart
