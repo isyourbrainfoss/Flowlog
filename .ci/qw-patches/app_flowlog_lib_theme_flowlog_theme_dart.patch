@@ -1,0 +1,66 @@
+diff --git a/app/flowlog/lib/theme/flowlog_theme.dart b/app/flowlog/lib/theme/flowlog_theme.dart
+index f661147..4b3d5dd 100644
+--- a/app/flowlog/lib/theme/flowlog_theme.dart
++++ b/app/flowlog/lib/theme/flowlog_theme.dart
+@@ -151,11 +151,18 @@ abstract final class FlowlogTheme {
+ class FlowlogThemeController extends ChangeNotifier {
+   FlowlogThemeController({
+     this.themeMode = ThemeMode.dark,
+-    this.onThemeModeChanged,
++    this.colorblindCharts = false,
++    this.onAppearanceChanged,
+   });
+ 
+   ThemeMode themeMode;
+-  final Future<void> Function(ThemeMode mode)? onThemeModeChanged;
++  bool colorblindCharts;
++
++  /// Persists full appearance (theme + chart palette) after user changes.
++  final Future<void> Function({
++    required ThemeMode themeMode,
++    required bool colorblindCharts,
++  })? onAppearanceChanged;
+ 
+   /// True only when [themeMode] is explicitly dark (not when following system).
+   bool get isDark => themeMode == ThemeMode.dark;
+@@ -175,9 +182,38 @@ class FlowlogThemeController extends ChangeNotifier {
+     }
+     themeMode = mode;
+     notifyListeners();
+-    final persist = onThemeModeChanged;
++    _persist();
++  }
++
++  void setColorblindCharts(bool enabled) {
++    if (colorblindCharts == enabled) {
++      return;
++    }
++    colorblindCharts = enabled;
++    notifyListeners();
++    _persist();
++  }
++
++  /// Applies persisted values without writing them back to disk.
++  void restoreAppearance({
++    required ThemeMode themeMode,
++    required bool colorblindCharts,
++  }) {
++    final changed =
++        this.themeMode != themeMode || this.colorblindCharts != colorblindCharts;
++    this.themeMode = themeMode;
++    this.colorblindCharts = colorblindCharts;
++    if (changed) {
++      notifyListeners();
++    }
++  }
++
++  void _persist() {
++    final persist = onAppearanceChanged;
+     if (persist != null) {
+-      unawaited(persist(mode));
++      unawaited(
++        persist(themeMode: themeMode, colorblindCharts: colorblindCharts),
++      );
+     }
+   }
+ }

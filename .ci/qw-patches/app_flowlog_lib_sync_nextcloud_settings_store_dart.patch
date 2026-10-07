@@ -1,0 +1,143 @@
+diff --git a/app/flowlog/lib/sync/nextcloud_settings_store.dart b/app/flowlog/lib/sync/nextcloud_settings_store.dart
+index a5616d2..31928fb 100644
+--- a/app/flowlog/lib/sync/nextcloud_settings_store.dart
++++ b/app/flowlog/lib/sync/nextcloud_settings_store.dart
+@@ -3,6 +3,7 @@ import 'dart:io';
+ 
+ import 'package:flowlog/persistence/flowlog_storage.dart';
+ import 'package:flutter/foundation.dart';
++import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+ 
+ /// User-visible Nextcloud sync preferences (password stored separately).
+ @immutable
+@@ -70,16 +71,26 @@ class NextcloudSettings {
+   }
+ }
+ 
+-/// File-backed persistence for Nextcloud settings and credentials.
++/// Persistence for Nextcloud settings (JSON) and app password (secure storage).
++
++/// Non-secret preferences stay in [flowlog_nextcloud_settings.json]. The app
++/// password / token is stored via [FlutterSecureStorage] (Android Keystore /
++/// platform credential store). A legacy plaintext credentials JSON file is
++/// migrated once, then deleted.
+ class NextcloudSettingsStore {
+   NextcloudSettingsStore({
+     String? settingsPath,
+     String? credentialsPath,
++    FlutterSecureStorage? secureStorage,
+   })  : _settingsPathOverride = settingsPath,
+-        _credentialsPathOverride = credentialsPath;
++        _credentialsPathOverride = credentialsPath,
++        _secureStorage = secureStorage ?? const FlutterSecureStorage();
++
++  static const _passwordKey = 'flowlog_nextcloud_app_password';
+ 
+   final String? _settingsPathOverride;
+   final String? _credentialsPathOverride;
++  final FlutterSecureStorage _secureStorage;
+ 
+   Future<String> _resolveSettingsPath() async {
+     return _settingsPathOverride ??
+@@ -117,27 +128,39 @@ class NextcloudSettingsStore {
+   }
+ 
+   Future<String?> loadPassword() async {
+-    final file = File(await _resolveCredentialsPath());
+-    if (!file.existsSync()) {
++    try {
++      final fromSecure = await _secureStorage.read(key: _passwordKey);
++      if (fromSecure != null && fromSecure.isNotEmpty) {
++        await _deleteLegacyCredentialsFile();
++        return fromSecure;
++      }
++    } on Object {
++      // Fall through to legacy file / null (tests, unsupported platforms).
++    }
++
++    final legacy = await _loadLegacyPassword();
++    if (legacy == null || legacy.isEmpty) {
+       return null;
+     }
+ 
+     try {
+-      final decoded = jsonDecode(await file.readAsString());
+-      if (decoded is! Map<String, dynamic>) {
+-        return null;
+-      }
+-      final password = decoded['password'];
+-      if (password is! String || password.isEmpty) {
+-        return null;
+-      }
+-      return password;
+-    } catch (_) {
+-      return null;
++      await _secureStorage.write(key: _passwordKey, value: legacy);
++      await _deleteLegacyCredentialsFile();
++    } on Object {
++      // Keep legacy file readable if secure write fails.
+     }
++    return legacy;
+   }
+ 
+   Future<void> savePassword(String password) async {
++    try {
++      await _secureStorage.write(key: _passwordKey, value: password);
++      await _deleteLegacyCredentialsFile();
++      return;
++    } on Object {
++      // Fall back to file only when secure storage is unavailable (rare).
++    }
++
+     final file = File(await _resolveCredentialsPath());
+     await file.parent.create(recursive: true);
+     await file.writeAsString(
+@@ -153,9 +176,43 @@ class NextcloudSettingsStore {
+       await settingsFile.delete();
+     }
+ 
+-    final credentialsFile = File(await _resolveCredentialsPath());
+-    if (credentialsFile.existsSync()) {
+-      await credentialsFile.delete();
++    try {
++      await _secureStorage.delete(key: _passwordKey);
++    } on Object {
++      // ignore
++    }
++    await _deleteLegacyCredentialsFile();
++  }
++
++  Future<String?> _loadLegacyPassword() async {
++    final file = File(await _resolveCredentialsPath());
++    if (!file.existsSync()) {
++      return null;
++    }
++
++    try {
++      final decoded = jsonDecode(await file.readAsString());
++      if (decoded is! Map<String, dynamic>) {
++        return null;
++      }
++      final password = decoded['password'];
++      if (password is! String || password.isEmpty) {
++        return null;
++      }
++      return password;
++    } catch (_) {
++      return null;
++    }
++  }
++
++  Future<void> _deleteLegacyCredentialsFile() async {
++    final file = File(await _resolveCredentialsPath());
++    if (file.existsSync()) {
++      try {
++        await file.delete();
++      } on Object {
++        // ignore
++      }
+     }
+   }
+-}
+\ No newline at end of file
++}
