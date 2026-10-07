@@ -6,21 +6,33 @@ import 'package:flutter/material.dart';
 
 /// User appearance preference: coffee dark, café light, or follow system.
 class AppearanceSettings {
-  const AppearanceSettings({this.themeMode = ThemeMode.dark});
+  const AppearanceSettings({
+    this.themeMode = ThemeMode.dark,
+    this.colorblindCharts = false,
+  });
 
   final ThemeMode themeMode;
+
+  /// When true, charts use [FlowlogChartPalette.colorblindSafe].
+  final bool colorblindCharts;
 
   /// True only when [themeMode] is explicitly dark (not when following system).
   bool get isDark => themeMode == ThemeMode.dark;
 
   bool get isSystem => themeMode == ThemeMode.system;
 
-  AppearanceSettings copyWith({ThemeMode? themeMode}) {
-    return AppearanceSettings(themeMode: themeMode ?? this.themeMode);
+  AppearanceSettings copyWith({
+    ThemeMode? themeMode,
+    bool? colorblindCharts,
+  }) {
+    return AppearanceSettings(
+      themeMode: themeMode ?? this.themeMode,
+      colorblindCharts: colorblindCharts ?? this.colorblindCharts,
+    );
   }
 }
 
-/// File-backed persistence for light/dark theme preference.
+/// File-backed persistence for light/dark theme and chart palette preference.
 class AppearanceSettingsStore {
   AppearanceSettingsStore({String? settingsPath})
       : _settingsPathOverride = settingsPath;
@@ -46,6 +58,7 @@ class AppearanceSettingsStore {
       final mode = decoded['themeMode'] as String?;
       return AppearanceSettings(
         themeMode: _themeModeFromString(mode) ?? ThemeMode.dark,
+        colorblindCharts: decoded['colorblindCharts'] as bool? ?? false,
       );
     } catch (_) {
       return const AppearanceSettings();
@@ -58,6 +71,7 @@ class AppearanceSettingsStore {
     await file.writeAsString(
       const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
         'themeMode': _themeModeToString(settings.themeMode),
+        'colorblindCharts': settings.colorblindCharts,
       }),
     );
   }
