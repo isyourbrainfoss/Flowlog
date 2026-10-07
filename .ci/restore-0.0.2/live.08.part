@@ -1,0 +1,80 @@
+    _sensorSource?.exitDemoMode();
+    setState(() {});
+  }
+
+  Future<void> _onReconnectSensors() async {
+    if (_controller?.isBrewing ?? false) {
+      return;
+    }
+    // Clear leftover post-shot readings so the status banner does not keep
+    // showing a stale "last" value while reconnect is in progress.
+    _livePressureNotifier.value = null;
+    _livePressureLastUpdate.value = null;
+    _liveWeightNotifier.value = null;
+    _liveWeightLastUpdate.value = null;
+
+    final hub = SensorHubScope.maybeOf(context);
+    if (hub == null) {
+      return;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Reconnecting paired sensors...'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
+    await hub.reconnectPairedDevices();
+    if (!mounted) {
+      return;
+    }
+
+    final pairedWithBle = hub.devices
+        .where((d) => d.bleRemoteId != null && d.bleRemoteId!.isNotEmpty)
+        .toList(growable: false);
+    final connected = pairedWithBle
+        .where((d) => d.state == ConnectionState.connected)
+        .length;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    if (pairedWithBle.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No paired sensors with a BLE id. Pair sensors first.'),
+          duration: Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else if (connected == pairedWithBle.length) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            connected == 1
+                ? 'Sensor reconnected.'
+                : 'All $connected sensors reconnected.',
+          ),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      final err = hub.lastError;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            err != null && err.isNotEmpty
+                ? 'Reconnect incomplete: $err'
+                : 'Reconnect incomplete ($connected/${pairedWithBle.length}).',
+          ),
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _onPairSensors() {

@@ -1,0 +1,80 @@
+      return;
+    }
+    // Give the stream a moment after start before treating silence as a fault.
+    final started = controller.sessionStartedAt;
+    if (started != null &&
+        DateTime.now().difference(started) < const Duration(seconds: 8)) {
+      return;
+    }
+    _weightRearmAttempted = true;
+    unawaited(_sensorSource?.rearmWeightStream());
+  }
+
+  Future<void> _onRearmWeightPressed() async {
+    await _sensorSource?.rearmWeightStream();
+    if (!mounted || (_controller?.isBrewing ?? false)) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        key: Key('weight_stream_rearm_snackbar'),
+        content: Text('Refreshing scale weight stream…'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _maybeFireYieldWarn(LiveShotController controller) {
+    if (!controller.isBrewing || _yieldWarnFired) {
+      return;
+    }
+    final defaults = _brewDefaults;
+    if (defaults == null || !defaults.yieldAlertEnabled) {
+      return;
+    }
+    final samples = controller.samples;
+    if (samples.isEmpty) {
+      return;
+    }
+    // Prefer freshest known weight (merged samples may end on a pressure-only
+    // tick with null weight if the scale stream is flaky).
+    double? weight = samples.last.weightG ?? _liveWeightNotifier.value;
+    if (weight == null) {
+      for (
+        var i = samples.length - 1;
+        i >= 0 && i >= samples.length - 12;
+        i--
+      ) {
+        final w = samples[i].weightG;
+        if (w != null) {
+          weight = w;
+          break;
+        }
+      }
+    }
+    if (!shouldFireYieldWarn(
+      weightG: weight,
+      warnAtG: defaults.effectiveYieldWarnAtG,
+      targetYieldG: defaults.targetYieldG,
+      alreadyFired: _yieldWarnFired,
+    )) {
+      return;
+    }
+
+    _yieldWarnFired = true;
+    unawaited(playYieldWarnCue());
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _checkAutoStop(LiveShotController controller) {
+    if (controller.sessionState != ShotSessionState.recording) {
+      _autoStopTimer?.cancel();
+      _autoStopTimer = null;
+      return;
+    }
+
+    final samples = controller.samples;
+    if (samples.length < 8) return; // need some history (~0.8s at 100ms)
