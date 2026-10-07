@@ -1,0 +1,31 @@
+name: Restore ble_transport
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Restore ble_transport.dart from known-good commit
+        run: |
+          set -euo pipefail
+          GOOD=69a060e78df169d28423d8e89f04832420fb0234
+          git checkout "$GOOD" -- app/flowlog/lib/sensors/ble_transport.dart
+          if git diff --quiet -- app/flowlog/lib/sensors/ble_transport.dart; then
+            echo "Already restored; nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/flowlog/lib/sensors/ble_transport.dart
+          git commit -m "fix: restore ble_transport.dart (revert corrupted placeholder)"
+          git push
