@@ -1,0 +1,80 @@
+import 'dart:convert';
+
+import 'package:drift/drift.dart';
+import 'package:meta/meta.dart';
+
+import '../models/flavour_intensities.dart';
+import '../models/shot.dart' as models;
+import '../models/bean.dart' show beanMatchesQuery, foldForSearch, repairMojibake;
+import 'bean_repository.dart';
+import '../models/shot_annotation.dart' as models;
+import '../models/shot_sample.dart' as models;
+import 'flowlog_database.dart';
+import 'shot_list_filters.dart';
+import 'type_converters.dart';
+
+/// A recorded local (or synced) shot deletion used to prevent resurrection.
+@immutable
+class DeletedShotTombstone {
+  const DeletedShotTombstone({
+    required this.shotId,
+    required this.deletedAt,
+  });
+
+  final String shotId;
+  final DateTime deletedAt;
+
+  factory DeletedShotTombstone.fromJson(Map<String, dynamic> json) {
+    return DeletedShotTombstone(
+      shotId: json['shotId'] as String? ?? json['id'] as String,
+      deletedAt: DateTime.parse(json['deletedAt'] as String).toUtc(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'shotId': shotId,
+        'deletedAt': deletedAt.toUtc().toIso8601String(),
+      };
+}
+
+/// Persists and loads [models.Shot] records with optional samples.
+class ShotRepository {
+  ShotRepository(this._db);
+
+  final FlowlogDatabase _db;
+
+  /// Inserts a shot and its samples in a single transaction.
+  Future<void> insertShot(models.Shot shot) async {
+    await _db.transaction(() async {
+      await _db.into(_db.shots).insertOnConflictUpdate(_shotToCompanion(shot));
+
+      await (_db.delete(_db.shotSamples)
+            ..where((row) => row.shotId.equals(shot.id)))
+          .go();
+
+      await (_db.delete(_db.shotAnnotations)
+            ..where((row) => row.shotId.equals(shot.id)))
+          .go();
+
+      await (_db.delete(_db.shotTargetSamples)
+            ..where((row) => row.shotId.equals(shot.id)))
+          .go();
+
+      if (shot.samples.isNotEmpty) {
+        await _db.batch((batch) {
+          batch.insertAll(
+            _db.shotSamples,
+            shot.samples
+                .map((sample) => _sampleToCompanion(shot.id, sample))
+                .toList(),
+          );
+        });
+      }
+
+      if (shot.annotations.isNotEmpty) {
+        await _db.batch((batch) {
+          batch.insertAll(
+            _db.shotAnnotations,
+            shot.annotations
+                .map((annotation) => _annotationToCompanion(shot.id, annotation))
+                .toList(),
