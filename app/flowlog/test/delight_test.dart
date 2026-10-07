@@ -364,7 +364,10 @@ Future<void> _startAndStopSession(
     await controller.stop();
     await Future<void>.delayed(const Duration(milliseconds: 500));
   });
-  await pumpUntilFound(tester, find.byKey(const Key('shot_saved_snackbar')));
+  await pumpUntilFound(
+    tester,
+    find.byKey(const Key('brew_complete_banner')),
+  );
 }
 
 String _fixturePath(String relativePath) {
