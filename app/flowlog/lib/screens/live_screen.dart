@@ -1,41 +1,43 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flowlog/location/brew_gps.dart';
-import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/live/annotations.dart';
 import 'package:flowlog/screens/live/auto_start.dart';
-import 'package:flowlog/screens/live/brew_complete_banner.dart';
 import 'package:flowlog/screens/live/controls.dart';
 import 'package:flowlog/screens/live/delight.dart';
+import 'package:flowlog/screens/live/demo_fixture.dart';
 import 'package:flowlog/screens/live/feedback.dart';
 import 'package:flowlog/screens/live/fullscreen_chart.dart';
-import 'package:flowlog/screens/live/idle_sensor_status.dart';
-import 'package:flowlog/screens/live/metrics_row.dart';
-import 'package:flowlog/screens/live/live_pressure_bar.dart';
+import 'package:flowlog/screens/live/live_auto_stop.dart';
+import 'package:flowlog/screens/live/live_brew_complete_overlay.dart';
+import 'package:flowlog/screens/live/live_brew_hud.dart';
+import 'package:flowlog/screens/live/live_idle_layout.dart';
+import 'package:flowlog/screens/live/live_repositories.dart';
+import 'package:flowlog/screens/live/live_scale_push.dart';
+import 'package:flowlog/screens/live/live_sensor_actions.dart';
+import 'package:flowlog/screens/live/live_shot_saver.dart';
+import 'package:flowlog/screens/live/live_target_gamification.dart';
+import 'package:flowlog/screens/live/live_weight_tracker.dart';
 import 'package:flowlog/screens/live/live_yield_bar.dart';
+import 'package:flowlog/screens/live/live_yield_warn.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
-import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
-import 'package:flowlog/settings/brew_defaults_store.dart';
-import 'package:flowlog/settings/brew_location_store.dart';
-import 'package:flowlog/settings/scale_settings_store.dart';
-import 'package:flowlog/sync/sync_feedback.dart';
-import 'package:flowlog/screens/more/sensors_screen.dart';
+import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/sensors/live_sensor_source.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
-import 'package:flowlog/shell/active_bean_scope.dart';
+import 'package:flowlog/settings/brew_defaults_store.dart';
+import 'package:flowlog/settings/brew_location_store.dart';
 import 'package:flowlog/shell/active_brew_scope.dart';
-import 'package:flowlog/shell/app_destinations.dart';
-import 'package:flowlog/shell/shot_events.dart';
 import 'package:flowlog/shell/shell_breakpoints.dart';
-import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog/shell/shortcuts.dart';
+import 'package:flowlog/shell/shot_events.dart';
 import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
-import 'package:flowlog_sensors/flowlog_sensors.dart';
+import 'package:flowlog_sensors/flowlog_sensors.dart' show ConnectionState;
 import 'package:flutter/material.dart' hide ConnectionState;
-import 'package:flutter/services.dart';
+
+export 'package:flowlog/screens/live/demo_fixture.dart'
+    show kBundledDemoFixtureAsset;
 
 /// Live shot tab: recording controls, live chart, metrics, and god-shot save.
 class LiveScreen extends StatefulWidget {
@@ -111,17 +113,9 @@ class _LiveScreenState extends State<LiveScreen> {
   late final ValueNotifier<List<ShotSample>> _samplesNotifier;
   late final ShotAnnotationController _annotationController;
   late final ValueNotifier<List<ShotAnnotation>> _annotationsNotifier;
-  ShotRepository? _shotRepository;
-  BeanRepository? _beanRepository;
-  ProfileRepository? _profileRepository;
-  FlowlogDatabase? _database;
 
-  bool _autoSavingShot = false;
-  String? _lastAutoSavedShotId;
-  bool _autoSavedCurrent = false;
   ShotSessionState _lastSessionState = ShotSessionState.idle;
   bool _wasBrewing = false;
-  Timer? _autoStopTimer;
   FlowlogShortcutRegistry? _shortcutRegistry;
   RepeatShotController? _repeatShotController;
   TargetBrewController? _targetBrewController;
@@ -131,40 +125,44 @@ class _LiveScreenState extends State<LiveScreen> {
   late final ChartInteractionController _chartInteractionController;
   late final AutoStartSettingsController _ownedAutoStartController;
   AutoStartSettingsController? _autoStartController;
-  late final BrewLocationStore _brewLocationStore;
-  late final BrewGpsCapture _brewGpsCapture;
-  BrewSummary? _lastBrewSummary;
-  Timer? _brewCompleteDismissTimer;
-  static const _brewCompleteAutoDismiss = Duration(seconds: 45);
   SensorHub? _sensorHub;
   ConnectionState? _lastPressensorState;
   ActiveBrewNotifier? _activeBrewNotifier;
   ShotEventsNotifier? _shotEventsNotifier;
 
-  /// Fires once per brew when cup weight crosses the early-stop warn level.
-  bool _yieldWarnFired = false;
+  late final LiveRepositories _repositories;
+  late final BrewCompleteBannerController _brewCompleteBanner;
+  late final LiveShotSaver _shotSaver;
+  late final LiveAutoStopGuard _autoStop;
+  late final LiveWeightTracker _weightTracker;
+  final LiveYieldWarnTracker _yieldWarn = LiveYieldWarnTracker();
 
   late final ValueNotifier<double?> _livePressureNotifier;
   late final ValueNotifier<DateTime?> _livePressureLastUpdate;
-  late final ValueNotifier<double?> _liveWeightNotifier;
-  late final ValueNotifier<DateTime?> _liveWeightLastUpdate;
   DateTime _lastSamplesUpdate = DateTime.now();
-
-  /// One automatic weight-stream re-arm per brew when the scale is silent.
-  bool _weightRearmAttempted = false;
 
   @override
   void initState() {
     super.initState();
     _ownsController = widget.controller == null;
-    _brewLocationStore = widget.brewLocationStore ?? BrewLocationStore();
-    _brewGpsCapture = widget.brewGpsCapture ?? const BrewGpsCapture();
 
     _samplesNotifier = ValueNotifier<List<ShotSample>>(const []);
     _livePressureNotifier = ValueNotifier<double?>(null);
     _livePressureLastUpdate = ValueNotifier<DateTime?>(null);
-    _liveWeightNotifier = ValueNotifier<double?>(null);
-    _liveWeightLastUpdate = ValueNotifier<DateTime?>(null);
+    _weightTracker = LiveWeightTracker(
+      resolveHub: () => _sensorHub ?? SensorHubScope.maybeOf(context),
+      resolveSource: () => _sensorSource,
+      resolveController: () => _controller,
+    );
+    _autoStop = LiveAutoStopGuard(
+      onAutoStop: () {
+        if (mounted &&
+            _controller != null &&
+            _controller!.sessionState == ShotSessionState.recording) {
+          _controller!.stop();
+        }
+      },
+    );
     _annotationController = ShotAnnotationController();
     _annotationsNotifier = ValueNotifier<List<ShotAnnotation>>(
       List<ShotAnnotation>.from(_annotationController.annotations),
@@ -181,10 +179,38 @@ class _LiveScreenState extends State<LiveScreen> {
       }),
     );
 
+    _repositories = LiveRepositories(
+      shotOverride: () => widget.shotRepository,
+      beanOverride: () => widget.beanRepository,
+      profileOverride: () => widget.profileRepository,
+    );
+    _brewCompleteBanner = BrewCompleteBannerController()..addListener(_rebuild);
+    _shotSaver = LiveShotSaver(
+      repositories: _repositories,
+      brewLocationStore: widget.brewLocationStore ?? BrewLocationStore(),
+      brewGpsCapture: widget.brewGpsCapture ?? const BrewGpsCapture(),
+      banner: _brewCompleteBanner,
+      confettiController: _confettiController,
+      resolveController: () => _controller,
+      resolveInitialMetadata: () => _repeatShotController?.prefill?.metadata,
+      resolveAnnotations: () => _annotationController.annotations,
+      resolveTargetPressureSamples: _chartTargetPressureSamples,
+      resolveIdGenerator: () => widget.shotIdGenerator,
+      resolveOnShotSaved: () => widget.onShotSaved,
+      resolveShotEvents: () => _shotEventsNotifier,
+      onStateChanged: _rebuild,
+    );
+
     if (widget.controller != null) {
       _sensorSource = widget.sensorSource;
       _bindController(widget.controller!);
       _controllerReady = true;
+    }
+  }
+
+  void _rebuild() {
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -213,22 +239,11 @@ class _LiveScreenState extends State<LiveScreen> {
         previous != ConnectionState.connected &&
         current == ConnectionState.connected &&
         mounted) {
-      final threshold = _resolvedAutoStartController.settings.startThresholdBar;
-      final batteryWarning = pressensorLowBatteryWarning(
-        hub.pressensorBatteryPercent,
-      );
-      final message = StringBuffer(
-        'Pressensor connected — auto-start at ${threshold.toStringAsFixed(1)} bar',
-      );
-      if (batteryWarning != null) {
-        message.write('. $batteryWarning');
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          key: const Key('pressensor_connected_snackbar'),
-          content: Text(message.toString()),
-          behavior: SnackBarBehavior.floating,
-        ),
+      showPressensorConnectedSnackBar(
+        context,
+        autoStartThresholdBar:
+            _resolvedAutoStartController.settings.startThresholdBar,
+        batteryPercent: hub.pressensorBatteryPercent,
       );
     }
   }
@@ -240,8 +255,7 @@ class _LiveScreenState extends State<LiveScreen> {
     _controller!.addListener(_syncSamples);
     _controller!.addListener(_onSessionLifecycle);
     _wasBrewing = _controller!.isBrewing;
-    _autoSavedCurrent = false;
-    _lastAutoSavedShotId = null;
+    _shotSaver.resetForNewSession();
     _syncSamples();
   }
 
@@ -251,8 +265,8 @@ class _LiveScreenState extends State<LiveScreen> {
         widget.sensorSource ??
         LiveSensorSource(
           hub: hub,
-          demoFixturePath: _resolveDemoFixtureFilePath(),
-          demoFixtureLoader: _loadBundledDemoFixture,
+          demoFixturePath: resolveDemoFixtureFilePath(),
+          demoFixtureLoader: loadBundledDemoFixture,
           pressureAdapterFactory: widget.pressureAdapterFactory,
           weightAdapterFactory: widget.weightAdapterFactory,
         );
@@ -276,19 +290,7 @@ class _LiveScreenState extends State<LiveScreen> {
     if (source == null) {
       return;
     }
-    final scaleSettings = await ScaleSettingsStore().load();
-    final brew = _brewDefaults;
-    // Prefer dedicated scale settings; fall back to brew defaults for yield.
-    final target = scaleSettings.targetYieldG;
-    final warn = scaleSettings.warnAtG > 0
-        ? scaleSettings.warnAtG
-        : (brew?.effectiveYieldWarnAtG ?? kDefaultYieldWarnAtG);
-    await source.pushScaleDisplayConfig(
-      targetYieldG: target.round(),
-      warnAtG: warn.round(),
-      pressureMinBar: scaleSettings.pressureMinBar.round(),
-      pressureMaxBar: scaleSettings.pressureMaxBar.round(),
-    );
+    await pushLiveScaleDisplayConfig(source, brewDefaults: _brewDefaults);
   }
 
   @override
@@ -340,34 +342,16 @@ class _LiveScreenState extends State<LiveScreen> {
     _samplesNotifier.dispose();
     _livePressureNotifier.dispose();
     _livePressureLastUpdate.dispose();
-    _liveWeightNotifier.dispose();
-    _liveWeightLastUpdate.dispose();
-    _autoStopTimer?.cancel();
-    _brewCompleteDismissTimer?.cancel();
+    _weightTracker.dispose();
+    _autoStop.dispose();
+    _brewCompleteBanner
+      ..removeListener(_rebuild)
+      ..dispose();
     _sensorHub?.setScaleRecoveryEnabled(true);
     if (_ownsController) {
       _controller?.dispose();
     }
     super.dispose();
-  }
-
-  void _dismissBrewCompleteBanner() {
-    _brewCompleteDismissTimer?.cancel();
-    _brewCompleteDismissTimer = null;
-    if (_lastBrewSummary != null && mounted) {
-      setState(() => _lastBrewSummary = null);
-    } else {
-      _lastBrewSummary = null;
-    }
-  }
-
-  void _scheduleBrewCompleteDismiss() {
-    _brewCompleteDismissTimer?.cancel();
-    _brewCompleteDismissTimer = Timer(_brewCompleteAutoDismiss, () {
-      if (mounted) {
-        setState(() => _lastBrewSummary = null);
-      }
-    });
   }
 
   void _syncSamples() {
@@ -391,103 +375,24 @@ class _LiveScreenState extends State<LiveScreen> {
       _lastSamplesUpdate = now;
     }
 
-    _trackLiveWeight(controller);
-    _checkAutoStop(controller);
+    _weightTracker.track(controller);
+    _autoStop.check(controller);
     _maybeFireYieldWarn(controller);
   }
 
-  void _trackLiveWeight(LiveShotController controller) {
-    final samples = controller.samples;
-    if (samples.isEmpty) {
-      _maybeRearmSilentScale(controller);
-      return;
-    }
-    // Prefer the true BLE receive time from the hub scale adapter. Merged
-    // samples carry the last weight on every pressure tick, so sample.weightG
-    // alone cannot prove the scale is still streaming.
-    final hub = _sensorHub ?? SensorHubScope.maybeOf(context);
-    final adapter = hub?.activeAdapterFor(SensorKind.scale);
-    if (adapter is DecentScaleBleAdapter) {
-      final rxMs = adapter.lastWeightReceiveMs;
-      if (rxMs != null) {
-        final age = DateTime.now().millisecondsSinceEpoch - rxMs;
-        if (age <= kWeightStreamFreshWindow.inMilliseconds) {
-          // Latest carry-forward weight for display.
-          for (var i = samples.length - 1; i >= 0; i--) {
-            final w = samples[i].weightG;
-            if (w != null) {
-              _liveWeightNotifier.value = w;
-              break;
-            }
-          }
-          _liveWeightLastUpdate.value = DateTime.fromMillisecondsSinceEpoch(
-            rxMs,
-          );
-          _weightRearmAttempted = false;
-          return;
-        }
-      }
-    } else {
-      // No hub adapter (tests / factory path): fall back to sample presence.
-      for (var i = samples.length - 1; i >= 0 && i >= samples.length - 3; i--) {
-        final w = samples[i].weightG;
-        if (w != null) {
-          _liveWeightNotifier.value = w;
-          _liveWeightLastUpdate.value = DateTime.now();
-          _weightRearmAttempted = false;
-          _maybeRearmSilentScale(controller);
-          return;
-        }
-      }
-    }
-    _maybeRearmSilentScale(controller);
-  }
-
-  WeightStreamHealth _weightStreamHealth({required bool isBrewing}) {
-    final hub = _sensorHub ?? SensorHubScope.maybeOf(context);
-    final source = _sensorSource;
-    final scalePaired =
-        source?.scalePaired ?? hub?.hasKind(SensorKind.scale) ?? false;
-    final linked =
-        source?.scaleLinkConnected ??
-        (hub?.scaleState == ConnectionState.connected);
-    final adapter = hub?.activeAdapterFor(SensorKind.scale);
-    int? rxMs;
-    if (adapter is DecentScaleBleAdapter) {
-      rxMs = adapter.lastWeightReceiveMs;
-    } else {
-      final last = _liveWeightLastUpdate.value;
-      rxMs = last?.millisecondsSinceEpoch;
-    }
-    final started = _controller?.sessionStartedAt;
-    return resolveWeightStreamHealth(
-      scalePaired: scalePaired,
-      scaleLinked: linked,
-      isBrewing: isBrewing,
-      shotHasWeight: (_controller?.samples ?? const <ShotSample>[]).any(
-        (s) => s.weightG != null,
-      ),
-      lastWeightReceiveMs: rxMs,
-      brewElapsed: started == null ? null : DateTime.now().difference(started),
+  void _maybeFireYieldWarn(LiveShotController controller) {
+    final fire = _yieldWarn.check(
+      controller,
+      defaults: _brewDefaults,
+      fallbackWeightG: _weightTracker.weight.value,
     );
-  }
-
-  void _maybeRearmSilentScale(LiveShotController controller) {
-    if (!controller.isBrewing || _weightRearmAttempted) {
+    if (!fire) {
       return;
     }
-    if (_weightStreamHealth(isBrewing: true) !=
-        WeightStreamHealth.linkedNoWeight) {
-      return;
+    unawaited(playYieldWarnCue());
+    if (mounted) {
+      setState(() {});
     }
-    // Give the stream a moment after start before treating silence as a fault.
-    final started = controller.sessionStartedAt;
-    if (started != null &&
-        DateTime.now().difference(started) < const Duration(seconds: 8)) {
-      return;
-    }
-    _weightRearmAttempted = true;
-    unawaited(_sensorSource?.rearmWeightStream());
   }
 
   Future<void> _onRearmWeightPressed() async {
@@ -495,111 +400,7 @@ class _LiveScreenState extends State<LiveScreen> {
     if (!mounted || (_controller?.isBrewing ?? false)) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        key: Key('weight_stream_rearm_snackbar'),
-        content: Text('Refreshing scale weight stream…'),
-        duration: Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  void _maybeFireYieldWarn(LiveShotController controller) {
-    if (!controller.isBrewing || _yieldWarnFired) {
-      return;
-    }
-    final defaults = _brewDefaults;
-    if (defaults == null || !defaults.yieldAlertEnabled) {
-      return;
-    }
-    final samples = controller.samples;
-    if (samples.isEmpty) {
-      return;
-    }
-    // Prefer freshest known weight (merged samples may end on a pressure-only
-    // tick with null weight if the scale stream is flaky).
-    double? weight = samples.last.weightG ?? _liveWeightNotifier.value;
-    if (weight == null) {
-      for (
-        var i = samples.length - 1;
-        i >= 0 && i >= samples.length - 12;
-        i--
-      ) {
-        final w = samples[i].weightG;
-        if (w != null) {
-          weight = w;
-          break;
-        }
-      }
-    }
-    if (!shouldFireYieldWarn(
-      weightG: weight,
-      warnAtG: defaults.effectiveYieldWarnAtG,
-      targetYieldG: defaults.targetYieldG,
-      alreadyFired: _yieldWarnFired,
-    )) {
-      return;
-    }
-
-    _yieldWarnFired = true;
-    unawaited(playYieldWarnCue());
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  void _checkAutoStop(LiveShotController controller) {
-    if (controller.sessionState != ShotSessionState.recording) {
-      _autoStopTimer?.cancel();
-      _autoStopTimer = null;
-      return;
-    }
-
-    final samples = controller.samples;
-    if (samples.length < 8) return; // need some history (~0.8s at 100ms)
-
-    // A frozen BLE stream (scale watchdog / radio stall) stops new samples.
-    // Do not treat leftover ticks as "pump off" and kill the brew.
-    final started = controller.sessionStartedAt;
-    if (started != null) {
-      final lastAge = DateTime.now().difference(
-        started.add(Duration(milliseconds: samples.last.elapsedMs)),
-      );
-      if (lastAge > const Duration(milliseconds: 800)) {
-        _autoStopTimer?.cancel();
-        _autoStopTimer = null;
-        return;
-      }
-    }
-
-    // Look at last ~8 samples (~800ms). If pressure has been near zero after
-    // we have seen meaningful pressure, auto-stop so forgotten brews don't
-    // save huge zero tails. Do not auto-stop during initial low-pressure
-    // pre-infusion or when user manually starts the brew button before the
-    // pump has built pressure.
-    final recent = samples.sublist(samples.length - 8);
-    final allLow = recent.every((s) => (s.pressureBar ?? 100) < 0.4);
-
-    if (allLow) {
-      final hasSeenPressure = samples.any((s) => (s.pressureBar ?? 0) >= 0.8);
-      if (hasSeenPressure) {
-        _autoStopTimer ??= Timer(const Duration(milliseconds: 1500), () {
-          if (mounted &&
-              _controller != null &&
-              _controller!.sessionState == ShotSessionState.recording) {
-            _controller!.stop();
-          }
-          _autoStopTimer = null;
-        });
-      } else {
-        _autoStopTimer?.cancel();
-        _autoStopTimer = null;
-      }
-    } else {
-      _autoStopTimer?.cancel();
-      _autoStopTimer = null;
-    }
+    showWeightRearmSnackBar(context);
   }
 
   void _syncAnnotations() {
@@ -650,132 +451,17 @@ class _LiveScreenState extends State<LiveScreen> {
     // showing a stale "last" value while reconnect is in progress.
     _livePressureNotifier.value = null;
     _livePressureLastUpdate.value = null;
-    _liveWeightNotifier.value = null;
-    _liveWeightLastUpdate.value = null;
+    _weightTracker.clear();
 
     final hub = SensorHubScope.maybeOf(context);
     if (hub == null) {
       return;
     }
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Reconnecting paired sensors...'),
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-
-    await hub.reconnectPairedDevices();
-    if (!mounted) {
-      return;
-    }
-
-    final pairedWithBle = hub.devices
-        .where((d) => d.bleRemoteId != null && d.bleRemoteId!.isNotEmpty)
-        .toList(growable: false);
-    final connected = pairedWithBle
-        .where((d) => d.state == ConnectionState.connected)
-        .length;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    if (pairedWithBle.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No paired sensors with a BLE id. Pair sensors first.'),
-          duration: Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } else if (connected == pairedWithBle.length) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            connected == 1
-                ? 'Sensor reconnected.'
-                : 'All $connected sensors reconnected.',
-          ),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } else {
-      final err = hub.lastError;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            err != null && err.isNotEmpty
-                ? 'Reconnect incomplete: $err'
-                : 'Reconnect incomplete ($connected/${pairedWithBle.length}).',
-          ),
-          duration: const Duration(seconds: 4),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+    await reconnectSensorsWithFeedback(context, hub);
   }
 
-  void _onPairSensors() {
-    FlowlogShellScope.maybeOf(context)?.switchTab(AppTab.more);
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => Scaffold(
-          appBar: AppBar(title: const Text('Sensors')),
-          body: const SensorsScreen(),
-        ),
-      ),
-    );
-  }
-
-  Future<FlowlogDatabase> _ensureDatabase() async {
-    if (_database != null) {
-      return _database!;
-    }
-
-    _database = await openFlowlogDatabase();
-    return _database!;
-  }
-
-  Future<BeanRepository> _ensureBeanRepository() async {
-    if (widget.beanRepository != null) {
-      return widget.beanRepository!;
-    }
-    if (_beanRepository != null) {
-      return _beanRepository!;
-    }
-
-    final database = await _ensureDatabase();
-    _beanRepository = BeanRepository(database);
-    return _beanRepository!;
-  }
-
-  Future<ShotRepository> _ensureShotRepository() async {
-    if (widget.shotRepository != null) {
-      return widget.shotRepository!;
-    }
-    if (_shotRepository != null) {
-      return _shotRepository!;
-    }
-
-    final database = await _ensureDatabase();
-    _shotRepository = ShotRepository(database);
-    return _shotRepository!;
-  }
-
-  Future<ProfileRepository> _ensureProfileRepository() async {
-    if (widget.profileRepository != null) {
-      return widget.profileRepository!;
-    }
-    if (_profileRepository != null) {
-      return _profileRepository!;
-    }
-
-    final database = await _ensureDatabase();
-    _profileRepository = ProfileRepository(database);
-    return _profileRepository!;
-  }
+  void _onPairSensors() => openPairSensorsScreen(context);
 
   void _onSessionLifecycle() {
     final controller = _controller;
@@ -785,29 +471,26 @@ class _LiveScreenState extends State<LiveScreen> {
 
     final brewing = controller.isBrewing;
     _activeBrewNotifier?.setBrewing(brewing);
-    if (brewing && _lastBrewSummary != null) {
-      _dismissBrewCompleteBanner();
+    if (brewing && _brewCompleteBanner.isVisible) {
+      _brewCompleteBanner.dismiss();
     }
     // Trigger auto-save on stop transition (covers both manual stop and auto-stop).
     if (_wasBrewing &&
         !brewing &&
         controller.canSaveShot &&
-        !_autoSavedCurrent) {
-      unawaited(_autoSaveStoppedSession());
+        !_shotSaver.savedCurrent) {
+      unawaited(_shotSaver.autoSaveStoppedSession(context));
     }
     // Also catch stopped state directly (helps auto-stop timer path reliability)
     if (controller.sessionState == ShotSessionState.stopped &&
         controller.canSaveShot &&
-        !_autoSavedCurrent) {
-      unawaited(_autoSaveStoppedSession());
+        !_shotSaver.savedCurrent) {
+      unawaited(_shotSaver.autoSaveStoppedSession(context));
     }
     if (brewing && !_wasBrewing) {
-      _autoSavedCurrent = false;
-      _lastAutoSavedShotId = null;
-      _yieldWarnFired = false;
-      _weightRearmAttempted = false;
-      _liveWeightNotifier.value = null;
-      _liveWeightLastUpdate.value = null;
+      _shotSaver.resetForNewSession();
+      _yieldWarn.reset();
+      _weightTracker.resetForNewBrew();
       _sensorHub?.setScaleRecoveryEnabled(false);
       // Re-enable live follow for the new pull.
       _chartInteractionController.resetViewport();
@@ -829,193 +512,6 @@ class _LiveScreenState extends State<LiveScreen> {
       }
     }
     _wasBrewing = brewing;
-  }
-
-  Future<void> _autoSaveStoppedSession() async {
-    final controller = _controller;
-    if (controller == null ||
-        !controller.canSaveShot ||
-        _autoSavingShot ||
-        _autoSavedCurrent) {
-      return;
-    }
-
-    final startedAt = controller.sessionStartedAt;
-    if (startedAt == null) {
-      return;
-    }
-
-    _autoSavedCurrent = true;
-    setState(() => _autoSavingShot = true);
-    try {
-      final repository = await _ensureShotRepository();
-      if (!mounted) {
-        return;
-      }
-
-      final activeBean = ActiveBeanScope.maybeOf(context);
-      final locationSettings = await _brewLocationStore.loadSettings();
-      BrewGpsPosition? gps;
-      if (locationSettings.autoGpsEnabled) {
-        gps = await _brewGpsCapture.captureCurrentPosition();
-      }
-      final beanRepository = await _ensureBeanRepository();
-      if (!mounted) {
-        return;
-      }
-
-      final targetSamples = _chartTargetPressureSamples();
-      final shot = await runAutoSaveFlow(
-        context: context,
-        repository: repository,
-        shotRepository: repository,
-        samples: controller.samples,
-        startedAt: startedAt,
-        endedAt: controller.sessionEndedAt,
-        initialMetadata: _repeatShotController?.prefill?.metadata,
-        beanRepository: beanRepository,
-        activeBeanName: activeBean?.name,
-        activeBeanId: activeBean?.beanId,
-        annotations: _annotationController.annotations,
-        location: locationSettings.currentLocation,
-        latitude: gps?.latitude,
-        longitude: gps?.longitude,
-        autoStartPressureBar: controller.autoStartPressureBar,
-        targetPressureSamples: targetSamples,
-        idGenerator: widget.shotIdGenerator,
-        // Banner owns post-brew actions — skip snackbar so it does not
-        // fight the bottom nav / Live controls after immersive ends.
-        showSavedSnackBar: false,
-        onSaved: (saved) {
-          _lastAutoSavedShotId = saved.id;
-          _autoSavedCurrent = true;
-          widget.onShotSaved?.call(saved);
-        },
-        onAddNotes: (saved) => _onAddNotesToSavedShot(saved),
-        onDiscard: (saved) => _onDiscardSavedShot(saved),
-      );
-
-      await celebratePersonalBestTasteScore(
-        repository: repository,
-        shot: shot,
-        confettiController: _confettiController,
-      );
-
-      if (shot != null) {
-        if (mounted) {
-          setState(() => _lastBrewSummary = BrewSummary.fromShot(shot));
-          _autoSavedCurrent = true;
-          _scheduleBrewCompleteDismiss();
-        }
-        _shotEventsNotifier?.notifyShotsChanged();
-        final database = await _ensureDatabase();
-        if (!mounted) {
-          return;
-        }
-        unawaited(syncIfEnabledWithFeedback(context, database: database));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _autoSavingShot = false);
-      }
-    }
-  }
-
-  Future<void> _onAddNotesToSavedShot(Shot shot) async {
-    final repository = await _ensureShotRepository();
-    if (!mounted) {
-      return;
-    }
-
-    final beanRepository = await _ensureBeanRepository();
-    if (!mounted) {
-      return;
-    }
-
-    final updated = await runAddNotesFlow(
-      context: context,
-      repository: repository,
-      beanRepository: beanRepository,
-      shot: shot,
-      onSaved: widget.onShotSaved,
-    );
-
-    if (updated != null) {
-      // Edit done — drop the Live "Edit" banner; History still has full edit.
-      if (_lastAutoSavedShotId == shot.id ||
-          _lastAutoSavedShotId == updated.id) {
-        _dismissBrewCompleteBanner();
-      }
-      _shotEventsNotifier?.notifyShotsChanged();
-      await celebratePersonalBestTasteScore(
-        repository: repository,
-        shot: updated,
-        confettiController: _confettiController,
-      );
-      final database = await _ensureDatabase();
-      if (!mounted) {
-        return;
-      }
-      unawaited(syncIfEnabledWithFeedback(context, database: database));
-    }
-  }
-
-  Future<void> _discardAutoSavedShotById(String id) async {
-    final repository = await _ensureShotRepository();
-    if (!mounted) {
-      return;
-    }
-    final shot = await repository.getShotById(id);
-    if (shot == null) {
-      await repository.deleteShot(id);
-      _lastAutoSavedShotId = null;
-      _autoSavedCurrent = false;
-      _dismissBrewCompleteBanner();
-      _shotEventsNotifier?.notifyShotsChanged();
-      return;
-    }
-    await _onDiscardSavedShot(shot);
-    _dismissBrewCompleteBanner();
-  }
-
-  Future<void> _onDiscardSavedShot(Shot shot) async {
-    final repository = await _ensureShotRepository();
-    if (!mounted) {
-      return;
-    }
-    await repository.deleteShot(shot.id);
-    if (_lastAutoSavedShotId == shot.id) {
-      _lastAutoSavedShotId = null;
-      _autoSavedCurrent = false;
-    }
-    _shotEventsNotifier?.notifyShotsChanged();
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          key: Key('shot_discarded_snackbar'),
-          content: Text('Shot discarded'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  Future<void> _saveCurrentSession() async {
-    final controller = _controller;
-    if (controller == null || !controller.canSaveShot || _autoSavedCurrent) {
-      return;
-    }
-    await _autoSaveStoppedSession();
-  }
-
-  Future<void> _editLastSavedShot() async {
-    if (_lastAutoSavedShotId == null) return;
-    final repository = await _ensureShotRepository();
-    if (!mounted) return;
-    final shot = await repository.getShotWithSamples(_lastAutoSavedShotId!);
-    if (shot == null || !mounted) return;
-    await _onAddNotesToSavedShot(shot);
   }
 
   List<ShotSample> _chartTargetPressureSamples() {
@@ -1069,7 +565,7 @@ class _LiveScreenState extends State<LiveScreen> {
       endedAt: controller.sessionEndedAt,
     );
 
-    final profileRepository = await _ensureProfileRepository();
+    final profileRepository = await _repositories.profiles();
     if (!mounted) {
       return;
     }
@@ -1108,25 +604,13 @@ class _LiveScreenState extends State<LiveScreen> {
         final samples = controller.samples;
         final demoModeActive = _sensorSource?.isDemoMode ?? false;
         final latestSample = samples.isEmpty ? null : samples.last;
-        final repeatPrefill = _repeatShotController?.prefill;
         final chartTargetSamples = _chartTargetPressureSamples();
         final autoStartSettings = _resolvedAutoStartController.settings;
-
-        // Skip during the pull — brew HUD does not show it, and O(n) on
-        // every 50 ms notify hitch the chart.
-        final bool showLiveGamif =
-            state == ShotSessionState.stopped &&
-            samples.isNotEmpty &&
-            chartTargetSamples.isNotEmpty;
-        final Map<String, dynamic> liveGamif = showLiveGamif
-            ? computeTargetGamification(samples, chartTargetSamples)
-            : const <String, dynamic>{
-                'closenessPercent': null,
-                'maxStreakSeconds': 0,
-                'currentStreakSeconds': 0,
-                'penaltyCount': 0,
-                'score': null,
-              };
+        final gamification = LiveTargetGamificationStats.forSession(
+          state: state,
+          samples: samples,
+          targets: chartTargetSamples,
+        );
 
         final shell = ConfettiOverlay(
           controller: _confettiController,
@@ -1149,355 +633,104 @@ class _LiveScreenState extends State<LiveScreen> {
                 final targetP = latestSample == null
                     ? null
                     : _targetPressureAtElapsed(latestSample.elapsedMs);
+                final liveWeightG = _weightTracker.weight.value;
+                void onRearmWeight() => unawaited(_onRearmWeightPressed());
 
-                // Active brew: immersive high-focus layout (shell hides tabs).
-                // Only plot + live digits + cup/pressure bars + stop control.
                 final Widget body;
                 if (isBrewing) {
-                  body = Column(
-                    key: const ValueKey('live-brew-layout'),
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                          child: LayoutBuilder(
-                            builder: (context, chartConstraints) {
-                              final h = chartConstraints.maxHeight.isFinite
-                                  ? chartConstraints.maxHeight
-                                  : chartHeight;
-                              return DualCurveChart(
-                                height: h,
-                                samplesNotifier: _samplesNotifier,
-                                annotationsNotifier: _annotationsNotifier,
-                                interactionController:
-                                    _chartInteractionController,
-                                denseTimeAxis: true,
-                                targetPressureSamples: chartTargetSamples,
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      Material(
-                        elevation: 2,
-                        color: Theme.of(context).colorScheme.surface,
-                        child: SafeArea(
-                          top: false,
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                LiveYieldProgress(
-                                  weightG:
-                                      latestSample?.weightG ??
-                                      _liveWeightNotifier.value,
-                                  targetYieldG: targetYield,
-                                  warnAtG: warnAt,
-                                  showWarnBanner: _yieldWarnFired,
-                                  compact: true,
-                                  height: 10,
-                                  weightHealth: _weightStreamHealth(
-                                    isBrewing: true,
-                                  ),
-                                  onRearmWeight: () =>
-                                      unawaited(_onRearmWeightPressed()),
-                                ),
-                                const SizedBox(height: 6),
-                                LivePressureDeviationBar(
-                                  currentPressure: latestSample?.pressureBar,
-                                  targetPressure: targetP,
-                                  compact: true,
-                                  height: 10,
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _formatBrewElapsed(
-                                          latestSample?.elapsedMs,
-                                        ),
-                                        key: const Key('live_elapsed_digit'),
-                                        textAlign: TextAlign.center,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .headlineSmall
-                                            ?.copyWith(
-                                              fontFeatures: const [
-                                                FontFeature.tabularFigures(),
-                                              ],
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Text(
-                                        _formatBrewFlow(latestFlowGs(samples)),
-                                        key: const Key('live_flow_digit'),
-                                        textAlign: TextAlign.center,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .headlineSmall
-                                            ?.copyWith(
-                                              fontFeatures: const [
-                                                FontFeature.tabularFigures(),
-                                              ],
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                LiveControls(
-                                  controller: controller,
-                                  prominent: true,
-                                  compact: false,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  body = LiveBrewHud(
+                    controller: controller,
+                    samples: samples,
+                    latestSample: latestSample,
+                    fallbackChartHeight: chartHeight,
+                    samplesNotifier: _samplesNotifier,
+                    annotationsNotifier: _annotationsNotifier,
+                    interactionController: _chartInteractionController,
+                    targetPressureSamples: chartTargetSamples,
+                    liveWeightG: liveWeightG,
+                    targetYieldG: targetYield,
+                    warnAtG: warnAt,
+                    showYieldWarnBanner: _yieldWarn.fired,
+                    weightHealth: _weightTracker.health(isBrewing: true),
+                    targetPressure: targetP,
+                    onRearmWeight: onRearmWeight,
                   );
                 } else {
-                  final chartSection = Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding,
+                  final showSensorStatus =
+                      state == ShotSessionState.idle ||
+                      state == ShotSessionState.stopped;
+                  final showStoppedBars =
+                      state == ShotSessionState.stopped && latestSample != null;
+                  body = LiveIdleLayout(
+                    pinChart:
+                        constraints.maxHeight.isFinite &&
+                        constraints.maxHeight >= 360,
+                    useCompactLayout: useCompactLayout,
+                    chartSection: LiveIdleChartSection(
+                      horizontalPadding: horizontalPadding,
+                      demoModeActive: demoModeActive,
+                      onDismissDemoMode: _onDismissDemoMode,
+                      repeatController: _repeatShotController,
+                      sensorStatus: showSensorStatus
+                          ? LiveIdleSensorStatus(
+                              hub: _sensorHub,
+                              autoStartController: _resolvedAutoStartController,
+                              pressureBarNotifier: _livePressureNotifier,
+                              lastUpdateNotifier: _livePressureLastUpdate,
+                              onReconnect: _onReconnectSensors,
+                              onPair: _onPairSensors,
+                            )
+                          : null,
+                      chartHeight: chartHeight,
+                      samplesNotifier: _samplesNotifier,
+                      annotationsNotifier: _annotationsNotifier,
+                      interactionController: _chartInteractionController,
+                      targetPressureSamples: chartTargetSamples,
+                      onOpenFullscreenChart: _onOpenFullscreenChart,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (demoModeActive)
-                          DemoModeBanner(onDismiss: _onDismissDemoMode),
-                        if (demoModeActive) const SizedBox(height: 8),
-                        if (repeatPrefill != null)
-                          RepeatShotBanner(
-                            profileName: repeatPrefill.profile.name,
-                            onDismiss: _repeatShotController!.clear,
-                          ),
-                        if (repeatPrefill != null) const SizedBox(height: 8),
-                        if (state == ShotSessionState.idle ||
-                            state == ShotSessionState.stopped)
-                          _sensorHub == null
-                              ? IdleSensorStatus(
-                                  pressureBarNotifier: _livePressureNotifier,
-                                  lastUpdateNotifier: _livePressureLastUpdate,
-                                  pressensorPaired: false,
-                                  pressensorLinkState:
-                                      ConnectionState.disconnected,
-                                  onReconnect: _onReconnectSensors,
-                                  onPair: _onPairSensors,
-                                  autoStartEnabled: _resolvedAutoStartController
-                                      .settings
-                                      .enabled,
-                                  autoStartThreshold:
-                                      _resolvedAutoStartController
-                                          .settings
-                                          .startThresholdBar,
-                                )
-                              : ListenableBuilder(
-                                  listenable: _sensorHub!,
-                                  builder: (context, _) {
-                                    final hub = _sensorHub!;
-                                    return IdleSensorStatus(
-                                      pressureBarNotifier:
-                                          _livePressureNotifier,
-                                      lastUpdateNotifier:
-                                          _livePressureLastUpdate,
-                                      pressensorPaired: hub.hasKind(
-                                        SensorKind.pressensor,
-                                      ),
-                                      pressensorLinkState: hub.pressensorState,
-                                      onReconnect: _onReconnectSensors,
-                                      onPair: _onPairSensors,
-                                      autoStartEnabled:
-                                          _resolvedAutoStartController
-                                              .settings
-                                              .enabled,
-                                      autoStartThreshold:
-                                          _resolvedAutoStartController
-                                              .settings
-                                              .startThresholdBar,
-                                    );
-                                  },
-                                ),
-                        if (state == ShotSessionState.idle ||
-                            state == ShotSessionState.stopped)
-                          const SizedBox(height: 8),
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            DualCurveChart(
-                              height: chartHeight,
-                              samplesNotifier: _samplesNotifier,
-                              annotationsNotifier: _annotationsNotifier,
-                              interactionController:
-                                  _chartInteractionController,
-                              denseTimeAxis: true,
-                              targetPressureSamples: chartTargetSamples,
-                            ),
-                            Positioned(
-                              right: 4,
-                              bottom: 28,
-                              child: LiveFullscreenChartButton(
-                                onPressed: _onOpenFullscreenChart,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                    controlsSection: LiveIdleControlsSection(
+                      controller: controller,
+                      horizontalPadding: horizontalPadding,
+                      useCompactLayout: useCompactLayout,
+                      latestSample: latestSample,
+                      liveWeightG: liveWeightG,
+                      targetYieldG: targetYield,
+                      warnAtG: warnAt,
+                      // Stopped => not brewing; only computed when shown.
+                      weightHealth: showStoppedBars
+                          ? _weightTracker.health(isBrewing: false)
+                          : null,
+                      onRearmWeight: onRearmWeight,
+                      targetPressure: targetP,
+                      hasTargetCurve: chartTargetSamples.isNotEmpty,
+                      gamification: gamification,
+                      showSaveButton: !_shotSaver.savedCurrent,
+                      onRepeatShot: () => unawaited(_onRepeatShotPressed()),
+                      onSaveShot: () =>
+                          unawaited(_shotSaver.saveCurrentSession(context)),
                     ),
                   );
-
-                  final controlsSection = Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      horizontalPadding,
-                      8,
-                      horizontalPadding,
-                      useCompactLayout ? 12 : 24,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if ((state == ShotSessionState.stopped) &&
-                            latestSample != null) ...[
-                          LiveMetricsRow(
-                            metrics: LiveMetrics.fromStoppedSession(
-                              controller.samples,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          LiveYieldProgress(
-                            weightG:
-                                latestSample.weightG ??
-                                _liveWeightNotifier.value,
-                            targetYieldG: targetYield,
-                            warnAtG: warnAt,
-                            showWarnBanner: false,
-                            weightHealth: _weightStreamHealth(
-                              isBrewing:
-                                  state == ShotSessionState.recording ||
-                                  state == ShotSessionState.paused,
-                            ),
-                            onRearmWeight: () =>
-                                unawaited(_onRearmWeightPressed()),
-                          ),
-                          const SizedBox(height: 6),
-                          LivePressureDeviationBar(
-                            currentPressure: latestSample.pressureBar,
-                            targetPressure: targetP,
-                          ),
-                          if (chartTargetSamples.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            _LiveTargetGamification(
-                              closeness:
-                                  liveGamif['closenessPercent'] as double?,
-                              maxStreakSec:
-                                  liveGamif['maxStreakSeconds'] as int? ?? 0,
-                              currentStreakSec:
-                                  liveGamif['currentStreakSeconds'] as int? ??
-                                  0,
-                              penaltyCount:
-                                  liveGamif['penaltyCount'] as int? ?? 0,
-                              score: liveGamif['score'] as double?,
-                            ),
-                          ],
-                        ],
-                        const SizedBox(height: 8),
-                        Text(
-                          '${controller.sampleCount} samples',
-                          style: Theme.of(context).textTheme.bodySmall,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Session: ${state.name}',
-                          style: Theme.of(context).textTheme.titleMedium,
-                          textAlign: TextAlign.center,
-                        ),
-                        if (controller.canSaveShot) ...[
-                          Align(
-                            alignment: Alignment.center,
-                            child: RepeatShotButton(
-                              onPressed: () =>
-                                  unawaited(_onRepeatShotPressed()),
-                            ),
-                          ),
-                          if (!_autoSavedCurrent) ...[
-                            const SizedBox(height: 8),
-                            FilledButton.icon(
-                              key: const Key('save_current_shot_button'),
-                              onPressed: () => unawaited(_saveCurrentSession()),
-                              icon: const Icon(Icons.save),
-                              label: const Text('Save shot'),
-                            ),
-                          ],
-                        ],
-                        if (controller.canSaveShot) const SizedBox(height: 16),
-                      ],
-                    ),
-                  );
-
-                  final pinChart =
-                      constraints.maxHeight.isFinite &&
-                      constraints.maxHeight >= 360;
-
-                  body = pinChart
-                      ? Column(
-                          key: const ValueKey('live-pinned-layout'),
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: SingleChildScrollView(child: chartSection),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: SingleChildScrollView(
-                                padding: EdgeInsets.only(
-                                  top: useCompactLayout ? 0 : 8,
-                                ),
-                                child: controlsSection,
-                              ),
-                            ),
-                          ],
-                        )
-                      : SingleChildScrollView(
-                          key: const ValueKey('live-scroll-layout'),
-                          padding: EdgeInsets.symmetric(
-                            vertical: useCompactLayout ? 12 : 24,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [chartSection, controlsSection],
-                          ),
-                        );
                 }
 
-                final brewBanner = !isBrewing && _lastBrewSummary != null
-                    ? Material(
-                        key: const Key('brew_complete_overlay'),
-                        elevation: 8,
-                        borderRadius: BorderRadius.circular(12),
-                        shadowColor: Colors.black54,
-                        child: BrewCompleteBanner(
-                          summary: _lastBrewSummary!,
-                          onDismiss: _dismissBrewCompleteBanner,
-                          onEdit: _lastAutoSavedShotId != null
-                              ? () => unawaited(_editLastSavedShot())
-                              : null,
-                          onDiscard: _lastAutoSavedShotId != null
-                              ? () {
-                                  final id = _lastAutoSavedShotId!;
-                                  unawaited(_discardAutoSavedShotById(id));
-                                }
-                              : null,
-                        ),
+                final summary = _brewCompleteBanner.summary;
+                final lastSavedId = _shotSaver.lastSavedShotId;
+                final brewBanner = !isBrewing && summary != null
+                    ? LiveBrewCompleteOverlay(
+                        summary: summary,
+                        onDismiss: _brewCompleteBanner.dismiss,
+                        onEdit: lastSavedId != null
+                            ? () => unawaited(
+                                _shotSaver.editLastSavedShot(context),
+                              )
+                            : null,
+                        onDiscard: lastSavedId != null
+                            ? () => unawaited(
+                                _shotSaver.discardAutoSavedShotById(
+                                  context,
+                                  lastSavedId,
+                                ),
+                              )
+                            : null,
                       )
                     : null;
 
@@ -1580,172 +813,4 @@ double _liveChartHeight(BoxConstraints constraints) {
   }
 
   return 300;
-}
-
-String _formatBrewElapsed(int? elapsedMs) {
-  final ms = elapsedMs ?? 0;
-  final totalSec = (ms / 1000).floor();
-  final minutes = totalSec ~/ 60;
-  final seconds = totalSec % 60;
-  return '${minutes.toString().padLeft(1, '0')}:${seconds.toString().padLeft(2, '0')}';
-}
-
-String _formatBrewFlow(double? flowGs) {
-  if (flowGs == null) {
-    return '— g/s';
-  }
-  return '${flowGs.toStringAsFixed(1)} g/s';
-}
-
-/// Compact live gamification strip shown while brewing against a target curve.
-/// Displays running closeness %, current/max green streak, number of distinct
-/// penalty periods, and score (less strict event-based penalties).
-class _LiveTargetGamification extends StatelessWidget {
-  const _LiveTargetGamification({
-    // ignore: unused_element_parameter
-    super.key,
-    required this.closeness,
-    required this.maxStreakSec,
-    required this.currentStreakSec,
-    required this.penaltyCount,
-    required this.score,
-  });
-
-  final double? closeness;
-  final int maxStreakSec;
-  final int currentStreakSec;
-  final int penaltyCount;
-  final double? score;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final hasTarget =
-        closeness != null ||
-        score != null ||
-        maxStreakSec > 0 ||
-        currentStreakSec > 0;
-
-    if (!hasTarget) {
-      return const SizedBox.shrink();
-    }
-
-    final closenessStr = closeness != null
-        ? '${closeness!.toStringAsFixed(0)}%'
-        : '—';
-    final scoreStr = score != null ? score!.toStringAsFixed(0) : '—';
-    final streakStr = currentStreakSec > 0
-        ? '${currentStreakSec}s / ${maxStreakSec}s'
-        : (maxStreakSec > 0 ? 'max ${maxStreakSec}s' : '—');
-
-    final isGoodStreak = currentStreakSec >= 3;
-    final streakColor = isGoodStreak
-        ? Colors.green.shade700
-        : theme.colorScheme.onSurfaceVariant;
-    final hasPenalties = penaltyCount > 0;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.track_changes, size: 16),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 12,
-              children: [
-                _GamifPill(label: 'Close', value: closenessStr),
-                _GamifPill(
-                  label: 'Streak',
-                  value: streakStr,
-                  valueColor: streakColor,
-                ),
-                if (hasPenalties)
-                  _GamifPill(
-                    label: 'Penalties',
-                    value: '$penaltyCount',
-                    valueColor: theme.colorScheme.error,
-                  ),
-                _GamifPill(label: 'Score', value: scoreStr),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GamifPill extends StatelessWidget {
-  const _GamifPill({
-    // ignore: unused_element_parameter
-    super.key,
-    required this.label,
-    required this.value,
-    this.valueColor,
-  });
-
-  final String label;
-  final String value;
-  final Color? valueColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          '$label ',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        Text(
-          value,
-          style: theme.textTheme.labelMedium?.copyWith(
-            fontFeatures: const [FontFeature.tabularFigures()],
-            color: valueColor ?? theme.colorScheme.onSurface,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-const String kBundledDemoFixtureAsset = 'assets/demo_shot.jsonl';
-
-String? _resolveDemoFixtureFilePath() {
-  const candidates = [
-    '../../fixtures/sensor_streams/demo_shot.jsonl',
-    '../../../fixtures/sensor_streams/demo_shot.jsonl',
-    'fixtures/sensor_streams/demo_shot.jsonl',
-  ];
-
-  for (final candidate in candidates) {
-    final file = File(candidate);
-    if (file.existsSync()) {
-      return file.path;
-    }
-  }
-
-  return null;
-}
-
-Future<List<SensorSample>> _loadBundledDemoFixture() async {
-  final content = await rootBundle.loadString(kBundledDemoFixtureAsset);
-  return MockReplayAdapter.parseLines(
-    content.split('\n'),
-    source: kBundledDemoFixtureAsset,
-  );
 }
