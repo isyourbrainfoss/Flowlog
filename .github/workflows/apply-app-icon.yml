@@ -1,0 +1,177 @@
+name: Apply App Icon (recenter)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-app-icon
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install pillow numpy
+
+      - name: Recenter master + regenerate mipmaps
+        run: |
+          python3 << 'PY'
+          from pathlib import Path
+          import re
+          import numpy as np
+          from PIL import Image, ImageFilter
+
+          root = Path(".")
+          master_path = root / "app/flowlog/assets/icon/app_icon.png"
+          im = Image.open(master_path).convert("RGBA")
+          w, h = im.size
+          assert w == h == 1024, (w, h)
+          arr = np.array(im.convert("RGB")).astype(np.float32)
+          bg = np.array([0x23, 0x15, 0x0E], dtype=np.float32)
+          dist = np.linalg.norm(arr - bg, axis=2)
+
+          # Body bbox: content vs #23150E, morph clean, mask handle (top-left)
+          mask = (dist > 50).astype(np.uint8) * 255
+          mi = Image.fromarray(mask, "L").filter(ImageFilter.MedianFilter(5))
+          mi = mi.filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.MinFilter(9))
+          m = np.array(mi) > 128
+          m_body = m.copy()
+          m_body[:280, :420] = False
+          ys, xs = np.where(m_body)
+          top, bot = int(ys.min()), int(ys.max())
+          left, right = int(xs.min()), int(xs.max())
+          T, B = top, h - 1 - bot
+          L, R = left, w - 1 - right
+          nudge_up = int(round((T - B) / 2))
+          nudge_right = int(round((R - L) / 2))
+          print(f"before margins T={T} B={B} L={L} R={R}")
+          print(f"nudge up={nudge_up} right={nudge_right}")
+
+          BG = (0x23, 0x15, 0x0E, 255)
+          shifted = Image.new("RGBA", (w, h), BG)
+          # Move content up by nudge_up and right by nudge_right
+          # source crop: drop top nudge_up rows; paste at (nudge_right, 0)
+          if nudge_up >= 0 and nudge_right >= 0:
+              crop = im.crop((0, nudge_up, w - nudge_right, h))
+              shifted.paste(crop, (nudge_right, 0), crop)
+          elif nudge_up >= 0 and nudge_right < 0:
+              # move left
+              nl = -nudge_right
+              crop = im.crop((nl, nudge_up, w, h))
+              shifted.paste(crop, (0, 0), crop)
+          else:
+              # General affine fallback
+              shifted = Image.new("RGBA", (w, h), BG)
+              shifted.paste(im, (nudge_right, -nudge_up), im)
+
+          # Verify
+          arr2 = np.array(shifted.convert("RGB")).astype(np.float32)
+          dist2 = np.linalg.norm(arr2 - bg, axis=2)
+          mask2 = (dist2 > 50).astype(np.uint8) * 255
+          mi2 = Image.fromarray(mask2, "L").filter(ImageFilter.MedianFilter(5))
+          mi2 = mi2.filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.MinFilter(9))
+          m2 = np.array(mi2) > 128
+          m2[:280, :420] = False
+          ys2, xs2 = np.where(m2)
+          T2, B2 = int(ys2.min()), h - 1 - int(ys2.max())
+          L2, R2 = int(xs2.min()), w - 1 - int(xs2.max())
+          print(f"after margins T={T2} B={B2} L={L2} R={R2}")
+          assert abs(T2 - B2) <= 3, (T2, B2)
+          assert abs(L2 - R2) <= 3, (L2, R2)
+
+          flat = Image.new("RGBA", (w, h), BG)
+          flat.paste(shifted, (0, 0), shifted)
+          master = flat
+          master.save(master_path, "PNG", optimize=True)
+          print("wrote", master_path, master_path.stat().st_size)
+
+          res = root / "app/flowlog/android/app/src/main/res"
+          legacy = {
+              "mipmap-mdpi": 48,
+              "mipmap-hdpi": 72,
+              "mipmap-xhdpi": 96,
+              "mipmap-xxhdpi": 144,
+              "mipmap-xxxhdpi": 192,
+          }
+          adaptive = {
+              "mipmap-mdpi": 108,
+              "mipmap-hdpi": 162,
+              "mipmap-xhdpi": 216,
+              "mipmap-xxhdpi": 324,
+              "mipmap-xxxhdpi": 432,
+          }
+          for folder, size in legacy.items():
+              out = res / folder / "ic_launcher.png"
+              master.resize((size, size), Image.Resampling.LANCZOS).save(out, "PNG", optimize=True)
+              print(out, size)
+          for folder, size in adaptive.items():
+              out = res / folder / "ic_launcher_foreground.png"
+              master.resize((size, size), Image.Resampling.LANCZOS).save(out, "PNG", optimize=True)
+              print(out, size)
+
+          colors = res / "values" / "colors.xml"
+          text = colors.read_text()
+          bg_hex = "#23150E"
+          if "ic_launcher_background" in text:
+              text = re.sub(
+                  r'<color name="ic_launcher_background">[^<]*</color>',
+                  f'<color name="ic_launcher_background">{bg_hex}</color>',
+                  text,
+              )
+          else:
+              text = text.replace(
+                  "</resources>",
+                  f'    <color name="ic_launcher_background">{bg_hex}</color>\n</resources>',
+              )
+          colors.write_text(text)
+
+          anydpi = res / "mipmap-anydpi-v26"
+          anydpi.mkdir(exist_ok=True)
+          (anydpi / "ic_launcher.xml").write_text(
+              '<?xml version="1.0" encoding="utf-8"?>\n'
+              '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
+              '    <background android:drawable="@color/ic_launcher_background"/>\n'
+              '    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>\n'
+              '</adaptive-icon>\n'
+          )
+          print("adaptive bg", bg_hex)
+          print("done")
+          PY
+
+      - name: Commit icons and remove one-shot workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/apply-app-icon.yml
+          git add -A app/flowlog/assets/icon \
+            app/flowlog/android/app/src/main/res \
+            .github/workflows/apply-app-icon.yml
+          git status
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git commit -m "$(cat <<'EOF'
+          fix: recenter Flowlog launcher icon on brown canvas
+
+          Nudge portafilter so brown padding is even top/bottom and
+          left/right. Regenerates legacy mipmaps + adaptive foregrounds;
+          background stays #23150E.
+          EOF
+          )"
+          git push origin HEAD:main
+
+      - name: Summary
+        run: echo "Recentering pushed to main; Android Release should follow."
