@@ -1,0 +1,80 @@
+                                ),
+                                const SizedBox(height: 6),
+                                LivePressureDeviationBar(
+                                  currentPressure: latestSample?.pressureBar,
+                                  targetPressure: targetP,
+                                  compact: true,
+                                  height: 10,
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _formatBrewElapsed(
+                                          latestSample?.elapsedMs,
+                                        ),
+                                        key: const Key('live_elapsed_digit'),
+                                        textAlign: TextAlign.center,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineSmall
+                                            ?.copyWith(
+                                              fontFeatures: const [
+                                                FontFeature.tabularFigures(),
+                                              ],
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        _formatBrewFlow(latestFlowGs(samples)),
+                                        key: const Key('live_flow_digit'),
+                                        textAlign: TextAlign.center,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineSmall
+                                            ?.copyWith(
+                                              fontFeatures: const [
+                                                FontFeature.tabularFigures(),
+                                              ],
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                LiveControls(
+                                  controller: controller,
+                                  prominent: true,
+                                  compact: false,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                } else {
+                  final chartSection = Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (demoModeActive)
+                          DemoModeBanner(onDismiss: _onDismissDemoMode),
+                        if (demoModeActive) const SizedBox(height: 8),
+                        if (repeatPrefill != null)
+                          RepeatShotBanner(
+                            profileName: repeatPrefill.profile.name,
+                            onDismiss: _repeatShotController!.clear,
+                          ),
+                        if (repeatPrefill != null) const SizedBox(height: 8),
+                        if (state == ShotSessionState.idle ||
+                            state == ShotSessionState.stopped)
+                          _sensorHub == null

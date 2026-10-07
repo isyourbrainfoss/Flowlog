@@ -1,0 +1,80 @@
+                'penaltyCount': 0,
+                'score': null,
+              };
+
+        final shell = ConfettiOverlay(
+          controller: _confettiController,
+          child: LiveShotEndListener(
+            controller: controller,
+            shotEndFeedback: widget.shotEndFeedback,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final useCompactLayout =
+                    constraints.maxWidth < ShellBreakpoints.sidebar ||
+                    constraints.maxHeight < ShellBreakpoints.minRailHeight;
+                final horizontalPadding = useCompactLayout ? 8.0 : 24.0;
+                final chartHeight = _liveChartHeight(constraints);
+                final isBrewing = controller.isBrewing;
+                final targetYield =
+                    _brewDefaults?.targetYieldG ?? kDefaultTargetYieldG;
+                final warnAt =
+                    _brewDefaults?.effectiveYieldWarnAtG ??
+                    kDefaultYieldWarnAtG;
+                final targetP = latestSample == null
+                    ? null
+                    : _targetPressureAtElapsed(latestSample.elapsedMs);
+
+                // Active brew: immersive high-focus layout (shell hides tabs).
+                // Only plot + live digits + cup/pressure bars + stop control.
+                final Widget body;
+                if (isBrewing) {
+                  body = Column(
+                    key: const ValueKey('live-brew-layout'),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                          child: LayoutBuilder(
+                            builder: (context, chartConstraints) {
+                              final h = chartConstraints.maxHeight.isFinite
+                                  ? chartConstraints.maxHeight
+                                  : chartHeight;
+                              return DualCurveChart(
+                                height: h,
+                                samplesNotifier: _samplesNotifier,
+                                annotationsNotifier: _annotationsNotifier,
+                                interactionController:
+                                    _chartInteractionController,
+                                denseTimeAxis: true,
+                                targetPressureSamples: chartTargetSamples,
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      Material(
+                        elevation: 2,
+                        color: Theme.of(context).colorScheme.surface,
+                        child: SafeArea(
+                          top: false,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                LiveYieldProgress(
+                                  weightG:
+                                      latestSample?.weightG ??
+                                      _liveWeightNotifier.value,
+                                  targetYieldG: targetYield,
+                                  warnAtG: warnAt,
+                                  showWarnBanner: _yieldWarnFired,
+                                  compact: true,
+                                  height: 10,
+                                  weightHealth: _weightStreamHealth(
+                                    isBrewing: true,
+                                  ),
+                                  onRearmWeight: () =>
+                                      unawaited(_onRearmWeightPressed()),
