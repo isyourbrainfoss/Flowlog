@@ -11,13 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Decode and apply patches
+      - name: Decode and apply remaining patch
         run: |
           set -euo pipefail
-          cat .ci/qw-a.*.b64.txt | tr -d '\n' | base64 -d > .ci/quick-wins-0.0.3.a.patch
-          cat .ci/qw-b.*.b64.txt | tr -d '\n' | base64 -d > .ci/quick-wins-0.0.3.b.patch
-          git apply --index .ci/quick-wins-0.0.3.a.patch
-          git apply --index .ci/quick-wins-0.0.3.b.patch
+          for i in 0 1 2 3 4 5; do
+            cat ".ci/rem.${i}.b64.txt"
+          done | tr -d '\n' | base64 -d > .ci/remaining.patch
+          git apply --index .ci/remaining.patch
           git config user.name "isyourbrainfoss"
           git config user.email "isyourbrainfoss@proton.me"
           git commit -m "feat(0.0.3): finish quick wins (secure NC, brew wake, sync UX, BLE, release)"
@@ -25,10 +25,10 @@ jobs:
       - name: Remove one-shot helper
         run: |
           set -euo pipefail
-          git rm -f .ci/qw-a.*.b64.txt .ci/qw-b.*.b64.txt \
-            .ci/quick-wins-0.0.3.patch .ci/quick-wins-0.0.3.a.patch .ci/quick-wins-0.0.3.b.patch \
+          git rm -f .ci/rem.*.b64.txt .ci/remaining.patch \
+            .ci/qw-*.b64.txt .ci/quick-wins-0.0.3*.patch \
             .github/workflows/apply-quick-wins-patch.yml || true
-          rm -f .ci/quick-wins-0.0.3.a.patch .ci/quick-wins-0.0.3.b.patch || true
+          rm -f .ci/remaining.patch || true
           git add -A
           if ! git diff --cached --quiet; then
             git commit -m "chore: remove one-shot quick-wins patch helper"
