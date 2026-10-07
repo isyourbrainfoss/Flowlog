@@ -1,0 +1,80 @@
+    }
+
+    if (filters.startedOnOrAfter != null) {
+      final afterIso =
+          const UtcIso8601Converter().toSql(filters.startedOnOrAfter!);
+      query.where((shot) => shot.startedAt.isBiggerOrEqualValue(afterIso));
+    }
+
+    if (filters.startedOnOrBefore != null) {
+      final beforeIso =
+          const UtcIso8601Converter().toSql(filters.startedOnOrBefore!);
+      query.where((shot) => shot.startedAt.isSmallerOrEqualValue(beforeIso));
+    }
+
+    if (filters.minTasteScore != null) {
+      query.where(
+        (shot) =>
+            shot.tasteScore.isBiggerOrEqualValue(filters.minTasteScore!),
+      );
+    }
+
+    if (filters.minPeakPressureBar != null ||
+        filters.maxPeakPressureBar != null) {
+      final shotIds = await _shotIdsWithPeakPressureRange(
+        minBar: filters.minPeakPressureBar,
+        maxBar: filters.maxPeakPressureBar,
+      );
+      if (shotIds.isEmpty) {
+        query.where((shot) => const Constant(false));
+      } else {
+        query.where((shot) => shot.id.isIn(shotIds));
+      }
+    }
+
+    if (filters.minDurationMs != null || filters.maxDurationMs != null) {
+      final shotIds = await _shotIdsInDurationRange(
+        minMs: filters.minDurationMs,
+        maxMs: filters.maxDurationMs,
+      );
+      if (shotIds.isEmpty) {
+        query.where((shot) => const Constant(false));
+      } else {
+        query.where((shot) => shot.id.isIn(shotIds));
+      }
+    }
+
+    if (filters.minGrindSetting != null) {
+      query.where(
+        (shot) => shot.grindSetting
+            .isBiggerOrEqualValue(filters.minGrindSetting!),
+      );
+    }
+    if (filters.maxGrindSetting != null) {
+      query.where(
+        (shot) => shot.grindSetting
+            .isSmallerOrEqualValue(filters.maxGrindSetting!),
+      );
+    }
+
+    if (filters.tagIds.isNotEmpty) {
+      final shotIds = await _shotIdsWithAnyTag(filters.tagIds);
+      if (shotIds.isEmpty) {
+        query.where((shot) => const Constant(false));
+      } else {
+        query.where((shot) => shot.id.isIn(shotIds));
+      }
+    }
+  }
+
+  /// ASCII id fragment safe to interpolate into LIKE. Null if [folded] has
+  /// wildcards or quotes (those are handled via [beanMatchesQuery] instead).
+  static String? _safeLikeNeedle(String folded) {
+    if (folded.isEmpty) {
+      return null;
+    }
+    if (!RegExp(r'^[a-z0-9._-]+$').hasMatch(folded)) {
+      return null;
+    }
+    return folded;
+  }
