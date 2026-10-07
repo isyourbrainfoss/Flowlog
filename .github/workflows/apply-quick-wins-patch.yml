@@ -11,30 +11,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Decode and apply remaining patch
+      - name: Apply large-file quick-wins patches
         run: |
           set -euo pipefail
-          # Fix accidental rem.1b transcription typo if present (Ym9u/E2 -> b24t/E2E)
-          if [ -f .ci/rem.1b.b64.txt ]; then
-            sed -i 's/Ym9uLWJsb2IgRTIgZW5jcnlwdGlvbiAn/b24tYmxvYiBFMkUgZW5jcnlwdGlvbiAn/g' .ci/rem.1b.b64.txt
-          fi
-          for n in 0a 0b 1a 1b 2a 2b 3a 3b 4a 4b 5; do
-            cat ".ci/rem.${n}.b64.txt"
-          done | tr -d '\n' | base64 -d > .ci/remaining.patch
-          git apply --index .ci/remaining.patch
+          shopt -s nullglob
+          for p in .ci/qw-patches/*.patch; do
+            echo "Applying $p"
+            git apply --index "$p"
+          done
           git config user.name "isyourbrainfoss"
           git config user.email "isyourbrainfoss@proton.me"
-          git commit -m "feat(0.0.3): finish quick wins (secure NC, brew wake, sync UX, BLE, release)"
+          git commit -m "feat(0.0.3): large-file quick wins (shell, sensors, sync sites, lock)"
           git push origin HEAD:main
-      - name: Remove one-shot helper
+      - name: Cleanup helpers
         run: |
           set -euo pipefail
-          git rm -f .ci/rem.*.b64.txt .ci/remaining.patch \
+          git rm -rf .ci/qw-patches .ci/rem.*.b64.txt .ci/remaining.patch \
             .ci/qw-*.b64.txt .ci/quick-wins-0.0.3*.patch \
             .github/workflows/apply-quick-wins-patch.yml || true
-          rm -f .ci/remaining.patch || true
           git add -A
           if ! git diff --cached --quiet; then
-            git commit -m "chore: remove one-shot quick-wins patch helper"
+            git commit -m "chore: remove quick-wins patch helpers"
             git push origin HEAD:main
           fi
