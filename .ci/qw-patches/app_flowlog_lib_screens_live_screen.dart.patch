@@ -1,0 +1,37 @@
+diff --git a/app/flowlog/lib/screens/live_screen.dart b/app/flowlog/lib/screens/live_screen.dart
+index 731084e..edc759b 100644
+--- a/app/flowlog/lib/screens/live_screen.dart
++++ b/app/flowlog/lib/screens/live_screen.dart
+@@ -20,7 +20,7 @@ import 'package:flowlog/screens/live/save_shot.dart';
+ import 'package:flowlog/settings/brew_defaults_store.dart';
+ import 'package:flowlog/settings/brew_location_store.dart';
+ import 'package:flowlog/settings/scale_settings_store.dart';
+-import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
++import 'package:flowlog/sync/sync_feedback.dart';
+ import 'package:flowlog/screens/more/sensors_screen.dart';
+ import 'package:flowlog/sensors/live_sensor_source.dart';
+ import 'package:flowlog/sensors/sensor_hub.dart';
+@@ -909,7 +909,10 @@ class _LiveScreenState extends State<LiveScreen> {
+         }
+         _shotEventsNotifier?.notifyShotsChanged();
+         final database = await _ensureDatabase();
+-        unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
++        if (!mounted) {
++          return;
++        }
++        unawaited(syncIfEnabledWithFeedback(context, database: database));
+       }
+     } finally {
+       if (mounted) {
+@@ -950,7 +953,10 @@ class _LiveScreenState extends State<LiveScreen> {
+         confettiController: _confettiController,
+       );
+       final database = await _ensureDatabase();
+-      unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
++      if (!mounted) {
++        return;
++      }
++      unawaited(syncIfEnabledWithFeedback(context, database: database));
+     }
+   }
+ 
