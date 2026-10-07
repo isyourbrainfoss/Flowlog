@@ -1,0 +1,80 @@
+      }
+
+      final currentIndex = _devices.indexWhere((entry) => entry.id == id);
+      if (currentIndex < 0) {
+        return;
+      }
+
+      _devices[currentIndex] = _devices[currentIndex].copyWith(
+        state: ConnectionState.connected,
+      );
+      setLastError(null);
+      if (device.kind == SensorKind.scale) {
+        _ensureScaleHealthWatchdog();
+      }
+      recordReconnect(
+        deviceId: id,
+        deviceName: device.name,
+        outcome: ReconnectOutcome.connected,
+        notify: false,
+      );
+      notifyListeners();
+    } on Object catch (error) {
+      final message = 'BLE connect failed: $error';
+      final currentIndex = _devices.indexWhere((entry) => entry.id == id);
+      await _failConnect(
+        currentIndex >= 0 ? currentIndex : index,
+        device,
+        message,
+      );
+      await _teardownAdapter(id);
+    }
+  }
+
+  Future<void> _failConnect(
+    int index,
+    PairedSensorEntry device,
+    String message,
+  ) async {
+    _devices[index] = device.copyWith(state: ConnectionState.disconnected);
+    setLastError(message);
+    recordReconnect(
+      deviceId: device.id,
+      deviceName: device.name,
+      outcome: ReconnectOutcome.failed,
+      message: message,
+      notify: false,
+    );
+    notifyListeners();
+  }
+
+  void _onAdapterStateChanged(String id, ConnectionState state) {
+    final index = _devices.indexWhere((device) => device.id == id);
+    if (index < 0) {
+      return;
+    }
+
+    _devices[index] = _devices[index].copyWith(state: state);
+    if (state == ConnectionState.connected) {
+      final adapter = _activeAdapters[id];
+      if (adapter is PressensorBleAdapter) {
+        _batteryByDevice[id] = adapter.batteryPercent;
+      }
+    } else if (state == ConnectionState.disconnected) {
+      _batteryByDevice.remove(id);
+      _stopScaleHealthWatchdogIfIdle();
+    }
+    if (state == ConnectionState.error) {
+      setLastError('Sensor link error ($id).');
+      final device = _devices[index];
+      if (device.kind == SensorKind.scale &&
+          _scaleRecoveryEnabled &&
+          !_scaleRecoverInFlight.contains(id)) {
+        // Scale watchdog escalated — full reconnect.
+        _ensureScaleHealthWatchdog();
+        unawaited(_recoverSilentScales());
+      }
+    }
+    if (state == ConnectionState.connected &&
+        _devices[index].kind == SensorKind.scale) {
+      _ensureScaleHealthWatchdog();
