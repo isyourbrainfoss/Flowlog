@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/history/history_fullscreen_chart.dart';
 import 'package:flowlog/screens/library/share_profile.dart';
-import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
+import 'package:flowlog/sync/sync_feedback.dart';
 import 'package:flowlog/screens/live/metadata_sheet.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
@@ -227,8 +227,11 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
         await _loadDisplayMetadata();
         if (widget.shotRepository == null) {
           final database = await _ensureDatabase();
+          if (!mounted) {
+            return;
+          }
           unawaited(
-            FlowlogSyncCoordinator.syncIfEnabled(database: database),
+            syncIfEnabledWithFeedback(context, database: database),
           );
         }
       }
@@ -276,7 +279,10 @@ class _ShotDetailScreenState extends State<ShotDetailScreen> {
 
       if (widget.shotRepository == null) {
         final database = await _ensureDatabase();
-        unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
+        if (!mounted) {
+          return;
+        }
+        unawaited(syncIfEnabledWithFeedback(context, database: database));
       }
 
       if (mounted) {

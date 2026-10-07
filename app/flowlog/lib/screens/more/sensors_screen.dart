@@ -12,6 +12,7 @@ import 'package:flowlog_sensors/flowlog_sensors.dart'
         isPressensorLowBattery,
         pressensorLowBatteryWarning;
 import 'package:flutter/material.dart' hide ConnectionState;
+import 'package:geolocator/geolocator.dart';
 
 /// Sensors pairing and connection management.
 class SensorsScreen extends StatelessWidget {
@@ -438,14 +439,29 @@ Future<void> _runSensorScanFlow(
         );
       }
     case BleScanAssignOutcome.unavailable:
-      await showDialog<void>(
+      final message =
+          result.message ?? 'Bluetooth is not available on this device.';
+      final isPermission = message.toLowerCase().contains('permission');
+      final action = await showDialog<String>(
         context: dialogNavContext,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Bluetooth unavailable'),
-          content: Text(
-            result.message ?? 'Bluetooth is not available on this device.',
+          key: const Key('ble_unavailable_dialog'),
+          title: Text(
+            isPermission ? 'Bluetooth permission needed' : 'Bluetooth unavailable',
           ),
+          content: Text(message),
           actions: [
+            if (isPermission)
+              TextButton(
+                key: const Key('ble_open_settings_button'),
+                onPressed: () => Navigator.pop(dialogContext, 'settings'),
+                child: const Text('Open settings'),
+              ),
+            TextButton(
+              key: const Key('ble_retry_button'),
+              onPressed: () => Navigator.pop(dialogContext, 'retry'),
+              child: const Text('Try again'),
+            ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('OK'),
@@ -453,6 +469,21 @@ Future<void> _runSensorScanFlow(
           ],
         ),
       );
+      if (action == 'settings') {
+        try {
+          await Geolocator.openAppSettings();
+        } on Object {
+          // Platform may not support opening settings.
+        }
+      } else if (action == 'retry') {
+        if (context.mounted) {
+          await _runSensorScanFlow(context, hub, kind);
+        } else if (navigator.mounted) {
+          // dialogNavContext is the root navigator captured before awaits.
+          // ignore: use_build_context_synchronously
+          await _runSensorScanFlow(dialogNavContext, hub, kind);
+        }
+      }
   }
 }
 

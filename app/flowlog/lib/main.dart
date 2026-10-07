@@ -25,10 +25,19 @@ class FlowlogApp extends StatefulWidget {
     this.autoReconnectSensors = true,
   });
 
+  /// Optional controller for tests; created internally when omitted.
   final FlowlogThemeController? themeController;
+
+  /// Optional sensor registry for tests; created internally when omitted.
   final SensorHub? sensorHub;
+
+  /// Optional appearance store override for tests.
   final AppearanceSettingsStore? appearanceSettingsStore;
+
+  /// Optional paired-sensors store override for tests.
   final PairedSensorsStore? pairedSensorsStore;
+
+  /// When false, skips background BLE reconnect on startup (widget tests).
   final bool autoReconnectSensors;
 
   @override
@@ -108,6 +117,8 @@ class _FlowlogAppState extends State<FlowlogApp> with WidgetsBindingObserver {
     }
   }
 
+  // Two spaced attempts — the old 600ms/2s/5s/10s cascade stacked BLE
+  // connect work and made cold start feel stuck.
   static const _startupReconnectDelays = [
     Duration(milliseconds: 1500),
     Duration(seconds: 8),

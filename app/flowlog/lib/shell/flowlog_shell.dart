@@ -4,9 +4,10 @@ import 'package:flowlog/screens/live/auto_start.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/settings/default_bean_store.dart';
-import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
+import 'package:flowlog/sync/sync_feedback.dart';
 import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog/shell/active_brew_scope.dart';
+import 'package:flowlog/shell/screen_wake_lock.dart';
 import 'package:flowlog/shell/shot_events.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/app_destinations.dart';
@@ -97,7 +98,10 @@ class _FlowlogShellState extends State<FlowlogShell> {
       // competing with BLE reconnect and History open on cold start.
       _deferredSyncTimer?.cancel();
       _deferredSyncTimer = Timer(const Duration(seconds: 12), () {
-        unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
+        if (!mounted) {
+          return;
+        }
+        unawaited(syncIfEnabledWithFeedback(context, database: database));
       });
     }
   }
@@ -312,17 +316,25 @@ class _FlowlogShellState extends State<FlowlogShell> {
           notifier: _shotEventsNotifier,
           child: ActiveBrewScope(
             notifier: _activeBrewNotifier,
-            child: AutoStartSettingsScope(
-              controller: _autoStartController,
-              child: TargetBrewScope(
-                controller: _targetBrewController,
-                child: RepeatShotScope(
-                  controller: _repeatShotController,
-                  child: FlowlogShellScope(
-                    switchTab: _switchTab,
-                    child: FlowlogShortcuts(
-                      registry: _shortcutRegistry,
-                      currentTab: destination.tab,
+            child: ListenableBuilder(
+              listenable: _activeBrewNotifier,
+              builder: (context, child) {
+                return ScreenWakeLock(
+                  enabled: _activeBrewNotifier.isBrewing,
+                  child: child!,
+                );
+              },
+              child: AutoStartSettingsScope(
+                controller: _autoStartController,
+                child: TargetBrewScope(
+                  controller: _targetBrewController,
+                  child: RepeatShotScope(
+                    controller: _repeatShotController,
+                    child: FlowlogShellScope(
+                      switchTab: _switchTab,
+                      child: FlowlogShortcuts(
+                        registry: _shortcutRegistry,
+                        currentTab: destination.tab,
                       // Single Scaffold + stable tab stack. Switching Scaffold
                       // keys used to remount Live mid-start and abort the brew.
                       child: ListenableBuilder(
@@ -431,8 +443,9 @@ class _FlowlogShellState extends State<FlowlogShell> {
                 ),
               ),
             ),
-          ),
-        );
+              ),
+            ),
+          );
       },
     );
   }

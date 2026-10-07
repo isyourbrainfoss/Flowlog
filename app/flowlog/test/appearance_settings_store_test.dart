@@ -26,6 +26,7 @@ void main() {
       final settings = await store.load();
       expect(settings.themeMode, ThemeMode.dark);
       expect(settings.isDark, isTrue);
+      expect(settings.colorblindCharts, isFalse);
     });
 
     test('persists light mode preference', () async {
@@ -41,6 +42,18 @@ void main() {
       expect(loaded.themeMode, ThemeMode.system);
       expect(loaded.isSystem, isTrue);
       expect(loaded.isDark, isFalse);
+    });
+
+    test('persists colorblind charts preference', () async {
+      await store.save(
+        const AppearanceSettings(
+          themeMode: ThemeMode.light,
+          colorblindCharts: true,
+        ),
+      );
+      final loaded = await store.load();
+      expect(loaded.themeMode, ThemeMode.light);
+      expect(loaded.colorblindCharts, isTrue);
     });
   });
 }

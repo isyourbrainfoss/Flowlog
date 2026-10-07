@@ -7,7 +7,7 @@ import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/history/shot_detail.dart';
 import 'package:flowlog/shell/shot_events.dart';
 import 'package:flowlog/shell/shell_breakpoints.dart';
-import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
+import 'package:flowlog/sync/sync_feedback.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 
@@ -238,7 +238,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     if (widget.shotRepository == null) {
       final database = await _ensureDatabase();
-      unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
+      if (!mounted) {
+        return;
+      }
+      unawaited(syncIfEnabledWithFeedback(context, database: database));
     }
 
     if (!mounted) return;
@@ -297,7 +300,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     if (widget.shotRepository == null) {
       final database = await _ensureDatabase();
-      unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
+      if (!mounted) {
+        return;
+      }
+      unawaited(syncIfEnabledWithFeedback(context, database: database));
     }
 
     if (!mounted) {

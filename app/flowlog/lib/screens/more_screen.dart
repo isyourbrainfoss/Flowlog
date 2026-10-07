@@ -14,7 +14,9 @@ import 'package:flowlog/screens/more/sensors_screen.dart';
 import 'package:flowlog/settings/brew_location_store.dart';
 import 'package:flowlog/shell/shot_events.dart';
 import 'package:flowlog/shell/shortcuts.dart';
-import 'package:flowlog/sync/flowlog_sync_coordinator.dart';
+import 'package:flowlog/screens/more/about_screen.dart';
+import 'package:flowlog/sync/sync_feedback.dart';
+import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -66,8 +68,8 @@ class _MoreScreenState extends State<MoreScreen> {
       await repo.insertShot(toSave);
       imported += 1;
     }
-    unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
     if (!mounted) return;
+    unawaited(syncIfEnabledWithFeedback(context, database: database));
     ShotEventsScope.maybeOf(context)?.notifyShotsChanged();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -132,6 +134,21 @@ class _MoreScreenState extends State<MoreScreen> {
             },
             showSelectedIcon: false,
           ),
+        ),
+        SwitchListTile(
+          key: const Key('more_colorblind_charts_switch'),
+          secondary: const Icon(Icons.palette_outlined),
+          title: const Text('Colorblind-safe charts'),
+          subtitle: const Text(
+            'High-contrast curve colors for colour-vision deficiencies',
+          ),
+          value: themeController.colorblindCharts,
+          onChanged: (enabled) {
+            themeController.setColorblindCharts(enabled);
+            FlowlogChartColors.palette = enabled
+                ? FlowlogChartPalette.colorblindSafe
+                : FlowlogChartPalette.coffee;
+          },
         ),
         ListTile(
           key: const Key('more_brew_defaults_tile'),
@@ -270,6 +287,14 @@ class _MoreScreenState extends State<MoreScreen> {
           subtitle: const Text('RSSI, reconnect log, last error'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => openSensorDiagnosticsScreen(context),
+        ),
+        ListTile(
+          key: const Key('more_about_tile'),
+          leading: const Icon(Icons.info_outline),
+          title: const Text('About'),
+          subtitle: const Text('Version and what\'s new'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => openAboutScreen(context),
         ),
       ],
     );

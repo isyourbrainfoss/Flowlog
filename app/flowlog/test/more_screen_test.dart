@@ -80,4 +80,29 @@ void main() {
     expect(find.byType(SensorDiagnosticsScreen), findsOneWidget);
     expect(find.text('Reconnect log'), findsOneWidget);
   });
+
+  testWidgets('About section navigates to about screen', (tester) async {
+    await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
+    await tester.pumpAndSettle();
+
+    await _openMoreTab(tester);
+    await _scrollToMoreTile(tester, find.byKey(const Key('more_about_tile')));
+
+    await tester.tap(find.byKey(const Key('more_about_tile')));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(AppBar, 'About'), findsOneWidget);
+    expect(find.byKey(const Key('about_whats_new')), findsOneWidget);
+  });
+
+  testWidgets('Colorblind charts switch is on More appearance', (tester) async {
+    await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
+    await tester.pumpAndSettle();
+
+    await _openMoreTab(tester);
+    expect(
+      find.byKey(const Key('more_colorblind_charts_switch')),
+      findsOneWidget,
+    );
+  });
 }
