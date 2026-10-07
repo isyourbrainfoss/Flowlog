@@ -1,0 +1,80 @@
+    if (samples.isEmpty) {
+      _maybeRearmSilentScale(controller);
+      return;
+    }
+    // Prefer the true BLE receive time from the hub scale adapter. Merged
+    // samples carry the last weight on every pressure tick, so sample.weightG
+    // alone cannot prove the scale is still streaming.
+    final hub = _sensorHub ?? SensorHubScope.maybeOf(context);
+    final adapter = hub?.activeAdapterFor(SensorKind.scale);
+    if (adapter is DecentScaleBleAdapter) {
+      final rxMs = adapter.lastWeightReceiveMs;
+      if (rxMs != null) {
+        final age = DateTime.now().millisecondsSinceEpoch - rxMs;
+        if (age <= kWeightStreamFreshWindow.inMilliseconds) {
+          // Latest carry-forward weight for display.
+          for (var i = samples.length - 1; i >= 0; i--) {
+            final w = samples[i].weightG;
+            if (w != null) {
+              _liveWeightNotifier.value = w;
+              break;
+            }
+          }
+          _liveWeightLastUpdate.value = DateTime.fromMillisecondsSinceEpoch(
+            rxMs,
+          );
+          _weightRearmAttempted = false;
+          return;
+        }
+      }
+    } else {
+      // No hub adapter (tests / factory path): fall back to sample presence.
+      for (var i = samples.length - 1; i >= 0 && i >= samples.length - 3; i--) {
+        final w = samples[i].weightG;
+        if (w != null) {
+          _liveWeightNotifier.value = w;
+          _liveWeightLastUpdate.value = DateTime.now();
+          _weightRearmAttempted = false;
+          _maybeRearmSilentScale(controller);
+          return;
+        }
+      }
+    }
+    _maybeRearmSilentScale(controller);
+  }
+
+  WeightStreamHealth _weightStreamHealth({required bool isBrewing}) {
+    final hub = _sensorHub ?? SensorHubScope.maybeOf(context);
+    final source = _sensorSource;
+    final scalePaired =
+        source?.scalePaired ?? hub?.hasKind(SensorKind.scale) ?? false;
+    final linked =
+        source?.scaleLinkConnected ??
+        (hub?.scaleState == ConnectionState.connected);
+    final adapter = hub?.activeAdapterFor(SensorKind.scale);
+    int? rxMs;
+    if (adapter is DecentScaleBleAdapter) {
+      rxMs = adapter.lastWeightReceiveMs;
+    } else {
+      final last = _liveWeightLastUpdate.value;
+      rxMs = last?.millisecondsSinceEpoch;
+    }
+    final started = _controller?.sessionStartedAt;
+    return resolveWeightStreamHealth(
+      scalePaired: scalePaired,
+      scaleLinked: linked,
+      isBrewing: isBrewing,
+      shotHasWeight: (_controller?.samples ?? const <ShotSample>[]).any(
+        (s) => s.weightG != null,
+      ),
+      lastWeightReceiveMs: rxMs,
+      brewElapsed: started == null ? null : DateTime.now().difference(started),
+    );
+  }
+
+  void _maybeRearmSilentScale(LiveShotController controller) {
+    if (!controller.isBrewing || _weightRearmAttempted) {
+      return;
+    }
+    if (_weightStreamHealth(isBrewing: true) !=
+        WeightStreamHealth.linkedNoWeight) {

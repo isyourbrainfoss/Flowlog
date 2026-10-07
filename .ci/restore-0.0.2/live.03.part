@@ -1,0 +1,80 @@
+    _controller!.addListener(_onSessionLifecycle);
+    _wasBrewing = _controller!.isBrewing;
+    _autoSavedCurrent = false;
+    _lastAutoSavedShotId = null;
+    _syncSamples();
+  }
+
+  void _ensureProductionController() {
+    final hub = SensorHubScope.of(context);
+    _sensorSource =
+        widget.sensorSource ??
+        LiveSensorSource(
+          hub: hub,
+          demoFixturePath: _resolveDemoFixtureFilePath(),
+          demoFixtureLoader: _loadBundledDemoFixture,
+          pressureAdapterFactory: widget.pressureAdapterFactory,
+          weightAdapterFactory: widget.weightAdapterFactory,
+        );
+
+    _bindController(
+      LiveShotController(
+        sampleAdapter: SessionSensorAdapter(
+          resolve: _sensorSource!.resolveSampleAdapter,
+        ),
+        onTare: _sensorSource!.onTare,
+        onPhoneBrewStart: _sensorSource!.onPhoneBrewStart,
+        onPhoneBrewEnd: _sensorSource!.onPhoneBrewEnd,
+        onForwardPressure: _sensorSource!.forwardPressure,
+        onPushScaleConfig: _pushScaleConfigToDevice,
+      ),
+    );
+  }
+
+  Future<void> _pushScaleConfigToDevice() async {
+    final source = _sensorSource;
+    if (source == null) {
+      return;
+    }
+    final scaleSettings = await ScaleSettingsStore().load();
+    final brew = _brewDefaults;
+    // Prefer dedicated scale settings; fall back to brew defaults for yield.
+    final target = scaleSettings.targetYieldG;
+    final warn = scaleSettings.warnAtG > 0
+        ? scaleSettings.warnAtG
+        : (brew?.effectiveYieldWarnAtG ?? kDefaultYieldWarnAtG);
+    await source.pushScaleDisplayConfig(
+      targetYieldG: target.round(),
+      warnAtG: warn.round(),
+      pressureMinBar: scaleSettings.pressureMinBar.round(),
+      pressureMaxBar: scaleSettings.pressureMaxBar.round(),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_controllerReady && widget.controller == null) {
+      _ensureProductionController();
+      _controllerReady = true;
+    }
+
+    final scope = FlowlogShortcutsScope.maybeOf(context);
+    if (scope != null) {
+      _shortcutRegistry = scope.registry;
+      _shortcutRegistry!.setToggleLiveShot(_onToggleShotShortcut);
+      _shortcutRegistry!.setStartDemoShot(_onTryDemoShot);
+    }
+    _repeatShotController =
+        widget.repeatShotController ?? RepeatShotScope.maybeOf(context);
+    _targetBrewController = TargetBrewScope.maybeOf(context);
+    _autoStartController =
+        widget.autoStartController ?? AutoStartSettingsScope.maybeOf(context);
+
+    _activeBrewNotifier = ActiveBrewScope.maybeOf(context);
+    _shotEventsNotifier = ShotEventsScope.maybeOf(context);
+
+    final hub = SensorHubScope.maybeOf(context);
+    if (hub != _sensorHub) {
+      _sensorHub?.removeListener(_onSensorHubChanged);
+      _sensorHub = hub;
