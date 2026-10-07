@@ -1,0 +1,80 @@
+      WHERE cnt <= ?
+         OR rn = 1
+         OR rn = cnt
+         OR ((rn - 1) % MAX(1, (cnt - 1) / ?)) = 0
+      ORDER BY shot_id, elapsed_ms
+      ''',
+      variables: [
+        for (final id in ids) Variable.withString(id),
+        Variable.withInt(maxPoints),
+        Variable.withInt(inner),
+      ],
+      readsFrom: {_db.shotSamples},
+    ).get();
+
+    final byShot = <String, List<models.ShotSample>>{};
+    for (final row in queryRows) {
+      final shotId = row.read<String>('shot_id');
+      byShot.putIfAbsent(shotId, () => []).add(
+            models.ShotSample(
+              elapsedMs: row.read<int>('elapsed_ms'),
+              pressureBar: row.readNullable<double>('pressure_bar'),
+              weightG: row.readNullable<double>('weight_g'),
+              flowGs: row.readNullable<double>('flow_gs'),
+              tempC: row.readNullable<double>('temp_c'),
+            ),
+          );
+    }
+    return byShot;
+  }
+
+  /// Evenly spaced sample subset for sparklines (always keeps first/last).
+  static List<models.ShotSample> _downsampleSamples(
+    List<models.ShotSample> samples,
+    int maxPoints,
+  ) {
+    if (samples.length <= maxPoints || maxPoints < 3) {
+      return samples;
+    }
+    final result = <models.ShotSample>[samples.first];
+    final inner = maxPoints - 2;
+    final lastIndex = samples.length - 1;
+    for (var i = 1; i <= inner; i++) {
+      final index = ((i * lastIndex) / (inner + 1)).round().clamp(1, lastIndex - 1);
+      final sample = samples[index];
+      if (result.last.elapsedMs != sample.elapsedMs) {
+        result.add(sample);
+      }
+    }
+    if (result.last.elapsedMs != samples.last.elapsedMs) {
+      result.add(samples.last);
+    }
+    return result;
+  }
+
+  Future<void> _applyShotListFilters(
+    SimpleSelectStatement<$ShotsTable, ShotRow> query,
+    ShotListFilters filters,
+  ) async {
+    final beanQuery = filters.beanQuery.trim();
+    if (beanQuery.isNotEmpty) {
+      // Match in Dart (Unicode + brand/origin). SQLite LIKE is ASCII-only
+      // on Android, so "mørkbrent" never hit "Mørkbrent" there.
+      final beans = await BeanRepository(_db).listBeans();
+      final beanIds = [
+        for (final bean in beans)
+          if (beanMatchesQuery(bean, beanQuery)) bean.id,
+      ];
+      final folded = foldForSearch(beanQuery).trim();
+      final idNeedle = _safeLikeNeedle(folded);
+
+      query.where((shot) {
+        Expression<bool> pred = const Constant(false);
+        if (beanIds.isNotEmpty) {
+          pred = pred | shot.beanId.isIn(beanIds);
+        }
+        if (idNeedle != null) {
+          pred = pred | shot.beanId.lower().like('%$idNeedle%');
+        }
+        return pred;
+      });
