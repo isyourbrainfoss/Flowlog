@@ -383,10 +383,10 @@ class _LiveScreenState extends State<LiveScreen> {
     }
     _lastSessionState = state;
 
-    // Full samples list to chart at ~30 fps to reduce repaint lag/cost.
+    // Full samples list to chart at ~20 fps to reduce copy/GC lag.
     // Individual pressure value updates at full sensor rate (see _livePressureNotifier).
     final now = DateTime.now();
-    if (now.difference(_lastSamplesUpdate).inMilliseconds >= 33) {
+    if (now.difference(_lastSamplesUpdate).inMilliseconds >= 50) {
       _samplesNotifier.value = List<ShotSample>.from(controller.samples);
       _lastSamplesUpdate = now;
     }
@@ -883,6 +883,9 @@ class _LiveScreenState extends State<LiveScreen> {
         autoStartPressureBar: controller.autoStartPressureBar,
         targetPressureSamples: targetSamples,
         idGenerator: widget.shotIdGenerator,
+        // Banner owns post-brew actions — skip snackbar so it does not
+        // fight the bottom nav / Live controls after immersive ends.
+        showSavedSnackBar: false,
         onSaved: (saved) {
           _lastAutoSavedShotId = saved.id;
           _autoSavedCurrent = true;
@@ -949,6 +952,24 @@ class _LiveScreenState extends State<LiveScreen> {
       final database = await _ensureDatabase();
       unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
     }
+  }
+
+  Future<void> _discardAutoSavedShotById(String id) async {
+    final repository = await _ensureShotRepository();
+    if (!mounted) {
+      return;
+    }
+    final shot = await repository.getShotById(id);
+    if (shot == null) {
+      await repository.deleteShot(id);
+      _lastAutoSavedShotId = null;
+      _autoSavedCurrent = false;
+      _dismissBrewCompleteBanner();
+      _shotEventsNotifier?.notifyShotsChanged();
+      return;
+    }
+    await _onDiscardSavedShot(shot);
+    _dismissBrewCompleteBanner();
   }
 
   Future<void> _onDiscardSavedShot(Shot shot) async {
@@ -1254,16 +1275,6 @@ class _LiveScreenState extends State<LiveScreen> {
                             onDismiss: _repeatShotController!.clear,
                           ),
                         if (repeatPrefill != null) const SizedBox(height: 8),
-                        if (_lastBrewSummary != null) ...[
-                          BrewCompleteBanner(
-                            summary: _lastBrewSummary!,
-                            onDismiss: _dismissBrewCompleteBanner,
-                            onEdit: _lastAutoSavedShotId != null
-                                ? () => unawaited(_editLastSavedShot())
-                                : null,
-                          ),
-                          const SizedBox(height: 8),
-                        ],
                         if (state == ShotSessionState.idle ||
                             state == ShotSessionState.stopped)
                           _sensorHub == null
@@ -1462,6 +1473,28 @@ class _LiveScreenState extends State<LiveScreen> {
                         );
                 }
 
+                final brewBanner = !isBrewing && _lastBrewSummary != null
+                    ? Material(
+                        key: const Key('brew_complete_overlay'),
+                        elevation: 8,
+                        borderRadius: BorderRadius.circular(12),
+                        shadowColor: Colors.black54,
+                        child: BrewCompleteBanner(
+                          summary: _lastBrewSummary!,
+                          onDismiss: _dismissBrewCompleteBanner,
+                          onEdit: _lastAutoSavedShotId != null
+                              ? () => unawaited(_editLastSavedShot())
+                              : null,
+                          onDiscard: _lastAutoSavedShotId != null
+                              ? () {
+                                  final id = _lastAutoSavedShotId!;
+                                  unawaited(_discardAutoSavedShotById(id));
+                                }
+                              : null,
+                        ),
+                      )
+                    : null;
+
                 return Scaffold(
                   primary: false,
                   // During brew the stop control is embedded in the HUD so
@@ -1482,7 +1515,27 @@ class _LiveScreenState extends State<LiveScreen> {
                             ),
                           ),
                         ),
-                  body: body,
+                  // Stack the post-brew banner above Live content so it does
+                  // not scroll under the chart or fight shell chrome.
+                  body: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      body,
+                      if (brewBanner != null)
+                        Positioned(
+                          left: horizontalPadding,
+                          right: horizontalPadding,
+                          top: 0,
+                          child: SafeArea(
+                            bottom: false,
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: brewBanner,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 );
               },
             ),

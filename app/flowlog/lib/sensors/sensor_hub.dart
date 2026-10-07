@@ -378,7 +378,7 @@ class SensorHub extends ChangeNotifier {
       if (succeeded && device.kind == SensorKind.scale) {
         await _waitForScaleGrams(device.id);
       } else if (!succeeded) {
-        await Future<void>.delayed(const Duration(milliseconds: 800));
+        await Future<void>.delayed(const Duration(milliseconds: 400));
       }
     }
   }
@@ -416,7 +416,7 @@ class SensorHub extends ChangeNotifier {
 
   Future<void> _waitForScaleGrams(String id) async {
     const poll = Duration(milliseconds: 100);
-    final deadline = DateTime.now().add(const Duration(milliseconds: 1200));
+    final deadline = DateTime.now().add(const Duration(milliseconds: 700));
     while (DateTime.now().isBefore(deadline)) {
       if (!_scaleRecoveryEnabled) {
         return;
@@ -612,6 +612,7 @@ class SensorHub extends ChangeNotifier {
     required ReconnectOutcome outcome,
     String? message,
     DateTime? timestamp,
+    bool notify = true,
   }) {
     _reconnectLog.add(
       SensorReconnectEvent(
@@ -622,7 +623,9 @@ class SensorHub extends ChangeNotifier {
         timestamp: timestamp ?? DateTime.now(),
       ),
     );
-    notifyListeners();
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   void clearReconnectLog() {
@@ -668,6 +671,7 @@ class SensorHub extends ChangeNotifier {
       deviceId: id,
       deviceName: device.name,
       outcome: ReconnectOutcome.attempted,
+      notify: false,
     );
     notifyListeners();
 
@@ -704,10 +708,10 @@ class SensorHub extends ChangeNotifier {
       _listenAdapterSamples(id, adapter);
 
       await adapter.connect().timeout(
-        const Duration(seconds: 35),
+        const Duration(seconds: 18),
         onTimeout: () {
           throw TimeoutException(
-            'BLE connect timed out after 35s for $bleRemoteId',
+            'BLE connect timed out after 18s for $bleRemoteId',
           );
         },
       );
@@ -732,6 +736,7 @@ class SensorHub extends ChangeNotifier {
         deviceId: id,
         deviceName: device.name,
         outcome: ReconnectOutcome.connected,
+        notify: false,
       );
       notifyListeners();
     } on Object catch (error) {
@@ -758,6 +763,7 @@ class SensorHub extends ChangeNotifier {
       deviceName: device.name,
       outcome: ReconnectOutcome.failed,
       message: message,
+      notify: false,
     );
     notifyListeners();
   }

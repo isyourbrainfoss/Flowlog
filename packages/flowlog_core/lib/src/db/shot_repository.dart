@@ -155,8 +155,8 @@ class ShotRepository {
       ];
     }
 
-    // Full includeSamples (sync/export): batch samples; load
-    // annotations/targets only when needed (detail uses getShotWithSamples).
+    // Full includeSamples (sync/export): batch samples, annotations, and
+    // targets in three queries (no per-shot N+1 that stalls the UI isolate).
     if (includeSamples) {
       final ids = rows.map((r) => r.id).toList();
       final allSampleRows = await (_db.select(_db.shotSamples)
@@ -173,34 +173,44 @@ class ShotRepository {
         list.add(_sampleFromRow(sampleRow));
       }
 
-      // Full includeSamples (sync/export): still batch samples; load
-      // annotations/targets only when needed (detail uses getShotWithSamples).
-      final shots = <models.Shot>[];
-      for (final row in rows) {
-        final annotationRows = await (_db.select(_db.shotAnnotations)
-              ..where((annotation) => annotation.shotId.equals(row.id))
-              ..orderBy([
-                (annotation) => OrderingTerm.asc(annotation.elapsedMs),
-                (annotation) => OrderingTerm.asc(annotation.id),
-              ]))
-            .get();
+      final allAnnotationRows = await (_db.select(_db.shotAnnotations)
+            ..where((annotation) => annotation.shotId.isIn(ids))
+            ..orderBy([
+              (annotation) => OrderingTerm.asc(annotation.shotId),
+              (annotation) => OrderingTerm.asc(annotation.elapsedMs),
+              (annotation) => OrderingTerm.asc(annotation.id),
+            ]))
+          .get();
+      final annotationsByShot = <String, List<models.ShotAnnotation>>{};
+      for (final row in allAnnotationRows) {
+        annotationsByShot
+            .putIfAbsent(row.shotId, () => [])
+            .add(_annotationFromRow(row));
+      }
 
-        final targetSampleRows = await (_db.select(_db.shotTargetSamples)
-              ..where((sample) => sample.shotId.equals(row.id))
-              ..orderBy([(sample) => OrderingTerm.asc(sample.elapsedMs)]))
-            .get();
+      final allTargetRows = await (_db.select(_db.shotTargetSamples)
+            ..where((sample) => sample.shotId.isIn(ids))
+            ..orderBy([
+              (sample) => OrderingTerm.asc(sample.shotId),
+              (sample) => OrderingTerm.asc(sample.elapsedMs),
+            ]))
+          .get();
+      final targetsByShot = <String, List<models.ShotSample>>{};
+      for (final row in allTargetRows) {
+        targetsByShot
+            .putIfAbsent(row.shotId, () => [])
+            .add(_targetSampleFromRow(row));
+      }
 
-        shots.add(
+      return [
+        for (final row in rows)
           _shotFromRow(
             row,
             samples: byShot[row.id] ?? const [],
-            annotations: annotationRows.map(_annotationFromRow).toList(),
-            targetPressureSamples:
-                targetSampleRows.map(_targetSampleFromRow).toList(),
+            annotations: annotationsByShot[row.id] ?? const [],
+            targetPressureSamples: targetsByShot[row.id] ?? const [],
           ),
-        );
-      }
-      return shots;
+      ];
     }
 
     return const [];
