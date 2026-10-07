@@ -96,7 +96,7 @@ class _FlowlogShellState extends State<FlowlogShell> {
       // Defer Nextcloud until the first frames are interactive — sync was
       // competing with BLE reconnect and History open on cold start.
       _deferredSyncTimer?.cancel();
-      _deferredSyncTimer = Timer(const Duration(seconds: 3), () {
+      _deferredSyncTimer = Timer(const Duration(seconds: 12), () {
         unawaited(FlowlogSyncCoordinator.syncIfEnabled(database: database));
       });
     }
