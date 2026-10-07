@@ -20,8 +20,12 @@ jobs:
           set -euo pipefail
           GOOD=69a060e78df169d28423d8e89f04832420fb0234
           git checkout "$GOOD" -- app/flowlog/lib/sensors/ble_transport.dart
-          if git diff --quiet -- app/flowlog/lib/sensors/ble_transport.dart; then
-            echo "Already restored; nothing to commit"
+          # checkout COMM -- path stages the file; compare to HEAD, not the index
+          if git diff --quiet HEAD -- app/flowlog/lib/sensors/ble_transport.dart; then
+            echo "Already matches $GOOD; nothing to commit"
+            # Still print a preview so we can verify in logs
+            head -c 80 app/flowlog/lib/sensors/ble_transport.dart; echo
+            wc -c app/flowlog/lib/sensors/ble_transport.dart
             exit 0
           fi
           git config user.name "github-actions[bot]"
@@ -29,3 +33,5 @@ jobs:
           git add app/flowlog/lib/sensors/ble_transport.dart
           git commit -m "fix: restore ble_transport.dart (revert corrupted placeholder)"
           git push
+          head -c 80 app/flowlog/lib/sensors/ble_transport.dart; echo
+          wc -c app/flowlog/lib/sensors/ble_transport.dart
