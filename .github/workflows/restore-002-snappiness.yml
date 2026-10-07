@@ -1,0 +1,79 @@
+name: Restore 0.0.2 snappiness files
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: restore-002-files
+  cancel-in-progress: false
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Assemble dart files from text parts
+        run: |
+          set -euo pipefail
+          assemble() {
+            local dest="$1"; shift
+            mkdir -p "$(dirname "$dest")"
+            cat "$@" > "$dest"
+            echo "Wrote $dest ($(wc -c < "$dest") bytes)"
+            head -c 80 "$dest"; echo
+            # must start with import
+            head -c 6 "$dest" | grep -q '^import' || head -c 10 "$dest"
+          }
+          assemble "app/flowlog/lib/sensors/sensor_hub.dart" .ci/restore-0.0.2/hub.00.part .ci/restore-0.0.2/hub.01.part .ci/restore-0.0.2/hub.02.part .ci/restore-0.0.2/hub.03.part .ci/restore-0.0.2/hub.04.part .ci/restore-0.0.2/hub.05.part .ci/restore-0.0.2/hub.06.part .ci/restore-0.0.2/hub.07.part .ci/restore-0.0.2/hub.08.part .ci/restore-0.0.2/hub.09.part .ci/restore-0.0.2/hub.10.part
+          assemble "packages/flowlog_core/lib/src/db/shot_repository.dart" .ci/restore-0.0.2/repo.00.part .ci/restore-0.0.2/repo.01.part .ci/restore-0.0.2/repo.02.part .ci/restore-0.0.2/repo.03.part .ci/restore-0.0.2/repo.04.part .ci/restore-0.0.2/repo.05.part .ci/restore-0.0.2/repo.06.part .ci/restore-0.0.2/repo.07.part .ci/restore-0.0.2/repo.08.part .ci/restore-0.0.2/repo.09.part
+          assemble "app/flowlog/lib/screens/live_screen.dart" .ci/restore-0.0.2/live.00.part .ci/restore-0.0.2/live.01.part .ci/restore-0.0.2/live.02.part .ci/restore-0.0.2/live.03.part .ci/restore-0.0.2/live.04.part .ci/restore-0.0.2/live.05.part .ci/restore-0.0.2/live.06.part .ci/restore-0.0.2/live.07.part .ci/restore-0.0.2/live.08.part .ci/restore-0.0.2/live.09.part .ci/restore-0.0.2/live.10.part .ci/restore-0.0.2/live.11.part .ci/restore-0.0.2/live.12.part .ci/restore-0.0.2/live.13.part .ci/restore-0.0.2/live.14.part .ci/restore-0.0.2/live.15.part .ci/restore-0.0.2/live.16.part .ci/restore-0.0.2/live.17.part .ci/restore-0.0.2/live.18.part .ci/restore-0.0.2/live.19.part .ci/restore-0.0.2/live.20.part .ci/restore-0.0.2/live.21.part
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          expected = {
+            'app/flowlog/lib/sensors/sensor_hub.dart': ('ef527042587ef2793ae3527eeced59452e726983', 24552),
+            'packages/flowlog_core/lib/src/db/shot_repository.dart': ('732b72d0731f9dc699f6e63971be1b5d739495db', 25465),
+            'app/flowlog/lib/screens/live_screen.dart': ('731084e2735561188f5be2ebf4b629a8ffce7173', 63473),
+          }
+          for path, (blob, nbytes) in expected.items():
+              data = Path(path).read_bytes()
+              assert len(data) == nbytes, (path, len(data), nbytes)
+              assert data.startswith(b'import'), path
+              assert b'SEE_FILE' not in data, path
+              got = hashlib.sha1(b'blob %d\0' % len(data) + data).hexdigest()
+              assert got == blob, (path, got, blob)
+              print('OK', path, blob)
+          PY
+
+      - name: Commit and push if changed
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            app/flowlog/lib/sensors/sensor_hub.dart \
+            packages/flowlog_core/lib/src/db/shot_repository.dart \
+            app/flowlog/lib/screens/live_screen.dart
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "fix(perf): restore sensor_hub, shot_repository, live_screen for 0.0.2"
+          git push
+
+      - name: Cleanup chunk path (optional keep for audit)
+        run: |
+          rm -rf .ci/restore-0.0.2 || true
+          if [ -d .ci/restore-0.0.2 ] || git ls-files --error-unmatch .ci/restore-0.0.2 >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git rm -r .ci/restore-0.0.2 || true
+            git commit -m "chore: remove 0.0.2 restore chunks" || true
+            git push || true
+          fi
