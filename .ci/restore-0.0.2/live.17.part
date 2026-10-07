@@ -1,0 +1,80 @@
+                        if ((state == ShotSessionState.stopped) &&
+                            latestSample != null) ...[
+                          LiveMetricsRow(
+                            metrics: LiveMetrics.fromStoppedSession(
+                              controller.samples,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          LiveYieldProgress(
+                            weightG:
+                                latestSample.weightG ??
+                                _liveWeightNotifier.value,
+                            targetYieldG: targetYield,
+                            warnAtG: warnAt,
+                            showWarnBanner: false,
+                            weightHealth: _weightStreamHealth(
+                              isBrewing:
+                                  state == ShotSessionState.recording ||
+                                  state == ShotSessionState.paused,
+                            ),
+                            onRearmWeight: () =>
+                                unawaited(_onRearmWeightPressed()),
+                          ),
+                          const SizedBox(height: 6),
+                          LivePressureDeviationBar(
+                            currentPressure: latestSample.pressureBar,
+                            targetPressure: targetP,
+                          ),
+                          if (chartTargetSamples.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            _LiveTargetGamification(
+                              closeness:
+                                  liveGamif['closenessPercent'] as double?,
+                              maxStreakSec:
+                                  liveGamif['maxStreakSeconds'] as int? ?? 0,
+                              currentStreakSec:
+                                  liveGamif['currentStreakSeconds'] as int? ??
+                                  0,
+                              penaltyCount:
+                                  liveGamif['penaltyCount'] as int? ?? 0,
+                              score: liveGamif['score'] as double?,
+                            ),
+                          ],
+                        ],
+                        const SizedBox(height: 8),
+                        Text(
+                          '${controller.sampleCount} samples',
+                          style: Theme.of(context).textTheme.bodySmall,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Session: ${state.name}',
+                          style: Theme.of(context).textTheme.titleMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                        if (controller.canSaveShot) ...[
+                          Align(
+                            alignment: Alignment.center,
+                            child: RepeatShotButton(
+                              onPressed: () =>
+                                  unawaited(_onRepeatShotPressed()),
+                            ),
+                          ),
+                          if (!_autoSavedCurrent) ...[
+                            const SizedBox(height: 8),
+                            FilledButton.icon(
+                              key: const Key('save_current_shot_button'),
+                              onPressed: () => unawaited(_saveCurrentSession()),
+                              icon: const Icon(Icons.save),
+                              label: const Text('Save shot'),
+                            ),
+                          ],
+                        ],
+                        if (controller.canSaveShot) const SizedBox(height: 16),
+                      ],
+                    ),
+                  );
+
+                  final pinChart =
