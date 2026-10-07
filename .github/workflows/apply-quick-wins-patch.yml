@@ -11,10 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply patch
+      - name: Apply patches
         run: |
           set -euo pipefail
-          git apply --index .ci/quick-wins-0.0.3.patch
+          git apply --index .ci/quick-wins-0.0.3.a.patch
+          git apply --index .ci/quick-wins-0.0.3.b.patch
           git config user.name "isyourbrainfoss"
           git config user.email "isyourbrainfoss@proton.me"
           git commit -m "feat(0.0.3): finish quick wins (secure NC, brew wake, sync UX, BLE, release)"
@@ -22,6 +23,11 @@ jobs:
       - name: Remove one-shot helper
         run: |
           set -euo pipefail
-          git rm -f .ci/quick-wins-0.0.3.patch .github/workflows/apply-quick-wins-patch.yml
-          git commit -m "chore: remove one-shot quick-wins patch helper"
-          git push origin HEAD:main
+          git rm -f .ci/quick-wins-0.0.3.patch .ci/quick-wins-0.0.3.a.patch .ci/quick-wins-0.0.3.b.patch \
+            .github/workflows/apply-quick-wins-patch.yml || true
+          git add -A
+          git status --short
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: remove one-shot quick-wins patch helper"
+            git push origin HEAD:main
+          fi
