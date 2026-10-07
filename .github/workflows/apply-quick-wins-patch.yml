@@ -1,0 +1,27 @@
+name: Apply quick-wins patch
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply patch
+        run: |
+          set -euo pipefail
+          git apply --index .ci/quick-wins-0.0.3.patch
+          git config user.name "isyourbrainfoss"
+          git config user.email "isyourbrainfoss@proton.me"
+          git commit -m "feat(0.0.3): finish quick wins (secure NC, brew wake, sync UX, BLE, release)"
+          git push origin HEAD:main
+      - name: Remove one-shot helper
+        run: |
+          set -euo pipefail
+          git rm -f .ci/quick-wins-0.0.3.patch .github/workflows/apply-quick-wins-patch.yml
+          git commit -m "chore: remove one-shot quick-wins patch helper"
+          git push origin HEAD:main
