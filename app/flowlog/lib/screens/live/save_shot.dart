@@ -416,6 +416,7 @@ Future<Shot?> runAutoSaveFlow({
   void Function(Shot shot)? onSaved,
   Future<void> Function(Shot shot)? onAddNotes,
   Future<void> Function(Shot shot)? onDiscard,
+  bool showSavedSnackBar = true,
 }) async {
   if (samples.isEmpty) {
     return null;
@@ -484,7 +485,7 @@ Future<Shot?> runAutoSaveFlow({
   await saveShot(repository: repository, shot: shot);
   onSaved?.call(shot);
 
-  if (context.mounted) {
+  if (showSavedSnackBar && context.mounted) {
     showAutoSavedSnackBar(
       context,
       summary: BrewSummary.fromShot(shot),
