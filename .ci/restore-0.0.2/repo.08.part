@@ -1,0 +1,80 @@
+      tasteScore: Value(shot.tasteScore),
+      flavourTags: Value(jsonEncode(shot.flavourTags)),
+      flavourIntensities: Value(encodeFlavourIntensities(shot.flavourIntensities)),
+      coffeejackRewindTurns: Value(shot.coffeejackRewindTurns),
+      coffeejackPreinfusionTurns: Value(shot.coffeejackPreinfusionTurns),
+      grinder: Value(shot.grinder),
+      showerScreen: Value(shot.showerScreen),
+      basket: Value(shot.basket),
+      scale: Value(shot.scale),
+      brewer: Value(shot.brewer),
+      lastModifiedAt: Value(shot.lastModifiedAt),
+      autoStartPressureBar: Value(shot.autoStartPressureBar),
+      targetClosenessPercent: Value(shot.targetClosenessPercent),
+      targetMaxStreakSeconds: Value(shot.targetMaxStreakSeconds),
+      targetScore: Value(shot.targetScore),
+    );
+  }
+
+  ShotSamplesCompanion _sampleToCompanion(
+    String shotId,
+    models.ShotSample sample,
+  ) {
+    return ShotSamplesCompanion.insert(
+      shotId: shotId,
+      elapsedMs: sample.elapsedMs,
+      pressureBar: Value(sample.pressureBar),
+      weightG: Value(sample.weightG),
+      flowGs: Value(sample.flowGs),
+      tempC: Value(sample.tempC),
+    );
+  }
+
+  ShotTargetSamplesCompanion _targetSampleToCompanion(
+    String shotId,
+    models.ShotSample sample,
+  ) {
+    return ShotTargetSamplesCompanion.insert(
+      shotId: shotId,
+      elapsedMs: sample.elapsedMs,
+      pressureBar: Value(sample.pressureBar),
+    );
+  }
+
+  ShotAnnotationsCompanion _annotationToCompanion(
+    String shotId,
+    models.ShotAnnotation annotation,
+  ) {
+    return ShotAnnotationsCompanion.insert(
+      shotId: shotId,
+      elapsedMs: annotation.elapsedMs,
+      label: annotation.label,
+      type: _annotationTypeToSql(annotation.type),
+    );
+  }
+
+  models.Shot _shotFromRow(
+    ShotRow row, {
+    required List<models.ShotSample> samples,
+    required List<models.ShotAnnotation> annotations,
+    List<models.ShotSample> targetPressureSamples = const [],
+  }) {
+    return models.Shot(
+      id: row.id,
+      startedAt: row.startedAt,
+      endedAt: row.endedAt,
+      doseG: row.doseG,
+      yieldG: row.yieldG,
+      grindSetting: row.grindSetting,
+      beanId: row.beanId,
+      waterTempC: row.waterTempC,
+      notes: repairMojibake(row.notes),
+      location: row.location,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      tasteScore: row.tasteScore,
+      flavourTags: _decodeFlavourTags(row.flavourTags),
+      flavourIntensities: decodeFlavourIntensities(row.flavourIntensities),
+      coffeejackRewindTurns: row.coffeejackRewindTurns,
+      coffeejackPreinfusionTurns: row.coffeejackPreinfusionTurns,
+      grinder: row.grinder,
