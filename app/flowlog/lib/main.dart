@@ -98,11 +98,11 @@ class _FlowlogAppState extends State<FlowlogApp> with WidgetsBindingObserver {
     }
   }
 
+  // Two spaced attempts — the old 600ms/2s/5s/10s cascade stacked BLE
+  // connect work and made cold start feel stuck.
   static const _startupReconnectDelays = [
-    Duration(milliseconds: 600),
-    Duration(seconds: 2),
-    Duration(seconds: 5),
-    Duration(seconds: 10),
+    Duration(milliseconds: 1500),
+    Duration(seconds: 8),
   ];
 
   void _scheduleStartupReconnects() {

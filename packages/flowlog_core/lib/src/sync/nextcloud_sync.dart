@@ -60,7 +60,7 @@ Future<NextcloudSyncResult> nextcloudSync({
     var mergedRemote = false;
 
     if (remoteContent != null) {
-      final remotePayload = parseSyncBackup(remoteContent);
+      final remotePayload = await parseSyncBackupAsync(remoteContent);
       remoteExportedAt = remotePayload.exportedAt;
 
       mergeResult = await mergeSyncPayloadFromRemote(
@@ -77,9 +77,10 @@ Future<NextcloudSyncResult> nextcloudSync({
     );
     final localExportedAt = uploadPayload.exportedAt;
 
+    final encoded = await encodeSyncBackupAsync(uploadPayload);
     await transport.putText(
       kNextcloudRemoteFile,
-      encodeSyncBackup(uploadPayload),
+      encoded,
     );
 
     final merge = mergeResult;
