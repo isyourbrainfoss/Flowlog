@@ -1,0 +1,152 @@
+name: Apply App Icon (one-shot)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-app-icon
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: pip install pillow
+
+      - name: Decode source + generate Android launcher icons
+        run: |
+          python3 << 'PY'
+          from pathlib import Path
+          import base64, hashlib, re
+          from PIL import Image
+
+          root = Path(".")
+          ci = root / ".ci/app-icon"
+          manifest = (ci / "src.manifest.txt").read_text()
+          meta = dict(line.split("=", 1) for line in manifest.strip().splitlines())
+          n = int(meta["chunks"])
+          expect = meta["sha256"]
+          parts = []
+          for i in range(n):
+              parts.append((ci / f"src.b64.{i:02d}.txt").read_text().strip())
+          raw = base64.b64decode("".join(parts))
+          got = hashlib.sha256(raw).hexdigest()
+          assert got == expect, f"sha mismatch {got} != {expect}"
+          print(f"decoded {len(raw)} bytes ok")
+
+          src_path = ci / "source.jpg"
+          src_path.write_bytes(raw)
+          im = Image.open(src_path).convert("RGBA")
+          master = im.resize((1024, 1024), Image.Resampling.LANCZOS)
+
+          branding = root / "app/flowlog/assets/icon"
+          branding.mkdir(parents=True, exist_ok=True)
+          master_path = branding / "app_icon.png"
+          master.save(master_path, "PNG", optimize=True)
+          print("wrote", master_path, master_path.stat().st_size)
+
+          res = root / "app/flowlog/android/app/src/main/res"
+          legacy = {
+              "mipmap-mdpi": 48,
+              "mipmap-hdpi": 72,
+              "mipmap-xhdpi": 96,
+              "mipmap-xxhdpi": 144,
+              "mipmap-xxxhdpi": 192,
+          }
+          adaptive = {
+              "mipmap-mdpi": 108,
+              "mipmap-hdpi": 162,
+              "mipmap-xhdpi": 216,
+              "mipmap-xxhdpi": 324,
+              "mipmap-xxxhdpi": 432,
+          }
+          for folder, size in legacy.items():
+              out = res / folder / "ic_launcher.png"
+              master.resize((size, size), Image.Resampling.LANCZOS).save(out, "PNG", optimize=True)
+              print(out, size)
+          for folder, size in adaptive.items():
+              out = res / folder / "ic_launcher_foreground.png"
+              master.resize((size, size), Image.Resampling.LANCZOS).save(out, "PNG", optimize=True)
+              print(out, size)
+
+          # background from corner average
+          samples = [
+              master.getpixel((0, 0)),
+              master.getpixel((1023, 0)),
+              master.getpixel((0, 1023)),
+              master.getpixel((1023, 1023)),
+              master.getpixel((512, 20)),
+          ]
+          avg = tuple(sum(c[i] for c in samples) // len(samples) for i in range(3))
+          bg_hex = "#{:02X}{:02X}{:02X}".format(*avg)
+
+          colors = res / "values" / "colors.xml"
+          text = colors.read_text()
+          if "ic_launcher_background" in text:
+              text = re.sub(
+                  r'<color name="ic_launcher_background">[^<]*</color>',
+                  f'<color name="ic_launcher_background">{bg_hex}</color>',
+                  text,
+              )
+          else:
+              text = text.replace(
+                  "</resources>",
+                  f'    <color name="ic_launcher_background">{bg_hex}</color>\n</resources>',
+              )
+          colors.write_text(text)
+
+          anydpi = res / "mipmap-anydpi-v26"
+          anydpi.mkdir(exist_ok=True)
+          (anydpi / "ic_launcher.xml").write_text(
+              '<?xml version="1.0" encoding="utf-8"?>\n'
+              '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
+              '    <background android:drawable="@color/ic_launcher_background"/>\n'
+              '    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>\n'
+              '</adaptive-icon>\n'
+          )
+          print("adaptive bg", bg_hex)
+          print("done")
+          PY
+
+      - name: Commit icons and clean one-shot helpers
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Remove staging helpers + this workflow so it does not linger
+          rm -rf .ci/app-icon
+          rm -f .github/workflows/apply-app-icon.yml
+          git add -A app/flowlog/assets/icon \
+            app/flowlog/android/app/src/main/res \
+            .ci/app-icon \
+            .github/workflows/apply-app-icon.yml
+          git status
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git commit -m "$(cat <<'EOF'
+          feat: set coffee-themed Android launcher icon
+
+          Replace default Flutter mipmaps with the user-provided 3D
+          portafilter/grinder icon. Adds adaptive icon (API 26+) with
+          dark-brown background and keeps a 1024 PNG master under
+          assets/icon for future flutter_launcher_icons use.
+          EOF
+          )"
+          git push origin HEAD:main
+
+      - name: Summary
+        run: |
+          echo "Icon commit pushed to main; Android Release should start from that push."
