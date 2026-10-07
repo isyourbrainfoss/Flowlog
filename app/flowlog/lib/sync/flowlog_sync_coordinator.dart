@@ -16,6 +16,11 @@ class FlowlogSyncCoordinator {
   static NextcloudSyncRunner _syncRunner = nextcloudSync;
   static DateTime? _lastSyncAttempt;
   static Future<NextcloudSyncResult?>? _inFlight;
+  static final DateTime _appStartedAt = DateTime.now();
+
+  /// Auto-sync waits this long after process start so cold-start BLE reconnect
+  /// can finish without competing for the UI isolate / radio.
+  static const Duration coldStartSyncDelay = Duration(seconds: 12);
 
   @visibleForTesting
   static void debugOverride({
@@ -69,6 +74,11 @@ class FlowlogSyncCoordinator {
     final pending = _inFlight;
     if (pending != null) {
       return pending;
+    }
+
+    if (!force &&
+        DateTime.now().difference(_appStartedAt) < coldStartSyncDelay) {
+      return null;
     }
 
     if (!force &&
