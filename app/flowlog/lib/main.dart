@@ -7,8 +7,8 @@ import 'package:flowlog/settings/appearance_settings_store.dart';
 import 'package:flowlog/settings/paired_sensors_store.dart';
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/flowlog_shell.dart';
-import 'package:flowlog/shell/screen_wake_lock.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
+import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -25,19 +25,10 @@ class FlowlogApp extends StatefulWidget {
     this.autoReconnectSensors = true,
   });
 
-  /// Optional controller for tests; created internally when omitted.
   final FlowlogThemeController? themeController;
-
-  /// Optional sensor registry for tests; created internally when omitted.
   final SensorHub? sensorHub;
-
-  /// Optional appearance store override for tests.
   final AppearanceSettingsStore? appearanceSettingsStore;
-
-  /// Optional paired-sensors store override for tests.
   final PairedSensorsStore? pairedSensorsStore;
-
-  /// When false, skips background BLE reconnect on startup (widget tests).
   final bool autoReconnectSensors;
 
   @override
@@ -65,9 +56,18 @@ class _FlowlogAppState extends State<FlowlogApp> with WidgetsBindingObserver {
     _themeController =
         widget.themeController ??
         FlowlogThemeController(
-          onThemeModeChanged: (mode) => _appearanceSettingsStore.save(
-            AppearanceSettings(themeMode: mode),
-          ),
+          onAppearanceChanged: ({
+            required ThemeMode themeMode,
+            required bool colorblindCharts,
+          }) {
+            _applyChartPalette(colorblindCharts);
+            return _appearanceSettingsStore.save(
+              AppearanceSettings(
+                themeMode: themeMode,
+                colorblindCharts: colorblindCharts,
+              ),
+            );
+          },
         );
     _ownsSensorHub = widget.sensorHub == null;
     _sensorHub =
@@ -79,12 +79,22 @@ class _FlowlogAppState extends State<FlowlogApp> with WidgetsBindingObserver {
     unawaited(_restorePersistedPreferences());
   }
 
+  void _applyChartPalette(bool colorblindCharts) {
+    FlowlogChartColors.palette = colorblindCharts
+        ? FlowlogChartPalette.colorblindSafe
+        : FlowlogChartPalette.coffee;
+  }
+
   Future<void> _restorePersistedPreferences() async {
     await FlowlogStorage.shared.rootPath();
 
     final appearance = await _appearanceSettingsStore.load();
+    _applyChartPalette(appearance.colorblindCharts);
     if (mounted && widget.themeController == null) {
-      _themeController.setThemeMode(appearance.themeMode);
+      _themeController.restoreAppearance(
+        themeMode: appearance.themeMode,
+        colorblindCharts: appearance.colorblindCharts,
+      );
     }
 
     if (_ownsSensorHub) {
@@ -98,8 +108,6 @@ class _FlowlogAppState extends State<FlowlogApp> with WidgetsBindingObserver {
     }
   }
 
-  // Two spaced attempts — the old 600ms/2s/5s/10s cascade stacked BLE
-  // connect work and made cold start feel stuck.
   static const _startupReconnectDelays = [
     Duration(milliseconds: 1500),
     Duration(seconds: 8),
@@ -161,34 +169,32 @@ class _FlowlogAppState extends State<FlowlogApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return ScreenWakeLock(
-      child: SensorHubScope(
-        hub: _sensorHub,
-        child: FlowlogThemeScope(
-          controller: _themeController,
-          child: ListenableBuilder(
-            listenable: _themeController,
-            builder: (context, _) {
-              return MaterialApp(
-                title: 'Flowlog',
-                debugShowCheckedModeBanner: false,
-                theme: FlowlogTheme.cafeLight,
-                darkTheme: FlowlogTheme.coffeeDark,
-                themeMode: _themeController.themeMode,
-                home: const FlowlogShell(),
-                onGenerateRoute: (settings) {
-                  final builder = buildAppRoutes()[settings.name];
-                  if (builder == null) {
-                    return null;
-                  }
-                  return MaterialPageRoute<void>(
-                    settings: settings,
-                    builder: builder,
-                  );
-                },
-              );
-            },
-          ),
+    return SensorHubScope(
+      hub: _sensorHub,
+      child: FlowlogThemeScope(
+        controller: _themeController,
+        child: ListenableBuilder(
+          listenable: _themeController,
+          builder: (context, _) {
+            return MaterialApp(
+              title: 'Flowlog',
+              debugShowCheckedModeBanner: false,
+              theme: FlowlogTheme.cafeLight,
+              darkTheme: FlowlogTheme.coffeeDark,
+              themeMode: _themeController.themeMode,
+              home: const FlowlogShell(),
+              onGenerateRoute: (settings) {
+                final builder = buildAppRoutes()[settings.name];
+                if (builder == null) {
+                  return null;
+                }
+                return MaterialPageRoute<void>(
+                  settings: settings,
+                  builder: builder,
+                );
+              },
+            );
+          },
         ),
       ),
     );
