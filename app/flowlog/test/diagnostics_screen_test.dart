@@ -33,7 +33,7 @@ void main() {
       expect(find.byKey(const Key('last_error_message')), findsOneWidget);
       expect(find.text('No errors recorded'), findsOneWidget);
       expect(
-        find.text('Pair a sensor to see RSSI placeholders.'),
+        find.text('Pair a sensor to see its signal strength.'),
         findsOneWidget,
       );
       expect(
@@ -53,7 +53,7 @@ void main() {
       expect(find.textContaining('15% · Low battery'), findsOneWidget);
     });
 
-    testWidgets('shows RSSI placeholder and live value', (tester) async {
+    testWidgets('shows RSSI value and not-connected fallback', (tester) async {
       final hub = SensorHub()..addDevice(SensorKind.pressensor, name: 'PRS');
       addTearDown(hub.dispose);
 
@@ -62,12 +62,24 @@ void main() {
 
       await pumpDiagnosticsScreen(tester, hub: hub);
 
-      expect(find.text('RSSI: -58 dBm'), findsOneWidget);
+      expect(find.text('RSSI: -58 dBm · Strong'), findsOneWidget);
 
       hub.updateRssi(deviceId, null);
       await tester.pump();
 
-      expect(find.text('RSSI: — dBm (placeholder)'), findsOneWidget);
+      expect(find.text('RSSI: — dBm (not connected)'), findsOneWidget);
+    });
+
+    test('rssiDisplayText buckets quality and connection state', () {
+      expect(rssiDisplayText(rssi: -55, isConnected: true), '-55 dBm · Strong');
+      expect(rssiDisplayText(rssi: -66, isConnected: true), '-66 dBm · Good');
+      expect(rssiDisplayText(rssi: -77, isConnected: true), '-77 dBm · Fair');
+      expect(rssiDisplayText(rssi: -90, isConnected: false), '-90 dBm · Weak');
+      expect(rssiDisplayText(rssi: null, isConnected: true), '— dBm (reading…)');
+      expect(
+        rssiDisplayText(rssi: null, isConnected: false),
+        '— dBm (not connected)',
+      );
     });
 
     testWidgets('shows last error and reconnect log entries', (tester) async {

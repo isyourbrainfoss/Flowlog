@@ -9,7 +9,7 @@ import 'package:flowlog/shell/shortcuts.dart';
 import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 
-/// Sensor diagnostics: RSSI placeholder, reconnect log, and last error.
+/// Sensor diagnostics: live RSSI, battery, reconnect log, and last error.
 class SensorDiagnosticsScreen extends StatelessWidget {
   const SensorDiagnosticsScreen({super.key});
 
@@ -27,8 +27,9 @@ class SensorDiagnosticsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Connection troubleshooting for paired sensors. Live BLE metrics '
-          'will populate here once hardware pairing lands.',
+          'Connection troubleshooting for paired sensors. Signal strength '
+          'refreshes every few seconds while a sensor is connected '
+          '(paused during a brew).',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -43,13 +44,14 @@ class SensorDiagnosticsScreen extends StatelessWidget {
         const SizedBox(height: 8),
         if (devices.isEmpty)
           const _EmptyDiagnosticsHint(
-            message: 'Pair a sensor to see RSSI placeholders.',
+            message: 'Pair a sensor to see its signal strength.',
           )
         else
           for (final device in devices) ...[
             _RssiCard(
               deviceName: device.name,
               rssi: hub.rssiFor(device.id),
+              isConnected: device.state == ConnectionState.connected,
             ),
             const SizedBox(height: 8),
           ],
@@ -248,18 +250,44 @@ class _BatteryCard extends StatelessWidget {
   }
 }
 
+/// Rough link-quality bucket for an RSSI reading in dBm.
+@visibleForTesting
+String rssiQualityLabel(int rssi) {
+  if (rssi >= -60) {
+    return 'Strong';
+  }
+  if (rssi >= -70) {
+    return 'Good';
+  }
+  if (rssi >= -80) {
+    return 'Fair';
+  }
+  return 'Weak';
+}
+
+/// Subtitle text for the diagnostics RSSI row.
+@visibleForTesting
+String rssiDisplayText({required int? rssi, required bool isConnected}) {
+  if (rssi != null) {
+    return '$rssi dBm · ${rssiQualityLabel(rssi)}';
+  }
+  return isConnected ? '— dBm (reading…)' : '— dBm (not connected)';
+}
+
 class _RssiCard extends StatelessWidget {
   const _RssiCard({
     required this.deviceName,
     required this.rssi,
+    required this.isConnected,
   });
 
   final String deviceName;
   final int? rssi;
+  final bool isConnected;
 
   @override
   Widget build(BuildContext context) {
-    final display = rssi == null ? '— dBm (placeholder)' : '$rssi dBm';
+    final display = rssiDisplayText(rssi: rssi, isConnected: isConnected);
 
     return Card(
       elevation: FlowlogColors.cardElevation,

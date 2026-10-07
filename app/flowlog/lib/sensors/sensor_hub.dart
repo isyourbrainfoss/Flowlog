@@ -73,10 +73,17 @@ class SensorHub extends ChangeNotifier {
     List<PairedSensorEntry>? initialDevices,
     BleConnectionBackend? bleBackend,
     this._pairedSensorsStore,
+    this.rssiPollInterval = kRssiPollInterval,
   }) : _devices = List.of(initialDevices ?? []),
        _bleBackend = bleBackend ?? const UnsupportedBleConnectionBackend() {
     _syncIdCounterFromDevices();
   }
+
+  /// Default cadence for live RSSI reads while a sensor is connected.
+  static const Duration kRssiPollInterval = Duration(seconds: 5);
+
+  /// How often connected sensors are polled for live RSSI.
+  final Duration rssiPollInterval;
 
   final List<PairedSensorEntry> _devices;
   final PairedSensorsStore? _pairedSensorsStore;
@@ -95,6 +102,9 @@ class SensorHub extends ChangeNotifier {
   final Set<String> _scaleRecoverInFlight = {};
   bool _scaleRecoveryEnabled = true;
   bool? _scaleSilenceNotified;
+  Timer? _rssiTimer;
+  bool _rssiReadInFlight = false;
+  bool _disposed = false;
 
   /// When false, silent-scale recovery must not disconnect/reconnect.
   /// Live turns this off for the duration of a brew so a brief FFF4 gap
@@ -126,7 +136,8 @@ class SensorHub extends ChangeNotifier {
   /// Most recent connection error across all sensors.
   String? get lastError => _lastError;
 
-  /// RSSI in dBm from the most recent scan, when available.
+  /// RSSI in dBm: live reading while connected (polled every
+  /// [rssiPollInterval]), otherwise the value seen during the last scan.
   int? rssiFor(String deviceId) => _rssiByDevice[deviceId];
 
   /// Battery percent (0–100) after the last successful pressensor connect.
@@ -231,8 +242,9 @@ class SensorHub extends ChangeNotifier {
       bleRemoteId: bleRemoteId,
       name: name?.trim().isNotEmpty ?? false ? name!.trim() : device.name,
     );
-    if (rssi != null) {
-      _rssiByDevice[device.id] = rssi;
+    final scanRssi = normalizeRssi(rssi);
+    if (scanRssi != null) {
+      _rssiByDevice[device.id] = scanRssi;
     }
     unawaited(_persistDevices());
     notifyListeners();
@@ -296,6 +308,7 @@ class SensorHub extends ChangeNotifier {
     if (_devices.length != before) {
       _rssiByDevice.remove(id);
       _batteryByDevice.remove(id);
+      _stopRssiPollingIfIdle();
       unawaited(_persistDevices());
       notifyListeners();
     }
@@ -566,6 +579,80 @@ class SensorHub extends ChangeNotifier {
     }
   }
 
+  /// True when the backend can read live RSSI from a connected link.
+  bool get supportsLiveRssi => _bleBackend is BleRssiReader;
+
+  void _ensureRssiPolling() {
+    if (_bleBackend is! BleRssiReader || _rssiTimer != null) {
+      return;
+    }
+    _rssiTimer = Timer.periodic(rssiPollInterval, (_) {
+      unawaited(refreshRssi());
+    });
+  }
+
+  void _stopRssiPollingIfIdle() {
+    final anyConnected = _devices.any(
+      (d) => d.state == ConnectionState.connected,
+    );
+    if (!anyConnected) {
+      _rssiTimer?.cancel();
+      _rssiTimer = null;
+    }
+  }
+
+  /// Reads live RSSI for every connected sensor and notifies on change.
+  ///
+  /// Skipped mid-brew ([scaleRecoveryEnabled] false): the read takes the
+  /// per-device GATT op lock and a rebuild would hitch the brew HUD. A failed
+  /// read keeps the last known value instead of blanking the diagnostics row.
+  Future<void> refreshRssi() async {
+    final backend = _bleBackend;
+    if (backend is! BleRssiReader || !_scaleRecoveryEnabled) {
+      return;
+    }
+    // BleRssiReader is a side interface, so flow analysis cannot promote.
+    final reader = backend as BleRssiReader;
+    if (_rssiReadInFlight) {
+      return;
+    }
+    _rssiReadInFlight = true;
+    var changed = false;
+    try {
+      for (final device in List<PairedSensorEntry>.from(_devices)) {
+        final remoteId = device.bleRemoteId;
+        if (device.state != ConnectionState.connected ||
+            remoteId == null ||
+            remoteId.isEmpty) {
+          continue;
+        }
+        int? value;
+        try {
+          value = normalizeRssi(await reader.readRssi(remoteId));
+        } on Object {
+          value = null;
+        }
+        if (value == null || !_scaleRecoveryEnabled) {
+          continue;
+        }
+        // Device may have dropped or been removed while we awaited.
+        final latest = _deviceById(device.id);
+        if (latest == null || latest.state != ConnectionState.connected) {
+          continue;
+        }
+        if (_rssiByDevice[device.id] != value) {
+          _rssiByDevice[device.id] = value;
+          changed = true;
+        }
+      }
+    } finally {
+      _rssiReadInFlight = false;
+    }
+    if (changed && !_disposed) {
+      notifyListeners();
+    }
+  }
+
   void _syncIdCounterFromDevices() {
     for (final device in devices) {
       final match = RegExp(r'^sensor-(\d+)$').firstMatch(device.id);
@@ -665,7 +752,7 @@ class SensorHub extends ChangeNotifier {
 
     final device = _devices[index];
     _devices[index] = device.copyWith(state: ConnectionState.connecting);
-    _rssiByDevice[id] = null;
+    // Keep any scan-time RSSI until the first live read replaces it.
     _batteryByDevice[id] = null;
     recordReconnect(
       deviceId: id,
@@ -739,6 +826,8 @@ class SensorHub extends ChangeNotifier {
         notify: false,
       );
       notifyListeners();
+      _ensureRssiPolling();
+      unawaited(refreshRssi());
     } on Object catch (error) {
       final message = 'BLE connect failed: $error';
       final currentIndex = _devices.indexWhere((entry) => entry.id == id);
@@ -782,7 +871,9 @@ class SensorHub extends ChangeNotifier {
       }
     } else if (state == ConnectionState.disconnected) {
       _batteryByDevice.remove(id);
+      _rssiByDevice[id] = null;
       _stopScaleHealthWatchdogIfIdle();
+      _stopRssiPollingIfIdle();
     }
     if (state == ConnectionState.error) {
       setLastError('Sensor link error ($id).');
@@ -799,6 +890,9 @@ class SensorHub extends ChangeNotifier {
         _devices[index].kind == SensorKind.scale) {
       _ensureScaleHealthWatchdog();
     }
+    if (state == ConnectionState.connected) {
+      _ensureRssiPolling();
+    }
     notifyListeners();
   }
 
@@ -813,14 +907,19 @@ class SensorHub extends ChangeNotifier {
       state: ConnectionState.disconnected,
     );
     _batteryByDevice.remove(id);
+    _rssiByDevice[id] = null;
     _stopScaleHealthWatchdogIfIdle();
+    _stopRssiPollingIfIdle();
     notifyListeners();
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _scaleHealthTimer?.cancel();
     _scaleHealthTimer = null;
+    _rssiTimer?.cancel();
+    _rssiTimer = null;
     for (final subscription in [
       ..._adapterStateSubs.values,
       ..._adapterSampleSubs.values,

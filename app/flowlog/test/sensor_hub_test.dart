@@ -490,6 +490,127 @@ void main() {
       expect(hub.isScaleWeightStreamSilent, isTrue);
     });
   });
+
+  group('SensorHub live RSSI', () {
+    Future<(SensorHub, _RssiConnectBackend, String)> connectedHub() async {
+      final backend = _RssiConnectBackend();
+      final hub = SensorHub(
+        bleBackend: backend,
+        rssiPollInterval: const Duration(milliseconds: 20),
+      );
+      hub
+        ..addDevice(SensorKind.pressensor)
+        ..assignBleRemoteId(
+          SensorKind.pressensor,
+          bleRemoteId: 'AA:BB',
+          rssi: -80,
+        );
+      final id = hub.devices.first.id;
+      expect(hub.rssiFor(id), -80, reason: 'scan RSSI before connect');
+      await hub.connect(id);
+      await Future<void>.delayed(Duration.zero);
+      return (hub, backend, id);
+    }
+
+    test('normalizeRssi drops platform sentinels', () {
+      expect(normalizeRssi(-60), -60);
+      expect(normalizeRssi(0), isNull);
+      expect(normalizeRssi(5), isNull);
+      expect(normalizeRssi(-127), isNull);
+      expect(normalizeRssi(-128), isNull);
+      expect(normalizeRssi(null), isNull);
+    });
+
+    test('reads live RSSI right after connect and keeps polling', () async {
+      final (hub, backend, id) = await connectedHub();
+      addTearDown(hub.dispose);
+
+      expect(hub.supportsLiveRssi, isTrue);
+      expect(hub.devices.first.state, ConnectionState.connected);
+      expect(hub.rssiFor(id), -61);
+
+      var notified = 0;
+      hub.addListener(() => notified += 1);
+      backend.nextRssi = -49;
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(hub.rssiFor(id), -49);
+      expect(notified, greaterThanOrEqualTo(1));
+
+      // Unchanged readings do not spam listeners.
+      final before = notified;
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(notified, before);
+    });
+
+    test('failed read keeps the last known value', () async {
+      final (hub, backend, id) = await connectedHub();
+      addTearDown(hub.dispose);
+
+      backend.nextRssi = null;
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(hub.rssiFor(id), -61);
+    });
+
+    test('pauses polling while a brew disables scale recovery', () async {
+      final (hub, backend, id) = await connectedHub();
+      addTearDown(hub.dispose);
+
+      hub.setScaleRecoveryEnabled(false);
+      final readsBefore = backend.rssiReads;
+      backend.nextRssi = -40;
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(backend.rssiReads, readsBefore);
+      expect(hub.rssiFor(id), -61);
+
+      hub.setScaleRecoveryEnabled(true);
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(hub.rssiFor(id), -40);
+    });
+
+    test('disconnect clears RSSI and stops polling', () async {
+      final (hub, backend, id) = await connectedHub();
+      addTearDown(hub.dispose);
+
+      await hub.disconnect(id);
+      expect(hub.rssiFor(id), isNull);
+      final readsAfter = backend.rssiReads;
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      expect(backend.rssiReads, readsAfter);
+    });
+
+    test('backends without RSSI support never poll', () async {
+      final hub = SensorHub(bleBackend: _CountingConnectBackend());
+      addTearDown(hub.dispose);
+      expect(hub.supportsLiveRssi, isFalse);
+    });
+  });
+}
+
+class _RssiConnectBackend implements BleConnectionBackend, BleRssiReader {
+  int? nextRssi = -61;
+  int rssiReads = 0;
+
+  @override
+  Future<String?> ensureReady() async => null;
+
+  @override
+  Future<List<BleDiscoveredDevice>> scan(
+    SensorKind kind, {
+    Duration timeout = const Duration(seconds: 8),
+    Future<void>? abort,
+  }) async => const [];
+
+  @override
+  Future<SensorAdapter> createAdapter({
+    required SensorKind kind,
+    required String bleRemoteId,
+  }) async => _AlwaysConnectAdapter();
+
+  @override
+  Future<int?> readRssi(String bleRemoteId) async {
+    rssiReads += 1;
+    return nextRssi;
+  }
 }
 
 class _CountingConnectBackend implements BleConnectionBackend {

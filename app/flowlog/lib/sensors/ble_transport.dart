@@ -125,6 +125,28 @@ abstract class BleConnectionBackend {
   });
 }
 
+/// Optional [BleConnectionBackend] capability: read live RSSI from a
+/// connected GATT link (Android `readRemoteRssi`, BlueZ `Rssi` property).
+///
+/// Kept separate from [BleConnectionBackend] so test fakes and platforms
+/// without live RSSI do not have to implement it; [SensorHub] only polls when
+/// its backend implements this interface.
+abstract interface class BleRssiReader {
+  /// Returns the current RSSI (dBm) for [bleRemoteId], or null when the link
+  /// is down or the platform cannot report a value right now.
+  Future<int?> readRssi(String bleRemoteId);
+}
+
+/// Normalizes a raw RSSI reading to dBm, mapping platform "unknown" sentinels
+/// (0 / positive values from BlueZ when not discovering, -128 / -127 for
+/// cached devices) to null.
+int? normalizeRssi(int? raw) {
+  if (raw == null || raw >= 0 || raw <= -127) {
+    return null;
+  }
+  return raw;
+}
+
 /// BLE backend for platforms without Bluetooth support (desktop CI, tests).
 class UnsupportedBleConnectionBackend implements BleConnectionBackend {
   const UnsupportedBleConnectionBackend({this.message});
@@ -157,7 +179,8 @@ class UnsupportedBleConnectionBackend implements BleConnectionBackend {
 }
 
 /// flutter_blue_plus wiring for Android and Linux.
-class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
+class FlutterBlueBleConnectionBackend
+    implements BleConnectionBackend, BleRssiReader {
   @override
   Future<String?> ensureReady() async {
     if (!Platform.isAndroid && !Platform.isLinux) {
@@ -344,6 +367,21 @@ class FlutterBlueBleConnectionBackend implements BleConnectionBackend {
     final devices = found.values.toList()
       ..sort((a, b) => b.rssi.compareTo(a.rssi));
     return devices;
+  }
+
+  @override
+  Future<int?> readRssi(String bleRemoteId) async {
+    final device = BluetoothDevice.fromId(bleRemoteId);
+    if (!device.isConnected) {
+      return null;
+    }
+    try {
+      // Short timeout: this takes FBP's per-device op mutex, so a slow read
+      // must not hold up notify/write traffic for long.
+      return normalizeRssi(await device.readRssi(timeout: 4));
+    } on Object {
+      return null;
+    }
   }
 
   Future<void> _mergeLinuxCachedDevices({
