@@ -1,0 +1,80 @@
+        !_autoSavedCurrent) {
+      unawaited(_autoSaveStoppedSession());
+    }
+    if (brewing && !_wasBrewing) {
+      _autoSavedCurrent = false;
+      _lastAutoSavedShotId = null;
+      _yieldWarnFired = false;
+      _weightRearmAttempted = false;
+      _liveWeightNotifier.value = null;
+      _liveWeightLastUpdate.value = null;
+      _sensorHub?.setScaleRecoveryEnabled(false);
+      // Re-enable live follow for the new pull.
+      _chartInteractionController.resetViewport();
+      // Reload brew defaults so yield target/warn edits apply to this shot.
+      unawaited(
+        _brewDefaultsStore.load().then((d) {
+          if (mounted) setState(() => _brewDefaults = d);
+        }),
+      );
+    }
+    if (!brewing && _wasBrewing) {
+      _sensorHub?.setScaleRecoveryEnabled(true);
+      // Show the whole pull after stop (not the live last-~30s window).
+      _chartInteractionController.fitFullShot();
+      // In-brew "wind back" cue is stale once recording ends, and it sits
+      // on top of Repeat / save actions on a phone-sized screen.
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+      }
+    }
+    _wasBrewing = brewing;
+  }
+
+  Future<void> _autoSaveStoppedSession() async {
+    final controller = _controller;
+    if (controller == null ||
+        !controller.canSaveShot ||
+        _autoSavingShot ||
+        _autoSavedCurrent) {
+      return;
+    }
+
+    final startedAt = controller.sessionStartedAt;
+    if (startedAt == null) {
+      return;
+    }
+
+    _autoSavedCurrent = true;
+    setState(() => _autoSavingShot = true);
+    try {
+      final repository = await _ensureShotRepository();
+      if (!mounted) {
+        return;
+      }
+
+      final activeBean = ActiveBeanScope.maybeOf(context);
+      final locationSettings = await _brewLocationStore.loadSettings();
+      BrewGpsPosition? gps;
+      if (locationSettings.autoGpsEnabled) {
+        gps = await _brewGpsCapture.captureCurrentPosition();
+      }
+      final beanRepository = await _ensureBeanRepository();
+      if (!mounted) {
+        return;
+      }
+
+      final targetSamples = _chartTargetPressureSamples();
+      final shot = await runAutoSaveFlow(
+        context: context,
+        repository: repository,
+        shotRepository: repository,
+        samples: controller.samples,
+        startedAt: startedAt,
+        endedAt: controller.sessionEndedAt,
+        initialMetadata: _repeatShotController?.prefill?.metadata,
+        beanRepository: beanRepository,
+        activeBeanName: activeBean?.name,
+        activeBeanId: activeBean?.beanId,
+        annotations: _annotationController.annotations,
+        location: locationSettings.currentLocation,
