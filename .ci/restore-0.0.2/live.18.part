@@ -1,0 +1,80 @@
+                      constraints.maxHeight.isFinite &&
+                      constraints.maxHeight >= 360;
+
+                  body = pinChart
+                      ? Column(
+                          key: const ValueKey('live-pinned-layout'),
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: SingleChildScrollView(child: chartSection),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: SingleChildScrollView(
+                                padding: EdgeInsets.only(
+                                  top: useCompactLayout ? 0 : 8,
+                                ),
+                                child: controlsSection,
+                              ),
+                            ),
+                          ],
+                        )
+                      : SingleChildScrollView(
+                          key: const ValueKey('live-scroll-layout'),
+                          padding: EdgeInsets.symmetric(
+                            vertical: useCompactLayout ? 12 : 24,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [chartSection, controlsSection],
+                          ),
+                        );
+                }
+
+                final brewBanner = !isBrewing && _lastBrewSummary != null
+                    ? Material(
+                        key: const Key('brew_complete_overlay'),
+                        elevation: 8,
+                        borderRadius: BorderRadius.circular(12),
+                        shadowColor: Colors.black54,
+                        child: BrewCompleteBanner(
+                          summary: _lastBrewSummary!,
+                          onDismiss: _dismissBrewCompleteBanner,
+                          onEdit: _lastAutoSavedShotId != null
+                              ? () => unawaited(_editLastSavedShot())
+                              : null,
+                          onDiscard: _lastAutoSavedShotId != null
+                              ? () {
+                                  final id = _lastAutoSavedShotId!;
+                                  unawaited(_discardAutoSavedShotById(id));
+                                }
+                              : null,
+                        ),
+                      )
+                    : null;
+
+                return Scaffold(
+                  primary: false,
+                  // During brew the stop control is embedded in the HUD so
+                  // the shell can go fully immersive (no bottom tab bar).
+                  bottomNavigationBar: isBrewing
+                      ? null
+                      : SafeArea(
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              horizontalPadding,
+                              8,
+                              horizontalPadding,
+                              useCompactLayout ? 8 : 12,
+                            ),
+                            child: LiveControls(
+                              controller: controller,
+                              prominent: useCompactLayout,
+                            ),
+                          ),
+                        ),
+                  // Stack the post-brew banner above Live content so it does
+                  // not scroll under the chart or fight shell chrome.
+                  body: Stack(
