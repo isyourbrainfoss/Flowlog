@@ -243,7 +243,7 @@ void main() {
       await db.close();
     });
 
-    testWidgets('auto-saves on stop and shows snackbar with actions', (
+    testWidgets('auto-saves on stop and shows brew-complete banner overlay', (
       tester,
     ) async {
       Shot? savedShot;
@@ -257,12 +257,12 @@ void main() {
 
       await _startAndStopSession(tester, harness.controller);
 
-      expect(find.byKey(const Key('shot_saved_snackbar')), findsOneWidget);
-      expect(find.textContaining('Shot saved'), findsOneWidget);
-      expect(find.textContaining('peak'), findsOneWidget);
+      // Snackbar suppressed — banner overlay owns Edit/Discard.
+      expect(find.byKey(const Key('shot_saved_snackbar')), findsNothing);
+      expect(find.byKey(const Key('brew_complete_overlay')), findsOneWidget);
       expect(find.byKey(const Key('brew_complete_banner')), findsOneWidget);
-      expect(find.byKey(const Key('shot_add_notes_action')), findsOneWidget);
-      expect(find.byKey(const Key('shot_discard_action')), findsOneWidget);
+      expect(find.byKey(const Key('brew_complete_edit')), findsOneWidget);
+      expect(find.byKey(const Key('brew_complete_discard')), findsOneWidget);
       expect(savedShot, isNotNull);
       expect(savedShot!.id, 'shot-widget-test');
       expect(savedShot!.samples, harness.controller.samples);
@@ -518,5 +518,5 @@ Future<void> _startAndStopSession(
     await controller.stop();
     await Future<void>.delayed(const Duration(milliseconds: 500));
   });
-  await pumpUntilFound(tester, find.byKey(const Key('shot_saved_snackbar')));
+  await pumpUntilFound(tester, find.byKey(const Key('brew_complete_banner')));
 }
