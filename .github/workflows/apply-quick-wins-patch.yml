@@ -11,9 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply patches
+      - name: Decode and apply patches
         run: |
           set -euo pipefail
+          cat .ci/qw-a.*.b64.txt | tr -d '\n' | base64 -d > .ci/quick-wins-0.0.3.a.patch
+          cat .ci/qw-b.*.b64.txt | tr -d '\n' | base64 -d > .ci/quick-wins-0.0.3.b.patch
           git apply --index .ci/quick-wins-0.0.3.a.patch
           git apply --index .ci/quick-wins-0.0.3.b.patch
           git config user.name "isyourbrainfoss"
@@ -23,10 +25,11 @@ jobs:
       - name: Remove one-shot helper
         run: |
           set -euo pipefail
-          git rm -f .ci/quick-wins-0.0.3.patch .ci/quick-wins-0.0.3.a.patch .ci/quick-wins-0.0.3.b.patch \
+          git rm -f .ci/qw-a.*.b64.txt .ci/qw-b.*.b64.txt \
+            .ci/quick-wins-0.0.3.patch .ci/quick-wins-0.0.3.a.patch .ci/quick-wins-0.0.3.b.patch \
             .github/workflows/apply-quick-wins-patch.yml || true
+          rm -f .ci/quick-wins-0.0.3.a.patch .ci/quick-wins-0.0.3.b.patch || true
           git add -A
-          git status --short
           if ! git diff --cached --quiet; then
             git commit -m "chore: remove one-shot quick-wins patch helper"
             git push origin HEAD:main
