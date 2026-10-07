@@ -1,0 +1,80 @@
+        samplesNotifier: _samplesNotifier,
+        annotationsNotifier: _annotationsNotifier,
+        interactionController: _chartInteractionController,
+        targetPressureSamples: _chartTargetPressureSamples(),
+      ),
+    );
+  }
+
+  Future<void> _onRepeatShotPressed() async {
+    final controller = _controller;
+    if (controller == null || !controller.canSaveShot) {
+      return;
+    }
+
+    final startedAt = controller.sessionStartedAt;
+    if (startedAt == null) {
+      return;
+    }
+
+    final shot = buildShotFromSession(
+      samples: controller.samples,
+      startedAt: startedAt,
+      endedAt: controller.sessionEndedAt,
+    );
+
+    final profileRepository = await _ensureProfileRepository();
+    if (!mounted) {
+      return;
+    }
+
+    await startRepeatShotFromShot(
+      context: context,
+      shot: shot,
+      profileRepository: profileRepository,
+      repeatController: _repeatShotController ?? widget.repeatShotController,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (controller == null) {
+      return const Scaffold(primary: false, body: SizedBox.shrink());
+    }
+
+    final listenables = <Listenable>[controller];
+    if (_repeatShotController != null) {
+      listenables.add(_repeatShotController!);
+    }
+    if (_targetBrewController != null) {
+      listenables.add(_targetBrewController!);
+    }
+    listenables.add(_resolvedAutoStartController);
+    // Do not merge SensorHub here. BLE connect / reconnect notifies several
+    // times a second and was rebuilding the whole brew tree (and fighting
+    // any snackbar overlay). Idle chrome listens to the hub locally.
+
+    return ListenableBuilder(
+      listenable: Listenable.merge(listenables),
+      builder: (context, _) {
+        final state = controller.sessionState;
+        final samples = controller.samples;
+        final demoModeActive = _sensorSource?.isDemoMode ?? false;
+        final latestSample = samples.isEmpty ? null : samples.last;
+        final repeatPrefill = _repeatShotController?.prefill;
+        final chartTargetSamples = _chartTargetPressureSamples();
+        final autoStartSettings = _resolvedAutoStartController.settings;
+
+        // Skip during the pull — brew HUD does not show it, and O(n) on
+        // every 50 ms notify hitch the chart.
+        final bool showLiveGamif =
+            state == ShotSessionState.stopped &&
+            samples.isNotEmpty &&
+            chartTargetSamples.isNotEmpty;
+        final Map<String, dynamic> liveGamif = showLiveGamif
+            ? computeTargetGamification(samples, chartTargetSamples)
+            : const <String, dynamic>{
+                'closenessPercent': null,
+                'maxStreakSeconds': 0,
+                'currentStreakSeconds': 0,
