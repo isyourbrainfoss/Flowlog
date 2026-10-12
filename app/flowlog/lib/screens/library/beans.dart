@@ -3,6 +3,7 @@ import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../util/decimal_input.dart';
 
 /// Common retail bag sizes in grams (250g EU specialty, 500g half-kilo, 1kg).
 const List<int> kBeanStockPresetsG = [200, 250, 500, 1000];
@@ -613,7 +614,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
     if (trimmed.isEmpty) {
       return null;
     }
-    return double.tryParse(trimmed);
+    return parseDecimal(trimmed);
   }
 
   bool get _isDirty {
@@ -1035,10 +1036,10 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
                     decimal: true,
                   ),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d*')),
                   ],
                   onChanged: (value) {
-                    final parsed = double.tryParse(value.trim());
+                    final parsed = parseDecimal(value.trim());
                     setState(() {
                       _selectedStockPreset = _matchingStockPreset(parsed);
                     });

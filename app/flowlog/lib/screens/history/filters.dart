@@ -4,6 +4,7 @@ import 'package:flowlog/shell/shell_breakpoints.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../util/decimal_input.dart';
 
 /// Filter controls for the history shot list.
 ///
@@ -449,7 +450,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
                 decimal: true,
               ),
               inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
               ],
               onChanged: _onMinPeakChanged,
             ),
@@ -484,7 +485,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
                   decimal: true,
                 ),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                 ],
                 onChanged: _onMaxPeakChanged,
               ),
@@ -534,7 +535,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
                   decimal: true,
                 ),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                 ],
                 onChanged: _onMinGrindChanged,
               ),
@@ -552,7 +553,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
                   decimal: true,
                 ),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                 ],
                 onChanged: _onMaxGrindChanged,
               ),
@@ -594,7 +595,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
       _emit(widget.filters.copyWith(clearMinPeakPressureBar: true));
       return;
     }
-    final parsed = double.tryParse(trimmed);
+    final parsed = parseDecimal(trimmed);
     if (parsed == null) {
       return;
     }
@@ -607,7 +608,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
       _emit(widget.filters.copyWith(clearMaxPeakPressureBar: true));
       return;
     }
-    final parsed = double.tryParse(trimmed);
+    final parsed = parseDecimal(trimmed);
     if (parsed == null) {
       return;
     }
@@ -646,7 +647,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
       _emit(widget.filters.copyWith(clearMinGrindSetting: true));
       return;
     }
-    final parsed = double.tryParse(trimmed);
+    final parsed = parseDecimal(trimmed);
     if (parsed == null) {
       return;
     }
@@ -659,7 +660,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
       _emit(widget.filters.copyWith(clearMaxGrindSetting: true));
       return;
     }
-    final parsed = double.tryParse(trimmed);
+    final parsed = parseDecimal(trimmed);
     if (parsed == null) {
       return;
     }

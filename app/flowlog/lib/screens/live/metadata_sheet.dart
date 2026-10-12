@@ -8,6 +8,7 @@ import 'package:flowlog/settings/equipment_store.dart';
 import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
+import '../../util/decimal_input.dart';
 
 /// Metadata fields captured after a shot, aligned with [Shot] properties.
 @immutable
@@ -625,7 +626,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
     if (trimmed.isEmpty) {
       return null;
     }
-    return double.tryParse(trimmed);
+    return parseDecimal(trimmed);
   }
 
   String? _parseString(String value) {

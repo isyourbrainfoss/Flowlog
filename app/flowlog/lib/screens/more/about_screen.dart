@@ -3,11 +3,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 /// Short release notes shown on the About screen for this marketing version.
 const flowlogWhatsNew = '''
-• Nextcloud app password stored in platform secure storage (not plaintext JSON)
-• Screen stays awake only during an active Live brew
-• Auto-sync failures show a snackbar outside Settings
-• Colorblind-safe chart palette toggle under Appearance
-• Bluetooth permission errors offer Open settings + Try again
+• Number fields accept comma decimals (e.g. 18,5 g) — dose, grind, yield, filters, beans, simulator
+• Fix: values typed with a comma were silently dropped
 ''';
 
 /// About tile content: marketing version, build number, and what's new.

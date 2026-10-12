@@ -14,6 +14,7 @@ import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../util/decimal_input.dart';
 
 /// Default simulator timeline length.
 const int kSimulatorDefaultDurationMs = 30000;
@@ -882,7 +883,7 @@ class _SelectedKeyframeEditorState extends State<_SelectedKeyframeEditor> {
     if (widget.isFirst) {
       return;
     }
-    final seconds = double.tryParse(_timeController.text.trim());
+    final seconds = parseDecimal(_timeController.text.trim());
     if (seconds == null) {
       return;
     }
@@ -890,7 +891,7 @@ class _SelectedKeyframeEditorState extends State<_SelectedKeyframeEditor> {
   }
 
   void _applyPressure() {
-    final pressure = double.tryParse(_pressureController.text.trim());
+    final pressure = parseDecimal(_pressureController.text.trim());
     if (pressure == null) {
       return;
     }

@@ -1,6 +1,7 @@
 import 'package:flowlog/settings/equipment_store.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import '../../util/decimal_input.dart';
 
 /// Simple management page for user's equipment inventory and presets.
 class EquipmentScreen extends StatefulWidget {
@@ -267,8 +268,8 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                   onPressed: () {
                     final name = nameController.text.trim();
                     if (name.isEmpty) return;
-                    final dose = double.tryParse(doseController.text.trim());
-                    final grind = double.tryParse(grindController.text.trim());
+                    final dose = parseDecimal(doseController.text.trim());
+                    final grind = parseDecimal(grindController.text.trim());
                     final rewind = int.tryParse(rewindController.text.trim());
                     final slow = int.tryParse(slowController.text.trim());
                     Navigator.pop(
