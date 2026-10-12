@@ -46,8 +46,8 @@ class LivePressureDeviationBar extends StatelessWidget {
     final markerColor = !hasCurrent
         ? cs.outline
         : isDeviating
-            ? Colors.red
-            : Colors.black;
+        ? Colors.red
+        : Colors.black;
 
     final bar = SizedBox(
       key: const Key('live_pressure_deviation_bar'),
@@ -72,9 +72,7 @@ class LivePressureDeviationBar extends StatelessWidget {
                     )
                   : null,
               color: hasTarget ? null : cs.surfaceContainerHighest,
-              border: Border.all(
-                color: cs.outline.withValues(alpha: 0.3),
-              ),
+              border: Border.all(color: cs.outline.withValues(alpha: 0.3)),
             ),
           ),
           if (!hasTarget)
@@ -120,8 +118,37 @@ class LivePressureDeviationBar extends StatelessWidget {
       ),
     );
 
+    // Without a target the deviation bar has no meaning: say so instead.
+    final Widget barOrHint = hasTarget
+        ? bar
+        : SizedBox(
+            key: const Key('live_pressure_no_target'),
+            height: height + 4,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.flag_outlined,
+                  size: height + 4,
+                  color: cs.onSurfaceVariant,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'No target set — pick a target curve or pressure limit '
+                    'in Brew defaults',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+
     if (!showReadout) {
-      return bar;
+      return barOrHint;
     }
 
     return Column(
@@ -144,15 +171,18 @@ class LivePressureDeviationBar extends StatelessWidget {
                 key: const Key('live_pressure_digit'),
                 textAlign: TextAlign.end,
                 overflow: TextOverflow.ellipsis,
-                style: (compact
-                        ? theme.textTheme.headlineSmall
-                        : theme.textTheme.headlineMedium)
-                    ?.copyWith(
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                  fontWeight: FontWeight.w700,
-                  height: 1.0,
-                  color: isDeviating ? Colors.red.shade700 : cs.onSurface,
-                ),
+                style:
+                    (compact
+                            ? theme.textTheme.headlineSmall
+                            : theme.textTheme.headlineMedium)
+                        ?.copyWith(
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                          fontWeight: FontWeight.w700,
+                          height: 1.0,
+                          color: isDeviating
+                              ? Colors.red.shade700
+                              : cs.onSurface,
+                        ),
               ),
             ),
             if (targetPressure != null) ...[
@@ -170,7 +200,7 @@ class LivePressureDeviationBar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        bar,
+        barOrHint,
       ],
     );
   }

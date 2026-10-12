@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../models/flavour_intensities.dart';
 import '../models/shot.dart';
 import '../models/shot_sample.dart';
+import '../util/decimal.dart';
 
 /// Parses a Flowlog shot CSV document produced by [exportShotToCsv].
 ///
@@ -194,7 +195,11 @@ double? _parseNullableDouble(String? raw) {
   if (raw == null || raw.isEmpty) {
     return null;
   }
-  return double.parse(raw);
+  final value = parseDecimal(raw);
+  if (value == null) {
+    throw FormatException('Invalid number: $raw');
+  }
+  return value;
 }
 
 int? _parseNullableInt(String? raw) {

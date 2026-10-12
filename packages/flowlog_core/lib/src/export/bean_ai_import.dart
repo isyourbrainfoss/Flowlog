@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../models/bean.dart';
+import '../util/decimal.dart';
 
 /// Parsed bean fields from an external AI response (no persistence id).
 class BeanAiDraft {
@@ -260,12 +261,17 @@ double? _parseStockG(Object? value) {
       return null;
     }
 
-    final numeric = trimmed.replaceAll(RegExp(r'[^0-9.]'), '');
-    if (numeric.isEmpty) {
+    var numeric = trimmed.replaceAll(RegExp(r'[^0-9.,]'), '');
+    // "1,000" / "1.000" thousands separators (groups of exactly 3 digits):
+    // a bag stock of ~1 g is implausible, so treat these as grouping.
+    if (RegExp(r'^[1-9]\d{0,2}([.,]\d{3})+$').hasMatch(numeric)) {
+      numeric = numeric.replaceAll(RegExp(r'[.,]'), '');
+    }
+    final grams = parseDecimal(numeric);
+    if (grams == null) {
       throw FormatException('Invalid stockG: $value');
     }
 
-    final grams = double.parse(numeric);
     if (grams <= 0) {
       throw FormatException('stockG must be positive: $grams');
     }

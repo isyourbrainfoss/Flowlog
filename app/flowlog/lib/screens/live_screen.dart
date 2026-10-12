@@ -520,7 +520,16 @@ class _LiveScreenState extends State<LiveScreen> {
       return repeatSamples;
     }
     if (_brewDefaults?.useDefaultTargetBrew ?? true) {
-      return _targetBrewController?.pressureSamples ?? const [];
+      final curve = _targetBrewController?.pressureSamples ?? const [];
+      if (curve.isNotEmpty) return curve;
+    }
+    // No curve: fall back to the global flat pressure limit, if set.
+    final limit = _brewDefaults?.pressureLimitBar;
+    if (limit != null) {
+      final samples = _controller?.samples;
+      final lastMs =
+          samples == null || samples.isEmpty ? 0 : samples.last.elapsedMs;
+      return flatPressureTargetSamples(limit, untilMs: lastMs);
     }
     return const [];
   }

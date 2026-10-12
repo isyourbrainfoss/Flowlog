@@ -108,6 +108,14 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
     await _brewDefaultsStore.save(updated);
   }
 
+  Future<void> _updatePressureLimit(double? bar) async {
+    final updated = bar == null
+        ? _brewDefaults.copyWith(clearPressureLimit: true)
+        : _brewDefaults.copyWith(pressureLimitBar: bar);
+    setState(() => _brewDefaults = updated);
+    await _brewDefaultsStore.save(updated);
+  }
+
   Future<void> _updateTargetYield(double grams) async {
     final updated = _brewDefaults.copyWith(targetYieldG: grams);
     setState(() => _brewDefaults = updated);
@@ -179,6 +187,42 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
                       value: _brewDefaults.useDefaultTargetBrew,
                       onChanged: _updateUseDefaultTargetBrew,
                     ),
+                    SwitchListTile(
+                      key: const Key('brew_defaults_pressure_limit_switch'),
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Flat pressure target'),
+                      subtitle: const Text(
+                        'Single bar value used as the target line and '
+                        'deviation bar when no target curve is set',
+                      ),
+                      value: _brewDefaults.pressureLimitBar != null,
+                      onChanged: (on) => _updatePressureLimit(
+                        on ? kDefaultPressureLimitBar : null,
+                      ),
+                    ),
+                    if (_brewDefaults.pressureLimitBar != null) ...[
+                      Text(
+                        'Pressure target: '
+                        '${_brewDefaults.pressureLimitBar!.toStringAsFixed(1)} bar',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      Slider(
+                        key: const Key('brew_defaults_pressure_limit'),
+                        value: _brewDefaults.pressureLimitBar!.clamp(
+                          kPressureLimitMinBar,
+                          kPressureLimitMaxBar,
+                        ),
+                        min: kPressureLimitMinBar,
+                        max: kPressureLimitMaxBar,
+                        divisions: ((kPressureLimitMaxBar -
+                                    kPressureLimitMinBar) *
+                                2)
+                            .round(),
+                        label:
+                            '${_brewDefaults.pressureLimitBar!.toStringAsFixed(1)} bar',
+                        onChanged: _updatePressureLimit,
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     BrewMetadataSliders(
                       doseG: _brewDefaults.defaultDoseG,

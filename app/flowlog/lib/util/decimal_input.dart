@@ -1,14 +1,4 @@
-/// Locale-tolerant decimal parsing for user-typed numbers.
-///
-/// Many locales (e.g. Norwegian, German) use a comma as the decimal
-/// separator and their numeric keyboards emit `,` instead of `.`. Plain
-/// [double.tryParse] rejects `18,5`, which silently dropped values.
+/// Shared locale-tolerant decimal parsing (see flowlog_core).
 library;
 
-/// Parses [input] as a decimal, accepting either `.` or `,` as separator.
-/// Returns null for empty or invalid input.
-double? parseDecimal(String input) {
-  final trimmed = input.trim().replaceAll(' ', '');
-  if (trimmed.isEmpty) return null;
-  return double.tryParse(trimmed.replaceAll(',', '.'));
-}
+export 'package:flowlog_core/flowlog_core.dart' show parseDecimal;

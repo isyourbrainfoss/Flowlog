@@ -3,8 +3,10 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 /// Short release notes shown on the About screen for this marketing version.
 const flowlogWhatsNew = '''
-• Number fields accept comma decimals (e.g. 18,5 g) — dose, grind, yield, filters, beans, simulator
-• Fix: values typed with a comma were silently dropped
+• Flat pressure target: set one bar value (e.g. 9 bar) in Brew defaults — used as the target line and deviation bar when no target curve is set
+• Pressure bar now says "No target set" instead of showing a meaningless bar
+• CSV and bean AI imports accept comma decimals (18,5) and 1,000 g style stock
+• Fix: small memory leak in equipment add/edit dialogs
 ''';
 
 /// About tile content: marketing version, build number, and what's new.

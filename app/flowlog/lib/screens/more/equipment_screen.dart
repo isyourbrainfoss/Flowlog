@@ -66,232 +66,20 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
     }
   }
 
-  Future<EquipmentItem?> _showItemDialog({EquipmentItem? initial}) async {
-    final nameController = TextEditingController(text: initial?.name ?? '');
-    String category = initial?.category ?? kEquipmentCategories.first;
-
+  Future<EquipmentItem?> _showItemDialog({EquipmentItem? initial}) {
     return showDialog<EquipmentItem>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(initial == null ? 'Add equipment' : 'Edit equipment'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: category,
-                items: kEquipmentCategories
-                    .map(
-                      (c) => DropdownMenuItem(
-                        value: c,
-                        child: Text(kEquipmentCategoryLabels[c] ?? c),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => category = v ?? category,
-                decoration: const InputDecoration(labelText: 'Category'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Name',
-                  hintText: 'e.g. Chestnut X',
-                ),
-                autofocus: true,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              final name = nameController.text.trim();
-              if (name.isEmpty) return;
-              final id = initial?.id ?? const Uuid().v4();
-              Navigator.pop(
-                ctx,
-                EquipmentItem(id: id, name: name, category: category),
-              );
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+      builder: (ctx) => _EquipmentItemDialog(initial: initial),
     );
   }
 
   Future<void> _addPreset() => _editPreset();
 
   Future<void> _editPreset([EquipmentPreset? existing]) async {
-    final nameController = TextEditingController(text: existing?.name ?? '');
-    final selections = <String, String>{
-      ...?existing?.selections,
-    };
-    final doseController = TextEditingController(
-      text: existing?.defaultDoseG?.toString() ?? '',
-    );
-    final grindController = TextEditingController(
-      text: existing?.defaultGrindSetting?.toString() ?? '',
-    );
-    final rewindController = TextEditingController(
-      text: existing?.defaultRewindTurnsBeforeFill?.toString() ?? '',
-    );
-    final slowController = TextEditingController(
-      text: existing?.defaultSlowPreinfusionTurns?.toString() ?? '',
-    );
-
-    for (final cat in kEquipmentCategories) {
-      if (selections.containsKey(cat)) {
-        continue;
-      }
-      final items = _store.itemsForCategory(cat);
-      if (items.isNotEmpty) {
-        selections[cat] = items.first.name;
-      }
-    }
-
     final result = await showDialog<EquipmentPreset>(
       context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            final viewInsets = MediaQuery.viewInsetsOf(ctx);
-            return AlertDialog(
-              title: Text(existing == null ? 'New equipment preset' : 'Edit preset'),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: SingleChildScrollView(
-                  // Keep focused fields above the keyboard.
-                  padding: EdgeInsets.only(bottom: viewInsets.bottom),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextField(
-                        key: const Key('equipment_preset_name'),
-                        controller: nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Preset name',
-                          hintText: 'CoffeeJack original parts',
-                        ),
-                        textInputAction: TextInputAction.next,
-                        autofocus: existing == null,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Equipment',
-                        style: Theme.of(ctx).textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: 8),
-                      for (final cat in kEquipmentCategories) ...[
-                        _PresetCategoryPicker(
-                          category: cat,
-                          items: _store.itemsForCategory(cat),
-                          selectedName: selections[cat],
-                          onChanged: (name) {
-                            setDialogState(() {
-                              if (name == null || name.isEmpty) {
-                                selections.remove(cat);
-                              } else {
-                                selections[cat] = name;
-                              }
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      const SizedBox(height: 8),
-                      Text(
-                        'Optional defaults',
-                        style: Theme.of(ctx).textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: doseController,
-                        decoration: const InputDecoration(
-                          labelText: 'Default dose (g)',
-                          hintText: '18.0',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        textInputAction: TextInputAction.next,
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: grindController,
-                        decoration: const InputDecoration(
-                          labelText: 'Default grind',
-                          hintText: '4.2',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        textInputAction: TextInputAction.next,
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: rewindController,
-                        decoration: const InputDecoration(
-                          labelText: 'Default rewind turns',
-                          hintText: '5',
-                        ),
-                        keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.next,
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: slowController,
-                        decoration: const InputDecoration(
-                          labelText: 'Default slow preinfusion turns',
-                          hintText: '5',
-                        ),
-                        keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.done,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  key: const Key('equipment_preset_save'),
-                  onPressed: () {
-                    final name = nameController.text.trim();
-                    if (name.isEmpty) return;
-                    final dose = parseDecimal(doseController.text.trim());
-                    final grind = parseDecimal(grindController.text.trim());
-                    final rewind = int.tryParse(rewindController.text.trim());
-                    final slow = int.tryParse(slowController.text.trim());
-                    Navigator.pop(
-                      ctx,
-                      EquipmentPreset(
-                        id: existing?.id ?? const Uuid().v4(),
-                        name: name,
-                        selections: Map<String, String>.from(selections),
-                        defaultDoseG: dose,
-                        defaultGrindSetting: grind,
-                        defaultRewindTurnsBeforeFill: rewind,
-                        defaultSlowPreinfusionTurns: slow,
-                      ),
-                    );
-                  },
-                  child: Text(existing == null ? 'Create' : 'Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (ctx) =>
+          _EquipmentPresetDialog(existing: existing, store: _store),
     );
 
     if (result == null) {
@@ -386,8 +174,9 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                         : Icons.star_border,
                   ),
                   onPressed: () async {
-                    final newDefault =
-                        _store.settings.defaultPresetId == p.id ? null : p.id;
+                    final newDefault = _store.settings.defaultPresetId == p.id
+                        ? null
+                        : p.id;
                     await _store.setDefaultPreset(newDefault);
                     setState(() {});
                   },
@@ -482,15 +271,13 @@ class _PresetCategoryPicker extends StatelessWidget {
         child: Text(
           'No items — add under $label first',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
 
-    final value = items.any((i) => i.name == selectedName)
-        ? selectedName!
-        : '';
+    final value = items.any((i) => i.name == selectedName) ? selectedName! : '';
 
     return DropdownButtonFormField<String>(
       initialValue: value,
@@ -499,17 +286,274 @@ class _PresetCategoryPicker extends StatelessWidget {
         border: const OutlineInputBorder(),
       ),
       items: [
-        const DropdownMenuItem<String>(
-          value: '',
-          child: Text('— none —'),
-        ),
+        const DropdownMenuItem<String>(value: '', child: Text('— none —')),
         for (final item in items)
-          DropdownMenuItem<String>(
-            value: item.name,
-            child: Text(item.name),
-          ),
+          DropdownMenuItem<String>(value: item.name, child: Text(item.name)),
       ],
       onChanged: (v) => onChanged(v == null || v.isEmpty ? null : v),
+    );
+  }
+}
+
+class _EquipmentItemDialog extends StatefulWidget {
+  const _EquipmentItemDialog({this.initial});
+
+  final EquipmentItem? initial;
+
+  @override
+  State<_EquipmentItemDialog> createState() => _EquipmentItemDialogState();
+}
+
+class _EquipmentItemDialogState extends State<_EquipmentItemDialog> {
+  late final TextEditingController _name = TextEditingController(
+    text: widget.initial?.name ?? '',
+  );
+  late String _category =
+      widget.initial?.category ?? kEquipmentCategories.first;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.initial == null ? 'Add equipment' : 'Edit equipment'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: _category,
+              items: kEquipmentCategories
+                  .map(
+                    (c) => DropdownMenuItem(
+                      value: c,
+                      child: Text(kEquipmentCategoryLabels[c] ?? c),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) => _category = v ?? _category,
+              decoration: const InputDecoration(labelText: 'Category'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _name,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                hintText: 'e.g. Chestnut X',
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () {
+            final name = _name.text.trim();
+            if (name.isEmpty) return;
+            final id = widget.initial?.id ?? const Uuid().v4();
+            Navigator.pop(
+              context,
+              EquipmentItem(id: id, name: name, category: _category),
+            );
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+class _EquipmentPresetDialog extends StatefulWidget {
+  const _EquipmentPresetDialog({required this.store, this.existing});
+
+  final EquipmentStore store;
+  final EquipmentPreset? existing;
+
+  @override
+  State<_EquipmentPresetDialog> createState() => _EquipmentPresetDialogState();
+}
+
+class _EquipmentPresetDialogState extends State<_EquipmentPresetDialog> {
+  late final TextEditingController _name;
+  late final TextEditingController _dose;
+  late final TextEditingController _grind;
+  late final TextEditingController _rewind;
+  late final TextEditingController _slow;
+  late final Map<String, String> _selections;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    _name = TextEditingController(text: existing?.name ?? '');
+    _dose = TextEditingController(
+      text: existing?.defaultDoseG?.toString() ?? '',
+    );
+    _grind = TextEditingController(
+      text: existing?.defaultGrindSetting?.toString() ?? '',
+    );
+    _rewind = TextEditingController(
+      text: existing?.defaultRewindTurnsBeforeFill?.toString() ?? '',
+    );
+    _slow = TextEditingController(
+      text: existing?.defaultSlowPreinfusionTurns?.toString() ?? '',
+    );
+    _selections = <String, String>{...?existing?.selections};
+    for (final cat in kEquipmentCategories) {
+      if (_selections.containsKey(cat)) continue;
+      final items = widget.store.itemsForCategory(cat);
+      if (items.isNotEmpty) _selections[cat] = items.first.name;
+    }
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _dose.dispose();
+    _grind.dispose();
+    _rewind.dispose();
+    _slow.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.viewInsetsOf(context);
+    return AlertDialog(
+      title: Text(
+        widget.existing == null ? 'New equipment preset' : 'Edit preset',
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          // Keep focused fields above the keyboard.
+          padding: EdgeInsets.only(bottom: viewInsets.bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                key: const Key('equipment_preset_name'),
+                controller: _name,
+                decoration: const InputDecoration(
+                  labelText: 'Preset name',
+                  hintText: 'CoffeeJack original parts',
+                ),
+                textInputAction: TextInputAction.next,
+                autofocus: widget.existing == null,
+              ),
+              const SizedBox(height: 16),
+              Text('Equipment', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              for (final cat in kEquipmentCategories) ...[
+                _PresetCategoryPicker(
+                  category: cat,
+                  items: widget.store.itemsForCategory(cat),
+                  selectedName: _selections[cat],
+                  onChanged: (name) {
+                    setState(() {
+                      if (name == null || name.isEmpty) {
+                        _selections.remove(cat);
+                      } else {
+                        _selections[cat] = name;
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+              const SizedBox(height: 8),
+              Text(
+                'Optional defaults',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _dose,
+                decoration: const InputDecoration(
+                  labelText: 'Default dose (g)',
+                  hintText: '18.0',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _grind,
+                decoration: const InputDecoration(
+                  labelText: 'Default grind',
+                  hintText: '4.2',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _rewind,
+                decoration: const InputDecoration(
+                  labelText: 'Default rewind turns',
+                  hintText: '5',
+                ),
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _slow,
+                decoration: const InputDecoration(
+                  labelText: 'Default slow preinfusion turns',
+                  hintText: '5',
+                ),
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('equipment_preset_save'),
+          onPressed: () {
+            final name = _name.text.trim();
+            if (name.isEmpty) return;
+            final dose = parseDecimal(_dose.text.trim());
+            final grind = parseDecimal(_grind.text.trim());
+            final rewind = int.tryParse(_rewind.text.trim());
+            final slow = int.tryParse(_slow.text.trim());
+            Navigator.pop(
+              context,
+              EquipmentPreset(
+                id: widget.existing?.id ?? const Uuid().v4(),
+                name: name,
+                selections: Map<String, String>.from(_selections),
+                defaultDoseG: dose,
+                defaultGrindSetting: grind,
+                defaultRewindTurnsBeforeFill: rewind,
+                defaultSlowPreinfusionTurns: slow,
+              ),
+            );
+          },
+          child: Text(widget.existing == null ? 'Create' : 'Save'),
+        ),
+      ],
     );
   }
 }

@@ -13,3 +13,4 @@ export 'src/profiles/profile_metadata.dart';
 export 'src/shot_detect.dart';
 export 'src/shot_session.dart';
 export 'src/sync/sync.dart';
+export 'src/util/decimal.dart';

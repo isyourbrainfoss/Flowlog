@@ -1,7 +1,7 @@
 name: flowlog
 description: Flowlog — personal coffee intelligence hub.
 publish_to: none
-version: 0.0.5+5
+version: 0.0.6+6
 resolution: workspace
 
 environment:

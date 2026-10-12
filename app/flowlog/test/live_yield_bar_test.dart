@@ -164,6 +164,24 @@ void main() {
 
       expect(find.textContaining('6.0 bar'), findsOneWidget);
       expect(find.textContaining('/ 9'), findsNothing);
+      expect(find.byKey(const Key('live_pressure_no_target')), findsOneWidget);
+      expect(find.byKey(const Key('live_pressure_deviation_bar')), findsNothing);
+    });
+
+    testWidgets('shows deviation bar when a target is set', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: LivePressureDeviationBar(
+              currentPressure: 8.5,
+              targetPressure: 9.0,
+            ),
+          ),
+        ),
+      );
+      expect(find.byKey(const Key('live_pressure_deviation_bar')), findsOneWidget);
+      expect(find.byKey(const Key('live_pressure_no_target')), findsNothing);
+      expect(find.textContaining('/ 9.0'), findsOneWidget);
     });
   });
 

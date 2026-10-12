@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flowlog/persistence/flowlog_storage.dart';
+import 'package:flowlog_core/flowlog_core.dart';
 
 /// Default dose in grams applied when a brew is auto-saved.
 const double kDefaultBrewDoseG = 18.0;
@@ -32,6 +33,27 @@ const double kBrewGrindMax = 20.0;
 /// Step size for grind adjustments in the metadata sheet.
 const double kBrewGrindStep = 0.1;
 
+/// Bounds/default for the flat pressure limit (bar) used when no target
+/// curve is set.
+const double kPressureLimitMinBar = 3.0;
+const double kPressureLimitMaxBar = 12.0;
+const double kDefaultPressureLimitBar = 9.0;
+
+/// Duration (ms) a flat pressure-limit line spans at minimum on charts.
+const int kFlatTargetMinDurationMs = 30000;
+
+/// Builds a flat target curve at [bar] spanning at least
+/// [kFlatTargetMinDurationMs] (or [untilMs] if longer).
+List<ShotSample> flatPressureTargetSamples(double bar, {int untilMs = 0}) {
+  final end = untilMs > kFlatTargetMinDurationMs
+      ? untilMs
+      : kFlatTargetMinDurationMs;
+  return [
+    ShotSample(elapsedMs: 0, pressureBar: bar),
+    ShotSample(elapsedMs: end, pressureBar: bar),
+  ];
+}
+
 /// Snaps [value] to one decimal place within grind bounds.
 double snapGrindSetting(double value) {
   final snapped = (value * 10).round() / 10.0;
@@ -58,6 +80,7 @@ class BrewDefaultsSettings {
     this.targetYieldG = kDefaultTargetYieldG,
     this.yieldWarnAtG = kDefaultYieldWarnAtG,
     this.yieldAlertEnabled = true,
+    this.pressureLimitBar,
   });
 
   final double defaultDoseG;
@@ -84,6 +107,10 @@ class BrewDefaultsSettings {
   /// Play sound + show banner when live weight reaches [yieldWarnAtG].
   final bool yieldAlertEnabled;
 
+  /// Optional flat pressure target/limit (bar). Used everywhere a target
+  /// curve would be when no curve is set. Null = off.
+  final double? pressureLimitBar;
+
   /// Effective warn weight: never above target, never below a small floor.
   double get effectiveYieldWarnAtG {
     final target = targetYieldG.clamp(kBrewYieldMinG, kBrewYieldMaxG);
@@ -104,6 +131,8 @@ class BrewDefaultsSettings {
     double? targetYieldG,
     double? yieldWarnAtG,
     bool? yieldAlertEnabled,
+    double? pressureLimitBar,
+    bool clearPressureLimit = false,
   }) {
     return BrewDefaultsSettings(
       defaultDoseG: defaultDoseG ?? this.defaultDoseG,
@@ -115,6 +144,9 @@ class BrewDefaultsSettings {
       targetYieldG: targetYieldG ?? this.targetYieldG,
       yieldWarnAtG: yieldWarnAtG ?? this.yieldWarnAtG,
       yieldAlertEnabled: yieldAlertEnabled ?? this.yieldAlertEnabled,
+      pressureLimitBar: clearPressureLimit
+          ? null
+          : pressureLimitBar ?? this.pressureLimitBar,
     );
   }
 }
@@ -122,7 +154,7 @@ class BrewDefaultsSettings {
 /// File-backed persistence for brew metadata defaults.
 class BrewDefaultsSettingsStore {
   BrewDefaultsSettingsStore({String? settingsPath})
-      : _settingsPathOverride = settingsPath;
+    : _settingsPathOverride = settingsPath;
 
   final String? _settingsPathOverride;
 
@@ -145,18 +177,21 @@ class BrewDefaultsSettingsStore {
       return BrewDefaultsSettings(
         defaultDoseG:
             (decoded['defaultDoseG'] as num?)?.toDouble() ?? kDefaultBrewDoseG,
-        defaultGrindSetting: (decoded['defaultGrindSetting'] as num?)
-                ?.toDouble() ??
+        defaultGrindSetting:
+            (decoded['defaultGrindSetting'] as num?)?.toDouble() ??
             kDefaultBrewGrindSetting,
         useDefaultDose: decoded['useDefaultDose'] as bool? ?? true,
         useDefaultGrind: decoded['useDefaultGrind'] as bool? ?? true,
         useDefaultCoffeejack: decoded['useDefaultCoffeejack'] as bool? ?? true,
         useDefaultTargetBrew: decoded['useDefaultTargetBrew'] as bool? ?? true,
         targetYieldG:
-            (decoded['targetYieldG'] as num?)?.toDouble() ?? kDefaultTargetYieldG,
+            (decoded['targetYieldG'] as num?)?.toDouble() ??
+            kDefaultTargetYieldG,
         yieldWarnAtG:
-            (decoded['yieldWarnAtG'] as num?)?.toDouble() ?? kDefaultYieldWarnAtG,
+            (decoded['yieldWarnAtG'] as num?)?.toDouble() ??
+            kDefaultYieldWarnAtG,
         yieldAlertEnabled: decoded['yieldAlertEnabled'] as bool? ?? true,
+        pressureLimitBar: (decoded['pressureLimitBar'] as num?)?.toDouble(),
       );
     } catch (_) {
       return const BrewDefaultsSettings();
@@ -177,6 +212,8 @@ class BrewDefaultsSettingsStore {
         'targetYieldG': settings.targetYieldG,
         'yieldWarnAtG': settings.yieldWarnAtG,
         'yieldAlertEnabled': settings.yieldAlertEnabled,
+        if (settings.pressureLimitBar != null)
+          'pressureLimitBar': settings.pressureLimitBar,
       }),
     );
   }

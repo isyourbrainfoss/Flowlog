@@ -8,7 +8,6 @@ import 'package:flowlog/settings/equipment_store.dart';
 import 'package:flowlog/shell/active_bean_scope.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
-import '../../util/decimal_input.dart';
 
 /// Metadata fields captured after a shot, aligned with [Shot] properties.
 @immutable

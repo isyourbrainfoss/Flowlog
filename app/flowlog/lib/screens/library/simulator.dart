@@ -14,7 +14,6 @@ import 'package:flowlog_charts/flowlog_charts.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../util/decimal_input.dart';
 
 /// Default simulator timeline length.
 const int kSimulatorDefaultDurationMs = 30000;
