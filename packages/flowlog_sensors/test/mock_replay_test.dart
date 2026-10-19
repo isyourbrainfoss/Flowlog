@@ -78,6 +78,49 @@ void main() {
       expect(received, hasLength(1));
       expect(received.single.elapsedMs, 0);
     });
+
+    test('onReplayComplete fires once after the last sample', () async {
+      var completions = 0;
+      final received = <SensorSample>[];
+      late MockReplayAdapter adapter;
+      adapter = MockReplayAdapter(
+        fixtureLoader: () async => const [
+          SensorSample(elapsedMs: 0, pressureBar: 0),
+          SensorSample(elapsedMs: 20, pressureBar: 9),
+          SensorSample(elapsedMs: 40, pressureBar: 0),
+        ],
+        speed: 1.0,
+        onReplayComplete: () {
+          completions++;
+          expect(received, hasLength(3));
+        },
+      );
+      final sub = adapter.samples.listen(received.add);
+
+      await adapter.connect();
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+
+      expect(completions, 1);
+      await adapter.disconnect();
+      await sub.cancel();
+    });
+
+    test('onReplayComplete is not called when disconnected early', () async {
+      var completions = 0;
+      final adapter = MockReplayAdapter(
+        fixtureLoader: () async => const [
+          SensorSample(elapsedMs: 0, pressureBar: 0),
+          SensorSample(elapsedMs: 200, pressureBar: 9),
+        ],
+        onReplayComplete: () => completions++,
+      );
+
+      await adapter.connect();
+      await adapter.disconnect();
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(completions, 0);
+    });
   });
 }
 

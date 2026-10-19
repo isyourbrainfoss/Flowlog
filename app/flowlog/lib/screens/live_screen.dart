@@ -344,6 +344,7 @@ class _LiveScreenState extends State<LiveScreen> {
     _livePressureLastUpdate.dispose();
     _weightTracker.dispose();
     _autoStop.dispose();
+    _demoEndTimer?.cancel();
     _brewCompleteBanner
       ..removeListener(_rebuild)
       ..dispose();
@@ -434,8 +435,27 @@ class _LiveScreenState extends State<LiveScreen> {
     }
 
     source.enterDemoMode();
+    source.onDemoReplayComplete = _onDemoReplayComplete;
     setState(() {});
     await controller.start();
+  }
+
+  Timer? _demoEndTimer;
+
+  /// Ends the demo brew shortly after the fixture's last sample, the way a
+  /// real shot auto-stops once the pump is off.
+  void _onDemoReplayComplete() {
+    _demoEndTimer?.cancel();
+    _demoEndTimer = Timer(const Duration(milliseconds: 300), () {
+      final controller = _controller;
+      if (!mounted ||
+          controller == null ||
+          !(_sensorSource?.isDemoMode ?? false) ||
+          controller.sessionState != ShotSessionState.recording) {
+        return;
+      }
+      unawaited(controller.stop());
+    });
   }
 
   void _onDismissDemoMode() {

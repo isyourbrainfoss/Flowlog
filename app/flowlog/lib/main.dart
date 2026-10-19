@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flowlog/persistence/flowlog_storage.dart';
+import 'package:flowlog/screens/live/repeat_shot.dart';
+import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/sensors/ble_transport.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/settings/appearance_settings_store.dart';
@@ -51,6 +53,13 @@ class _FlowlogAppState extends State<FlowlogApp> with WidgetsBindingObserver {
   late final bool _ownsSensorHub;
   late final AppearanceSettingsStore _appearanceSettingsStore;
   late final PairedSensorsStore _pairedSensorsStore;
+
+  // Owned here (not by FlowlogShell) so their scopes can wrap the root
+  // Navigator: History → shot detail, More → Target brew and other pushed
+  // routes are not descendants of the shell, and "Repeat shot" / "Set as
+  // target brew" used to silently miss the shell's controllers.
+  final RepeatShotController _repeatShotController = RepeatShotController();
+  final TargetBrewController _targetBrewController = TargetBrewController();
   final List<Timer> _autoReconnectTimers = [];
   Timer? _resumeReconnectTimer;
 
@@ -175,6 +184,8 @@ class _FlowlogAppState extends State<FlowlogApp> with WidgetsBindingObserver {
     if (_ownsSensorHub) {
       _sensorHub.dispose();
     }
+    _repeatShotController.dispose();
+    _targetBrewController.dispose();
     super.dispose();
   }
 
@@ -193,7 +204,17 @@ class _FlowlogAppState extends State<FlowlogApp> with WidgetsBindingObserver {
               theme: FlowlogTheme.cafeLight,
               darkTheme: FlowlogTheme.coffeeDark,
               themeMode: _themeController.themeMode,
-              home: const FlowlogShell(),
+              builder: (context, child) => RepeatShotScope(
+                controller: _repeatShotController,
+                child: TargetBrewScope(
+                  controller: _targetBrewController,
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              ),
+              home: FlowlogShell(
+                repeatShotController: _repeatShotController,
+                targetBrewController: _targetBrewController,
+              ),
               onGenerateRoute: (settings) {
                 final builder = buildAppRoutes()[settings.name];
                 if (builder == null) {

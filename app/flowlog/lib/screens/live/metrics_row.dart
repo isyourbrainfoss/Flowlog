@@ -24,6 +24,8 @@ class LiveMetrics {
     this.tempTrend = MetricTrend.neutral,
     this.elapsedTrend = MetricTrend.neutral,
     this.projectedYieldTrend = MetricTrend.neutral,
+    this.showProjectedYield = true,
+    this.showTrends = true,
   });
 
   static const defaultTargetDurationMs = 30000;
@@ -45,6 +47,14 @@ class LiveMetrics {
   final MetricTrend tempTrend;
   final MetricTrend elapsedTrend;
   final MetricTrend projectedYieldTrend;
+
+  /// False after a brew: the final yield is already the Yield tile, so a
+  /// second identical "Yield" tile is just noise.
+  final bool showProjectedYield;
+
+  /// False after a brew: trends compare consecutive samples and are all
+  /// "steady" (a dash after every value) once the shot has stopped.
+  final bool showTrends;
 
   /// Builds metrics from the current [sample], optionally comparing to [previous].
   factory LiveMetrics.fromSamples({
@@ -131,6 +141,8 @@ class LiveMetrics {
       tempTrend: MetricTrend.neutral,
       elapsedTrend: MetricTrend.neutral,
       projectedYieldTrend: MetricTrend.neutral,
+      showProjectedYield: false,
+      showTrends: false,
     );
   }
 
@@ -226,6 +238,7 @@ class LiveMetricsRow extends StatelessWidget {
         label: resolved.pressureLabel,
         value: _formatPressure(resolved.pressureBar),
         trend: resolved.pressureTrend,
+        showTrend: resolved.showTrends,
         labelStyle: labelStyle,
         valueStyle: valueStyle,
       ),
@@ -234,6 +247,7 @@ class LiveMetricsRow extends StatelessWidget {
         label: resolved.weightLabel,
         value: _formatWeight(resolved.weightG),
         trend: resolved.weightTrend,
+        showTrend: resolved.showTrends,
         labelStyle: labelStyle,
         valueStyle: valueStyle,
       ),
@@ -247,6 +261,7 @@ class LiveMetricsRow extends StatelessWidget {
           label: 'Flow',
           value: _formatFlow(resolved.flowGs),
           trend: resolved.flowTrend,
+          showTrend: resolved.showTrends,
           labelStyle: labelStyle,
           valueStyle: valueStyle,
         ),
@@ -255,22 +270,26 @@ class LiveMetricsRow extends StatelessWidget {
         label: 'Elapsed',
         value: _formatElapsed(resolved.elapsedMs),
         trend: resolved.elapsedTrend,
+        showTrend: resolved.showTrends,
         labelStyle: labelStyle,
         valueStyle: valueStyle,
       ),
-      _MetricTile(
-        label: resolved.projectedYieldLabel,
-        value: _formatYield(resolved.projectedYieldG),
-        trend: resolved.projectedYieldTrend,
-        labelStyle: labelStyle,
-        valueStyle: valueStyle,
-      ),
+      if (resolved.showProjectedYield)
+        _MetricTile(
+          label: resolved.projectedYieldLabel,
+          value: _formatYield(resolved.projectedYieldG),
+          trend: resolved.projectedYieldTrend,
+          showTrend: resolved.showTrends,
+          labelStyle: labelStyle,
+          valueStyle: valueStyle,
+        ),
       ?(resolved.tempC != null
           ? _MetricTile(
               key: const Key('live_metric_temp'),
               label: 'Temp',
               value: _formatTemp(resolved.tempC),
               trend: resolved.tempTrend,
+              showTrend: resolved.showTrends,
               labelStyle: labelStyle,
               valueStyle: valueStyle,
             )
@@ -372,11 +391,13 @@ class _MetricTile extends StatelessWidget {
     required this.trend,
     required this.labelStyle,
     required this.valueStyle,
+    this.showTrend = true,
   });
 
   final String label;
   final String value;
   final MetricTrend trend;
+  final bool showTrend;
   final TextStyle? labelStyle;
   final TextStyle? valueStyle;
 
@@ -398,6 +419,35 @@ class _MetricTile extends StatelessWidget {
       builder: (context, constraints) {
         final maxWidth = constraints.maxWidth;
         final showInlineTrend = maxWidth >= 56;
+        if (!showTrend) {
+          return Semantics(
+            label: '$label $value',
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (maxWidth >= 24)
+                  Text(
+                    label,
+                    style: labelStyle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                if (maxWidth >= 24) const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    value,
+                    style: valueStyle,
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
         final showLabel = maxWidth >= 24;
 
         final trendWidget = Icon(

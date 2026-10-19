@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flowlog/util/decimal_input.dart';
 import 'package:flowlog/screens/live/brew_metadata_sliders.dart';
 import 'package:flowlog/screens/more/equipment_screen.dart';
 import 'package:flowlog/settings/brew_defaults_store.dart';
@@ -610,15 +611,7 @@ class _MetadataSheetState extends State<MetadataSheet> {
     return tag;
   }
 
-  String _formatDouble(double? value) {
-    if (value == null) {
-      return '';
-    }
-    if (value == value.roundToDouble()) {
-      return value.toInt().toString();
-    }
-    return value.toString();
-  }
+  String _formatDouble(double? value) => formatDecimalInput(value);
 
   double? _parseDouble(String value) {
     final trimmed = value.trim();

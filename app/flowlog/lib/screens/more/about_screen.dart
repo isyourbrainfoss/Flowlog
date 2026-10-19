@@ -3,10 +3,14 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 /// Short release notes shown on the About screen for this marketing version.
 const flowlogWhatsNew = '''
-• Flat pressure target: set one bar value (e.g. 9 bar) in Brew defaults — used as the target line and deviation bar when no target curve is set
-• Pressure bar now says "No target set" instead of showing a meaningless bar
-• CSV and bean AI imports accept comma decimals (18,5) and 1,000 g style stock
-• Fix: small memory leak in equipment add/edit dialogs
+• Repeat shot from History now really loads the shot as the target on Live (before it only showed a message)
+• "Try demo shot" (Sensor diagnostics) and Target brew → "Build in Simulator" work again; the latter opens the Simulator tab
+• "Set as target brew" from a shot updates Live right away
+• Number fields show decimals the way you type them — 18,5 stays 18,5 on Norwegian/German phones
+• Simulator: loading a shot keeps its pre-infusion step and 9 bar hold; preview and saved targets hold the last pressure to the end; "12 bar" axis label no longer overlaps
+• Live: the chart is no longer cut off when a target or brew-complete banner is shown
+• After a shot: one Yield tile and no dash after every value
+• The demo shot now ends by itself
 ''';
 
 /// About tile content: marketing version, build number, and what's new.

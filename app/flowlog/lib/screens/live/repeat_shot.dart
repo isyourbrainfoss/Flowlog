@@ -104,7 +104,7 @@ Future<void> startRepeatShotFromShot({
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         key: const Key('repeat_shot_snackbar'),
-        content: Text('Repeating ${profile.name}'),
+        content: Text(repeatShotSnackbarText(profile.name)),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -170,3 +170,15 @@ class RepeatShotBanner extends StatelessWidget {
     );
   }
 }
+
+/// Snackbar copy after "Repeat shot": profile names from shots already start
+/// with "Repeat …", which read as "Repeating Repeat 10-19 23:28".
+String repeatShotSnackbarText(String profileName) {
+  final name = profileName.trim();
+  if (name.toLowerCase().startsWith('repeat ')) {
+    final when = name.substring('repeat '.length).trim();
+    return 'Ready on Live — repeating shot from $when';
+  }
+  return 'Ready on Live — repeating $name';
+}
+

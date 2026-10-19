@@ -1,4 +1,5 @@
 import 'package:flowlog/screens/library/beans.dart';
+import 'package:flowlog/util/decimal_input.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -146,6 +147,29 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('2 shots'), findsOneWidget);
+    });
+
+    testWidgets('edit dialog shows bag size in the device decimal style', (
+      tester,
+    ) async {
+      debugDecimalSeparatorOverride = ',';
+      addTearDown(() => debugDecimalSeparatorOverride = null);
+      const bean = Bean(id: 'bean-half', name: 'Half Bean', stockG: 250.5);
+      await beanRepository.upsertBean(bean);
+
+      await _pumpBeansScreen(tester, beanRepository: beanRepository);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('bean_card_bean-half')));
+      await tester.pumpAndSettle();
+
+      final field = find.byKey(const Key('bean_stock_custom_field'));
+      await tester.ensureVisible(field);
+      final editable = tester.widget<EditableText>(
+        find.descendant(of: field, matching: find.byType(EditableText)),
+      );
+      // Typed as 250,5 on a Norwegian keyboard; must not come back as 250.5.
+      expect(editable.controller.text, '250,5');
     });
 
     testWidgets('shows remaining estimate and marks bag empty', (tester) async {

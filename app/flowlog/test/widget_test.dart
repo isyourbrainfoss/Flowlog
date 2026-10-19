@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import 'package:flowlog/main.dart';
+import 'package:flowlog/screens/live/repeat_shot.dart';
+import 'package:flowlog/screens/live/target_brew.dart';
+import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/shell/app_destinations.dart';
 import 'package:flowlog/shell/flowlog_shell.dart';
@@ -19,6 +24,49 @@ void main() {
     expect(find.text('Session: idle'), findsOneWidget);
     expect(find.byKey(const Key('live_brew')), findsOneWidget);
     expect(find.byType(NavigationRail), findsOneWidget);
+  });
+
+  testWidgets('routes pushed over the shell share its controllers', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
+    await tester.pumpAndSettle();
+
+    final shellContext = tester.element(find.text('Session: idle'));
+    final shellRepeat = RepeatShotScope.maybeOf(shellContext);
+    final shellTarget = TargetBrewScope.maybeOf(shellContext);
+    expect(shellRepeat, isNotNull);
+    expect(shellTarget, isNotNull);
+
+    late BuildContext routeContext;
+    unawaited(
+      Navigator.of(shellContext).push(
+        MaterialPageRoute<void>(
+          builder: (context) {
+            routeContext = context;
+            return const Scaffold(body: Text('pushed'));
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // History → shot detail and More → Target brew are pushed like this.
+    expect(RepeatShotScope.maybeOf(routeContext), same(shellRepeat));
+    expect(TargetBrewScope.maybeOf(routeContext), same(shellTarget));
+    expect(FlowlogShellScope.maybeOf(routeContext), isNotNull);
+    expect(FlowlogShortcutsScope.maybeOf(routeContext), isNotNull);
+  });
+
+  test('repeat snackbar does not say "Repeating Repeat"', () {
+    expect(
+      repeatShotSnackbarText('Repeat 10-19 23:28'),
+      'Ready on Live — repeating shot from 10-19 23:28',
+    );
+    expect(
+      repeatShotSnackbarText('Blooming 9 bar'),
+      'Ready on Live — repeating Blooming 9 bar',
+    );
   });
 
   testWidgets('Shell navigates to all four tabs', (tester) async {

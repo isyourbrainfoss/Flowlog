@@ -1,3 +1,4 @@
+import 'package:flowlog/util/decimal_input.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog_core/flowlog_core.dart';
@@ -557,7 +558,7 @@ class _BeanEditorDialogState extends State<_BeanEditorDialog> {
     _originController = TextEditingController(text: bean?.origin ?? '');
     _varietyController = TextEditingController(text: bean?.variety ?? '');
     _stockController = TextEditingController(
-      text: bean?.stockG?.toString() ?? '',
+      text: formatDecimalInput(bean?.stockG),
     );
     _notesController = TextEditingController(text: bean?.notes ?? '');
     _roastSliderValue = _roastLevelToSlider(bean?.roastLevel);

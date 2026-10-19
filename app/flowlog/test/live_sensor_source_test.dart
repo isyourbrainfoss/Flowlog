@@ -383,6 +383,32 @@ void main() {
       expect(find.text('Stop brew'), findsOneWidget);
     });
 
+    testWidgets('demo brew ends by itself when the replay finishes', (
+      tester,
+    ) async {
+      final source = LiveSensorSource(
+        hub: hub,
+        demoFixtureLoader: () async => const [
+          SensorSample(elapsedMs: 0, pressureBar: 0),
+          SensorSample(elapsedMs: 50, pressureBar: 9, weightG: 10),
+          SensorSample(elapsedMs: 100, pressureBar: 0, weightG: 20),
+        ],
+      );
+      final registry = await pumpLiveScreen(tester, sensorSource: source);
+
+      await tester.runAsync(() async {
+        await registry.startDemoShot?.call();
+        await tester.pump();
+        expect(find.text('Stop brew'), findsOneWidget);
+        // Replay (~100 ms) + short end delay.
+        await Future<void>.delayed(const Duration(milliseconds: 1800));
+      });
+      await tester.pumpAndSettle();
+
+      expect(find.text('Stop brew'), findsNothing);
+      expect(find.byKey(const ValueKey('live-brew-layout')), findsNothing);
+    });
+
     testWidgets('dismissing demo banner exits demo mode', (tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;

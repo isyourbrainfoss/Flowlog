@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flowlog/util/decimal_input.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/live/repeat_shot.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
@@ -312,31 +313,34 @@ List<PressureKeyframe> extractPressureKeyframesFromSamples(
     ];
   }
 
-  // Index set: start, end, global max, local extrema (incl. plateau edges).
-  final keepIdx = <int>{0, withPressure.length - 1};
+  // Index set: start, end, global max, plus the corners of the curve found
+  // with Ramer–Douglas–Peucker on the pressure axis. Corners (pre-infusion
+  // knee, ramp top, end of the 9 bar hold, ramp down) are what make a
+  // profile; plain local extrema missed them on wavy real shots and turned
+  // a flat hold into one long slope.
   var maxIdx = 0;
   for (var i = 1; i < withPressure.length; i++) {
     if (withPressure[i].pressureBar > withPressure[maxIdx].pressureBar) {
       maxIdx = i;
     }
   }
-  keepIdx.add(maxIdx);
 
-  for (var i = 1; i < withPressure.length - 1; i++) {
-    final prev = withPressure[i - 1].pressureBar;
-    final cur = withPressure[i].pressureBar;
-    final next = withPressure[i + 1].pressureBar;
-    final rising = cur > prev + 1e-6;
-    final falling = cur < prev - 1e-6;
-    final nextFalling = next < cur - 1e-6;
-    final nextRising = next > cur + 1e-6;
-    // Peak: was rising (or flat after rise) then falls; valley inverse.
-    final isPeak = (rising || (cur >= prev && nextFalling)) && nextFalling;
-    final isValley = (falling || (cur <= prev && nextRising)) && nextRising;
-    if ((isPeak || isValley) &&
-        (cur - prev).abs() >= minPressureDeltaBar * 0.25) {
-      keepIdx.add(i);
+  // Keep the true peak unless a corner already sits within 0.3 bar of it
+  // (avoids a second point right next to the ramp top on wavy holds).
+  Set<int> simplify(double epsilon) {
+    final keep = _simplifyPressureCurve(withPressure, epsilon);
+    final peak = withPressure[maxIdx].pressureBar;
+    if (!keep.any((i) => withPressure[i].pressureBar >= peak - 0.3)) {
+      keep.add(maxIdx);
     }
+    return keep;
+  }
+
+  var epsilonBar = math.max(0.5, minPressureDeltaBar);
+  var keepIdx = simplify(epsilonBar);
+  while (keepIdx.length > maxKeyframes && epsilonBar < 12) {
+    epsilonBar *= 1.5;
+    keepIdx = simplify(epsilonBar);
   }
 
   final ordered = keepIdx.toList()..sort();
@@ -344,28 +348,39 @@ List<PressureKeyframe> extractPressureKeyframesFromSamples(
     for (final i in ordered) withPressure[i],
   ];
 
-  // Drop middle points that are too close unless they hold the global max.
-  final maxBar = withPressure[maxIdx].pressureBar;
+  // Enforce the editor's minimum spacing: when two points are too close,
+  // keep the one that follows the real curve better (the end always stays).
   final compacted = <PressureKeyframe>[spaced.first];
   for (var i = 1; i < spaced.length; i++) {
     final c = spaced[i];
     final isLast = i == spaced.length - 1;
-    final isMax = (c.pressureBar - maxBar).abs() < 1e-6;
     final farEnough =
         c.elapsedMs >= compacted.last.elapsedMs + kSimulatorMinKeyframeSpacingMs;
-    if (isLast || isMax || farEnough) {
-      if (!farEnough &&
-          !isMax &&
-          isLast &&
-          compacted.length > 1 &&
-          c.elapsedMs < compacted.last.elapsedMs + kSimulatorMinKeyframeSpacingMs) {
-        compacted[compacted.length - 1] = c;
-      } else {
+    if (farEnough) {
+      compacted.add(c);
+      continue;
+    }
+    if (compacted.length == 1) {
+      // Too close to the start point: only the end may still be added.
+      if (isLast) {
         compacted.add(c);
       }
-    } else if ((c.pressureBar - compacted.last.pressureBar).abs() >
-        minPressureDeltaBar) {
-      compacted.add(c);
+      continue;
+    }
+    if (isLast) {
+      // The end point always stays; it replaces the too-close previous one.
+      compacted[compacted.length - 1] = c;
+      continue;
+    }
+    // Keep whichever of the two close points leaves the smaller error
+    // against the real curve between the previous kept point and the next
+    // candidate (so the ramp-top corner wins over a wavy 0.2 bar peak).
+    final anchor = compacted[compacted.length - 2];
+    final next = spaced[i + 1];
+    final prev = compacted.last;
+    if (_maxErrorVia(withPressure, anchor, c, next) <
+        _maxErrorVia(withPressure, anchor, prev, next)) {
+      compacted[compacted.length - 1] = c;
     }
   }
   spaced = compacted;
@@ -393,13 +408,82 @@ List<PressureKeyframe> extractPressureKeyframesFromSamples(
   return spaced;
 }
 
+/// Largest |pressure error| over [points] between [a] and [c] when the
+/// curve is drawn as straight segments a → [via] → c.
+double _maxErrorVia(
+  List<PressureKeyframe> points,
+  PressureKeyframe a,
+  PressureKeyframe via,
+  PressureKeyframe c,
+) {
+  double lerp(PressureKeyframe p, PressureKeyframe q, int t) {
+    final span = q.elapsedMs - p.elapsedMs;
+    if (span <= 0) return q.pressureBar;
+    return p.pressureBar +
+        (q.pressureBar - p.pressureBar) * (t - p.elapsedMs) / span;
+  }
+
+  var worst = 0.0;
+  for (final p in points) {
+    if (p.elapsedMs < a.elapsedMs || p.elapsedMs > c.elapsedMs) continue;
+    final line = p.elapsedMs <= via.elapsedMs
+        ? lerp(a, via, p.elapsedMs)
+        : lerp(via, c, p.elapsedMs);
+    worst = math.max(worst, (line - p.pressureBar).abs());
+  }
+  return worst;
+}
+
+/// Indices kept by Ramer–Douglas–Peucker using the vertical (pressure)
+/// distance to the chord, in bar. Always keeps the first and last index.
+Set<int> _simplifyPressureCurve(
+  List<PressureKeyframe> points,
+  double epsilonBar,
+) {
+  final keep = <int>{0, points.length - 1};
+  final stack = <(int, int)>[(0, points.length - 1)];
+  while (stack.isNotEmpty) {
+    final (first, last) = stack.removeLast();
+    if (last - first < 2) {
+      continue;
+    }
+    final a = points[first];
+    final b = points[last];
+    final span = b.elapsedMs - a.elapsedMs;
+    var worstIdx = -1;
+    var worstDist = epsilonBar;
+    for (var i = first + 1; i < last; i++) {
+      final p = points[i];
+      final t = span <= 0 ? 0.0 : (p.elapsedMs - a.elapsedMs) / span;
+      final onChord = a.pressureBar + (b.pressureBar - a.pressureBar) * t;
+      final dist = (p.pressureBar - onChord).abs();
+      if (dist > worstDist) {
+        worstDist = dist;
+        worstIdx = i;
+      }
+    }
+    if (worstIdx >= 0) {
+      keep.add(worstIdx);
+      stack
+        ..add((first, worstIdx))
+        ..add((worstIdx, last));
+    }
+  }
+  return keep;
+}
+
 /// Expands keyframes into a dense pressure profile for charting.
 ///
 /// Segments are **linear** between control points so a flat 9 bar hold
 /// (two keyframes at 9 bar) stays exactly flat and easy to edit.
+///
+/// When [holdUntilMs] is past the last keyframe, the last pressure is held
+/// until then — matching the flat line the editor draws to the end of the
+/// timeline, so previews and saved targets cover the whole shot.
 List<ShotSample> expandKeyframesToProfile(
   List<PressureKeyframe> keyframes, {
   int stepMs = 500,
+  int? holdUntilMs,
 }) {
   if (keyframes.isEmpty) {
     return const [];
@@ -407,7 +491,7 @@ List<ShotSample> expandKeyframesToProfile(
 
   final sorted = List<PressureKeyframe>.from(keyframes)
     ..sort((a, b) => a.elapsedMs.compareTo(b.elapsedMs));
-  final endMs = sorted.last.elapsedMs;
+  final endMs = math.max(sorted.last.elapsedMs, holdUntilMs ?? 0);
   final profile = <ShotSample>[];
 
   for (var elapsedMs = 0; elapsedMs <= endMs; elapsedMs += stepMs) {
@@ -871,11 +955,11 @@ class _SelectedKeyframeEditorState extends State<_SelectedKeyframeEditor> {
   }
 
   String _formatTime(PressureKeyframe keyframe) {
-    return (keyframe.elapsedMs / 1000).toStringAsFixed(1);
+    return formatDecimalInput(keyframe.elapsedMs / 1000, fractionDigits: 1);
   }
 
   String _formatPressure(PressureKeyframe keyframe) {
-    return keyframe.pressureBar.toStringAsFixed(1);
+    return formatDecimalInput(keyframe.pressureBar, fractionDigits: 1);
   }
 
   void _applyTime() {
@@ -1075,7 +1159,21 @@ class _PressureProfileEditorPainter extends CustomPainter {
       );
     }
 
-    _paintText(canvas, 'bar', Offset(4, topPad - 2), textStyle);
+    // Unit sits right of the top tick value; drawing it at the same spot
+    // made "12" and "bar" overlap.
+    final topLabel = pressureMax == pressureMax.roundToDouble()
+        ? '${pressureMax.toInt()}'
+        : pressureMax.toStringAsFixed(1);
+    final topLabelWidth = (TextPainter(
+      text: TextSpan(text: topLabel, style: textStyle),
+      textDirection: TextDirection.ltr,
+    )..layout()).width;
+    _paintText(
+      canvas,
+      'bar',
+      Offset(4 + topLabelWidth + 3, plot.top - 6),
+      textStyle,
+    );
   }
 
   String _formatAxisTime(int elapsedMs) {
@@ -1186,8 +1284,12 @@ SavedProfile profileFromKeyframes(
   List<PressureKeyframe> keyframes, {
   String? name,
   String? sourceShotId,
+  int? holdUntilMs,
 }) {
-  final pressureSamples = expandKeyframesToProfile(keyframes);
+  final pressureSamples = expandKeyframesToProfile(
+    keyframes,
+    holdUntilMs: holdUntilMs,
+  );
   return SavedProfile(
     id: generateProfileId(),
     name: name ?? 'Simulator profile',
@@ -1542,6 +1644,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       _keyframes,
       name: name,
       sourceShotId: _profile?.sourceShotId,
+      holdUntilMs: _timelineDurationMs,
     );
     final repository = await _ensureProfileRepository();
     await repository.insertProfile(profile);
@@ -1577,6 +1680,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       _keyframes,
       name: name,
       sourceShotId: _profile?.sourceShotId,
+      holdUntilMs: _timelineDurationMs,
     );
     final repository = await _ensureProfileRepository();
     await repository.insertProfile(profile);
@@ -1614,6 +1718,7 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
       _keyframes,
       name: name,
       sourceShotId: _profile?.sourceShotId,
+      holdUntilMs: _timelineDurationMs,
     );
     final repository = await _ensureProfileRepository();
     await repository.insertProfile(profile);
@@ -1665,10 +1770,13 @@ class _SimulatorScreenState extends State<SimulatorScreen> {
 
         final displayName = (_profile ?? state.profile).name;
 
-        final pressureProfile = expandKeyframesToProfile(_keyframes);
+        final durationMs = _timelineDurationMs;
+        final pressureProfile = expandKeyframesToProfile(
+          _keyframes,
+          holdUntilMs: durationMs,
+        );
         final predictedSamples = buildPredictedFlowSamples(pressureProfile);
         final summary = summarizePredictedFlow(predictedSamples);
-        final durationMs = _timelineDurationMs;
 
         return Scaffold(
           body: Column(

@@ -536,6 +536,34 @@ void main() {
       expect(find.byType(SimulatorScreen), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('showSimulator selects the Simulator sub-tab', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(home: LibraryScreen()),
+      );
+      await pumpForAsync(tester);
+      final tabBar = tester.widget<TabBar>(find.byType(TabBar));
+      expect(tabBar.controller!.index, 0);
+
+      // Already mounted (Library tab kept alive in the shell stack).
+      LibraryScreen.showSimulator();
+      await pumpForAsync(tester, frames: 5);
+      expect(tabBar.controller!.index, LibraryScreen.simulatorTabIndex);
+      expect(LibraryScreen.requestedTab.value, isNull);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('pending showSimulator applies on first build', (
+      tester,
+    ) async {
+      LibraryScreen.showSimulator();
+      await tester.pumpWidget(
+        const MaterialApp(home: LibraryScreen()),
+      );
+      await pumpForAsync(tester, frames: 5);
+      final tabBar = tester.widget<TabBar>(find.byType(TabBar));
+      expect(tabBar.controller!.index, LibraryScreen.simulatorTabIndex);
+    });
   });
 }
 

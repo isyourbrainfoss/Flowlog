@@ -154,6 +154,12 @@ class LiveSensorSource {
 
   bool get isDemoMode => _demoMode;
 
+  /// Called when the demo fixture has been fully replayed. The fixture ends
+  /// on a single 0 bar sample, which is too short for the auto-stop guard,
+  /// so Live uses this to end the demo brew instead of leaving the timer
+  /// frozen with "Stop brew" showing.
+  void Function()? onDemoReplayComplete;
+
   void enterDemoMode() {
     _demoMode = true;
   }
@@ -173,6 +179,7 @@ class LiveSensorSource {
         fixturePath: demoFixturePath,
         fixtureLoader: demoFixtureLoader,
         speed: 1.0,
+        onReplayComplete: () => onDemoReplayComplete?.call(),
       );
     }
 

@@ -66,6 +66,35 @@ void main() {
   });
 
   group('LiveMetricsRow', () {
+    testWidgets('stopped session shows one Yield tile and no trend dashes', (
+      tester,
+    ) async {
+      final samples = [
+        for (var i = 0; i <= 40; i++)
+          ShotSample(
+            elapsedMs: i * 500,
+            pressureBar: i < 4 ? i * 2.0 : 9.0,
+            weightG: i * 0.9,
+          ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: LiveMetricsRow(
+              metrics: LiveMetrics.fromStoppedSession(samples),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Yield'), findsOneWidget);
+      expect(find.text('Proj. yield'), findsNothing);
+      expect(find.byIcon(Icons.remove), findsNothing);
+      expect(find.text('36.0 g'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('renders all metric labels and values from LiveMetrics', (
       tester,
     ) async {

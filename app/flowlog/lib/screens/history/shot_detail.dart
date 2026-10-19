@@ -612,7 +612,10 @@ class _MetadataGrid extends StatelessWidget {
 
     final brewTemp = brewTempRangeFromSamples(shot.samples);
 
+    // Stretch so single fields (Brew temp, Bean, Location, …) line up with
+    // the left column instead of floating in the middle.
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [

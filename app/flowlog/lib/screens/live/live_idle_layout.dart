@@ -32,25 +32,35 @@ class LiveIdleLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return pinChart
-        ? Column(
-            key: const ValueKey('live-pinned-layout'),
+    if (pinChart) {
+      // Controls take only the height they need (capped at the old 2/5
+      // share) so the chart gets the rest. A fixed 3:2 split clipped the
+      // chart's bottom when a target / repeat banner was shown on short
+      // windows, while the idle controls left a big empty gap below.
+      return LayoutBuilder(
+        key: const ValueKey('live-pinned-layout'),
+        builder: (context, constraints) {
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                flex: 3,
-                child: SingleChildScrollView(child: chartSection),
-              ),
-              Expanded(
-                flex: 2,
+              // [LiveIdleChartSection] sizes itself to this slot (and
+              // scrolls when it is too short).
+              Expanded(child: chartSection),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: constraints.maxHeight * 2 / 5,
+                ),
                 child: SingleChildScrollView(
                   padding: EdgeInsets.only(top: useCompactLayout ? 0 : 8),
                   child: controlsSection,
                 ),
               ),
             ],
-          )
-        : SingleChildScrollView(
+          );
+        },
+      );
+    }
+    return SingleChildScrollView(
             key: const ValueKey('live-scroll-layout'),
             padding: EdgeInsets.symmetric(vertical: useCompactLayout ? 12 : 24),
             child: Column(
@@ -94,8 +104,55 @@ class LiveIdleChartSection extends StatelessWidget {
   final List<ShotSample> targetPressureSamples;
   final VoidCallback onOpenFullscreenChart;
 
+  /// Below this slot height the chart keeps its fixed height and the section
+  /// scrolls instead of squeezing the plot.
+  static const double minFitHeight = 320;
+
+  /// Smallest plot height when fitting the chart to the remaining space.
+  static const double minChartHeight = 160;
+
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!constraints.hasBoundedHeight) {
+          return _buildColumn(fitChart: false);
+        }
+        if (constraints.maxHeight < minFitHeight) {
+          return SingleChildScrollView(child: _buildColumn(fitChart: false));
+        }
+        // Pinned layout: banners keep their size and the chart fills the
+        // rest, so a target / repeat / brew-complete banner no longer pushes
+        // the bottom of the plot (and its time axis) out of view.
+        return _buildColumn(fitChart: true);
+      },
+    );
+  }
+
+  Widget _buildChart(double height) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        DualCurveChart(
+          height: height,
+          samplesNotifier: samplesNotifier,
+          annotationsNotifier: annotationsNotifier,
+          interactionController: interactionController,
+          denseTimeAxis: true,
+          targetPressureSamples: targetPressureSamples,
+        ),
+        Positioned(
+          right: 4,
+          bottom: 28,
+          child: LiveFullscreenChartButton(
+            onPressed: onOpenFullscreenChart,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildColumn({required bool fitChart}) {
     final repeat = repeatController;
     final prefill = repeat?.prefill;
     final status = sensorStatus;
@@ -114,26 +171,21 @@ class LiveIdleChartSection extends StatelessWidget {
           if (prefill != null) const SizedBox(height: 8),
           ?status,
           if (status != null) const SizedBox(height: 8),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              DualCurveChart(
-                height: chartHeight,
-                samplesNotifier: samplesNotifier,
-                annotationsNotifier: annotationsNotifier,
-                interactionController: interactionController,
-                denseTimeAxis: true,
-                targetPressureSamples: targetPressureSamples,
+          if (fitChart)
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, box) {
+                  if (box.maxHeight >= minChartHeight) {
+                    return _buildChart(box.maxHeight);
+                  }
+                  return SingleChildScrollView(
+                    child: _buildChart(minChartHeight),
+                  );
+                },
               ),
-              Positioned(
-                right: 4,
-                bottom: 28,
-                child: LiveFullscreenChartButton(
-                  onPressed: onOpenFullscreenChart,
-                ),
-              ),
-            ],
-          ),
+            )
+          else
+            _buildChart(chartHeight),
         ],
       ),
     );

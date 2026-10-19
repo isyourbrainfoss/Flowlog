@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flowlog/util/decimal_input.dart';
 import 'package:flowlog/shell/shell_breakpoints.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -666,15 +667,7 @@ class _HistoryFiltersPanelState extends State<HistoryFiltersPanel> {
     _emit(widget.filters.copyWith(maxGrindSetting: parsed));
   }
 
-  static String _formatNumber(double? value) {
-    if (value == null) {
-      return '';
-    }
-    if (value == value.roundToDouble()) {
-      return value.toInt().toString();
-    }
-    return value.toString();
-  }
+  static String _formatNumber(double? value) => formatDecimalInput(value);
 
   static String _formatDurationSec(int? ms) {
     if (ms == null) {

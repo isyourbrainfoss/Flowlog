@@ -2,6 +2,7 @@ import 'package:flowlog/screens/more/backup.dart';
 import 'package:flowlog/screens/more/export.dart';
 import 'package:flowlog/screens/more/nextcloud_sync.dart';
 import 'package:flowlog/shell/app_destinations.dart';
+import 'package:flowlog/shell/shell_scope.dart' show MountedScopeTracker;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -40,10 +41,26 @@ class FlowlogShortcutsScope extends InheritedWidget {
   final AppTab currentTab;
   final FlowlogShortcutRegistry registry;
 
+  static MountedScopeTracker? _mounted;
+
+  /// Falls back to the mounted shell's scope for routes pushed on the root
+  /// navigator (see FlowlogShellScope).
   static FlowlogShortcutsScope? maybeOf(BuildContext context) {
     return context
-        .dependOnInheritedWidgetOfExactType<FlowlogShortcutsScope>();
+            .dependOnInheritedWidgetOfExactType<FlowlogShortcutsScope>() ??
+        _mounted?.widget as FlowlogShortcutsScope?;
   }
+
+  @override
+  InheritedElement createElement() => MountedScopeTracker(
+    this,
+    register: (element) => _mounted = element,
+    unregister: (element) {
+      if (identical(_mounted, element)) {
+        _mounted = null;
+      }
+    },
+  );
 
   static FlowlogShortcutsScope of(BuildContext context) {
     final scope = maybeOf(context);

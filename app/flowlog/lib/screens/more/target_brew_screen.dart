@@ -5,6 +5,7 @@ import 'package:flowlog/screens/library/profile_picker.dart';
 import 'package:flowlog/screens/live/target_brew.dart';
 import 'package:flowlog/settings/target_brew_store.dart';
 import 'package:flowlog/shell/app_destinations.dart';
+import 'package:flowlog/screens/library_screen.dart';
 import 'package:flowlog/shell/shell_scope.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 import 'package:flutter/material.dart';
@@ -121,6 +122,7 @@ class _TargetBrewScreenState extends State<TargetBrewScreen> {
   }
 
   void _openSimulator() {
+    LibraryScreen.showSimulator();
     FlowlogShellScope.maybeOf(context)?.switchTab(AppTab.library);
     Navigator.of(context).pop();
   }

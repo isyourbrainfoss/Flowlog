@@ -396,10 +396,10 @@ class _EquipmentPresetDialogState extends State<_EquipmentPresetDialog> {
     final existing = widget.existing;
     _name = TextEditingController(text: existing?.name ?? '');
     _dose = TextEditingController(
-      text: existing?.defaultDoseG?.toString() ?? '',
+      text: formatDecimalInput(existing?.defaultDoseG),
     );
     _grind = TextEditingController(
-      text: existing?.defaultGrindSetting?.toString() ?? '',
+      text: formatDecimalInput(existing?.defaultGrindSetting),
     );
     _rewind = TextEditingController(
       text: existing?.defaultRewindTurnsBeforeFill?.toString() ?? '',

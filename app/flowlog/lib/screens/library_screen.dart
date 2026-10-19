@@ -9,13 +9,24 @@ import 'package:flutter/material.dart';
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
 
+  /// Pending request to show a Library sub-tab (index), consumed by the
+  /// mounted [LibraryScreen] or on its next init. Used by More → Target
+  /// brew → "Build in Simulator", which used to land on Beans.
+  static final ValueNotifier<int?> requestedTab = ValueNotifier<int?>(null);
+
+  /// Index of the Simulator sub-tab.
+  static const simulatorTabIndex = 4;
+
+  /// Asks the Library tab to show the Simulator.
+  static void showSimulator() => requestedTab.value = simulatorTabIndex;
+
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
 }
 
 class _LibraryScreenState extends State<LibraryScreen>
     with SingleTickerProviderStateMixin {
-  static const _simulatorTabIndex = 4;
+  static const _simulatorTabIndex = LibraryScreen.simulatorTabIndex;
 
   late final TabController _tabController;
 
@@ -28,10 +39,24 @@ class _LibraryScreenState extends State<LibraryScreen>
           setState(() {});
         }
       });
+    LibraryScreen.requestedTab.addListener(_onTabRequested);
+    _onTabRequested();
+  }
+
+  void _onTabRequested() {
+    final index = LibraryScreen.requestedTab.value;
+    if (index == null) {
+      return;
+    }
+    LibraryScreen.requestedTab.value = null;
+    if (index >= 0 && index < _tabController.length) {
+      _tabController.index = index;
+    }
   }
 
   @override
   void dispose() {
+    LibraryScreen.requestedTab.removeListener(_onTabRequested);
     _tabController.dispose();
     super.dispose();
   }

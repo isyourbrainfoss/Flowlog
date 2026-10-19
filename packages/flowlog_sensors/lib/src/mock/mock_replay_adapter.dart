@@ -18,6 +18,7 @@ class MockReplayAdapter implements SensorAdapter {
     this.fixturePath,
     this.fixtureLoader,
     this.speed = 1.0,
+    this.onReplayComplete,
   }) : assert(
           fixturePath != null || fixtureLoader != null,
           'Provide fixturePath or fixtureLoader',
@@ -31,6 +32,10 @@ class MockReplayAdapter implements SensorAdapter {
 
   /// Replay speed multiplier (`1.0` = real-time, `0` = instant).
   final double speed;
+
+  /// Called once after the last fixture sample has been emitted (not when
+  /// the replay is cut short by [disconnect]).
+  final void Function()? onReplayComplete;
 
   final _stateController = StreamController<ConnectionState>.broadcast();
   final _samplesController = StreamController<SensorSample>.broadcast();
@@ -133,6 +138,7 @@ class MockReplayAdapter implements SensorAdapter {
         }
         _samplesController.add(sample);
       }
+      _notifyReplayComplete();
       return;
     }
 
@@ -148,6 +154,7 @@ class MockReplayAdapter implements SensorAdapter {
 
     final nextIndex = index + 1;
     if (nextIndex >= samples.length) {
+      _notifyReplayComplete();
       return;
     }
 
@@ -162,6 +169,20 @@ class MockReplayAdapter implements SensorAdapter {
 
     _replayTimer = Timer(Duration(milliseconds: delayMs), () {
       _emitSample(samples, nextIndex);
+    });
+  }
+
+  /// Fires [onReplayComplete] after listeners have received the last sample
+  /// (broadcast delivery is asynchronous).
+  void _notifyReplayComplete() {
+    final callback = onReplayComplete;
+    if (callback == null) {
+      return;
+    }
+    Timer.run(() {
+      if (_connected) {
+        callback();
+      }
     });
   }
 }

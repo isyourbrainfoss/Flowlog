@@ -136,7 +136,9 @@ Future<void> startDemoShotFromSettings(BuildContext context) async {
     return;
   }
 
-  Navigator.of(context).pop();
+  // Diagnostics can sit on top of Sensors (More → Sensors → Diagnostics);
+  // return all the way to the shell so Live is actually visible.
+  Navigator.of(context).popUntil((route) => route.isFirst);
   switchTab(AppTab.live);
   await Future<void>.delayed(Duration.zero);
   await startDemo();
