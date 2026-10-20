@@ -1163,6 +1163,8 @@ class DualCurveChartPainter extends CustomPainter {
         maxValue: scales.weightMax,
         step: _gridStepForMax(scales.weightMax, targetLines: 5),
         color: FlowlogChartColors.weightLine,
+        // "g" unit at the top and, with flow shown, "g/s" mid-plot.
+        reservedLabelTops: [axisUnitTop, if (showFlow) plotRect.center.dy],
       );
     } else if (!compact && showPressure && showFlow && !showWeight) {
       _drawRightValueLabels(
@@ -1171,6 +1173,7 @@ class DualCurveChartPainter extends CustomPainter {
         maxValue: scales.flowMax,
         step: 1,
         color: FlowlogChartColors.flowLine,
+        reservedLabelTops: const [axisUnitTop],
       );
     }
 
@@ -1178,30 +1181,35 @@ class DualCurveChartPainter extends CustomPainter {
   }
 
   /// Numeric labels for the secondary (right) axis in overlay mode.
+  ///
+  /// Labels that would collide with each other or with the unit labels at
+  /// [reservedLabelTops] are skipped (see [layoutRightAxisLabels]), so a
+  /// short chart shows fewer numbers instead of overlapping ones.
   void _drawRightValueLabels(
     Canvas canvas,
     Rect plotRect, {
     required double maxValue,
     required double step,
     required Color color,
+    List<double> reservedLabelTops = const [],
   }) {
-    if (maxValue <= 0 || step <= 0) {
-      return;
-    }
-
     final tickStyle = TextStyle(
       color: color.withValues(alpha: 0.95),
       fontSize: 9,
       fontWeight: FontWeight.w500,
     );
 
-    for (var value = step; value < maxValue - 0.001; value += step) {
-      final y = plotRect.bottom - (value / maxValue) * plotRect.height;
-      final labelY = y <= plotRect.top + 1 ? y + 3 : y - 7;
+    for (final label in layoutRightAxisLabels(
+      plotTop: plotRect.top,
+      plotBottom: plotRect.bottom,
+      maxValue: maxValue,
+      step: step,
+      reservedLabelTops: reservedLabelTops,
+    )) {
       _paintText(
         canvas,
-        _formatGridValue(value),
-        Offset(plotRect.right + 4, labelY),
+        _formatGridValue(label.value),
+        Offset(plotRect.right + 4, label.top),
         tickStyle,
         maxWidth: rightPad - 4,
         align: TextAlign.left,
@@ -1859,4 +1867,63 @@ double _snapAxisMax(
 }) {
   final snapped = math.max(minimum, (value / step).ceil() * step);
   return snapped;
+}
+
+/// A secondary-axis tick label: [value] drawn with its top edge at [top].
+@immutable
+class RightAxisLabel {
+  const RightAxisLabel(this.value, this.top);
+
+  final double value;
+  final double top;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RightAxisLabel && other.value == value && other.top == top;
+
+  @override
+  int get hashCode => Object.hash(value, top);
+
+  @override
+  String toString() => 'RightAxisLabel($value @ $top)';
+}
+
+/// Lays out right-axis tick labels between [plotTop] and [plotBottom] for
+/// values `step, 2·step, … < maxValue`, dropping any label whose box would
+/// come within [minGap] px of an already placed label or of a reserved label
+/// (e.g. the "g" / "g/s" unit captions) whose top is in [reservedLabelTops].
+///
+/// Labels are placed bottom-up so the low, most-used values win on a short
+/// chart.
+@visibleForTesting
+List<RightAxisLabel> layoutRightAxisLabels({
+  required double plotTop,
+  required double plotBottom,
+  required double maxValue,
+  required double step,
+  List<double> reservedLabelTops = const [],
+  double minGap = 11,
+}) {
+  final height = plotBottom - plotTop;
+  if (maxValue <= 0 || step <= 0 || height <= 0) {
+    return const [];
+  }
+  final placed = <RightAxisLabel>[];
+  bool collides(double top) {
+    for (final reserved in reservedLabelTops) {
+      if ((top - reserved).abs() < minGap) return true;
+    }
+    for (final label in placed) {
+      if ((top - label.top).abs() < minGap) return true;
+    }
+    return false;
+  }
+
+  for (var value = step; value < maxValue - 0.001; value += step) {
+    final y = plotBottom - (value / maxValue) * height;
+    final top = y <= plotTop + 1 ? y + 3 : y - 7;
+    if (collides(top)) continue;
+    placed.add(RightAxisLabel(value, top));
+  }
+  return placed;
 }
