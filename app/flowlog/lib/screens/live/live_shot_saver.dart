@@ -36,6 +36,7 @@ class LiveShotSaver {
     required this.resolveOnShotSaved,
     required this.resolveShotEvents,
     required this.onStateChanged,
+    this.resolveIsDemoSession,
   });
 
   final LiveRepositories repositories;
@@ -53,6 +54,14 @@ class LiveShotSaver {
 
   /// Called where Live must rebuild (save started/finished).
   final VoidCallback onStateChanged;
+
+  /// True when the current session is a demo/replay ("Try demo shot").
+  /// Demo sessions are never persisted to history (and so never synced to
+  /// Nextcloud).
+  final bool Function()? resolveIsDemoSession;
+
+  /// Whether the current session is a demo that must not be saved.
+  bool get isDemoSession => resolveIsDemoSession?.call() ?? false;
 
   bool _saving = false;
   bool _savedCurrent = false;
@@ -80,7 +89,8 @@ class LiveShotSaver {
     if (controller == null ||
         !controller.canSaveShot ||
         _saving ||
-        _savedCurrent) {
+        _savedCurrent ||
+        isDemoSession) {
       return;
     }
 
@@ -169,7 +179,10 @@ class LiveShotSaver {
   /// Manual "Save shot" for a stopped session that was not auto-saved.
   Future<void> saveCurrentSession(BuildContext context) async {
     final controller = resolveController();
-    if (controller == null || !controller.canSaveShot || _savedCurrent) {
+    if (controller == null ||
+        !controller.canSaveShot ||
+        _savedCurrent ||
+        isDemoSession) {
       return;
     }
     await autoSaveStoppedSession(context);
