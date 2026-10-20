@@ -7,6 +7,8 @@ import 'package:flowlog/screens/live/metadata_sheet.dart';
 import 'package:flowlog/screens/live/metrics_row.dart';
 import 'package:flowlog/screens/live/save_shot.dart';
 import 'package:flowlog/screens/live_screen.dart';
+import 'package:flowlog/sensors/live_sensor_source.dart';
+import 'package:flowlog/sensors/sensor_hub.dart';
 import 'package:flowlog/settings/brew_defaults_store.dart';
 import 'package:flowlog/settings/coffeejack_settings_store.dart';
 import 'package:flowlog/settings/brew_location_store.dart';
@@ -271,6 +273,45 @@ void main() {
       expect(loaded, savedShot);
     });
 
+    testWidgets('demo shots are not saved to history or synced', (
+      tester,
+    ) async {
+      final hub = SensorHub();
+      addTearDown(hub.dispose);
+      final source = LiveSensorSource(hub: hub)..enterDemoMode();
+      Shot? savedShot;
+      final harness = await _pumpLiveScreen(
+        tester,
+        repository: repository,
+        beanRepository: beanRepository,
+        onShotSaved: (shot) => savedShot = shot,
+        shotIdGenerator: () => 'shot-demo-test',
+        sensorSource: source,
+      );
+
+      await _startSession(tester, harness.controller);
+      await tester.runAsync(() async {
+        await harness.controller.stop();
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(harness.controller.canSaveShot, isTrue);
+      expect(savedShot, isNull);
+      // Nothing persisted, so the (database-driven) Nextcloud sync has
+      // nothing to upload either.
+      expect(await repository.getShotWithSamples('shot-demo-test'), isNull);
+      expect(await repository.listShots(), isEmpty);
+      expect(find.byKey(const Key('brew_complete_overlay')), findsNothing);
+
+      // Dismissing demo mode afterwards must not make the demo saveable.
+      source.exitDemoMode();
+      await tester.pump();
+      expect(find.text('Save shot'), findsNothing);
+      expect(await repository.listShots(), isEmpty);
+    });
+
     testWidgets('add notes opens metadata sheet and updates saved shot', (
       tester,
     ) async {
@@ -437,6 +478,7 @@ Future<_LiveHarness> _pumpLiveScreen(
   ShotIdGenerator shotIdGenerator = generateShotId,
   BrewLocationStore? brewLocationStore,
   BrewGpsCapture? brewGpsCapture,
+  LiveSensorSource? sensorSource,
 }) async {
   final scaleTransport = MockDecentScaleTransport();
   final scaleAdapter = DecentScaleBleAdapter(transport: scaleTransport);
@@ -461,6 +503,7 @@ Future<_LiveHarness> _pumpLiveScreen(
     MaterialApp(
       home: LiveScreen(
         controller: controller,
+        sensorSource: sensorSource,
         shotRepository: repository,
         beanRepository: beanRepository,
         onShotSaved: onShotSaved,

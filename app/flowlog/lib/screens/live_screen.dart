@@ -199,6 +199,7 @@ class _LiveScreenState extends State<LiveScreen> {
       resolveOnShotSaved: () => widget.onShotSaved,
       resolveShotEvents: () => _shotEventsNotifier,
       onStateChanged: _rebuild,
+      resolveIsDemoSession: () => _sessionIsDemo,
     );
 
     if (widget.controller != null) {
@@ -442,6 +443,11 @@ class _LiveScreenState extends State<LiveScreen> {
 
   Timer? _demoEndTimer;
 
+  /// Whether the session currently recording / last recorded is a demo
+  /// replay. Captured when the brew starts so dismissing the demo banner
+  /// afterwards cannot make the demo samples saveable.
+  bool _sessionIsDemo = false;
+
   /// Ends the demo brew shortly after the fixture's last sample, the way a
   /// real shot auto-stops once the pump is off.
   void _onDemoReplayComplete() {
@@ -508,6 +514,7 @@ class _LiveScreenState extends State<LiveScreen> {
       unawaited(_shotSaver.autoSaveStoppedSession(context));
     }
     if (brewing && !_wasBrewing) {
+      _sessionIsDemo = _sensorSource?.isDemoMode ?? false;
       _shotSaver.resetForNewSession();
       _yieldWarn.reset();
       _weightTracker.resetForNewBrew();
@@ -733,7 +740,8 @@ class _LiveScreenState extends State<LiveScreen> {
                       targetPressure: targetP,
                       hasTargetCurve: chartTargetSamples.isNotEmpty,
                       gamification: gamification,
-                      showSaveButton: !_shotSaver.savedCurrent,
+                      showSaveButton:
+                          !_shotSaver.savedCurrent && !_sessionIsDemo,
                       onRepeatShot: () => unawaited(_onRepeatShotPressed()),
                       onSaveShot: () =>
                           unawaited(_shotSaver.saveCurrentSession(context)),
