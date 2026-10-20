@@ -161,10 +161,14 @@ class LiveYieldProgress extends StatelessWidget {
             : atWarn
                 ? cs.secondary
                 : cs.primary;
+    // cs.secondary is espresso brown in dark mode and crema in light mode:
+    // both are low contrast as text on the surface, so warn-state text uses
+    // the readable on-container accent instead (crema / espresso).
+    final warnTextColor = cs.onSecondaryContainer;
     final digitColor = streamSilent
         ? cs.error
         : atWarn
-            ? cs.secondary
+            ? warnTextColor
             : cs.onSurface;
     final weightText = weight != null
         ? '${weight.toStringAsFixed(1)} g'
@@ -343,7 +347,7 @@ class LiveYieldProgress extends StatelessWidget {
                 'warn ${warn.toStringAsFixed(0)} g',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.labelSmall?.copyWith(
-                  color: cs.secondary,
+                  color: warnTextColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),

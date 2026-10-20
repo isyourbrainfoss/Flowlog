@@ -1,5 +1,6 @@
 import 'package:flowlog/screens/live/live_pressure_bar.dart';
 import 'package:flowlog/screens/live/live_yield_bar.dart';
+import 'package:flowlog/theme/flowlog_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -206,5 +207,44 @@ void main() {
       expect(find.byKey(const Key('live_yield_warn_banner')), findsOneWidget);
       expect(find.textContaining('wind back'), findsOneWidget);
     });
+  });
+
+  group('LiveYieldProgress contrast', () {
+    double contrast(Color a, Color b) {
+      final la = a.computeLuminance();
+      final lb = b.computeLuminance();
+      final hi = la > lb ? la : lb;
+      final lo = la > lb ? lb : la;
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    for (final entry in {
+      'light': FlowlogTheme.cafeLight,
+      'dark': FlowlogTheme.coffeeDark,
+    }.entries) {
+      testWidgets('warn-state weight digit is readable (${entry.key})', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: entry.value,
+            home: const Scaffold(
+              body: LiveYieldProgress(
+                weightG: 33,
+                targetYieldG: 36,
+                warnAtG: 32,
+              ),
+            ),
+          ),
+        );
+        final digit = tester.widget<Text>(
+          find.byKey(const Key('live_yield_weight_digit')),
+        );
+        final color = digit.style!.color!;
+        final surface = entry.value.colorScheme.surface;
+        // WCAG AA for large text is 3:1; aim for normal-text 4.5:1.
+        expect(contrast(color, surface), greaterThanOrEqualTo(4.5));
+      });
+    }
   });
 }
