@@ -28,31 +28,46 @@ class TargetBrewScreen extends StatefulWidget {
 }
 
 class _TargetBrewScreenState extends State<TargetBrewScreen> {
-  late final TargetBrewController _targetBrewController;
-  late final bool _ownsController;
+  /// Fallback controller, only created when neither [widget] nor an
+  /// ancestor [TargetBrewScope] provides one (e.g. isolated tests).
+  TargetBrewController? _ownedController;
+
+  /// Controller this screen reads from and writes to. Must be the same one
+  /// Live listens to, otherwise picking/clearing a target here updates
+  /// Live but leaves this screen showing the old "Current target".
+  TargetBrewController? _boundController;
   ProfileRepository? _profileRepository;
   FlowlogDatabase? _database;
   bool _loading = true;
+  bool _loadStarted = false;
   String? _profileName;
 
+  TargetBrewController get _targetBrewController => _boundController!;
+
   @override
-  void initState() {
-    super.initState();
-    _ownsController = widget.targetBrewController == null;
-    _targetBrewController =
-        widget.targetBrewController ?? TargetBrewController(
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final effective =
+        widget.targetBrewController ??
+        TargetBrewScope.maybeOf(context) ??
+        (_ownedController ??= TargetBrewController(
           settingsStore: widget.settingsStore,
-        );
-    _targetBrewController.addListener(_syncFromController);
-    unawaited(_load());
+        ));
+    if (!identical(effective, _boundController)) {
+      _boundController?.removeListener(_syncFromController);
+      _boundController = effective..addListener(_syncFromController);
+      _profileName = effective.profileName;
+    }
+    if (!_loadStarted) {
+      _loadStarted = true;
+      unawaited(_load());
+    }
   }
 
   @override
   void dispose() {
-    _targetBrewController.removeListener(_syncFromController);
-    if (_ownsController) {
-      _targetBrewController.dispose();
-    }
+    _boundController?.removeListener(_syncFromController);
+    _ownedController?.dispose();
     super.dispose();
   }
 
@@ -85,11 +100,8 @@ class _TargetBrewScreenState extends State<TargetBrewScreen> {
     }
   }
 
-  TargetBrewController _effectiveController(BuildContext context) {
-    return widget.targetBrewController ??
-        TargetBrewScope.maybeOf(context) ??
-        _targetBrewController;
-  }
+  TargetBrewController _effectiveController(BuildContext context) =>
+      _targetBrewController;
 
   Future<void> _pickProfile() async {
     final repository = await _ensureProfileRepository();
@@ -108,10 +120,9 @@ class _TargetBrewScreenState extends State<TargetBrewScreen> {
     if (!mounted) {
       return;
     }
-    await _effectiveController(context).setProfile(
-      profile,
-      profileRepository: repository,
-    );
+    await _effectiveController(
+      context,
+    ).setProfile(profile, profileRepository: repository);
   }
 
   Future<void> _clearTarget() async {
@@ -147,8 +158,8 @@ class _TargetBrewScreenState extends State<TargetBrewScreen> {
                   'Your target brew appears as a dotted pressure line on the '
                   'Live tab at all times — even before you start recording.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Card(
