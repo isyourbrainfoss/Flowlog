@@ -58,8 +58,7 @@ class _MoreScreenState extends State<MoreScreen> {
       final existing = await repo.getShotById(shot.id);
       if (existing != null) {
         toSave = shot.copyWith(
-          id:
-              'shot-scale-${DateTime.now().toUtc().millisecondsSinceEpoch}-$imported',
+          id: 'shot-scale-${DateTime.now().toUtc().millisecondsSinceEpoch}-$imported',
           lastModifiedAt: DateTime.now().toUtc(),
         );
       } else {
@@ -150,6 +149,11 @@ class _MoreScreenState extends State<MoreScreen> {
                 : FlowlogChartPalette.coffee;
           },
         ),
+        const Divider(height: 24),
+        const _MoreSectionHeader(
+          key: Key('more_section_brewing'),
+          title: 'Brewing',
+        ),
         ListTile(
           key: const Key('more_brew_defaults_tile'),
           leading: const Icon(Icons.tune),
@@ -166,9 +170,8 @@ class _MoreScreenState extends State<MoreScreen> {
             final autoStart = AutoStartSettingsScope.maybeOfStatic(context);
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => BrewDefaultsScreen(
-                  autoStartController: autoStart,
-                ),
+                builder: (_) =>
+                    BrewDefaultsScreen(autoStartController: autoStart),
               ),
             );
           },
@@ -177,7 +180,9 @@ class _MoreScreenState extends State<MoreScreen> {
           key: const Key('more_equipment_tile'),
           leading: const Icon(Icons.build),
           title: const Text('Equipment'),
-          subtitle: const Text('Manage grinders, screens, baskets, scales & brewers + presets'),
+          subtitle: const Text(
+            'Manage grinders, screens, baskets, scales & brewers + presets',
+          ),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
             Navigator.of(context).push(
@@ -189,9 +194,7 @@ class _MoreScreenState extends State<MoreScreen> {
           key: const Key('more_target_brew_tile'),
           leading: const Icon(Icons.timeline),
           title: const Text('Target brew'),
-          subtitle: const Text(
-            'Dotted pressure line always shown on Live',
-          ),
+          subtitle: const Text('Dotted pressure line always shown on Live'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
             Navigator.of(context).push(
@@ -212,6 +215,68 @@ class _MoreScreenState extends State<MoreScreen> {
           ),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => unawaited(_openBrewLocationScreen()),
+        ),
+        const _MoreSectionHeader(
+          key: Key('more_section_sensors'),
+          title: 'Sensors & scale',
+        ),
+        ListTile(
+          key: const Key('more_sensors_tile'),
+          leading: const Icon(Icons.sensors),
+          title: const Text('Sensors'),
+          subtitle: const Text('Pair Pressensor and scale'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => Scaffold(
+                  appBar: AppBar(title: const Text('Sensors')),
+                  body: const SensorsScreen(),
+                ),
+              ),
+            );
+          },
+        ),
+        ListTile(
+          key: const Key('more_scale_settings_tile'),
+          leading: const Icon(Icons.tune),
+          title: const Text('Scale display'),
+          subtitle: const Text(
+            'Target / warn weight and pressure bar range on the DIY scale',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => Scaffold(
+                  appBar: AppBar(title: const Text('Scale display')),
+                  body: const ScaleSettingsScreen(),
+                ),
+              ),
+            );
+          },
+        ),
+        ListTile(
+          key: const Key('more_import_scale_tile'),
+          leading: const Icon(Icons.scale_outlined),
+          title: const Text('Import from scale'),
+          subtitle: const Text(
+            'Last 3 phone-free shots — Wi‑Fi IP or Bluetooth',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => unawaited(_importFromScale()),
+        ),
+        ListTile(
+          key: const Key('more_diagnostics_tile'),
+          leading: const Icon(Icons.bug_report_outlined),
+          title: const Text('Sensor diagnostics'),
+          subtitle: const Text('RSSI, reconnect log, last error'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => openSensorDiagnosticsScreen(context),
+        ),
+        const _MoreSectionHeader(
+          key: Key('more_section_data'),
+          title: 'Data & sync',
         ),
         ListTile(
           leading: const Icon(Icons.cloud_sync),
@@ -234,60 +299,7 @@ class _MoreScreenState extends State<MoreScreen> {
           trailing: const Icon(Icons.chevron_right),
           onTap: () => openExportScreen(context),
         ),
-        ListTile(
-          key: const Key('more_import_scale_tile'),
-          leading: const Icon(Icons.scale_outlined),
-          title: const Text('Import from scale'),
-          subtitle: const Text(
-            'Last 3 phone-free shots — Wi‑Fi IP or Bluetooth',
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => unawaited(_importFromScale()),
-        ),
-        ListTile(
-          key: const Key('more_scale_settings_tile'),
-          leading: const Icon(Icons.tune),
-          title: const Text('Scale display'),
-          subtitle: const Text(
-            'Target / warn weight and pressure bar range on the DIY scale',
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (context) => Scaffold(
-                  appBar: AppBar(title: const Text('Scale display')),
-                  body: const ScaleSettingsScreen(),
-                ),
-              ),
-            );
-          },
-        ),
-        ListTile(
-          key: const Key('more_sensors_tile'),
-          leading: const Icon(Icons.sensors),
-          title: const Text('Sensors'),
-          subtitle: const Text('Pair Pressensor and scale'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (context) => Scaffold(
-                  appBar: AppBar(title: const Text('Sensors')),
-                  body: const SensorsScreen(),
-                ),
-              ),
-            );
-          },
-        ),
-        ListTile(
-          key: const Key('more_diagnostics_tile'),
-          leading: const Icon(Icons.bug_report_outlined),
-          title: const Text('Sensor diagnostics'),
-          subtitle: const Text('RSSI, reconnect log, last error'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => openSensorDiagnosticsScreen(context),
-        ),
+        const _MoreSectionHeader(key: Key('more_section_app'), title: 'App'),
         ListTile(
           key: const Key('more_about_tile'),
           leading: const Icon(Icons.info_outline),
@@ -297,6 +309,32 @@ class _MoreScreenState extends State<MoreScreen> {
           onTap: () => openAboutScreen(context),
         ),
       ],
+    );
+  }
+}
+
+/// Small section label so the More list scans as groups instead of one long
+/// run of similar-looking rows.
+class _MoreSectionHeader extends StatelessWidget {
+  const _MoreSectionHeader({super.key, required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      header: true,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+        child: Text(
+          title,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
     );
   }
 }

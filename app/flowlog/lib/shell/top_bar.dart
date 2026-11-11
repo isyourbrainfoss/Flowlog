@@ -48,81 +48,53 @@ class FlowlogTopBar extends StatelessWidget implements PreferredSizeWidget {
       color: colorScheme.surface,
       child: SafeArea(
         bottom: false,
-        child: SizedBox(
-          height: kToolbarHeight,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    key: const Key('top_bar_bean_name'),
-                    onTap: () => _showBeanNameDialog(context),
-                    borderRadius: BorderRadius.circular(
-                      FlowlogColors.cardRadius,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 8,
-                        horizontal: 4,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.coffee_outlined,
-                            size: 20,
-                            color: colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              beanName.isEmpty ? 'Select bean' : beanName,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: beanName.isEmpty
-                                    ? colorScheme.onSurfaceVariant
-                                    : colorScheme.onSurface,
-                                fontWeight: FontWeight.w600,
-                                fontStyle: beanName.isEmpty
-                                    ? FontStyle.italic
-                                    : null,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.edit_outlined,
-                            size: 16,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Captions next to the sensor icons need ~360 dp; below that
+            // (split screen, tiny windows) fall back to icon + tooltip.
+            final showCaptions = constraints.maxWidth >= 360;
+            return SizedBox(
+              height: kToolbarHeight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: _BeanStepButton(
+                          beanName: beanName,
+                          onTap: () => _showBeanNameDialog(context),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    SensorConnectionIcon(
+                      key: const Key('top_bar_prs_status'),
+                      label: 'Pressensor PRS',
+                      shortLabel: showCaptions ? 'Pressure' : null,
+                      icon: isPressensorLowBattery(pressensorBatteryPercent)
+                          ? Icons.battery_alert
+                          : Icons.speed,
+                      state: pressensorState,
+                      batteryPercent: pressensorBatteryPercent,
+                      onTap: () => _openSensorsScreen(context),
+                    ),
+                    const SizedBox(width: 4),
+                    SensorConnectionIcon(
+                      key: const Key('top_bar_scale_status'),
+                      label: 'Decent Scale',
+                      shortLabel: showCaptions ? 'Scale' : null,
+                      icon: Icons.scale,
+                      state: scaleState,
+                      warning: scaleStreamSilent,
+                      onTap: () => _openSensorsScreen(context),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                SensorConnectionIcon(
-                  key: const Key('top_bar_prs_status'),
-                  label: 'Pressensor PRS',
-                  icon: isPressensorLowBattery(pressensorBatteryPercent)
-                      ? Icons.battery_alert
-                      : Icons.speed,
-                  state: pressensorState,
-                  batteryPercent: pressensorBatteryPercent,
-                  onTap: () => _openSensorsScreen(context),
-                ),
-                const SizedBox(width: 4),
-                SensorConnectionIcon(
-                  key: const Key('top_bar_scale_status'),
-                  label: 'Decent Scale',
-                  icon: Icons.scale,
-                  state: scaleState,
-                  warning: scaleStreamSilent,
-                  onTap: () => _openSensorsScreen(context),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -297,19 +269,109 @@ class _BeanNameEditDialogState extends State<_BeanNameEditDialog> {
   }
 }
 
-/// Compact top-bar icon indicating sensor [ConnectionState].
+/// Top-bar bean control. With no active bean it reads as a clear, optional
+/// first step ("Select bean · optional") rather than greyed-out italic text;
+/// with a bean it shows the name with an edit affordance.
+class _BeanStepButton extends StatelessWidget {
+  const _BeanStepButton({required this.beanName, required this.onTap});
+
+  final String beanName;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final empty = beanName.isEmpty;
+
+    return Semantics(
+      button: true,
+      label: empty ? 'Select bean, optional' : 'Active bean: $beanName, edit',
+      excludeSemantics: true,
+      child: InkWell(
+        key: const Key('top_bar_bean_name'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(FlowlogColors.cardRadius),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 40),
+          padding: EdgeInsets.symmetric(
+            vertical: 6,
+            horizontal: empty ? 10 : 4,
+          ),
+          decoration: empty
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(FlowlogColors.cardRadius),
+                  border: Border.all(
+                    color: colorScheme.primary.withValues(alpha: 0.7),
+                  ),
+                )
+              : null,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                empty ? Icons.add_circle_outline : Icons.coffee_outlined,
+                size: 20,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                flex: 3,
+                child: Text(
+                  empty ? 'Select bean' : beanName,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: empty ? colorScheme.primary : colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
+              if (empty)
+                Flexible(
+                  child: Text(
+                    'optional',
+                    key: const Key('top_bar_bean_optional'),
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else
+                Icon(
+                  Icons.edit_outlined,
+                  size: 16,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Top-bar sensor button indicating [ConnectionState], with a short caption.
 class SensorConnectionIcon extends StatelessWidget {
   const SensorConnectionIcon({
     super.key,
     required this.label,
     required this.icon,
     required this.state,
+    this.shortLabel,
     this.batteryPercent,
     this.warning = false,
     this.onTap,
   });
 
   final String label;
+
+  /// Visible one-word caption next to the icon, so the button's purpose is
+  /// readable on a phone where tooltips need a long-press.
+  final String? shortLabel;
   final IconData icon;
   final ConnectionState state;
   final int? batteryPercent;
@@ -334,7 +396,21 @@ class SensorConnectionIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(FlowlogColors.cardRadius),
         border: Border.all(color: scheme.outline.withValues(alpha: 0.4)),
       ),
-      child: Icon(icon, size: 20, color: color),
+      child: shortLabel == null
+          ? Icon(icon, size: 20, color: color)
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 18, color: color),
+                const SizedBox(width: 4),
+                Text(
+                  shortLabel!,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelMedium?.copyWith(color: color),
+                ),
+              ],
+            ),
     );
 
     final battery = batteryPercent;
