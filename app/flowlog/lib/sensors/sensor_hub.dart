@@ -106,6 +106,29 @@ class SensorHub extends ChangeNotifier {
   bool _rssiReadInFlight = false;
   bool _disposed = false;
 
+  /// Bumped on every [connect]/[disconnect] for a device id. An in-flight
+  /// connect that is superseded (newer connect, user disconnect, removal,
+  /// dispose) must not register its adapter or overwrite state/subscriptions
+  /// owned by the newer attempt.
+  final Map<String, int> _connectGeneration = {};
+
+  int _bumpConnectGeneration(String id) {
+    final next = (_connectGeneration[id] ?? 0) + 1;
+    _connectGeneration[id] = next;
+    return next;
+  }
+
+  bool _isCurrentConnect(String id, int generation) =>
+      !_disposed && _connectGeneration[id] == generation;
+
+  Future<void> _discardAdapter(SensorAdapter adapter) async {
+    try {
+      await adapter.disconnect().timeout(const Duration(seconds: 3));
+    } on Object {
+      // Best effort: the attempt was superseded.
+    }
+  }
+
   /// When false, silent-scale recovery must not disconnect/reconnect.
   /// Live turns this off for the duration of a brew so a brief FFF4 gap
   /// cannot freeze the DIY scale or drop the pressensor on the same radio.
@@ -750,6 +773,7 @@ class SensorHub extends ChangeNotifier {
       return;
     }
 
+    final generation = _bumpConnectGeneration(id);
     final device = _devices[index];
     _devices[index] = device.copyWith(state: ConnectionState.connecting);
     // Keep any scan-time RSSI until the first live read replaces it.
@@ -763,32 +787,44 @@ class SensorHub extends ChangeNotifier {
     notifyListeners();
 
     final readyError = await _bleBackend.ensureReady();
+    if (!_isCurrentConnect(id, generation)) {
+      return;
+    }
     if (readyError != null) {
-      await _failConnect(index, device, readyError);
+      await _failConnect(device, readyError);
       return;
     }
 
     final bleRemoteId = device.bleRemoteId;
     if (bleRemoteId == null || bleRemoteId.isEmpty) {
       await _failConnect(
-        index,
         device,
         'Scan for this sensor first to assign its BLE device id.',
       );
       return;
     }
 
+    SensorAdapter? created;
     try {
       await _teardownAdapter(id);
+      if (!_isCurrentConnect(id, generation)) {
+        return;
+      }
 
       final adapter = await _bleBackend.createAdapter(
         kind: device.kind,
         bleRemoteId: bleRemoteId,
       );
+      created = adapter;
+      if (!_isCurrentConnect(id, generation)) {
+        await _discardAdapter(adapter);
+        return;
+      }
       _activeAdapters[id] = adapter;
       if (adapter is DecentScaleBleAdapter) {
         adapter.allowHardRecovery = _scaleRecoveryEnabled;
       }
+      unawaited(_adapterStateSubs.remove(id)?.cancel());
       _adapterStateSubs[id] = adapter.state.listen((state) {
         _onAdapterStateChanged(id, state);
       });
@@ -802,6 +838,13 @@ class SensorHub extends ChangeNotifier {
           );
         },
       );
+      if (!_isCurrentConnect(id, generation)) {
+        // A newer attempt / disconnect already tore this adapter down.
+        if (!identical(_activeAdapters[id], adapter)) {
+          await _discardAdapter(adapter);
+        }
+        return;
+      }
       if (device.kind == SensorKind.pressensor &&
           adapter is PressensorBleAdapter) {
         _batteryByDevice[id] = adapter.batteryPercent;
@@ -829,23 +872,29 @@ class SensorHub extends ChangeNotifier {
       _ensureRssiPolling();
       unawaited(refreshRssi());
     } on Object catch (error) {
+      if (!_isCurrentConnect(id, generation)) {
+        // Superseded: never fail/tear down the newer attempt's adapter.
+        final stale = created;
+        if (stale != null && !identical(_activeAdapters[id], stale)) {
+          await _discardAdapter(stale);
+        }
+        return;
+      }
       final message = 'BLE connect failed: $error';
-      final currentIndex = _devices.indexWhere((entry) => entry.id == id);
-      await _failConnect(
-        currentIndex >= 0 ? currentIndex : index,
-        device,
-        message,
-      );
+      await _failConnect(device, message);
       await _teardownAdapter(id);
     }
   }
 
-  Future<void> _failConnect(
-    int index,
-    PairedSensorEntry device,
-    String message,
-  ) async {
-    _devices[index] = device.copyWith(state: ConnectionState.disconnected);
+  Future<void> _failConnect(PairedSensorEntry device, String message) async {
+    // Look the device up again: it may have been removed or reordered while
+    // the connect attempt was awaiting.
+    final index = _devices.indexWhere((entry) => entry.id == device.id);
+    if (index >= 0) {
+      _devices[index] = _devices[index].copyWith(
+        state: ConnectionState.disconnected,
+      );
+    }
     setLastError(message);
     recordReconnect(
       deviceId: device.id,
@@ -897,6 +946,7 @@ class SensorHub extends ChangeNotifier {
   }
 
   Future<void> disconnect(String id) async {
+    _bumpConnectGeneration(id);
     await _teardownAdapter(id);
 
     final index = _devices.indexWhere((device) => device.id == id);
