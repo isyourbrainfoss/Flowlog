@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/persistence/atomic_file.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 
 /// Persisted default target brew profile reference.
@@ -61,7 +62,8 @@ class TargetBrewSettingsStore {
   Future<void> save(TargetBrewSettings settings) async {
     final file = File(await _resolveSettingsPath());
     await file.parent.create(recursive: true);
-    await file.writeAsString(
+    await writeStringAtomically(
+      file,
       const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
         if (settings.profileId != null) 'profileId': settings.profileId,
         if (settings.profileName != null) 'profileName': settings.profileName,

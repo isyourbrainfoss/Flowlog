@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/persistence/atomic_file.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 
 /// Categories for user equipment.
@@ -188,7 +189,7 @@ class EquipmentStore {
     final path = await _effectivePath();
     final file = File(path);
     await file.parent.create(recursive: true);
-    await file.writeAsString(jsonEncode({
+    await writeStringAtomically(file, jsonEncode({
       'items': settings.items.map((e) => e.toJson()).toList(),
       'presets': settings.presets.map((e) => e.toJson()).toList(),
       if (settings.defaultPresetId != null) 'defaultPresetId': settings.defaultPresetId,

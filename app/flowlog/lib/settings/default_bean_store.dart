@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/persistence/atomic_file.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 
 /// Top-bar default bean, independent of the last shot's bean.
@@ -46,7 +47,8 @@ class DefaultBeanStore {
   Future<void> save(DefaultBean bean) async {
     final file = File(await _resolveSettingsPath());
     await file.parent.create(recursive: true);
-    await file.writeAsString(
+    await writeStringAtomically(
+      file,
       const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
         'beanId': bean.beanId,
         'name': bean.name,

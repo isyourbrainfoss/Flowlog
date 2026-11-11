@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/persistence/atomic_file.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -122,7 +123,8 @@ class NextcloudSettingsStore {
   Future<void> saveSettings(NextcloudSettings settings) async {
     final file = File(await _resolveSettingsPath());
     await file.parent.create(recursive: true);
-    await file.writeAsString(
+    await writeStringAtomically(
+      file,
       const JsonEncoder.withIndent('  ').convert(settings.toJson()),
     );
   }
@@ -163,7 +165,8 @@ class NextcloudSettingsStore {
 
     final file = File(await _resolveCredentialsPath());
     await file.parent.create(recursive: true);
-    await file.writeAsString(
+    await writeStringAtomically(
+      file,
       const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
         'password': password,
       }),

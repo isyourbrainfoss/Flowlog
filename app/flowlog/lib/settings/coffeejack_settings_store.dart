@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/persistence/atomic_file.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 
 /// Default lever turns wound back before filling the boiler.
@@ -78,7 +79,8 @@ class CoffeejackSettingsStore {
   Future<void> save(CoffeejackSettings settings) async {
     final file = File(await _resolveSettingsPath());
     await file.parent.create(recursive: true);
-    await file.writeAsString(
+    await writeStringAtomically(
+      file,
       const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
         'rewindTurnsBeforeFill': settings.rewindTurnsBeforeFill,
         'slowPreinfusionTurns': settings.slowPreinfusionTurns,

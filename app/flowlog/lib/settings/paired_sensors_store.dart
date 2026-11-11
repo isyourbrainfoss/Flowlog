@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/persistence/atomic_file.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/sensors/sensor_kind.dart';
 
@@ -77,7 +78,8 @@ class PairedSensorsStore {
   Future<void> save(List<PairedSensorRecord> devices) async {
     final file = File(await _resolveSettingsPath());
     await file.parent.create(recursive: true);
-    await file.writeAsString(
+    await writeStringAtomically(
+      file,
       const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
         'devices': devices.map((device) => device.toJson()).toList(),
       }),
