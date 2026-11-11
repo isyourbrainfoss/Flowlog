@@ -22,6 +22,38 @@ Future<void> _scrollToMoreTile(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  testWidgets('More list is grouped under section headers', (tester) async {
+    await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
+    await tester.pumpAndSettle();
+
+    await _openMoreTab(tester);
+
+    expect(find.byKey(const Key('more_section_brewing')), findsOneWidget);
+    final brewingTop = tester
+        .getTopLeft(find.byKey(const Key('more_section_brewing')))
+        .dy;
+    final brewDefaultsTop = tester
+        .getTopLeft(find.byKey(const Key('more_brew_defaults_tile')))
+        .dy;
+    expect(brewDefaultsTop, greaterThan(brewingTop));
+
+    await _scrollToMoreTile(
+      tester,
+      find.byKey(const Key('more_section_sensors')),
+    );
+    expect(find.text('Sensors & scale'), findsOneWidget);
+    await _scrollToMoreTile(tester, find.byKey(const Key('more_section_data')));
+    expect(find.text('Data & sync'), findsOneWidget);
+    await _scrollToMoreTile(tester, find.byKey(const Key('more_section_app')));
+    await _scrollToMoreTile(tester, find.byKey(const Key('more_about_tile')));
+    expect(
+      tester.getTopLeft(find.byKey(const Key('more_about_tile'))).dy,
+      greaterThan(
+        tester.getTopLeft(find.byKey(const Key('more_section_app'))).dy,
+      ),
+    );
+  });
+
   testWidgets('More tab shows Sensors section', (tester) async {
     await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
     await tester.pumpAndSettle();
@@ -63,7 +95,9 @@ void main() {
     expect(find.byType(SensorsScreen), findsOneWidget);
   });
 
-  testWidgets('Diagnostics section navigates to diagnostics screen', (tester) async {
+  testWidgets('Diagnostics section navigates to diagnostics screen', (
+    tester,
+  ) async {
     await tester.pumpWidget(const FlowlogApp(autoReconnectSensors: false));
     await tester.pumpAndSettle();
 

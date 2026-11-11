@@ -93,8 +93,7 @@ void main() {
       WidgetTester tester, {
       ChartInteractionController? controller,
     }) async {
-      final interactionController =
-          controller ?? ChartInteractionController();
+      final interactionController = controller ?? ChartInteractionController();
 
       await tester.pumpWidget(
         MaterialApp(
@@ -123,6 +122,17 @@ void main() {
       expect(find.text('Flow'), findsOneWidget);
     });
 
+    testWidgets('view mode chips have phone-size tap targets', (tester) async {
+      await pumpChart(tester, controller: ChartInteractionController());
+
+      for (final mode in ChartViewMode.values) {
+        final size = tester.getSize(
+          find.byKey(Key('chart_view_mode_${mode.name}')),
+        );
+        expect(size.height, greaterThanOrEqualTo(48), reason: mode.name);
+      }
+    });
+
     testWidgets('enum toggle switches to split panels', (tester) async {
       final controller = ChartInteractionController();
       await pumpChart(tester, controller: controller);
@@ -143,7 +153,9 @@ void main() {
       );
     });
 
-    testWidgets('flow-only mode hides pressure and weight legend', (tester) async {
+    testWidgets('flow-only mode hides pressure and weight legend', (
+      tester,
+    ) async {
       final controller = ChartInteractionController();
       await pumpChart(tester, controller: controller);
 
@@ -207,15 +219,16 @@ void main() {
       );
       await tester.pump();
 
-      expect(
-        controller.viewport.visibleDurationMs,
-        lessThan(initialDuration),
-      );
+      expect(controller.viewport.visibleDurationMs, lessThan(initialDuration));
     });
 
     test('fitFullShot disables live follow and shows full duration', () {
       final controller = ChartInteractionController();
-      controller.syncTotalDuration(40000, followEndWhenZoomedOut: true, liveProgressMs: 40000);
+      controller.syncTotalDuration(
+        40000,
+        followEndWhenZoomedOut: true,
+        liveProgressMs: 40000,
+      );
       expect(controller.followLive, isTrue);
       expect(controller.viewport.visibleDurationMs, lessThan(40000));
 

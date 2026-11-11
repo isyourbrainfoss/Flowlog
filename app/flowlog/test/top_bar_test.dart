@@ -300,8 +300,24 @@ void main() {
 
       expect(find.byType(FlowlogTopBar), findsOneWidget);
       expect(find.text('Select bean'), findsOneWidget);
+      expect(find.byKey(const Key('top_bar_bean_optional')), findsOneWidget);
       expect(find.byKey(const Key('top_bar_prs_status')), findsOneWidget);
       expect(find.byKey(const Key('top_bar_scale_status')), findsOneWidget);
+      // Sensor buttons carry visible captions, not just icons.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('top_bar_prs_status')),
+          matching: find.text('Pressure'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('top_bar_scale_status')),
+          matching: find.text('Scale'),
+        ),
+        findsOneWidget,
+      );
     });
   });
 }

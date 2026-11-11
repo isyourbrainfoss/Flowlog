@@ -874,20 +874,25 @@ class _ViewModePicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Full-size chips with a padded 48 dp tap target: these sit under the
+    // chart and are often tapped mid-brew, so compact chips were too easy
+    // to miss on a phone.
     return Wrap(
-      spacing: 4,
+      spacing: 8,
+      runSpacing: 4,
+      alignment: WrapAlignment.end,
       children: [
         for (final mode in ChartViewMode.values)
           ChoiceChip(
             key: Key('chart_view_mode_${mode.name}'),
             label: Text(
               _Legend._viewModeLabel(mode),
-              style: const TextStyle(fontSize: 11),
+              style: const TextStyle(fontSize: 14),
             ),
             selected: viewMode == mode,
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+            materialTapTargetSize: MaterialTapTargetSize.padded,
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
             onSelected: (selected) {
               if (selected) {
                 onModeSelected(mode);
@@ -1442,10 +1447,7 @@ class DualCurveChartPainter extends CustomPainter {
       RRect.fromRectAndRadius(plate, const Radius.circular(10)),
       Paint()..color = surfaceStyle.background,
     );
-    painter.paint(
-      canvas,
-      Offset(plate.left + 12, plate.top + 7),
-    );
+    painter.paint(canvas, Offset(plate.left + 12, plate.top + 7));
   }
 
   void _drawTargetPressure(Canvas canvas, Rect plotRect, _ChartScales scales) {
