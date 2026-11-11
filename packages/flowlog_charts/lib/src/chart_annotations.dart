@@ -84,5 +84,6 @@ void paintShotAnnotations(
 
     final labelX = (x + 6).clamp(plotRect.left, plotRect.right - labelPainter.width);
     labelPainter.paint(canvas, Offset(labelX, plotRect.top + 18));
+    labelPainter.dispose();
   }
 }
