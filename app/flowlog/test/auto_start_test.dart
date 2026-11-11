@@ -211,6 +211,14 @@ void main() {
       expect(idleDigit(tester), '—');
       expect(find.byKey(const Key('idle_sensor_pair')), findsOneWidget);
       expect(find.text('Pair sensor'), findsOneWidget);
+      // Unpaired is a setup step: a filled Pair action, not an error card.
+      expect(
+        find.ancestor(
+          of: find.text('Pair sensor'),
+          matching: find.byWidgetPredicate((w) => w is FilledButton),
+        ),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('idle_sensor_reconnect')), findsNothing);
       expect(find.text('Reconnect'), findsNothing);
     });

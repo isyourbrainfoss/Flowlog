@@ -79,7 +79,7 @@ void main() {
 
     final destinations = <(AppTab tab, Finder bodyFinder)>[
       (AppTab.live, find.text('Session: idle')),
-      (AppTab.history, find.byKey(const Key('history_filter_bean'))),
+      (AppTab.history, find.text('No saved shots yet')),
       (AppTab.library, find.byKey(const Key('library_tab_beans'))),
       (AppTab.more, find.byKey(const Key('more_brew_defaults_tile'))),
     ];
