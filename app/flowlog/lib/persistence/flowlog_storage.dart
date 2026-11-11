@@ -13,7 +13,9 @@ class FlowlogStorage {
   FlowlogStorage({
     Future<Directory> Function()? directoryProvider,
     this.migrateLegacy = true,
-  }) : _directoryProvider = directoryProvider ?? _defaultDirectoryProvider;
+    String? legacyDirectory,
+  }) : _directoryProvider = directoryProvider ?? _defaultDirectoryProvider,
+       _legacyDirectoryOverride = legacyDirectory;
 
   /// When false, skips one-time import from the old temp-directory store.
   final bool migrateLegacy;
@@ -31,6 +33,7 @@ class FlowlogStorage {
   }
 
   final Future<Directory> Function() _directoryProvider;
+  final String? _legacyDirectoryOverride;
   Future<String>? _rootPathFuture;
   FlowlogDatabase? _database;
   Future<FlowlogDatabase>? _databaseFuture;
@@ -97,7 +100,7 @@ class FlowlogStorage {
     }
     _migrated = true;
 
-    final legacyDir = Directory.systemTemp.path;
+    final legacyDir = _legacyDirectoryOverride ?? Directory.systemTemp.path;
     final targetDir = await rootPath();
     await Directory(targetDir).create(recursive: true);
 
@@ -116,7 +119,28 @@ class FlowlogStorage {
         await legacy.copy(target.path);
       }
     }
+
+    // Nextcloud settings + the legacy plaintext app password must not linger
+    // in the (on Linux, shared) temp dir once imported: otherwise they are
+    // re-imported on every launch, and "sign out" resurrects the account on
+    // the next start.
+    for (final name in _legacySecretFiles) {
+      final legacy = File(p.join(legacyDir, name));
+      final target = File(p.join(targetDir, name));
+      if (legacy.existsSync() && target.existsSync()) {
+        try {
+          await legacy.delete();
+        } on Object {
+          // Best effort; never block opening the database.
+        }
+      }
+    }
   }
+
+  static const _legacySecretFiles = <String>[
+    'flowlog_nextcloud_settings.json',
+    'flowlog_nextcloud_credentials.json',
+  ];
 }
 
 /// Opens the shared file-backed [FlowlogDatabase].
