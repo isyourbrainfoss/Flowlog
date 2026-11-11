@@ -1605,6 +1605,9 @@ class DualCurveChartPainter extends CustomPainter {
     }
 
     painter.paint(canvas, offset);
+    // Paint() runs per frame while brewing; free the native paragraph now
+    // instead of waiting for GC.
+    painter.dispose();
   }
 
   String _formatDuration(int elapsedMs) {

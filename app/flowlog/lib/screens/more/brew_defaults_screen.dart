@@ -116,16 +116,14 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
     await _brewDefaultsStore.save(updated);
   }
 
-  Future<void> _updateTargetYield(double grams) async {
-    final updated = _brewDefaults.copyWith(targetYieldG: grams);
+  /// Slider drag tick: update the UI only. The value is persisted once in
+  /// [_commitBrewDefaults] (onChangeEnd) instead of a disk write per tick.
+  void _previewBrewDefaults(BrewDefaultsSettings updated) {
     setState(() => _brewDefaults = updated);
-    await _brewDefaultsStore.save(updated);
   }
 
-  Future<void> _updateYieldWarnAt(double grams) async {
-    final updated = _brewDefaults.copyWith(yieldWarnAtG: grams);
-    setState(() => _brewDefaults = updated);
-    await _brewDefaultsStore.save(updated);
+  Future<void> _commitBrewDefaults() async {
+    await _brewDefaultsStore.save(_brewDefaults);
   }
 
   Future<void> _updateYieldAlertEnabled(bool enabled) async {
@@ -220,7 +218,10 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
                             .round(),
                         label:
                             '${_brewDefaults.pressureLimitBar!.toStringAsFixed(1)} bar',
-                        onChanged: _updatePressureLimit,
+                        onChanged: (bar) => _previewBrewDefaults(
+                          _brewDefaults.copyWith(pressureLimitBar: bar),
+                        ),
+                        onChangeEnd: (_) => _commitBrewDefaults(),
                       ),
                     ],
                     const SizedBox(height: 16),
@@ -272,7 +273,10 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
                       divisions: (kBrewYieldMaxG - kBrewYieldMinG).round(),
                       label:
                           '${_brewDefaults.targetYieldG.toStringAsFixed(0)} g',
-                      onChanged: _updateTargetYield,
+                      onChanged: (grams) => _previewBrewDefaults(
+                        _brewDefaults.copyWith(targetYieldG: grams),
+                      ),
+                      onChangeEnd: (_) => _commitBrewDefaults(),
                     ),
                     Text(
                       'Warn at: ${_brewDefaults.effectiveYieldWarnAtG.toStringAsFixed(0)} g '
@@ -290,7 +294,10 @@ class _BrewDefaultsScreenState extends State<BrewDefaultsScreen> {
                       divisions: (kBrewYieldMaxG - kBrewYieldMinG).round(),
                       label:
                           '${_brewDefaults.yieldWarnAtG.toStringAsFixed(0)} g',
-                      onChanged: _updateYieldWarnAt,
+                      onChanged: (grams) => _previewBrewDefaults(
+                        _brewDefaults.copyWith(yieldWarnAtG: grams),
+                      ),
+                      onChangeEnd: (_) => _commitBrewDefaults(),
                     ),
                     const SizedBox(height: 32),
                     Text(

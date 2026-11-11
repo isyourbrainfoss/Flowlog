@@ -48,7 +48,8 @@ Future<NextcloudSyncResult> nextcloudSync({
   required FlowlogDatabase database,
   WebDavTransport? client,
 }) async {
-  final transport = client ?? WebDavClient(credentials);
+  final ownedClient = client == null ? WebDavClient(credentials) : null;
+  final transport = client ?? ownedClient!;
   const syncConfig = SyncConfig(accountEnabled: true);
 
   try {
@@ -114,6 +115,10 @@ Future<NextcloudSyncResult> nextcloudSync({
       message: error.toString(),
       error: error.toString(),
     );
+  } finally {
+    // Each sync pass created its own client; close it so sockets do not
+    // accumulate across the many save/resume-triggered syncs.
+    ownedClient?.close();
   }
 }
 

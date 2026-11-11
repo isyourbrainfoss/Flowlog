@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/persistence/atomic_file.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog_core/flowlog_core.dart';
 
@@ -201,7 +202,8 @@ class BrewDefaultsSettingsStore {
   Future<void> save(BrewDefaultsSettings settings) async {
     final file = File(await _resolveSettingsPath());
     await file.parent.create(recursive: true);
-    await file.writeAsString(
+    await writeStringAtomically(
+      file,
       const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
         'defaultDoseG': settings.defaultDoseG,
         'defaultGrindSetting': settings.defaultGrindSetting,

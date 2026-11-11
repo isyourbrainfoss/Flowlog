@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/persistence/atomic_file.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 import 'package:flowlog/screens/live/auto_start.dart';
 
@@ -41,7 +42,8 @@ class AutoStartSettingsStore {
   Future<void> save(AutoStartSettings settings) async {
     final file = File(await _resolveSettingsPath());
     await file.parent.create(recursive: true);
-    await file.writeAsString(
+    await writeStringAtomically(
+      file,
       const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
         'enabled': settings.enabled,
         'startThresholdBar': settings.startThresholdBar,

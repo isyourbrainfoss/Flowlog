@@ -35,6 +35,70 @@ class _ReadyBleBackend extends BleConnectionBackend {
 }
 
 void main() {
+  group('SensorHub connect races', () {
+    test('a superseded connect that fails late does not tear down the newer '
+        'link', () async {
+      final backend = _ControlledConnectBackend();
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+      hub.addDevice(SensorKind.pressensor);
+      hub.assignBleRemoteId(
+        SensorKind.pressensor,
+        bleRemoteId: '11:22:33:44:55:66',
+        name: 'PRS-race',
+      );
+      final id = hub.devices.first.id;
+
+      final first = hub.connect(id);
+      await pumpEventQueue();
+      expect(backend.adapters, hasLength(1));
+
+      final second = hub.connect(id);
+      await pumpEventQueue();
+      expect(backend.adapters, hasLength(2));
+      backend.adapters[1].completeConnect();
+      await second;
+      expect(hub.devices.first.state, ConnectionState.connected);
+
+      // The stale first attempt now fails (e.g. its 18 s timeout).
+      backend.adapters[0].failConnect(StateError('stale link timed out'));
+      await first;
+
+      expect(hub.devices.first.state, ConnectionState.connected);
+      expect(
+        hub.activeAdapterFor(SensorKind.pressensor),
+        same(backend.adapters[1]),
+      );
+      expect(backend.adapters[1].disconnectCalls, 0);
+      expect(hub.lastError, isNull);
+    });
+
+    test('removing a device mid-connect does not leak its BLE link', () async {
+      final backend = _ControlledConnectBackend();
+      final hub = SensorHub(bleBackend: backend);
+      addTearDown(hub.dispose);
+      hub.addDevice(SensorKind.pressensor);
+      hub.assignBleRemoteId(
+        SensorKind.pressensor,
+        bleRemoteId: '11:22:33:44:55:66',
+        name: 'PRS-remove',
+      );
+      final id = hub.devices.first.id;
+
+      final pending = hub.connect(id);
+      await pumpEventQueue();
+      hub.removeDevice(id);
+      await pumpEventQueue();
+      backend.adapters.single.completeConnect();
+      await pending;
+      await pumpEventQueue();
+
+      expect(hub.devices, isEmpty);
+      expect(hub.activeAdapterFor(SensorKind.pressensor), isNull);
+      expect(backend.adapters.single.disconnectCalls, greaterThan(0));
+    });
+  });
+
   group('SensorHub diagnostics', () {
     test('connect records reconnect log and last error', () async {
       final hub = SensorHub(bleBackend: _ReadyBleBackend());
@@ -778,5 +842,59 @@ class _OrderedConnectBackend implements BleConnectionBackend {
         deviceId: bleRemoteId,
       ),
     };
+  }
+}
+
+class _ControlledConnectBackend implements BleConnectionBackend {
+  final adapters = <_ControlledAdapter>[];
+
+  @override
+  Future<String?> ensureReady() async => null;
+
+  @override
+  Future<List<BleDiscoveredDevice>> scan(
+    SensorKind kind, {
+    Duration timeout = const Duration(seconds: 8),
+    Future<void>? abort,
+  }) async => const [];
+
+  @override
+  Future<SensorAdapter> createAdapter({
+    required SensorKind kind,
+    required String bleRemoteId,
+  }) async {
+    final adapter = _ControlledAdapter();
+    adapters.add(adapter);
+    return adapter;
+  }
+}
+
+/// Adapter whose connect() completes only when the test says so (and is not
+/// failed by disconnect(), like a radio-level connect that times out later).
+class _ControlledAdapter implements SensorAdapter {
+  final _state = StreamController<ConnectionState>.broadcast();
+  final _samples = StreamController<SensorSample>.broadcast();
+  final _connect = Completer<void>();
+  int disconnectCalls = 0;
+
+  void completeConnect() {
+    _connect.complete();
+    _state.add(ConnectionState.connected);
+  }
+
+  void failConnect(Object error) => _connect.completeError(error);
+
+  @override
+  Stream<ConnectionState> get state => _state.stream;
+
+  @override
+  Stream<SensorSample> get samples => _samples.stream;
+
+  @override
+  Future<void> connect() => _connect.future;
+
+  @override
+  Future<void> disconnect() async {
+    disconnectCalls += 1;
   }
 }

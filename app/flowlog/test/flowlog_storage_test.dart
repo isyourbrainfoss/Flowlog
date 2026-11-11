@@ -86,5 +86,50 @@ void main() {
         }
       }
     });
+
+    test(
+      'imports legacy Nextcloud files once, then removes them from temp',
+      () async {
+        final legacyDir = await Directory.systemTemp.createTemp(
+          'flowlog_legacy_test_',
+        );
+        addTearDown(() async {
+          if (legacyDir.existsSync()) {
+            await legacyDir.delete(recursive: true);
+          }
+        });
+        final legacyCreds = File(
+          '${legacyDir.path}/flowlog_nextcloud_credentials.json',
+        );
+        final legacySettings = File(
+          '${legacyDir.path}/flowlog_nextcloud_settings.json',
+        );
+        await legacyCreds.writeAsString('{"password":"secret"}');
+        await legacySettings.writeAsString('{"enabled":true}');
+
+        final migrating = FlowlogStorage(
+          directoryProvider: () async => rootDir,
+          legacyDirectory: legacyDir.path,
+        );
+        FlowlogStorage.overrideForTesting(migrating);
+        await migrating.database();
+
+        expect(
+          await File(
+            await migrating.filePath('flowlog_nextcloud_credentials.json'),
+          ).readAsString(),
+          '{"password":"secret"}',
+        );
+        expect(
+          File(
+            await migrating.filePath('flowlog_nextcloud_settings.json'),
+          ).existsSync(),
+          isTrue,
+        );
+        // Plaintext secret and account settings no longer linger in temp.
+        expect(legacyCreds.existsSync(), isFalse);
+        expect(legacySettings.existsSync(), isFalse);
+      },
+    );
   });
 }

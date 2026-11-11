@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/persistence/atomic_file.dart';
 import 'package:flowlog/persistence/flowlog_storage.dart';
 
 /// Defaults aligned with espresso-scale firmware `config.h`.
@@ -95,7 +96,8 @@ class ScaleSettingsStore {
   Future<void> save(ScaleDisplaySettings settings) async {
     final file = File(await _resolvePath());
     await file.parent.create(recursive: true);
-    await file.writeAsString(
+    await writeStringAtomically(
+      file,
       const JsonEncoder.withIndent('  ').convert(settings.toJson()),
     );
   }
@@ -121,6 +123,6 @@ class ScaleSettingsStore {
     }
     final file = File(await _resolveImportHostPath());
     await file.parent.create(recursive: true);
-    await file.writeAsString(trimmed);
+    await writeStringAtomically(file, trimmed);
   }
 }
