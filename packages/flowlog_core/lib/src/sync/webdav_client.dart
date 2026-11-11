@@ -36,10 +36,20 @@ abstract class WebDavTransport {
 
 class WebDavClient implements WebDavTransport {
   WebDavClient(this.credentials, {http.Client? httpClient})
-      : _client = httpClient ?? http.Client();
+      : _client = httpClient ?? http.Client(),
+        _ownsClient = httpClient == null;
 
   final WebDavCredentials credentials;
   final http.Client _client;
+  final bool _ownsClient;
+
+  /// Releases the underlying HTTP client (and its pooled sockets) when this
+  /// instance created it. An injected [http.Client] is left to its owner.
+  void close() {
+    if (_ownsClient) {
+      _client.close();
+    }
+  }
 
   String get basePath {
     final server = credentials.serverUrl.replaceAll(RegExp(r'/+$'), '');
@@ -67,6 +77,9 @@ class WebDavClient implements WebDavTransport {
         http.Request('MKCOL', resolveUri('$current/'))
           ..headers.addAll(authHeaders),
       );
+      // Drain the body so the connection returns to the pool instead of
+      // staying checked out until GC.
+      await response.stream.drain<void>();
       if (response.statusCode != 201 && response.statusCode != 405) {
         throw WebDavException(
           response.statusCode,

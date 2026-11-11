@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flowlog_core/flowlog_core.dart';
@@ -113,19 +114,61 @@ void main() {
         '/remote.php/dav/files/alice/Flowlog/backups/',
       );
     });
+
+    test('ensureCollection drains MKCOL response bodies', () async {
+      var drained = 0;
+      final client = WebDavClient(
+        credentials,
+        httpClient: _StubHttpClient(
+          (_) => http.Response('<d:error/>', 405),
+          onBodyDrained: () => drained++,
+        ),
+      );
+
+      await client.ensureCollection('Flowlog/backups');
+
+      expect(drained, 2);
+    });
+
+    test('close does not close an injected http client', () async {
+      final injected = _StubHttpClient((_) => http.Response('', 404));
+      final client = WebDavClient(credentials, httpClient: injected)..close();
+
+      expect(injected.closed, isFalse);
+      expect(await client.getText('Flowlog/sync.flowlog'), isNull);
+    });
   });
 }
 
 class _StubHttpClient extends http.BaseClient {
-  _StubHttpClient(this._handler);
+  _StubHttpClient(this._handler, {this.onBodyDrained});
 
   final http.Response Function(http.BaseRequest request) _handler;
+  final void Function()? onBodyDrained;
+  bool closed = false;
+
+  @override
+  void close() {
+    closed = true;
+    super.close();
+  }
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     final response = _handler(request);
+    final body = Stream.value(response.bodyBytes);
+    final onDrained = onBodyDrained;
     return http.StreamedResponse(
-      Stream.value(response.bodyBytes),
+      onDrained == null
+          ? body
+          : body.transform(
+              StreamTransformer.fromHandlers(
+                handleDone: (sink) {
+                  onDrained();
+                  sink.close();
+                },
+              ),
+            ),
       response.statusCode,
       headers: response.headers,
       request: request,
