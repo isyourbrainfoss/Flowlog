@@ -1417,14 +1417,34 @@ class DualCurveChartPainter extends CustomPainter {
     }
   }
 
+  /// Centered message on a plate in the plot background colour, so it does
+  /// not sit on a grid line. (Before, the text was laid out to its own width
+  /// and ended up at the left edge on the 6 bar line.)
   void _drawEmptyLabel(Canvas canvas, Rect plotRect, String message) {
-    _paintText(
+    final painter = TextPainter(
+      text: TextSpan(
+        text: message,
+        style: TextStyle(
+          color: surfaceStyle.axisLabel,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: math.max(0, plotRect.width - 32));
+    final plate = Rect.fromCenter(
+      center: plotRect.center,
+      width: painter.width + 24,
+      height: painter.height + 14,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(plate, const Radius.circular(10)),
+      Paint()..color = surfaceStyle.background,
+    );
+    painter.paint(
       canvas,
-      message,
-      Offset(plotRect.left, plotRect.center.dy - 6),
-      TextStyle(color: surfaceStyle.axisLabel, fontSize: 12),
-      maxWidth: plotRect.width,
-      align: TextAlign.center,
+      Offset(plate.left + 12, plate.top + 7),
     );
   }
 

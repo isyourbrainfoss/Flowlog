@@ -129,6 +129,13 @@ class _IdleSensorStatusState extends State<IdleSensorStatus> {
                 onColor = cs.onSecondaryContainer;
                 chipBackground = cs.secondary;
                 chipForeground = cs.onSecondary;
+              case _IdleCertainty.off when !paired:
+                // Nothing paired yet is a setup step, not a fault: neutral
+                // colours, and the Pair action carries the emphasis.
+                color = cs.surfaceContainerHigh;
+                onColor = cs.onSurface;
+                chipBackground = cs.surfaceContainerHighest;
+                chipForeground = cs.onSurfaceVariant;
               case _IdleCertainty.off:
                 color = cs.errorContainer;
                 onColor = cs.onErrorContainer;
@@ -164,7 +171,7 @@ class _IdleSensorStatusState extends State<IdleSensorStatus> {
                 semanticsLabel = 'pressensor off';
                 subtitle = paired
                     ? 'Pressensor not connected. Reconnect to start recording.'
-                    : 'No pressensor paired';
+                    : 'No pressensor paired yet. Pair one to record pressure.';
             }
 
             final showAction = !linkConnecting;
@@ -270,25 +277,40 @@ class _IdleSensorStatusState extends State<IdleSensorStatus> {
                         ),
                         if (showAction) ...[
                           const SizedBox(height: 6),
-                          OutlinedButton(
-                            key: actionKey,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: onColor,
-                              side: BorderSide(
-                                color: onColor.withValues(alpha: 0.5),
+                          if (!paired)
+                            FilledButton(
+                              key: actionKey,
+                              style: FilledButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
                               ),
-                              visualDensity: VisualDensity.compact,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
+                              onPressed: widget.onPair,
+                              child: Text(actionLabel),
+                            )
+                          else
+                            OutlinedButton(
+                              key: actionKey,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: onColor,
+                                side: BorderSide(
+                                  color: onColor.withValues(alpha: 0.5),
+                                ),
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
                               ),
+                              onPressed: paired
+                                  ? widget.onReconnect
+                                  : widget.onPair,
+                              child: Text(actionLabel),
                             ),
-                            onPressed: paired
-                                ? widget.onReconnect
-                                : widget.onPair,
-                            child: Text(actionLabel),
-                          ),
                         ],
                       ],
                     ),

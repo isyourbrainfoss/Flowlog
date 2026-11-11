@@ -45,6 +45,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   late ShotListFilters _filters;
   late Future<_HistoryData> _historyFuture;
+
   /// Last successful load — keeps the filter bar mounted while a reload runs
   /// so the soft keyboard is not dismissed on every keystroke.
   _HistoryData? _lastData;
@@ -133,7 +134,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return;
     }
     try {
-      final beans = await (await _ensureBeanRepository()).listBeansByRecentUse();
+      final beans = await (await _ensureBeanRepository())
+          .listBeansByRecentUse();
       if (!mounted) {
         return;
       }
@@ -155,10 +157,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final results = await Future.wait([
       // sparklineOnly: one batched sample query + downsample (no per-shot
       // N+1 queries that froze History with many brews).
-      shotRepository.listShots(
-        sparklineOnly: true,
-        filters: _filters,
-      ),
+      shotRepository.listShots(sparklineOnly: true, filters: _filters),
       tagRepository.listTags(),
       shotRepository.topTargetScores(limit: 5),
       if (beanRepository != null) beanRepository.listBeans(),
@@ -168,9 +167,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       shots: results[0] as List<Shot>,
       tags: results[1] as List<Tag>,
       topScores: results[2] as List<Shot>,
-      beans: beanRepository != null
-          ? results[3] as List<Bean>
-          : const <Bean>[],
+      beans: beanRepository != null ? results[3] as List<Bean> : const <Bean>[],
     );
     _lastData = data;
     return data;
@@ -201,10 +198,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (context) => ShotDetailScreen(
-          shot: shot,
-          shotRepository: shotRepository,
-        ),
+        builder: (context) =>
+            ShotDetailScreen(shot: shot, shotRepository: shotRepository),
       ),
     );
 
@@ -225,8 +220,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final existing = await shotRepository.getShotById(shot.id);
       if (existing != null) {
         toSave = shot.copyWith(
-          id:
-              'shot-scale-${DateTime.now().toUtc().millisecondsSinceEpoch}-$imported',
+          id: 'shot-scale-${DateTime.now().toUtc().millisecondsSinceEpoch}-$imported',
           lastModifiedAt: DateTime.now().toUtc(),
         );
       } else {
@@ -329,9 +323,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       messenger.showSnackBar(
         SnackBar(
           key: const Key('history_deleted_snackbar'),
-          content: Text(
-            count == 1 ? 'Brew deleted' : '$count brews deleted',
-          ),
+          content: Text(count == 1 ? 'Brew deleted' : '$count brews deleted'),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
         ),
@@ -381,25 +373,33 @@ class _HistoryScreenState extends State<HistoryScreen> {
           for (final bean in beans)
             bean.id: formatBeanDisplayLabel(bean, allBeans: beans),
         };
-        final listLoading = isInitialLoad ||
+        final listLoading =
+            isInitialLoad ||
             (snapshot.connectionState != ConnectionState.done && data != null);
 
         final size = MediaQuery.sizeOf(context);
-        final compactHistory = size.width < ShellBreakpoints.sidebar ||
+        final compactHistory =
+            size.width < ShellBreakpoints.sidebar ||
             size.height < ShellBreakpoints.minRailHeight;
+
+        // Nothing saved yet: a filter form and a second import button only
+        // crowd the empty state, which already offers the one action.
+        final nothingSavedYet =
+            !listLoading && shots.isEmpty && !_filters.isActive;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            HistoryFiltersPanel(
-              filters: _filters,
-              tags: tags,
-              beanSuggestions: _beanSuggestions,
-              onChanged: _onFiltersChanged,
-            ),
+            if (!nothingSavedYet)
+              HistoryFiltersPanel(
+                filters: _filters,
+                tags: tags,
+                beanSuggestions: _beanSuggestions,
+                onChanged: _onFiltersChanged,
+              ),
             // Phone: keep the list of brews. Import lives on More; high
             // scores still show on each card. Wide layouts keep the extras.
-            if (!compactHistory)
+            if (!compactHistory && !nothingSavedYet)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                 child: FilledButton.tonalIcon(
@@ -417,9 +417,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               const SizedBox(height: 8),
             ],
             if (listLoading && data == null)
-              const Expanded(
-                child: Center(child: CircularProgressIndicator()),
-              )
+              const Expanded(child: Center(child: CircularProgressIndicator()))
             else
               Expanded(
                 child: Stack(
@@ -433,8 +431,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       onDeleteShot: _deleteShot,
                       onDeleteShotConfirmed: _deleteShotConfirmed,
                       confirmDeleteShot: _confirmDeleteShot,
-                      onImportFromScale:
-                          compactHistory ? null : _importFromScale,
+                      onImportFromScale: compactHistory
+                          ? null
+                          : _importFromScale,
                     ),
                     if (listLoading)
                       const Positioned(
@@ -518,7 +517,7 @@ class _HistoryShotList extends StatelessWidget {
                 filters.isActive
                     ? 'Try clearing some filters to see more results.'
                     : 'Start a brew on the Live tab, or import a phone-free '
-                        'shot from the Flowlog scale (Wi‑Fi).',
+                          'shot from the Flowlog scale (Wi‑Fi).',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -603,7 +602,9 @@ class _LeaderboardSection extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 'High scores',
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(width: 6),
               Text(
@@ -637,7 +638,9 @@ class _LeaderboardSection extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.15)),
+                    border: Border.all(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.15),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -650,13 +653,17 @@ class _LeaderboardSection extends StatelessWidget {
                             height: 18,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: rank <= 3 ? theme.colorScheme.primary : theme.colorScheme.outline,
+                              color: rank <= 3
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.outline,
                               shape: BoxShape.circle,
                             ),
                             child: Text(
                               '$rank',
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: rank <= 3 ? theme.colorScheme.onPrimary : theme.colorScheme.surface,
+                                color: rank <= 3
+                                    ? theme.colorScheme.onPrimary
+                                    : theme.colorScheme.surface,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -666,7 +673,9 @@ class _LeaderboardSection extends StatelessWidget {
                             score.toStringAsFixed(0),
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              fontFeatures: const [FontFeature.tabularFigures()],
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
                             ),
                           ),
                         ],
@@ -674,7 +683,9 @@ class _LeaderboardSection extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         _shortDate(shot.startedAt),
-                        style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),

@@ -51,7 +51,7 @@ void main() {
     await pumpForAsync(tester);
 
     expect(find.text('Session: idle'), findsNothing);
-    expect(find.byKey(const Key('history_filter_bean')), findsOneWidget);
+    expect(find.text('No saved shots yet'), findsOneWidget);
   });
 
   testWidgets('Ctrl+E opens export screen from Live tab', (tester) async {

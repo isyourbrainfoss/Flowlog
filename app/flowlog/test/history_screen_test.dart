@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flowlog/screens/history/filters.dart';
 import 'package:flowlog/screens/history/history_shot_card.dart';
 import 'package:flowlog/screens/history/shot_detail.dart';
 import 'package:flowlog/screens/history_screen.dart';
@@ -42,6 +43,9 @@ void main() {
         find.byKey(const Key('history_empty_import_scale')),
         findsOneWidget,
       );
+      // One import action and no filter form while nothing is saved.
+      expect(find.byKey(const Key('history_import_scale_shot')), findsNothing);
+      expect(find.byType(HistoryFiltersPanel), findsNothing);
     });
 
     testWidgets('hides empty-state import on compact layout', (tester) async {
