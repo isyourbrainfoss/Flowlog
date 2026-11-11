@@ -3,22 +3,57 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Flowlog 0.0.8 (Android)</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
-    a.button { display: inline-block; padding: 0.6rem 1.2rem; background: #6f4e37; color: #fff; text-decoration: none; border-radius: 6px; }
-    code { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 3px; }
-  </style>
+  <meta name="robots" content="noindex">
+  <title>Flowlog 0.0.8</title>
+  <link rel="stylesheet" href="style.css">
+  <style>:root { --accent: #c4a574; --accent-ink: #1a120a; }</style>
 </head>
 <body>
-  <h1>Flowlog 0.0.8</h1>
-  <p>Personal coffee intelligence hub — live shot curves, history, and sensor tooling.</p>
-  <p><a class="button" href="https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/flowlog-arm64-v8a.apk">Download APK (arm64-v8a)</a></p>
-  <p>Version <strong>0.0.8</strong> (build 223). SHA-256: <code>6f516ec0259ff38ac2f7c58a88b5edca1a2fcf7996ebe3a97e28c659fe8ecbc2</code></p>
-  <p>Install updates via <a href="https://github.com/ImranR98/Obtainium">Obtainium</a> (recommended — Standard JSON):</p>
-  <p><code>https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/version.json</code></p>
-  <p>Direct APK fallback:</p>
-  <p><code>https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/flowlog-arm64-v8a.apk</code></p>
-  <p><a href="https://github.com/isyourbrainfoss/Flowlog">Source on GitHub</a></p>
+  <div class="wrap">
+    <header class="hero">
+      <div>
+        <p class="kicker">Personal coffee app</p>
+        <h1>Flowlog</h1>
+        <p class="lede">A personal coffee hub: live shot curves, history, a bean library, and tooling for a scale and a pressure sensor.</p>
+        <p class="meta">Version 0.0.8 · Android and Linux · October 2026 build on Pages</p>
+        <div class="actions">
+      <a class="button" href="#install">Install</a>
+      <a class="button secondary" href="https://github.com/isyourbrainfoss/Flowlog">Source on GitHub</a>
+        </div>
+      </div>
+      <p class="disclaimer">Personal, experimental software. Nothing here is a finished product, and nothing was necessarily written or reviewed by a human unless it says so. Use it at your own risk.</p>
+    </header>
+    <nav class="toc">
+      <a href="#screenshots">Screenshots</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/isyourbrainfoss/Flowlog">github.com/isyourbrainfoss/Flowlog</a>
+    </nav>
+    <section id="screenshots">
+      <h2>Screenshots</h2>
+      <ul class="shots">
+        <li><figure class="shot phone"><a href="images/live-brewing.jpg"><img src="images/live-brewing.jpg" alt="A demo shot mid-brew, with pressure, weight, and flow on one chart."></a><figcaption>Live brew</figcaption></figure></li><li><figure class="shot phone"><a href="images/live-finished.jpg"><img src="images/live-finished.jpg" alt="Yield, hold average, flow, and elapsed time after a demo brew."></a><figcaption>Finished shot</figcaption></figure></li><li><figure class="shot phone"><a href="images/live-light.jpg"><img src="images/live-light.jpg" alt="The same finished shot in the light theme."></a><figcaption>Light theme</figcaption></figure></li><li><figure class="shot phone"><a href="images/more.jpg"><img src="images/more.jpg" alt="Brew defaults, equipment, Nextcloud sync, and backup."></a><figcaption>More</figcaption></figure></li>
+      </ul>
+    </section>
+    <section id="install">
+      <h2>Install</h2>
+      
+    <div class="grid-2">
+      <div class="card"><h3>Android</h3>
+<p>Current build: <strong>0.0.8</strong> (version code 223), arm64-v8a.</p><p>On Android, <a href="https://github.com/ImranR98/Obtainium">Obtainium</a> can install updates from a Standard JSON file. Add this URL:</p>
+<pre><code>https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/version.json</code></pre>
+<p><a class="button secondary" href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/version.json">Add in Obtainium</a> (opens the app if it is already installed).</p>
+<p>GitHub Release asset URLs often fail on phones with “Connection closed while receiving data”. Prefer the JSON mirror above.</p><p><a class='button' href='https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/gh-pages/flowlog-arm64-v8a.apk'>Download APK</a></p><p class='hash'>SHA-256: <code>6f516ec0259ff38ac2f7c58a88b5edca1a2fcf7996ebe3a97e28c659fe8ecbc2</code></p></div>
+      <div class="card"><h3>Linux (Flatpak)</h3>
+<p>x86_64 and aarch64, including Linux phones. Not on Flathub — use the project remote.</p><pre><code>flatpak remote-add --if-not-exists --user flowlog \
+  https://isyourbrainfoss.github.io/Flowlog/flowlog.flatpakrepo
+flatpak install --user flowlog com.flowlog.flowlog</code></pre><p>The GNOME runtime is pulled from Flathub on first install.</p></div>
+    </div>
+    
+    </section>
+    
+    <footer>
+      <p>Source: <a href="https://github.com/isyourbrainfoss/Flowlog">github.com/isyourbrainfoss/Flowlog</a>. This is a personal project page, not a store listing.</p>
+    </footer>
+  </div>
 </body>
 </html>
