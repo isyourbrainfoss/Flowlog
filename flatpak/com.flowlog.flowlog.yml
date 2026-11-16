@@ -1,6 +1,6 @@
 app-id: com.flowlog.flowlog
 runtime: org.gnome.Platform
-runtime-version: '48'
+runtime-version: '50'
 sdk: org.gnome.Sdk
 command: flowlog
 separate-locales: false
