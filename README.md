@@ -99,17 +99,18 @@ APK filter: `flowlog-arm64-v8a\.apk` or `flowlog-release\.apk`
 ## Linux (Flatpak)
 
 Flowlog is published as a Flatpak for **x86_64** desktops and **aarch64** Linux phones
-(PostmarketOS, Mobian, etc.). It is not on Flathub; install from the project's GitHub
-Pages remote or from release bundles.
+(PostmarketOS, Mobian, etc.). It is not on Flathub; it lives in the shared, GPG-signed
+repo at <https://isyourbrainfoss.github.io/flatpak/> (also usable from GNOME Software,
+Discover and Bazaar).
 
-### Install from remote (recommended)
+### Install from the shared repo (recommended)
 
 One-time setup:
 
 ```bash
-flatpak remote-add --if-not-exists --user flowlog \
-  https://isyourbrainfoss.github.io/Flowlog/flowlog.flatpakrepo
-flatpak install --user flowlog com.flowlog.flowlog
+flatpak remote-add --if-not-exists --user isyourbrainfoss \
+  https://isyourbrainfoss.github.io/flatpak/isyourbrainfoss.flatpakrepo
+flatpak install --user isyourbrainfoss com.flowlog.flowlog
 ```
 
 Updates:
@@ -119,6 +120,18 @@ flatpak update --user com.flowlog.flowlog
 ```
 
 The GNOME 48 runtime is pulled from Flathub automatically on first install.
+
+### Moving from the old `flowlog` remote
+
+The old unsigned remote (`https://isyourbrainfoss.github.io/Flowlog/flowlog.flatpakrepo`)
+keeps working until 2027-01-15. To switch (your data is kept):
+
+```bash
+flatpak remote-add --if-not-exists --user isyourbrainfoss \
+  https://isyourbrainfoss.github.io/flatpak/isyourbrainfoss.flatpakrepo
+flatpak install --user --reinstall isyourbrainfoss com.flowlog.flowlog
+flatpak remote-delete --user flowlog
+```
 
 ### Install from a release bundle (offline)
 
@@ -139,10 +152,6 @@ flatpak install --user --bundle com.flowlog.flowlog-aarch64.flatpak
 ./flatpak/build-flatpak.sh          # current machine arch
 ./flatpak/build-flatpak.sh x86_64   # or aarch64
 ```
-
-> **Note:** GitHub Pages must be enabled once (Settings → Pages → deploy from the
-> `gh-pages` branch, `/` root) so `isyourbrainfoss.github.io/Flowlog/` serves the
-> Flatpak OSTree repo. Until then, use a [release bundle](#install-from-a-release-bundle-offline) below.
 
 ## Development
 

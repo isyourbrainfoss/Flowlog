@@ -188,6 +188,13 @@ jobs:
             echo "Matched release tag: $TAG" >&2
           fi
 
+      - name: Checksums for the bundles
+        if: steps.release.outputs.skip != 'true'
+        run: |
+          cd bundles
+          sha256sum com.flowlog.flowlog-x86_64.flatpak > com.flowlog.flowlog-x86_64.flatpak.sha256
+          sha256sum com.flowlog.flowlog-aarch64.flatpak > com.flowlog.flowlog-aarch64.flatpak.sha256
+
       - name: Upload Flatpak bundles to release
         if: steps.release.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
@@ -195,13 +202,32 @@ jobs:
           tag_name: ${{ steps.release.outputs.tag }}
           append_body: true
           body: |
-            **Linux Flatpak remote:**
+            **Linux Flatpak (signed shared repo):**
             ```bash
-            flatpak remote-add --if-not-exists --user flowlog \
-              https://isyourbrainfoss.github.io/Flowlog/flowlog.flatpakrepo
-            flatpak install --user flowlog com.flowlog.flowlog
+            flatpak remote-add --if-not-exists --user isyourbrainfoss \
+              https://isyourbrainfoss.github.io/flatpak/isyourbrainfoss.flatpakrepo
+            flatpak install --user isyourbrainfoss com.flowlog.flowlog
             ```
           files: |
             bundles/com.flowlog.flowlog-x86_64.flatpak
             bundles/com.flowlog.flowlog-aarch64.flatpak
+            bundles/com.flowlog.flowlog-x86_64.flatpak.sha256
+            bundles/com.flowlog.flowlog-aarch64.flatpak.sha256
           fail_on_unmatched_files: false
+
+      - name: Notify isyourbrainfoss/flatpak
+        # The shared, signed repo (https://isyourbrainfoss.github.io/flatpak/) imports and signs
+        # the bundles. No signing key lives here. Skipped when the secret is not set.
+        if: steps.release.outputs.skip != 'true'
+        env:
+          DISPATCH_TOKEN: ${{ secrets.FLATPAK_DISPATCH_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          if [ -z "$DISPATCH_TOKEN" ]; then
+            echo "::notice::FLATPAK_DISPATCH_TOKEN not set; the shared repo picks this up on its weekly or a manual run."
+            exit 0
+          fi
+          GH_TOKEN="$DISPATCH_TOKEN" gh api repos/isyourbrainfoss/flatpak/dispatches \
+            -f event_type=app-updated \
+            -F 'client_payload[app]=com.flowlog.flowlog' \
+            -F "client_payload[tag]=$TAG"
