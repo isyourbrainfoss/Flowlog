@@ -2,7 +2,7 @@
 Title=Flowlog
 Url=https://isyourbrainfoss.github.io/Flowlog/
 Homepage=https://github.com/isyourbrainfoss/Flowlog
-Comment=Community Flatpak builds of Flowlog
+Comment=Moved: use the signed repo https://isyourbrainfoss.github.io/flatpak/ (this one stops after 2027-01-15)
 Description=Personal coffee intelligence hub — live shot curves, history, and sensor tooling
-Icon=https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/main/flatpak/com.flowlog.flowlog.png
+Icon=https://raw.githubusercontent.com/isyourbrainfoss/Flowlog/main/app/flowlog/assets/icon/app_icon.png
 RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo
