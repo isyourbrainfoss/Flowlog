@@ -32,9 +32,9 @@ if ! command -v flutter >/dev/null; then
   exit 1
 fi
 
-echo "==> Installing GNOME Platform 48 (if missing)"
-flatpak install -y --user flathub org.gnome.Platform//48 org.gnome.Sdk//48 >/dev/null 2>&1 || \
-  flatpak install -y flathub org.gnome.Platform//48 org.gnome.Sdk//48
+echo "==> Installing GNOME Platform 50 (if missing)"
+flatpak install -y --user flathub org.gnome.Platform//50 org.gnome.Sdk//50 >/dev/null 2>&1 || \
+  flatpak install -y flathub org.gnome.Platform//50 org.gnome.Sdk//50
 
 echo "==> Building Flutter Linux release ($FLATPAK_ARCH)"
 cd "$APP_DIR"

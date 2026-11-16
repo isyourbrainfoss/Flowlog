@@ -119,7 +119,7 @@ Updates:
 flatpak update --user com.flowlog.flowlog
 ```
 
-The GNOME 48 runtime is pulled from Flathub automatically on first install.
+The GNOME 50 runtime is pulled from Flathub automatically on first install.
 
 ### Moving from the old `flowlog` remote
 
