@@ -8,6 +8,11 @@ on:
 permissions:
   contents: write
 
+# Same pin as linux-flatpak-release.yml so Android releases are built with
+# the toolchain Linux uses (3.47.8), not whatever stable is today.
+env:
+  FLUTTER_VERSION: "3.47.8"
+
 concurrency:
   group: android-pages
   cancel-in-progress: false
@@ -29,6 +34,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
 
       - name: Install dependencies
